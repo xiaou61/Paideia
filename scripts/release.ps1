@@ -298,6 +298,9 @@ paideia_deploy_epoch_seconds $epoch
 # TYPE paideia_build_info gauge
 paideia_build_info{version="$version"} 1
 "@
+# Prometheus 的 textfile 只接受 LF：PowerShell 的 here-string 是 CRLF，直接写会让整份文件
+# 以 "unknown metric type \"gauge\r\"" 被拒绝（2026-10-26 实测）。末尾也必须有换行。
+$deployProm = ($deployProm -replace "`r`n", "`n").TrimEnd("`n") + "`n"
 $deployB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($deployProm))
 try {
     Step '写发版标记' {

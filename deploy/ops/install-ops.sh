@@ -141,9 +141,9 @@ install_release_zip() {
     [ -x "$target" ] && { echo "已有 $target"; return; }
     local url="https://github.com/$repo/releases/download/v${version}/${zipname}.zip"
     curl -fsSL --retry 3 --retry-all-errors --retry-delay 2 "$url" -o "/tmp/$zipname.zip"
-    # unzip 不保证在最小镜像里；Ubuntu 24.04 自带，缺了就直接报错而不是静默跳过
-    unzip -qo "/tmp/$zipname.zip" -d /tmp
-    install -m 0755 "/tmp/$zipname/$name" "$target"
+    # 这两个 release 的 zip 都是**根目录一个二进制**（名字与 zip 相同），不是同名目录。
+    unzip -qo "/tmp/$zipname.zip" -d "/tmp/$zipname"
+    install -m 0755 "/tmp/$zipname/$zipname" "$target"
     rm -rf "/tmp/$zipname" "/tmp/$zipname.zip"
 }
 

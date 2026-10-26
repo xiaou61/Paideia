@@ -35,8 +35,9 @@ class OpsEvidenceCollector {
                     "100 * (1 - node_filesystem_avail_bytes{mountpoint=\"/\"}"
                             + " / node_filesystem_size_bytes{mountpoint=\"/\"})", 1, "%"),
             new Metric("http_5xx_percent",
-                    "100 * sum(rate(http_server_requests_seconds_count{status=~\"5..\"}[5m]))"
-                            + " / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 0.000001)",
+                    // 没有 5xx 时分子为空，`x / y` 整条也会变空；`or vector(0)` 让它落成 0。
+                    "100 * ((sum(rate(http_server_requests_seconds_count{status=~\"5..\"}[5m]))"
+                            + " or vector(0)) / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 0.000001))",
                     2, "%"),
             new Metric("http_p95_seconds",
                     "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket[5m])) by (le))",
@@ -100,7 +101,7 @@ class OpsEvidenceCollector {
                 .orElseThrow(() -> new IllegalArgumentException("未知指标"));
         Double value = prometheus.scalar(metric.query());
         if (value == null || !Double.isFinite(value)) {
-            return metric.name() + " = 不可达";
+            return metric.name() + " = 无数据";
         }
         return metric.name() + " = " + trimmed(value, metric.decimals()) + " " + metric.unit();
     }
@@ -185,7 +186,7 @@ class OpsEvidenceCollector {
             Double value = prometheus.scalar(metric.query());
             out.append(metric.name()).append(" = ");
             if (value == null || value.isNaN() || value.isInfinite()) {
-                out.append("不可达").append('\n');
+                out.append("无数据").append('\n');
             } else {
                 out.append(trimmed(value, metric.decimals())).append(' ').append(metric.unit()).append('\n');
             }

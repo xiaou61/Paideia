@@ -187,3 +187,9 @@ management:
   endpoint:
     health:
       show-details: never
+  # WORK-042：诊断要读 HTTP P95，默认 Micrometer 只给 count/sum/max，没有 _bucket。
+  # 只对 http.server.requests 开直方图，避免把全部指标都放大。
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
