@@ -16,6 +16,28 @@ import java.util.List;
 public interface AiAdminApi {
 
     /**
+     * 积分流水（管理端审计的分页视图，WORK-038 供管理工具使用）。
+     *
+     * <p>返回公共记录而不是内部 `CreditService.LedgerRow`：内部类型穿过模块边界会让
+     * `paideia-app` 必须 import `ai.internal`，Modulith 边界就破了。
+     *
+     * @param userId 只看某个人；null 表示全部
+     * @param kind   流水种类；空表示不过滤
+     * @param from   起始时间（含）；null 不限
+     * @param to     结束时间（含）；null 不限
+     */
+    io.github.xiaou61.platform.PageResult<LedgerEntry> ledger(Long userId, String kind,
+                                                              java.time.Instant from,
+                                                              java.time.Instant to,
+                                                              int page, int size);
+
+    /** 一条积分流水。字段与内部行一一对应，`createdAt` 用 ISO-8601 字符串。 */
+    record LedgerEntry(long id, long userId, long delta, String kind, String model,
+                       Integer inputTokens, Integer outputTokens, Long refMessageId,
+                       Long operatorUserId, String note, String createdAt) {
+    }
+
+    /**
      * 一批用户的用量快照。
      *
      * @param userIds 要查的用户 id；空集合直接返回空，不查库

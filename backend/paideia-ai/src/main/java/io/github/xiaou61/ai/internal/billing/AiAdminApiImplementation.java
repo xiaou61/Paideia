@@ -67,6 +67,20 @@ class AiAdminApiImplementation implements AiAdminApi {
         return credits.adjust(userId, delta, operatorId, note);
     }
 
+    @Override
+    public io.github.xiaou61.platform.PageResult<LedgerEntry> ledger(
+            Long userId, String kind, java.time.Instant from, java.time.Instant to,
+            int page, int size) {
+        var result = credits.auditPage(userId, kind, from, to,
+                io.github.xiaou61.platform.PageQuery.of(page, size, null));
+        return new io.github.xiaou61.platform.PageResult<>(result.total(), result.page(), result.size(),
+                result.items().stream().map(row -> new LedgerEntry(
+                        row.id(), row.userId(), row.delta(), row.kind(), row.model(),
+                        row.inputTokens(), row.outputTokens(), row.refMessageId(),
+                        row.operatorUserId(), row.note(),
+                        row.createdAt() == null ? null : row.createdAt().toString())).toList());
+    }
+
     private static <T> Map<Long, Long> toMap(List<T> rows,
                                              Function<T, Long> id,
                                              Function<T, Long> value) {
