@@ -1,5 +1,7 @@
 package io.github.xiaou61.sandbox.internal.run;
 
+import io.github.xiaou61.platform.BizException;
+import io.github.xiaou61.platform.ErrorCode;
 import java.util.List;
 
 /**
@@ -22,6 +24,22 @@ public final class CodeRun {
      * 所以调用方不能把它当成"跑一遍看看"。
      */
     public record Request(String language, String code, String stdin, String caseId, boolean explain) {
+
+        public Request {
+            if (explain) {
+                // 脚本只给第一段加 EXPLAIN 前缀，第二条语句会被**真实执行**。
+                // 这里就挡住：计划模式只接受单条语句，且去掉结尾分号
+                // （`EXPLAIN ... SELECT ...;` 本身也是语法错误）。
+                String sql = code == null ? "" : code.strip();
+                while (sql.endsWith(";")) {
+                    sql = sql.substring(0, sql.length() - 1).stripTrailing();
+                }
+                if (sql.contains(";")) {
+                    throw new BizException(ErrorCode.INVALID_ARGUMENT, "看执行计划时只能有一条 SQL 语句");
+                }
+                code = sql;
+            }
+        }
 
         /** 不带 explain 的形态：Java/Python 与既有调用点用它。 */
         public Request(String language, String code, String stdin, String caseId) {

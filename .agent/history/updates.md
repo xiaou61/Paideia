@@ -6387,3 +6387,18 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
   已部署（307.8 秒，前端重建）；**未推送**。
 - 未做：新阅读线没写 e2e（沿用 track-map 的通用断言，未逐线验证渲染）；
   `requireEntryId` 仍在接口里返回但没有消费方，暂不动契约。
+
+## 2026-10-26 10:58:24  · 项目 · 第六次区间审查（`c259084..c236b9e`，228 个提交）：6 critical + 81 high，修掉 4 条 critical
+
+- 类型：implementation
+- 变更：① 用**本地 magpie 网关**（`http://127.0.0.1:3425/v1`，模型 `workbuddy/deepseek-v4.1-flash`）审查基线之后的**全部 228 个提交**（811 文件 / +103,584 −1,488 行，跨 WORK-022..WORK-037），报告 `.agent/reviews/2026-10-21-c259084..c236b9e.md`：**694 条（critical 6、high 81、medium 326、low 281）**，原始 839 条按行号收敛。② 修掉 **4 条 critical**（另 1 条经核实是已修好的过期条目）：
+  - **`ReviewPage` 交卷必失败**：最后一题先 `setAnswers(next)` 再 `submit.mutate()`，而 `mutationFn` 读的是同一次渲染闭包里的 `answers`（不含最后一题），服务端因"每道题都要作答"直接拒绝——整次复习交不上去。改为把 `next` 显式传给 mutation。
+  - **`tabs.tsx` 方向写反**（我上一轮引入的回归）：`data-[orientation=horizontal]:flex-col` 让横排 Tabs 变成上下堆叠。改为 `data-[orientation=vertical]:flex-col`。
+  - **SQL「看执行计划」会真实执行第二条语句**：脚本只给第一段加 `EXPLAIN FORMAT=TREE` 前缀，多语句时第二条按普通语句执行，与 `CodeRun.Request` 明文承诺的"写操作不会真的落数据"相反。在 `Request` 的紧凑构造器里限单语句并去尾分号（`EXPLAIN ...;` 本身也是语法错误），补了 `DockerCommandTest` 用例。
+  - **`sql-editor` 重建把用户输入回退**：重建 effect 不依赖 `value`，却用闭包里的旧 `value` 建 doc；而 `schema` 每次渲染新建引用，结构快照一到就重建 → 已输入内容被还原。加 `valueRef`（照同文件 `onChangeRef` 的写法）。
+  - 过期条目（不修）：`OpsPage` 的 `api.request` 用错——代码里已是 `requestEnvelope`，注释还写着"实测踩过"。
+- 决策：**81 条 high 本轮未修**（时间与额度已大量用于审查本身，约 1.86 亿 tokens）。按"高必修"的口径它们仍欠着，下一轮应优先处理。
+- 依据：`.agent/reviews/2026-10-21-c259084..c236b9e.md`；用户 2026-10-26 指示"审全部 228 个提交"并指定 magpie 网关与 `workbuddy/deepseek-v4.1-flash`
+- 验证：前端 `pnpm -r typecheck` 11 包全过、`pnpm -r test` **410 条全过**（ui 209、assistant 41、sql-workbench 44、knowledge 51、camp 7…）；后端 `mvn -B -pl paideia-sandbox -am test` **70 条 0 失败**，其中 `DockerCommandTest` 13/13（含新增的单语句约束用例）。审查分段：第 4 段曾 4 个分组整组失败，已 `--resume` 补齐；第 7、8 段状态 `partial`（个别文件重试耗尽，无整组失败）。基线已推进到 `c236b9e`，`review_baseline.sh` 报"已全覆盖"。
+- 本地提交：见本轮提交
+- 远端推送：见本轮

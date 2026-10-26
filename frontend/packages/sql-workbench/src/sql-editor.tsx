@@ -106,6 +106,10 @@ export function SqlEditor({
   // onChange 进 ref：把它放进 effect 依赖会让每次输入都重建编辑器（光标与撤销栈全丢）
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
+  // 重建 effect 不依赖 value（schema 变化才重建），但它要用**最新**的文本建 doc：
+  // 直接用闭包里的 value 会把用户已经输入的内容回退到上一次同步时的值。
+  const valueRef = useRef(value)
+  valueRef.current = value
 
   useEffect(() => {
     if (host.current === null) {
@@ -141,7 +145,7 @@ export function SqlEditor({
     }
     const instance = new EditorView({
       parent: host.current,
-      doc: value,
+      doc: valueRef.current,
       extensions,
     })
     view.current = instance

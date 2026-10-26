@@ -50,7 +50,9 @@ export function ReviewPage() {
     },
   })
   const submit = useMutation({
-    mutationFn: () => learning.submitReview(session?.sessionId ?? 0, answers),
+    // 取显式传入的答案：交卷那一题刚 setAnswers 还没生效，闭包里的 answers 少一题
+    mutationFn: (payload: { itemId: number; choice: number }[]) =>
+      learning.submitReview(session?.sessionId ?? 0, payload),
     onSuccess: (data) => setResult(data),
   })
 
@@ -151,7 +153,7 @@ export function ReviewPage() {
                     if (index + 1 < session.items.length) {
                       setIndex(index + 1)
                     } else {
-                      submit.mutate()
+                      submit.mutate(next)
                     }
                   }}
                 >

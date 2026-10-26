@@ -15,6 +15,17 @@ import org.junit.jupiter.api.Test;
  */
 class DockerCommandTest {
 
+    @Test
+    void explainOnlyAcceptsSingleStatement() {
+        // 脚本只给第一段加 EXPLAIN 前缀，第二条会被真实执行 —— 必须在构造时就挡住
+        assertThatThrownBy(() -> new CodeRun.Request("sql", "SELECT 1; UPDATE t SET a=1", null, null, true))
+                .hasMessageContaining("只能有一条");
+
+        // 结尾分号要去掉：`EXPLAIN ... SELECT ...;` 本身也是语法错误
+        assertThat(new CodeRun.Request("sql", "  SELECT 1;  ", null, null, true).code())
+                .isEqualTo("SELECT 1");
+    }
+
     private static SandboxProperties props() {
         SandboxProperties properties = new SandboxProperties();
         properties.setJavaImage("eclipse-temurin:21-jdk-alpine");
