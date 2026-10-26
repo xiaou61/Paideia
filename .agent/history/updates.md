@@ -6542,3 +6542,26 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 线上现状：`/learn/tracks` **19 条**（16 theory + 3 practice）。
 - 本地提交：`a6a9897`（digest 断言）、`9fd4f5d`（系统设计）；已发版。
 - 仍缺：S5 项目式实战（TASK-012~014），这是四类实战里唯一没有的一类。
+
+## 2026-10-26 17:20 +0800 · WORK-038 · S5 项目式实战落地
+
+- 类型：implementation
+- **沙箱项目模式（TASK-012）**：`/sandbox/run` 新增 `files[]`（路径 + 内容），
+  分帧送进容器写到 `/tmp/work`，编译后跑**固定的测试入口**（Java `TestMain`、Python `test_main.py`）。
+  入口名是常量，请求里的任何内容都进不了命令行；加固参数一条没减（`--network=none`、
+  `--read-only`、`--cap-drop=ALL`、不挂宿主目录）。项目模式超时给到 30 秒（多文件编译 + 测试）。
+- **边界（都在服务端挡）**：≤20 个文件、单文件 ≤64KB、合计 ≤256KB；
+  路径只允许 `[A-Za-z0-9_./-]`，禁 `..`、禁绝对路径、禁空格与引号。
+- **判题（TASK-013）**：测试入口逐条打印 `ok: <用例名>` / `fail: <用例名>`，期望输出沿用既有
+  `run` 题型的比对；失败时用户直接看到哪个用例没过。判定仍在客户端——服务端只回实际输出。
+- **内容（TASK-014）**：`content/reading/java-project` 两关（topK 的边界、解析平均），
+  期望输出由修正版真跑生成，并验证骨架版不会碰巧通过。
+- **线上实测**：提交 `Main.java + TestMain.java` 两个文件，返回 `[9, 7, 5]` / `[]`、exit 0；
+  21 个文件被 40000 拒绝（`files size must be between 0 and 20`）；
+  `../evil.java` 被拒（`文件名不合法`）。内容导入后 `/learn/tracks` **20 条**
+  （16 theory + 4 practice，java-project 3 关，配对 java-from-zero）。
+- 验证：`paideia-sandbox` **84 执行 / 0 失败**（新增 8 条：命令行加固断言 + 项目模式边界校验）；
+  前端 `pnpm -r typecheck` 与 `pnpm -r test` 全过；已发版（210.6 秒）。
+- 本地提交：`6b91c49`（另有部分改动被并发会话的提交一并带上）；**未推送**。
+- 未做：项目模式没有 e2e（线上手工跑过两次提交与两条边界）；Python 项目模式只写了脚本，
+  没有内容实测。
