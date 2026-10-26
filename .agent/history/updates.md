@@ -6402,3 +6402,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：前端 `pnpm -r typecheck` 11 包全过、`pnpm -r test` **410 条全过**（ui 209、assistant 41、sql-workbench 44、knowledge 51、camp 7…）；后端 `mvn -B -pl paideia-sandbox -am test` **70 条 0 失败**，其中 `DockerCommandTest` 13/13（含新增的单语句约束用例）。审查分段：第 4 段曾 4 个分组整组失败，已 `--resume` 补齐；第 7、8 段状态 `partial`（个别文件重试耗尽，无整组失败）。基线已推进到 `c236b9e`，`review_baseline.sh` 报"已全覆盖"。
 - 本地提交：见本轮提交
 - 远端推送：见本轮
+
+## 2026-10-26 11:03:31 +0800 · WORK-038 · 签署 .agent/changes/WORK-038-理论线与实战线/requirements.md、.agent/changes/WORK-038-理论线与实战线/proposal.md、.agent/changes/WORK-038-理论线与实战线/design.md、.agent/changes/WORK-038-理论线与实战线/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-038-理论线与实战线/requirements.md、.agent/changes/WORK-038-理论线与实战线/proposal.md、.agent/changes/WORK-038-理论线与实战线/design.md、.agent/changes/WORK-038-理论线与实战线/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-038-理论线与实战线/requirements.md、.agent/changes/WORK-038-理论线与实战线/proposal.md、.agent/changes/WORK-038-理论线与实战线/design.md、.agent/changes/WORK-038-理论线与实战线/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
