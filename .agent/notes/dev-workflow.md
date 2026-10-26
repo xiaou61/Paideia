@@ -717,3 +717,14 @@ cd /tmp && curl -O https://arthas.aliyun.com/arthas-boot.jar && /opt/jdk25/bin/j
 **不用 `redefine`（热更新）**：我们纯后端发版实测 57–64 秒，为省一分钟承担"不能新增方法/字段、事后必须补正式发版"的代价不值。只做诊断，不做热修复。
 
 **并发会话注意**：本机可能同时有别的会话的 jar 在跑（实测遇到 PID 40724 与我的 45168 并存）。attach 前用 `netstat -ano | grep :<端口>` 确认 pid 归属，别打错人。
+
+## AIOps 监控与诊断（WORK-042，2026-10-26）
+
+- **拓扑**：Prometheus（保留 30 天）+ Grafana + Loki（3100）+ Alloy（12345），全部只绑回环；Alloy 只采 `paideia/laya/rustfs/mysql/redis-server` 的 journald，标签 `unit`/`level`。生产日志量实测约 6200 行/天，Loki 的存储压力很小。
+- **Grafana 13.2.4 的后台插件升级会打掉 Prometheus**：随包插件是 13.2.3，服务端 13.2.4，启动时 installer 试图原地升级；`ProtectSystem=strict` 下 `/usr/share` 只读，升级失败后插件被注销，所有 Prometheus 规则变成 `plugin.notRegistered`。已在 `grafana.ini` 设 `[plugins] preinstall_disabled = true` 与 `preinstall_auto_update = false`。**改监控配置后必须重启 Grafana**（provisioning 不热加载）。
+- **textfile 指标只接受 LF**：PowerShell here-string 是 CRLF，`release.ps1` 直接写会让 node_exporter 以 `unknown metric type "gauge\r"` **整份拒绝**；写前 `-replace "\r\n","\n"` 并补末尾换行。排查看 `journalctl -u node-exporter | grep textfile`。
+- **Alloy 的注释是 `//` 不是 `#`**：用 `#` 会报 `illegal character U+3002` 并启动失败，日志末尾是 `could not perform the initial load successfully`。
+- **5xx 比例的分子与分母都要 `or vector(0)`**：没有 5xx 或没有请求时两边都是空集，整条表达式变空 → Grafana 产生 `DatasourceNoData` 活动告警；只给分子兜底不够，`clamp_min` 里的分母也要兜。
+- **诊断链路**：确定性采集（摘要 + 固定指标 + firing 告警 + 脱敏日志 + 发版时间）→ 一次 DeepSeek 调用；报告落 `ops_diagnoses`，流水种类 `OPS_DIAGNOSIS`。手动触发记触发者 id；告警触发用 systemd drop-in 里的 `PAIDEIA_OPS_DIAGNOSIS_USER_ID`。webhook 只接受回环 + `X-Paideia-Ops-Token`（令牌在 `/etc/paideia-ops/hook.token`，600）。
+- **实测成本**：一次诊断约 1000 input / 3000 output tokens，扣 11–13 积分，耗时约 25 秒；10 分钟冷却 + 单飞挡住告警风暴。
+- **发布**：装/改监控走 `install-ops.sh`（服务器必须带代理；本次 GitHub 经 7890 的 TLS 失败，二进制从本机下载后 scp 过去）；它只重启监控单元，`release.ps1` 只重启 `paideia`。本次两次发版 122.8 / 68.5 秒。
