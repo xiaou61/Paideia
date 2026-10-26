@@ -6655,3 +6655,30 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
+
+## 2026-10-26 17:00 +0800 · 内容 · Java 从零开始扩到 35 课；实战线补题与「先修理论」
+
+- 类型：content + fix
+- 变更（内容）：
+  - Java 从零开始 23 → **35 课**，新增 12 课：枚举、注解与反射、正则、字符编码、日志、var、文本块、switch 表达式、instanceof 模式匹配、record、sealed、虚拟线程。
+  - 章节从 6 组细分为 **12 组**（起步 / 流程控制 / 数组与字符串 / 类与对象 / 继承与接口 / 集合与字符串 / equals 与集合选型 / 工程实践 / 泛型与函数式 / 并发与运行时 / 工程补遗 / 现代 Java），只改 `chapter` 与 `level`，不改课号与标题，避免旧进度失联。
+  - 难度校正：12（集合选型）、18–21（Optional / 日期时间 / Stream / Lambda）由 advanced 降为 intermediate；新增课按真实门槛标注。
+  - Java 调试实战 4 → **8 题**，新增第三关「对象与集合」：装箱缓存、浮点误差、缺 hashCode、remove 重载。
+  - Java 项目实战 2 → **4 关**：新增词频统计、分组求平均；四关全部用 ASCII 用例名，判题不再受容器编码影响。
+  - 四条实战线（调试 / 项目 / 读代码 / SQL）的总览都补了「先修理论」表：写清默认该先看哪几课，**不构成门槛**。
+- 变更（修复）：
+  - **导读被登记成关卡**：导入脚本把 `order=0` 的总览也写进 `learning_track_stages`，于是每条线的"下一关"永远是导读、进度永远到不了 100%，地图还多一格。现在导入时排除 order 0，并加断言防回归。
+  - **Java 项目实战两关根本编译不过**：starter 类名是 `Stats` / `Report`，而沙箱固定把用户文件写成 `Main.java`、测试调用 `Main.*`；两关的 `expected` 还是乱码（GBK 写坏）。四关重写后逐关本地编译运行验证：starter 能编译且不通过，参考解输出与 expected 逐字一致。
+  - `verify_course.py` 的 `pathSteps` 上限 30 与渲染器 `schema.ts` 的 20 不一致；Java 总览原有 23 步的 `learning-path` 实际会被前端判为不合法。上限改为 20，总览改为 11 个章节级步骤。
+  - 进度读取上限 200（`listMine`）与 TrackService 的 500：超过后较早通关的关卡会被截掉、地图误报未通关。两处都提到 2000（内容扩容后 20 条轨道约 150 关，200 已不够）。
+- 依据：用户 2026-10-26 要求「多加一些、再细分类、实战写出先掌握哪些理论、看看难度」；WORK-038 的 `mode` / `line_theory` 已经存在，本次不改 schema、不加迁移。
+- 验证：
+  - `python scripts/verify_course.py --dir content/courses/java`：**36 个文件通过（含代码执行）**。
+  - 全部 reading 内容围栏块：**107 块 / 0 个 JSON 或上限问题**。
+  - 四道项目题与四道新调试题：本地 `javac` 编译 + 运行，starter 均不通过、参考解与 expected 逐字一致。
+  - 后端非 app 切片：`scripts/test-db.sh mvn -B -T 1C -pl '!paideia-app' test` → **BUILD SUCCESS（1 分 35 秒）**，独占库已自动删除。
+- 未验证 / 已知限制：
+  - **未导入线上**：需要管理员凭据（本次会话没有），因此线上关卡数、导读是否消失尚未核对。
+  - 项目模式只在本地 JDK 25 编译运行，**未在沙箱容器（JDK 21）里实跑**；所用语法均为 Java 21 及以下。
+  - 去掉导读关卡后，导读正文仍留在知识库分类里，但 `/learn` 地图不再有它的入口——这是有意的（导读不可通关），代价是少一个"课程说明"入口。
+- 本地提交：worktree `work/java-expand`，未推送。
