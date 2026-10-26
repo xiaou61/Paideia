@@ -6479,3 +6479,22 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
   交集，由既有 `McpStartupSmokeTest` 抓到。
 - 本地提交：ca1e6a6、5ca3b81、7cc79db、e68fa21、ee16de8、7fe3dc7、a558042、7fc9375、e6f9629
 - 远端推送：未执行
+
+## 2026-10-26 12:10 +0800 · WORK-039 · 合并 master、撞号处理与推送
+
+- 类型：maintenance
+- 变更：把 `work-038-mcp-admin`（本项）合并进 master；**撞号处理**——并发会话已在 master 占用
+  WORK-038（理论线与实战线），本项工件与代码注释统一改为 **WORK-039**，仅保留早期本地提交信息里的
+  旧编号为历史。
+- 合并冲突一处：`McpViewRegistry.build()`。master 那版写成
+  `ToolQuery.view(allowedToolsets, view.write(), null, READ+WRITE)`，丢掉了**视图自身的工具组**，
+  不受限凭据访问 `/mcp/x/knowledge` 会拿到全部 12 个工具。保留本分支版本
+  （视图组 ∩ 凭据组 + 角色 + 三档 scope）。反向验证：换回 master 写法跑
+  `McpStartupSmokeTest#subViewRoutesToSingleToolset` → 1 条失败；换回本版 → 5/0。
+- 决策：合并后重跑关键验证再推送，而不是拿合并前的证据。
+- 验证（合并后的树上重跑）：后端非 app 切片 **620 执行 / 0 失败 / 14 跳过**；MCP 单测 34/0；
+  `McpStartupSmokeTest`+`McpAdminIntegrationTest` 10/0；模块与迁移闸 9/0；
+  `pnpm -r typecheck` 11 包全过；`mcp-tokens` e2e **6 passed**。
+  报告绑定提交 `f4c544c`，之后 master 上的提交只有内容线与导航测试（不涉及后端）。
+- 本地提交：`8aca2e6`（合并 master 到分支后快进 master）
+- 远端推送：`origin/master = 8aca2e6`（已核验）
