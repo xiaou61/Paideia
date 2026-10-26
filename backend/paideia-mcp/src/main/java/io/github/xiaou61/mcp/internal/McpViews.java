@@ -98,16 +98,4 @@ record McpViews(String name, Set<String> toolsets, boolean write, boolean defaul
         return ToolQuery.view(intersected, write, role, scopes);
     }
 
-    /**
-     * 构建视图时用的查询（服务端视角）。
-     *
-     * <p>scope 带全三档：清单要按视图的 write 设置过滤，而**不能**按某张凭据的 scope 过滤——
-     * 否则管理员的第一张凭据会把清单固化成它自己那一份。凭据的真实 scope 在调用阶段校验。
-     */
-    ToolQuery query(String role) {
-        Set<ToolScope> scopes = write
-                ? Set.of(ToolScope.READ, ToolScope.WRITE, ToolScope.ADMIN)
-                : Set.of(ToolScope.READ, ToolScope.ADMIN);
-        return ToolQuery.view(toolsets, write, role, scopes);
-    }
 }

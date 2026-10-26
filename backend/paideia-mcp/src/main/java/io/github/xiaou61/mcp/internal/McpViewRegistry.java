@@ -106,7 +106,10 @@ class McpViewRegistry {
     }
 
     private McpView build(McpViews view, String endpoint, Set<String> allowedToolsets, String role) {
-        List<ToolDescriptor> descriptors = catalog.view(view.query(role));
+        // scope 带全三档（清单按视图的 write 设置过滤，不按某张凭据的 scope 过滤）；
+        // 工具组必须与凭据白名单取交集——漏了它会让"只授权知识库"的凭据看到全部工具。
+        List<ToolDescriptor> descriptors = catalog.view(view.queryFor(
+                Set.of(ToolScope.READ, ToolScope.WRITE, ToolScope.ADMIN), allowedToolsets, role));
         HttpServletStreamableServerTransportProvider transport =
                 HttpServletStreamableServerTransportProvider.builder()
                         .mcpEndpoint(endpoint)
