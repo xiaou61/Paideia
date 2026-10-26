@@ -96,12 +96,18 @@ public class ResumeImportService {
                     usage == null ? 0 : usage.cacheReadTokens());
             run.addCredits(charged);
             run.finish(io.github.xiaou61.ai.RunOutcome.OK, null);
+            // 到这里**已经结算过了**：后面的日志与构造若抛异常，不能落进下面的 catch
+            // （那会 refundOrSettleFailed 对同一笔预留再结算一次 → 重复扣费并多写一条流水）。
+            Draft draft = new Draft(parsed.data(), text, parsed.dropped(), parsed.truncated(),
+                    truncatedChars, extracted.pages());
             log.info("ai.resume.parsed userId={} chars={} dropped={} truncatedFields={}",
                     userId, text.length(), parsed.dropped(), parsed.truncated());
-            return new Draft(parsed.data(), text, parsed.dropped(), parsed.truncated(),
-                    truncatedChars, extracted.pages());
+            return draft;
         } catch (RuntimeException failure) {
-            refundOrSettleFailed(userId, reserved, access.get(), usage);
+            if (usage == null) {
+                // usage 为 null 说明还没结算（parsed 都没拿到），才该退款
+                refundOrSettleFailed(userId, reserved, access.get(), null);
+            }
             run.finish(io.github.xiaou61.ai.RunOutcome.FAILED, "resume_import_failed");
             throw failure;
         } finally {

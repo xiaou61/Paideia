@@ -59,6 +59,10 @@ public class LearningReviewService {
     public record AnswerInput(long itemId, int choice) {
     }
 
+    /** 待写入的掌握度证据：等抢到交卷幂等闸之后再落库。 */
+    private record PendingMastery(long conceptId, boolean correct, int optionCount) {
+    }
+
     public record ResultView(long itemId, long conceptId, boolean correct, String explanation) {
     }
 
@@ -192,6 +196,7 @@ public class LearningReviewService {
             }
         }
         List<ResultView> results = new ArrayList<>();
+        List<PendingMastery> pendingMastery = new ArrayList<>();
         Map<Long, Boolean> allCorrectByConcept = new HashMap<>();
         Map<Long, Boolean> allCorrectByEntry = new HashMap<>();
         for (StoredItem item : items) {
@@ -206,10 +211,16 @@ public class LearningReviewService {
             results.add(new ResultView(item.itemId(), item.conceptId(), correct, item.explanation()));
             allCorrectByConcept.merge(item.conceptId(), correct, (left, right) -> left && right);
             allCorrectByEntry.merge(item.entryId(), correct, (left, right) -> left && right);
-            mastery.recordMastery(userId, item.conceptId(), correct, item.options().size());
+            // 掌握度先收集、**等抢到幂等闸再写**：并发交卷时两个请求都会走到这里，
+            // 若在此处就累加，失败的那个虽然回滚了，但"先加后判"的顺序会把重复计算写进
+            // 另一条依赖读-改-写的路径。把写放到闸之后，只有真正完成交卷的那次才记。
+            pendingMastery.add(new PendingMastery(item.conceptId(), correct, item.options().size()));
         }
         if (mapper.completeSession(sessionId, userId, JSON.writeValueAsString(answers), now) == 0) {
             throw new BizException(ErrorCode.CONFLICT, "这次复习已经交过了");
+        }
+        for (PendingMastery pending : pendingMastery) {
+            mastery.recordMastery(userId, pending.conceptId(), pending.correct(), pending.optionCount());
         }
         List<ScheduleView> schedule = new ArrayList<>();
         for (var entry : allCorrectByEntry.entrySet()) {

@@ -37,12 +37,17 @@ interface AiUsageMapper {
             """)
     List<BalanceRow> balancesOf(@Param("ids") List<Long> ids);
 
-    /** 累计消耗：只算流出，取绝对值。 */
+    /**
+     * 累计消耗：只算真实调用产生的流出，取绝对值。
+     *
+     * <p>必须排除 {@code ADJUST}：管理员调减会写负数 delta，不排除的话"被扣了 1000 分"会被
+     * 当成"用了 1000 分"，而该用户可能一次 AI 都没调过。
+     */
     @Select("""
             <script>
             SELECT user_id AS userId, COALESCE(SUM(-delta), 0) AS used
             FROM ai_credit_ledger
-            WHERE delta &lt; 0 AND user_id IN
+            WHERE delta &lt; 0 AND kind &lt;&gt; 'ADJUST' AND user_id IN
             <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
             GROUP BY user_id
             </script>

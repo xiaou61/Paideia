@@ -222,8 +222,8 @@ class CampServiceTest {
 
         assertThat(created.itemCount()).isEqualTo(2);
         verify(generator, times(1)).repair(anyString(), anyList(), any());
-        // 结算用第二轮的用量：以真正产生内容的这次为准
-        verify(credits).settleCamp(eq(USER), eq(100L), anyString(), eq(80), eq(60), eq(PROGRAM_ID));
+        // 两轮都是真实的上游调用：用量要相加（100+80 / 40+60），只记修复轮会让用户少付一次钱
+        verify(credits).settleCamp(eq(USER), eq(100L), anyString(), eq(180), eq(100), eq(PROGRAM_ID));
     }
 
     @Test

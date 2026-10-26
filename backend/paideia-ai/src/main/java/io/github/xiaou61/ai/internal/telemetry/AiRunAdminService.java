@@ -203,8 +203,8 @@ public class AiRunAdminService {
         }
         StatusCounts byStatus = new StatusCounts(ok, failed, timeout, cancelled, interrupted, running);
         long terminal = ok + failed + timeout + cancelled + interrupted;
-        TelemetrySummaryMapper.Percentiles duration = summary.durationPercentiles(window.from(), window.to());
-        TelemetrySummaryMapper.Percentiles ttft = summary.ttftPercentiles(window.from(), window.to());
+        TelemetrySummaryMapper.Percentiles duration = summary.durationPercentiles(window.from(), window.to(), k, s, m, userId);
+        TelemetrySummaryMapper.Percentiles ttft = summary.ttftPercentiles(window.from(), window.to(), k, s, m, userId);
         TelemetrySummaryMapper.TotalsFiltered totals =
                 summary.totalsFiltered(window.from(), window.to(), k, s, m, userId);
         long input = totals == null ? 0 : totals.inputTokens();
@@ -224,9 +224,11 @@ public class AiRunAdminService {
                 nominal == null ? 0 : nominal,
                 cacheSavedRatio(input, cacheRead),
                 properties.getSampling(),
-                summary.countByKind(window.from(), window.to()),
-                summary.countByModel(window.from(), window.to()),
-                summary.countByErrorType(window.from(), window.to()),
+                // 排行也必须带同一组筛选：否则按 kind/model 筛过之后，
+                // 顶部卡片是筛选后的、下面四个排行还是全平台的，同一屏两个口径。
+                summary.countByKind(window.from(), window.to(), k, s, m, userId),
+                summary.countByModel(window.from(), window.to(), k, s, m, userId),
+                summary.countByErrorType(window.from(), window.to(), k, s, m, userId),
                 summary.countByTool(window.from(), window.to()));
     }
 
@@ -247,12 +249,22 @@ public class AiRunAdminService {
      * <p>与实扣的差**不是 bug 而是信息**：缓存命中不计费、价目表可能在窗口内被改过，
      * 两者都会让名义值高于实扣。界面上必须同时显示，否则"扣分对不上"会被当成计费错误。
      */
+    private static int saturateToInt(long value) {
+        if (value <= 0) {
+            return 0;
+        }
+        return value > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) value;
+    }
+
     private Long nominalCredits(Instant from, Instant to, String kind, String status,
                                 String model, Long userId) {
         long total = 0;
         for (TelemetrySummaryMapper.ModelTokens row
                 : summary.tokensByModel(from, to, kind, status, model, userId)) {
-            total += billing.creditsFor(row.name(), (int) row.inputTokens(), (int) row.outputTokens());
+            // SUM 是 long：直接强转 int 在 90 天窗口 + 长上下文下会溢出成负数，
+            // 而 creditsFor 对 <=0 一律返回 0 —— 名义成本会静默变成 0。饱和到 int 上限。
+            total += billing.creditsFor(row.name(), saturateToInt(row.inputTokens()),
+                    saturateToInt(row.outputTokens()));
         }
         return total;
     }
