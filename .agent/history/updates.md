@@ -6578,3 +6578,27 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 线上现状：`/learn/tracks` **21 条**（17 theory + 4 practice）：
   sql-practice 6 关、java-project 3 关、java-debug 3 关、code-reading 4 关。
 - 本地提交：本条记录随内容一起提交；**未推送**。
+
+## 2026-10-26 14:52 +0800 · WORK-040 · 开源项目详解建项
+
+- 类型：requirements
+- 新建 WORK-040，只写到需求 draft；**未改代码、未改内容、未动 schema 与迁移**。
+- 用户裁决：两种形态**分开承载**——简讲进知识库（`/knowledge`，无进度无通关），
+  精讲进学习轨道（`/learn/:slug`，有关卡与复习），两者用普通链接相连；
+  比例以简讲为主（大多数项目只配一张卡片）。用户下一步再给讲解项目清单。
+- 建项前读码核实的关键事实（不是推测）：
+  - 内容流水线已在跑：`content/reading/<slug>/*.md` + `scripts/import-course.mjs`，94 篇。
+  - 四个围栏块已够表达精讲：`code-map` / `code-tour` / `code-challenge` / `quiz`。
+  - **通关判定按轨道类型分**：理论线只看小测、实战线只看动手、课程两者都要
+    （`LearningProgressRules.java:69-77`）——所以简讲若挂成学习线会出现"永远无法通关"。
+  - 导入脚本**恒建轨道**：`options.track !== false`（`import-course.mjs:344`）是死开关，
+    `parseArgs` 从未设置过 `track`。简讲要"只建条目、不建轨道"必须接 `--no-track`，
+    这是本项唯一计划中的代码改动（约 5 行）；同时分类不能打 `line_kind`，否则会以线身份出现在 `/learn`。
+  - `learning-path` 块的每步 `entryId` 是硬编码数字，现有 10 个 `00-总览.md` 全都不写，
+    渲染成不可点的静态列表（换库 id 就变）→ 两类内容互链改用纯 markdown 链接。
+- 验证：`project-lifecycle validate .` → **结果：通过**；`brief` 已登记 WORK-040
+  （phase=requirements, state=draft, mode=managed）。
+- 待确认（阻断需求批准）：Q-001 讲哪些项目、各几条、简讲/精讲怎么分；
+  Q-002 简讲分类按领域还是先平铺。
+- 本地提交：只提交本工件与这条更新历史；**未推送**。
+- 备注：工作区另有一个未跟踪目录 `content/reading/jvm/`，不是本项产物，未纳入本次提交。
