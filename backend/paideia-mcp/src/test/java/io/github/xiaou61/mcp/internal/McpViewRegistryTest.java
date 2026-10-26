@@ -98,4 +98,15 @@ class McpViewRegistryTest {
         assertThatThrownBy(() -> registry.view("/x/admin_nope", Set.of(), "admin"))
                 .isInstanceOf(McpViewRegistry.ViewNotFoundException.class);
     }
+
+    @Test
+    void adminGroupIsNotFoundForLearner() {
+        McpViewRegistry registry = new McpViewRegistry(catalog(),
+                new McpToolInvoker(catalog(), new McpRateLimiter(60)));
+
+        // 非管理员探测管理组得到 404，而不是"200 + 空清单"——后者等于确认组名存在
+        assertThatThrownBy(() -> registry.view("/x/admin_users", Set.of(), "learner"))
+                .isInstanceOf(McpViewRegistry.ViewNotFoundException.class);
+        assertThat(registry.view("/x/admin_users", Set.of(), "admin").name()).isEqualTo("admin_users");
+    }
 }

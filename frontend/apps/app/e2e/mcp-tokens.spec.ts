@@ -94,3 +94,19 @@ test('MCP 凭据：390px 宽下不出现横向滚动', async ({ page }) => {
   // 允许 1px 的亚像素误差；真溢出通常是几十像素
   expect(overflow).toBeLessThanOrEqual(1)
 })
+
+/**
+ * WORK-038：管理工具组与 admin 权限范围只对管理员出现。
+ *
+ * <p>服务端不依赖前端隐藏（非管理员直接 POST `scopes:["admin"]` 会 400），但界面不该让人
+ * 勾一个注定失败的选项。这里钉的是"普通人看不到"，管理员一侧由后端集成测试钉。
+ */
+test('MCP 凭据：非管理员看不到管理工具组与管理范围', async ({ page }) => {
+  await signIn(page)
+  await page.goto('/#/settings/mcp')
+
+  await expect(page.getByTestId('mcp-toolset-knowledge')).toBeVisible()
+  await expect(page.getByTestId('mcp-toolset-admin_content')).toHaveCount(0)
+  await expect(page.getByTestId('mcp-toolset-admin_users')).toHaveCount(0)
+  await expect(page.getByTestId('mcp-token-admin')).toHaveCount(0)
+})

@@ -84,6 +84,11 @@ class McpViewRegistry {
         if (!parsed.toolsets().isEmpty() && !catalog.toolsets().containsAll(parsed.toolsets())) {
             throw new ViewNotFoundException(path);
         }
+        // 管理组对非管理员就是"没有这个视图"：返回 200 + 空清单会确认组名存在，与 404 的约定相反。
+        // 组名 = 工具名前缀是目录启动期校验的硬约束（ToolCatalog.validateDescriptor）。
+        if (!isAdmin(role) && parsed.toolsets().stream().anyMatch(group -> group.startsWith("admin_"))) {
+            throw new ViewNotFoundException(path);
+        }
         String key = cacheKey(parsed, allowedToolsets, role);
         return views.computeIfAbsent(key, ignored -> build(parsed, pathOf(path), allowedToolsets, role));
     }

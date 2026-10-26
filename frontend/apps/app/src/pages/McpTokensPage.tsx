@@ -1,3 +1,4 @@
+import { useAuth } from '@paideia/auth'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Alert,
@@ -22,7 +23,7 @@ import { createMcpTokensApi } from '../mcp-tokens-api'
 
 const tokens = createMcpTokensApi(api)
 
-const SCOPE_LABELS: Record<string, string> = { read: '只读', write: '写入' }
+const SCOPE_LABELS: Record<string, string> = { read: '只读', write: '写入', admin: '管理' }
 
 /**
  * 可选工具组。
@@ -40,6 +41,14 @@ const TOOLSETS: ReadonlyArray<{ key: string; label: string; hint: string }> = [
   { key: 'learning', label: '学习进度', hint: '读到哪、下一站是哪' },
   { key: 'account', label: '账号资料', hint: '身份与目标岗位' },
   { key: 'assistant', label: '平台助手', hint: '把问题交给平台 AI 回答' },
+  { key: 'sql', label: 'SQL 数据集', hint: '看表结构与字段' },
+  { key: 'admin_content', label: '内容管理', hint: '分类/条目/概念/关系的增改删' },
+  { key: 'admin_users', label: '用户与积分', hint: '账号、角色、积分流水与调整' },
+  { key: 'admin_ai', label: 'AI 观测', hint: '调用概览、趋势、明细与反馈' },
+  { key: 'admin_review', label: '举报与数据集', hint: '笔记举报下架、数据集治理' },
+  { key: 'admin_learning', label: '题目标注', hint: '题目概念标注与评估导出' },
+  { key: 'admin_ops', label: '运维', hint: '服务、中间件与备份状态' },
+  { key: 'admin_digest', label: '速递', hint: '每日速递条目查看与删除' },
 ]
 
 /**
@@ -53,10 +62,13 @@ const TOOLSETS: ReadonlyArray<{ key: string; label: string; hint: string }> = [
  */
 export function McpTokensPage() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const { data, isLoading, error } = useQuery({ queryKey: ['mcp-tokens'], queryFn: () => tokens.list() })
 
   const [name, setName] = useState('')
   const [write, setWrite] = useState(false)
+  const [adminScope, setAdminScope] = useState(false)
   const [neverExpires, setNeverExpires] = useState(false)
   /** 勾选了的工具组；**空集合 = 全部**（与改动前签发的凭据语义一致）。 */
   const [toolsets, setToolsets] = useState<string[]>([])
@@ -68,7 +80,7 @@ export function McpTokensPage() {
     mutationFn: () =>
       tokens.create({
         name: name.trim(),
-        scopes: write ? ['read', 'write'] : ['read'],
+        scopes: ['read', ...(write ? ['write'] : []), ...(isAdmin && adminScope ? ['admin'] : [])],
         toolsets,
         expiresInDays: neverExpires ? 0 : 90,
       }),
@@ -174,7 +186,7 @@ export function McpTokensPage() {
             <div className="space-y-2">
               <Label>可以访问</Label>
               <div className="grid gap-2 sm:grid-cols-2" data-testid="mcp-token-toolsets">
-                {TOOLSETS.map((item) => {
+                {(isAdmin ? TOOLSETS : TOOLSETS.filter((item) => !item.key.startsWith('admin_'))).map((item) => {
                   const checked = toolsets.includes(item.key)
                   return (
                     <label
@@ -211,6 +223,16 @@ export function McpTokensPage() {
                 />
                 允许写入（建笔记、打自评标记）
               </label>
+              {isAdmin ? (
+                <label className="flex cursor-pointer items-center gap-2.5 text-sm">
+                  <Checkbox
+                    data-testid="mcp-token-admin"
+                    checked={adminScope}
+                    onCheckedChange={(value) => { setAdminScope(value === true) }}
+                  />
+                  允许后台管理（管理工具需要这项；只有管理员能建）
+                </label>
+              ) : null}
               <label className="flex cursor-pointer items-center gap-2.5 text-sm">
                 <Checkbox
                   data-testid="mcp-token-never-expires"
