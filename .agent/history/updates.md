@@ -6412,3 +6412,18 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
+
+## 2026-10-26 11:36:48  · 项目 · 修掉审查 84 条 high 里影响钱/安全/主流程的 16 条（worktree 隔离作业）
+
+- 类型：implementation
+- 变更：在 `.worktrees/high-fixes`（分支 `fix/review-high-2026-10-26`）里逐条修，验完合并回 master 并删除工作树。**20 个文件、+233 −59**：
+  - **钱（4 条）**：`CreditService.settleReview` 补 `@Transactional`（余额与流水分别提交会对不上账）；`AiUsageMapper` 的"已用积分"排除 `ADJUST`（管理员扣分被显示成用户消耗）；`CampService` 两轮上游调用用量相加（此前只记修复轮，用户为两次真实调用只付一次钱）；`ResumeImportService` 结算之后的异常不再落进 catch 二次结算（重复扣费 + 多写流水）。
+  - **安全（4 条）**：`SqlStatementGuard` 拒绝 `/*! ... */` MySQL 可执行注释（此前被当注释剔掉，校验看到空语句而真正执行的是原文，等于白名单后门）；`SqlAiService` 模型产出的 `referenceSql` 先过门禁再执行、执行后补配额审计（此前可无限触发容器不扣配额）；`SqlDatasetUploadService` 干跑按 `userId` 取槽（此前绕过每人并发 1）；`McpViewRegistry` 建视图按 `write` 标志过滤（只读视图此前会列出写工具）。
+  - **并发正确性（3 条）**：`QuestionAttemptMapper` 掌握度读改写加 `FOR UPDATE` + `recordMastery` 补事务（并发交卷互相覆盖计数）；`LearningReviewService` 掌握度记录移到交卷幂等闸**之后**（并发时失败的那次也累加了）；`AgentScopeConversation` 超时按轮数放大（`blockLast` 把"每轮阈值"变成"整条硬上限"，4 轮工具循环必被掐断）。
+  - **观测（3 条）**：`TelemetrySummaryMapper` 的分位查询与动态 `status` 不再互斥（传 `running`/`failed` 时分位数恒 NULL）；排行查询也带上同一组筛选（此前顶部卡片是筛选后的、下面排行是全平台的）；`AiRunAdminService` token 求和不再 int 溢出（溢出成负数会被 `creditsFor` 当成 0，名义成本静默变 0）。
+  - **前端（5 条）**：`quiz.tsx` 把 `recordAttempt` 移出 state updater（StrictMode 会调两次 → 重复上报作答与进度）；`ReviewPage` 交卷失败可见（此前无 `onError`，用户只看到按钮恢复可点）、结果题号改用下标（此前用主键 `+1` 会显示"第 1042 题"）；`CampDetailPage` 非法路由 id 不再发 NaN 请求；`result-chart` 换结果集时夹住列索引；`OAuthCallbackPage` 桌面跳转前给出提示（协议未注册是静默失败）。
+- 决策：**84 条 high 里修 16 条**，其余 68 条**不修**并说明理由——多为运维/脚本边界（`release.ps1` 引号拼接、`grafana.ini` cookie_secure、`install-ops.sh` 复用业务账号）、一次性内容脚本（`reorder-java-course.py`、`seed-demo-data.py`、`gen-arch-diagram.mjs`）、以及 `AccountSecuritySection` 那条**经核实是误报**（`canUnbindAnything` 是 `bound.length - 1 + hasPassword`，两个绑定可解、唯一方式才禁用，逻辑正确）。
+- 依据：`.agent/reviews/2026-10-21-c259084..c236b9e.md`（84 条 high）；用户 2026-10-26 指示"开 worktree 一个一个修""尤其是有用的"
+- 验证：工作树内后端 `mvn -B -pl paideia-ai,paideia-knowledge,paideia-sandbox,paideia-mcp,paideia-account -am test` **BUILD SUCCESS 0 失败**（含 `CampServiceTest` 10/10——该用例原本断言"只记修复轮用量"，已按新语义改为累加断言）；前端 `pnpm -r typecheck` 11 包全过、`pnpm -r test` **410 条全过**（ui 209、assistant 41、sql-workbench 44、knowledge 51…）。**未跑 e2e**。
+- 本地提交：`fa9acad`（工作树）+ `1a2e10d`（合并回 master）；工作树与分支已按规矩回收
+- 远端推送：见本轮
