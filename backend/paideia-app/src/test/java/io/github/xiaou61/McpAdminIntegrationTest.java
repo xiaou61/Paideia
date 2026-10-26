@@ -148,6 +148,24 @@ class McpAdminIntegrationTest {
     }
 
     @Test
+    @DisplayName("内容管理组：只读视图只含读工具，/write 才含写与删除")
+    void contentGroupSplitsReadAndWrite() throws Exception {
+        adminId = insertUser("admin");
+        String adminPat = adminPat();
+
+        List<String> readOnly = tools("/mcp/x/admin_content", adminPat,
+                initialize("/mcp/x/admin_content", adminPat));
+        assertThat(readOnly).contains("admin_content_list_entries", "admin_content_get_entry");
+        assertThat(readOnly).doesNotContain("admin_content_save_entry", "admin_content_delete_entry");
+        assertThat(readOnly).allMatch(name -> name.startsWith("admin_content_"));
+
+        List<String> writable = tools("/mcp/x/admin_content/write", adminPat,
+                initialize("/mcp/x/admin_content/write", adminPat));
+        assertThat(writable).contains("admin_content_save_entry", "admin_content_delete_entry");
+        assertThat(writable).allMatch(name -> name.startsWith("admin_content_"));
+    }
+
+    @Test
     @DisplayName("38 个管理工具全部注册、全部 ADMIN、只落在 7 个管理组")
     void allAdminToolsAreRegistered() {
         List<io.github.xiaou61.platform.ToolDescriptor> admin = catalog.snapshot().stream()
