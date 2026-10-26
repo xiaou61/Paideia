@@ -31,7 +31,7 @@ verified_commit: d02dfa5
 | AC-007 | `... -Dtest=GithubTrendingSourceTest` | 0 | 通过 | `historyFailureFallsBackToPagePeriodStars`：回退页面 3856 / 8000 |
 | AC-008 | `... -Dtest=GithubStarHistoryTest` | 0 | 通过 | `sameHostRedirectIsFollowed` + `crossHostRedirectIsRejected`（跨 host 拒绝） |
 | AC-009 | 集成 + `... -Dtest=ModularityTest,MigrationVersionFormatTest,MigrationChecksumTest,MigrationSeedOverlapTest ...` | 0 | 通过 | Flyway 成功应用 44 条迁移；新索引存在、旧索引 0；闸 9/0 |
-| AC-010 | 配置检查（人工） | 人工 | 通过 | `DigestProperties.cron`、`DigestJob` 注解默认、`application.yml` 均为 `0 0 8 * * *`；未在部署实例验证 |
+| AC-010 | 配置 + 进程环境检查（人工） | 人工 | 通过 | `DigestProperties.cron`/`DigestJob`/`application.yml` 为 `0 0 8 * * *`；2026-10-26 17:18 部署后 `/proc/<pid>/environ` 已核验 `DIGEST_CRON=0 0 8 * * *`；首次触发待 2026-10-27 08:00 |
 | AC-011 | `git diff` 扫描（人工） | 人工 | 通过 | 无新增凭据/服务器地址/代理 IP；配置只留 `DIGEST_*` 环境变量占位 |
 | AC-012 | `scripts/test-db.sh mvn -B -T 1C -pl '!paideia-app' test` + 集成 | 0 | 通过 | 306 执行 / 0 失败 / 13 跳过 + 集成 10/0；新闻/社区/HN 既有用例全绿 |
 | 后端单测全集 | `scripts/test-db.sh mvn -B -T 1C -pl '!paideia-app' test` | 0 | 通过 | 306 执行 / 0 失败 / 13 跳过（跳过的是需要环境变量的 live 用例） |
@@ -40,6 +40,9 @@ verified_commit: d02dfa5
 | 反向验证：日期映射 | 把 `plusDays(index + 1)` 改成 `plusDays(index)` 后跑 `-Dtest=GithubStarHistoryTest` | 1 | 通过 | 预期红：`weekLabelIsSundayButDaysStartMonday` 与 `saturdayIsFifthDay` 共 2 条失败；恢复后 5/0 |
 | 反向验证：兜底门禁 | 把 `passesGate` 改成 `return true` 后跑 `-Dtest=GithubTrendingSourceTest` | 1 | 通过 | 预期红：`emptyPageFallsBackToSearchWithGate` 1 条失败；恢复后 5/0 |
 | 反向验证：跨天唯一键 | 把迁移唯一键改成 `(fingerprint)` 后跑 `-Dtest=DigestIntegrationTest` | 1 | 通过 | 预期红：`sameFingerprintOnDifferentDaysIsAllowed` 抛 `DuplicateKey`；恢复后 10/0 |
+| 部署：反代 | 生产机 `curl 'http://127.0.0.1:8082/trending?since=daily'` 与 `since=weekly` | 0 | 通过 | nginx 1.24，127.0.0.1:8082；daily 200 / 585594 字节 / 11 篇；weekly 200 / 619228 / 14 篇 |
+| 部署：迁移与健康 | `systemctl is-active paideia` + `journalctl -u paideia` + `/actuator/health` | 0 | 通过 | active；`Migrating schema paideia to version 20261026160000` + `Successfully applied 1 migration`；health `UP` |
+| 部署：前端产物 | `grep -rl '按昨日新增 star' /opt/paideia-app/web/assets` | 0 | 通过 | `index-BsMloTKB.js` 命中；release 118.8 秒 |
 
 ## 验证结果
 
@@ -48,20 +51,22 @@ verified_commit: d02dfa5
 - **迁移与模块闸**：9 执行 / 0 失败；新迁移文件名/校验和/种子重叠/模块边界均通过。
 - **前端**：`pnpm -r typecheck` 全绿；新增的「今日/本周」切换与卡片数字通过类型检查。
 - **反向验证**：日期映射、兜底门禁、跨天唯一键三条都先红后绿，红的原因与预期一致。
-- **未做**：真实页面/ history 端点的自动化（测试用 stub；线上请求只在调研阶段做过）、浏览器 e2e、生产部署后的复核。
+- **部署**：nginx 1.24 安装并 enable，`127.0.0.1:8082` 反代 daily 200/585594 字节/11 篇、weekly 200/619228/14 篇；`/actuator/health` UP；Flyway 在 `paideia` 应用 `V20261026160000`；release 118.8 秒；新前端 `index-BsMloTKB.js` 含「按昨日新增 star」。
+- **未做**：新代码的首次线上采集（明天 08:00 才跑；今天的 GitHub 组仍是旧代码数据，`stars_day/week` 为 NULL）、浏览器 e2e（本会话没有线上 learner 口令）、真实端点的自动化（测试用 stub）。
 
 ## 验收结果
 
-- **AC-001 / AC-002 / AC-003 / AC-004 / AC-005 / AC-007 / AC-008 / AC-009 / AC-011 / AC-012**：有自动化或人工证据，判定通过。
-- **AC-006**：类型检查通过；切换的浏览器行为未跑 e2e，判定「部分」。
-- **AC-010**：配置三处一致；未在部署实例验证「08:00 真正触发」，判定「部分」。
+- **AC-003 / AC-004 / AC-005 / AC-007 / AC-008 / AC-009 / AC-011 / AC-012**：有自动化或人工证据，判定通过。
+- **AC-001 / AC-002**：代码与单测通过；线上新代码首次采集在 2026-10-27 08:00，今天的 GitHub 组仍是旧数据，判定「部分」。
+- **AC-006**：类型检查通过、新前端已上线；e2e 未跑（无线上 learner 口令），判定「部分」。
+- **AC-010**：配置与进程环境已核验（`DIGEST_CRON=0 0 8 * * *`）；首次触发待明天 08:00，判定「配置通过 / 运行待观察」。
 
 ## 失败与未验证项
 
-- **AC-006 的 e2e 未跑**：`apps/app/e2e/digest.spec.ts` 新增了「GitHub 组今日/本周切换」用例，但本机没有现成后端 jar 与含 GitHub 组的速递数据；强行跑会因空态跳过，不能算证据。
-- **生产页面通路未复验**：本工作树没有安装反向代理；线上仍是「页面超时 → Search 兜底」。部署后需要看日志出现「GitHub 候选：日榜 N、周榜 M」而不是「页面不可达」。
+- **AC-006 的 e2e 未跑**：`apps/app/e2e/digest.spec.ts` 新增了「GitHub 组今日/本周切换」用例；本会话没有线上 `e2e-learner` 口令，线上跑会卡在登录。新前端 bundle 已上线且包含「按昨日新增 star」，但浏览器行为没有执行证据。
+- **新代码首次线上采集未发生**：部署时间是 17:18，cron 是 08:00；启动补跑因今天已有内容而跳过。今天的 GitHub 组仍是旧代码采集的 30 条（`stars_day/week` 为 NULL，界面显示 `+0★`）；2026-10-27 08:00 才会写入第一批新格式数据。没有手动触发，避免把新旧两批混进同一天。
 - **完整 `ApiWalkthroughTest` 未跑**：只跑了非 `paideia-app` 全集 + `DigestIntegrationTest`；`api-shape.json` 里 digest 的条目是空数组，新增 item 字段不会改变快照。
-- **真实 GitHub 端点的自动化未纳入**：调研阶段已用线上请求验证（30 周、每日增量、301、5000/h、中位 1.61s），但测试套件里是 stub；端点若在将来变更，只有部署后的日志会暴露。
+- **真实 GitHub 端点的自动化未纳入**：调研阶段已用线上请求验证（30 周、每日增量、301、5000/h、中位 1.61s），生产机也已验证反代与 history 端点 200；但测试套件里是 stub，端点变更只能靠部署后的日志暴露。
 
 ## 剩余风险
 

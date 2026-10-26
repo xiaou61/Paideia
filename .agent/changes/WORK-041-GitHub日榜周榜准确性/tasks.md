@@ -145,7 +145,7 @@ approver_role: CTO
 - 验证：`cd frontend && pnpm -r typecheck` → 0 error；`pnpm --filter @paideia/app test:e2e -- digest.spec.ts`（视本地数据）
 - 反向验证：把周榜排序改成仍按 `starsDay`，切换用例必须红（或手工观察顺序不变）。
 
-### TASK-007 | blocked | 配置与反代部署准备
+### TASK-007 | done | 配置与反代部署准备
 
 - 对应：`REQ-007`、`REQ-008`、`AC-010`、`AC-011`
 - 依赖：无
@@ -157,7 +157,7 @@ approver_role: CTO
   2. 准备反代配置（监听 127.0.0.1、`proxy_ssl_name github.com`、多 upstream）；写部署说明。
   3. 部署前检查 `git log --all -- <迁移目录>` 无更晚时间戳；确认 jar 内只有一个 `V20261026160000`。
 - 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-ai -am -Dtest=DigestPropertiesTest -Dsurefire.failIfNoSpecifiedTests=false test`（若存在）；部署说明人工核对
-- 执行记录：配置已完成（cron 08:00、`github-trending-url` 占位）；**反代安装、生产配置与发版未执行，等待单独授权**。
+- 执行记录：配置已完成（cron 08:00、`github-trending-url` 占位）；2026-10-26 17:03–17:18 部署：装 nginx 1.24、127.0.0.1:8082 反代（Host/SNI=github.com、多边缘 IP、32k 头缓冲）、systemd drop-in 注入 `DIGEST_GITHUB_TRENDING_URL`/`DIGEST_CRON`，从工作树 release 118.8 秒；反代 daily 200/11 篇、weekly 200/14 篇，health UP，Flyway 应用新迁移。
 - 反向验证：无（配置与部署准备，靠启动日志与人工核对）
 
 ### TASK-008 | done | 验证与报告
@@ -171,8 +171,8 @@ approver_role: CTO
   2. 跑内环：`scripts/test-db.sh mvn -B -T 1C -pl '!paideia-app' test`；跑集成：`-Dtest=Digest*Test`。
   3. 跑前端 `pnpm -r typecheck` 与相关 e2e。
   4. 写报告：每条 AC 的命令、退出码、结果、证据；未验证项如实写。
-- 验证：报告 `status: partial`（AC-006 的 e2e 未跑；页面/部署真验未做）
-- 执行记录：单测 304/0/13、集成 10/0、迁移闸 9/0、前端 typecheck 0 error；三条反向验证均先红后绿。
+- 验证：报告 `status: partial`（e2e 未跑；新代码首次线上采集待 2026-10-27 08:00）
+- 执行记录：单测 306/0/13、集成 10/0、迁移闸 9/0、前端 typecheck 0 error；三条反向验证均先红后绿；部署后反代/迁移/健康/前端 bundle 已核验。
 - 反向验证：日期映射、跨天唯一键、兜底门禁三条各做一次 red-green。
 
 ## 完成条件
@@ -181,4 +181,4 @@ approver_role: CTO
 - 每条 `AC-*` 在 `testing/report.md` 有证据行；未验证项单独列出。
 - 日期映射、跨天唯一键、兜底门禁三条反向验证已记录。
 - 仓库内无新增凭据/服务器地址/代理 IP。
-- 部署（反代、生产配置、发版）未执行，等待单独授权。
+- 部署已执行（2026-10-26 17:18）；新代码首次采集待 2026-10-27 08:00，浏览器 e2e 未跑。

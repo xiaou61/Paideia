@@ -6682,3 +6682,14 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 复验：rebase 到 master `5abe939` 后，集成 10/0、前端 typecheck 0 error；主树有并发会话未提交改动，**本分支未合并**。
 - 本地提交：8d2468e, c28e4db, d02dfa5（未推送）
 - 远端推送：未执行
+
+## 2026-10-26 17:20 +0800 · WORK-041 · 部署：反代 + 发版
+
+- 类型：implementation
+- 变更：生产机安装 nginx 1.24；新增 `/etc/nginx/conf.d/github-trending.conf`（监听 127.0.0.1:8082，Host/SNI=github.com，多 GitHub 边缘 IP，32k 响应头缓冲）；systemd drop-in `/etc/systemd/system/paideia.service.d/digest.conf` 注入 `DIGEST_GITHUB_TRENDING_URL=http://127.0.0.1:8082/trending` 与 `DIGEST_CRON=0 0 8 * * *`；从干净工作树 `release.ps1` 发版（118.8 秒）。
+- 决策：从工作树发版而不是主树，因为主树有另一个会话未提交的 `LearnerHeader.tsx`/e2e 改动；主树里对方未提交的更新历史已备份并原样还原，未并入本次提交。
+- 依据：WORK-041 TASK-007；用户「部署吧，开始吧」。
+- 验证：反代 daily 200/585594 字节/11 篇、weekly 200/619228/14 篇；`/actuator/health` UP；Flyway 在 `paideia` 应用 `V20261026160000`；进程环境含 `DIGEST_*`；新前端 `index-BsMloTKB.js` 含「按昨日新增 star」。
+- 未验证：线上 e2e（本会话没有 e2e-learner 口令）；新代码首次采集在 2026-10-27 08:00，今天的 GitHub 组仍是旧数据（stars 字段 NULL）。
+- 本地提交：仅 WORK-041 的 report/tasks 与这条记录；主树另有并发会话未提交改动，未并入。
+- 远端推送：未执行。
