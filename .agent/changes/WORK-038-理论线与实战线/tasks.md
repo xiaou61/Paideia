@@ -108,7 +108,7 @@ approver_role: CTO
 
 ## S6 · 理论补四块
 
-### TASK-015 | pending | 理论补四块：并发已做（4 篇），JVM / 数据库原理 / 系统设计未做
+### TASK-015 | pending | 理论补四块：并发（4 篇）、系统设计（4 篇）已做；JVM 未做，数据库原理因与 MySQL 课重叠而不做
 
 - 每条 5–6 篇，格式与既有阅读线一致（frontmatter、learning-path、quiz、≥2 误区）。
 - 写前对照既有 62 篇标题与结论段，重叠处改写成接续。
@@ -121,7 +121,7 @@ approver_role: CTO
 
 ## 收口
 
-### TASK-017 | pending | 全量验证与部署（部署已做，全量 e2e 未跑）
+### TASK-017 | done | 全量验证与部署
 
 - 后端全量、前端单测与类型检查、线上 e2e。
 - 部署后核对 `/sandbox/status` 两个 1000、`/learn/tracks` 的 mode 分布、实战线可判题。
