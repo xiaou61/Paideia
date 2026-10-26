@@ -89,6 +89,11 @@ export interface RunCodeInput {
    * <p>**写操作在计划模式下不会真的落数据**——它不是"跑一遍看看"，是"看看会怎么跑"。
    */
   explain?: boolean
+  /**
+   * 项目模式（WORK-038）：多文件一起提交，服务端编译后跑固定的测试入口。
+   * 非空时 `code` 只进审计，不参与执行。
+   */
+  files?: { path: string; content: string }[]
   entryId?: number
   caseId?: string
 }

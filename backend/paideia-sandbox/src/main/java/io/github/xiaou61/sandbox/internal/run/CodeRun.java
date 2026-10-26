@@ -22,8 +22,12 @@ public final class CodeRun {
      * <p>`explain` 是 SQL 专用（WORK-035 T-05）：为真时不执行语句，而是把它包进
      * `EXPLAIN FORMAT=TREE` 跑，回的是执行计划。**写操作在计划模式下不会真的落数据**，
      * 所以调用方不能把它当成"跑一遍看看"。
+     *
+     * <p>`files` 非空表示**项目模式**（WORK-038）：多文件一起写进容器，编译后跑固定的测试入口。
+     * 此时 `code` 只用于审计，不参与执行。路径由控制器校验后才允许进这里。
      */
-    public record Request(String language, String code, String stdin, String caseId, boolean explain) {
+    public record Request(String language, String code, String stdin, String caseId, boolean explain,
+                          List<FileEntry> files) {
 
         public Request {
             if (explain) {
@@ -43,8 +47,26 @@ public final class CodeRun {
 
         /** 不带 explain 的形态：Java/Python 与既有调用点用它。 */
         public Request(String language, String code, String stdin, String caseId) {
-            this(language, code, stdin, caseId, false);
+            this(language, code, stdin, caseId, false, List.of());
         }
+
+        /** 带 explain 的单文件形态（SQL 执行计划等）。 */
+        public Request(String language, String code, String stdin, String caseId, boolean explain) {
+            this(language, code, stdin, caseId, explain, List.of());
+        }
+
+        /** 项目模式：多文件一起提交。 */
+        public Request(String language, String code, String caseId, List<FileEntry> files) {
+            this(language, code, "", caseId, false, files);
+        }
+
+        public boolean project() {
+            return files != null && !files.isEmpty();
+        }
+    }
+
+    /** 项目模式里的一个文件。`path` 必须是相对路径，已由控制器校验过。 */
+    public record FileEntry(String path, String content) {
     }
 
     /**

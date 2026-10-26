@@ -37,6 +37,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/sandbox")
 class SandboxController {
 
+    /** 项目模式允许的文件名：只认相对路径与安全字符集（无空格、无引号、无 `$`）。 */
+    private static final java.util.regex.Pattern PROJECT_PATH =
+            java.util.regex.Pattern.compile("[A-Za-z0-9_./-]+");
+
     private final SandboxProperties properties;
     private final CodeRunner runner;
     private final SandboxQuotaService quota;
@@ -105,6 +109,46 @@ class SandboxController {
         return ApiResponse.ok(schema);
     }
 
+    /**
+     * 项目模式校验（WORK-038）。返回空列表表示"不是项目模式"。
+     *
+     * <p>**路径是信任边界**：它会被拼进容器的 shell 脚本里写文件，所以只允许相对路径与
+     * 安全字符集（无空格、无引号、无 `$`），并拒绝 `..`。三个上限（文件数 / 单文件 / 总量）
+     * 都在这里挡，超了直接拒绝而不是截断——截断后的代码编译不过，报错会指向用户看不懂的地方。
+     */
+    List<CodeRun.FileEntry> validateProject(RunRequest body, String language) {
+        if (body.files() == null || body.files().isEmpty()) {
+            return List.of();
+        }
+        if ("sql".equals(language)) {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT, "SQL 不支持项目模式");
+        }
+        if (body.files().size() > properties.getMaxProjectFiles()) {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT,
+                    "一次最多提交 " + properties.getMaxProjectFiles() + " 个文件");
+        }
+        List<CodeRun.FileEntry> files = new java.util.ArrayList<>();
+        int total = 0;
+        for (ProjectFile file : body.files()) {
+            String path = file.path();
+            if (!PROJECT_PATH.matcher(path).matches() || path.startsWith("/") || path.contains("..")) {
+                throw new BizException(ErrorCode.INVALID_ARGUMENT, "文件名不合法：" + path);
+            }
+            String content = file.content() == null ? "" : file.content();
+            if (content.length() > properties.getMaxProjectFileChars()) {
+                throw new BizException(ErrorCode.INVALID_ARGUMENT,
+                        path + " 超过 " + properties.getMaxProjectFileChars() + " 字符");
+            }
+            total += content.length();
+            files.add(new CodeRun.FileEntry(path, content));
+        }
+        if (total > properties.getMaxProjectTotalChars()) {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT,
+                    "全部文件合计超过 " + properties.getMaxProjectTotalChars() + " 字符");
+        }
+        return List.copyOf(files);
+    }
+
     @PostMapping("/run")
     ApiResponse<RunView> run(@Valid @RequestBody RunRequest body) {
         long userId = currentUserId();
@@ -114,7 +158,14 @@ class SandboxController {
             throw new BizException(ErrorCode.INVALID_ARGUMENT,
                     "只支持 " + String.join(" / ", properties.languages()));
         }
-        if (body.code().length() > properties.getMaxCodeChars()) {
+        List<CodeRun.FileEntry> files = validateProject(body, language);
+        boolean project = !files.isEmpty();
+        // 项目模式下 code 只进审计：真正的执行内容是 files。
+        String code = body.code() == null ? "" : body.code();
+        if (!project && code.isBlank()) {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT, "代码不能为空");
+        }
+        if (code.length() > properties.getMaxCodeChars()) {
             throw new BizException(ErrorCode.INVALID_ARGUMENT,
                     "代码超过 " + properties.getMaxCodeChars() + " 字符");
         }
@@ -141,7 +192,7 @@ class SandboxController {
         }
         if (!runner.ready()) {
             quota.record(userId, body.entryId(), body.caseId(), language,
-                    CodeRun.Status.DISABLED, null, 0, 0, false, body.code());
+                    CodeRun.Status.DISABLED, null, 0, 0, false, code);
             throw new BizException(ErrorCode.SANDBOX_DISABLED,
                     runner.unavailableReason() == null ? "代码执行不可用" : runner.unavailableReason());
         }
@@ -152,7 +203,7 @@ class SandboxController {
             quota.requireQuota(userId, language);
         } catch (BizException rejected) {
             quota.record(userId, body.entryId(), body.caseId(), language,
-                    CodeRun.Status.REJECTED, null, 0, 0, false, body.code());
+                    CodeRun.Status.REJECTED, null, 0, 0, false, code);
             throw rejected;
         }
 
@@ -165,11 +216,11 @@ class SandboxController {
 
         CodeRun.Result result;
         try (RunSlot.Slot ignored = slots.acquire(userId)) {
-            result = runner.run(new CodeRun.Request(language, body.code(), stdin, body.caseId(), explain));
+            result = runner.run(new CodeRun.Request(language, code, stdin, body.caseId(), explain, files));
         } catch (BizException rejected) {
             // 并发被拒：写一条 rejected 审计（不计入次数，见 countSince）
             quota.record(userId, body.entryId(), body.caseId(), language,
-                    CodeRun.Status.REJECTED, null, 0, 0, false, body.code());
+                    CodeRun.Status.REJECTED, null, 0, 0, false, code);
             throw rejected;
         }
 
@@ -177,7 +228,7 @@ class SandboxController {
                 + result.stderr().getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
         quota.record(userId, body.entryId(), body.caseId(), language,
                 SandboxQuotaService.statusOf(result), result.exitCode(), result.durationMs(),
-                outputBytes, result.truncated(), body.code());
+                outputBytes, result.truncated(), code);
 
         return ApiResponse.ok(new RunView(result.stdout(), result.stderr(), result.exitCode(),
                 result.durationMs(), result.timedOut(), result.outOfMemory(), result.truncated(),
@@ -202,6 +253,10 @@ class SandboxController {
 
         if (!properties.isSupported(language)) {
             throw new BizException(ErrorCode.INVALID_ARGUMENT, "只支持 java 与 python");
+        }
+        // 逐步录制只支持单文件：项目模式（files）不参与
+        if (body.code() == null || body.code().isBlank()) {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT, "代码不能为空");
         }
         if (body.code().length() > properties.getMaxCodeChars()) {
             throw new BizException(ErrorCode.INVALID_ARGUMENT,
@@ -261,7 +316,8 @@ class SandboxController {
 
     record RunRequest(
             @NotBlank @Size(max = 16) String language,
-            @NotBlank String code,
+            // 项目模式下 code 可以为空：内容都在 files 里，code 只进审计。
+            @Size(max = 20_000) String code,
             @Size(max = 4_000) String stdin,
             // SQL 专用：数据集 key，服务端按白名单解析成建表与插数
             @Size(max = 64) String dataset,
@@ -271,7 +327,14 @@ class SandboxController {
             @Size(max = 64) String caseId,
             // SQL 专用（WORK-035 T-05）：true 时跑 EXPLAIN FORMAT=TREE 而不是执行语句。
             // 可空：老客户端不带这个字段时按 false 处理。
-            Boolean explain) {
+            Boolean explain,
+            // 项目模式（WORK-038）：多文件。非空时 code 不参与执行；路径与总量在这里校验。
+            @Size(max = 20) List<ProjectFile> files) {
+    }
+
+    /** 项目模式的一个文件。 */
+    record ProjectFile(@NotBlank @Size(max = 200) String path,
+                       @Size(max = 64_000) String content) {
     }
 
     /**

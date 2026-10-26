@@ -386,8 +386,22 @@ export interface RunChallenge {
   title: string
   language: 'java' | 'python'
   starter: string
+  /**
+   * 只读的支撑文件（WORK-038）：项目模式下与 `starter`（学习者编辑的那个文件）一起提交。
+   * 典型用法是放测试入口，让学习者改自己的实现、跑固定的测试。
+   *
+   * <p>可编辑文件的路径按语言固定：Java 是 `Main.java`，Python 是 `main.py`——它是约定，
+   * 不另开一个配置项。
+   */
+  files?: RunFile[]
   cases: RunCase[]
   explain?: string
+}
+
+/** 项目模式里的一个文件。路径只允许相对路径与 `[A-Za-z0-9_./-]`。 */
+export interface RunFile {
+  path: string
+  content: string
 }
 
 export type CodeChallenge = FillChallenge | OrderChallenge | BugChallenge | RunChallenge | SqlChallenge
@@ -469,7 +483,18 @@ export function parseCodeChallenge(code: string): ParseResult<CodeChallenge> {
           trim: entry['trim'] === undefined ? true : Boolean(entry['trim']),
         }
       })
-      return { id, kind, title, language: language as 'java' | 'python', starter, cases, explain }
+      // 项目模式（WORK-038）：可选的多文件。路径要能被拼进容器的写文件脚本，
+      // 所以这里就按服务端同一条口径挡住（不乱码、不含 `..`、不以 / 开头）。
+      const files = raw['files'] === undefined ? undefined : asArray(raw['files'], 'files', 1, 20).map(
+        (item, index) => {
+          const entry = asObject(item, `files[${index}]`)
+          const path = asText(entry['path'], `files[${index}].path`, 200)
+          need(/^[A-Za-z0-9_./-]+$/.test(path) && !path.startsWith('/') && !path.includes('..'),
+            `files[${index}].path 不合法：${path}`)
+          return { path, content: typeof entry['content'] === 'string' ? entry['content'] : '' }
+        },
+      )
+      return { id, kind, title, language: language as 'java' | 'python', starter, files, cases, explain }
     }
 
     if (kind === 'bug') {

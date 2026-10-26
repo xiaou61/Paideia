@@ -207,4 +207,30 @@ class DockerCommandTest {
         List<String> command = DockerCommand.of("python", properties, "/tmp/x.cid");
         assertThat(command).contains("--memory=128m", "--memory-swap=128m", "--cpus=0.25", "--pids-limit=32");
     }
+
+    @Test
+    void 项目模式的隔离强度不变且入口来自常量() {
+        SandboxProperties properties = props();
+        List<String> command = DockerCommand.of("java", properties, "/tmp/x.cid", false, true);
+        String script = command.get(command.size() - 1);
+
+        // 加固参数与单文件模式完全一致：多文件只改变"代码怎么进去"
+        assertThat(command).contains("--network=none", "--read-only", "--cap-drop=ALL",
+                "--security-opt=no-new-privileges");
+        // 不允许挂宿主目录：宿主文件系统对容器不可见（既有纪律）
+        assertThat(command).noneMatch(part -> part.equals("-v") || part.equals("--mount")
+                || part.startsWith("--volume"));
+        // 入口是常量，不是请求里的任何东西
+        assertThat(script).contains("java -cp /tmp/work/out TestMain");
+        assertThat(script).doesNotContain("$entry");
+    }
+
+    @Test
+    void 项目模式不支持sql() {
+        SandboxProperties properties = props();
+        properties.setSqlImage("paideia-sandbox-mysql:test");
+        assertThatThrownBy(() -> DockerCommand.of("sql", properties, "/tmp/x.cid", false, true))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("不支持项目模式");
+    }
 }

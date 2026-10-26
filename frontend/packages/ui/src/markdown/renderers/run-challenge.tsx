@@ -72,11 +72,21 @@ export function RunBody({
     try {
       // 逐用例串行跑：并发会把全局并发闸占满，用户自己的第二个用例反而被拒
       const collected: { testCase: RunCase; output: RunOutput; passed: boolean }[] = []
+      // 项目模式（WORK-038）：可编辑文件的路径按语言固定，其余文件原样带上。
+      // 支撑文件里若也写了这个路径，以编辑器内容为准——否则学习者改的不是被执行的那份。
+      const editablePath = challenge.language === 'java' ? 'Main.java' : 'main.py'
+      const files = challenge.files === undefined
+        ? undefined
+        : [
+            ...challenge.files.filter((file) => file.path !== editablePath),
+            { path: editablePath, content: code },
+          ]
       for (const testCase of challenge.cases) {
         const output = await sandbox.run({
           language: challenge.language,
           code,
           stdin: testCase.stdin,
+          files,
           caseId: `${challenge.id}:${testCase.name}`,
         })
         collected.push({ testCase, output, passed: judgeRun(testCase, output) })

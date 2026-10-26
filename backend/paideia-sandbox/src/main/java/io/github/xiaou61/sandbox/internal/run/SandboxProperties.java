@@ -61,6 +61,16 @@ public class SandboxProperties {
     private int maxCodeChars = 20_000;
     private int maxStdinChars = 4_000;
 
+    // ── 项目模式（WORK-038）────────────────────────────────────────────────
+    // 三个上限一起把"提交一次"的规模钉死：数量、单文件、总量。超了直接拒绝，
+    // 不做截断——截断后的代码编译不过，报错会指向用户看不懂的地方。
+    /** 一次最多提交几个文件。 */
+    private int maxProjectFiles = 20;
+    /** 单个文件的字符上限。 */
+    private int maxProjectFileChars = 64_000;
+    /** 所有文件加起来的字符上限。 */
+    private int maxProjectTotalChars = 256_000;
+
     /** stdout / stderr 各自截断到这个字节数。 */
     private int maxOutputBytes = 65_536;
 
@@ -188,6 +198,30 @@ public class SandboxProperties {
 
     public int getMaxCodeChars() {
         return maxCodeChars;
+    }
+
+    public int getMaxProjectFiles() {
+        return maxProjectFiles;
+    }
+
+    public void setMaxProjectFiles(int maxProjectFiles) {
+        this.maxProjectFiles = maxProjectFiles;
+    }
+
+    public int getMaxProjectFileChars() {
+        return maxProjectFileChars;
+    }
+
+    public void setMaxProjectFileChars(int maxProjectFileChars) {
+        this.maxProjectFileChars = maxProjectFileChars;
+    }
+
+    public int getMaxProjectTotalChars() {
+        return maxProjectTotalChars;
+    }
+
+    public void setMaxProjectTotalChars(int maxProjectTotalChars) {
+        this.maxProjectTotalChars = maxProjectTotalChars;
     }
 
     public void setMaxCodeChars(int maxCodeChars) {

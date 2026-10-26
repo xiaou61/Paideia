@@ -174,12 +174,25 @@ final class DockerCommand {
      *                仍然要读数据集，隔离要求没有降低。
      */
     static List<String> of(String language, SandboxProperties props, String cidFile, boolean explain) {
+        return of(language, props, cidFile, explain, false);
+    }
+
+    /**
+     * @param project 项目模式（WORK-038）：从 stdin 读 N 个文件写进 /tmp/work，编译后跑
+     *                **固定的测试入口**。加固参数与单文件模式完全一致——多文件只改变"代码怎么进去"，
+     *                不改变隔离强度。入口名是常量，请求里的任何字段都进不了命令行。
+     */
+    static List<String> of(String language, SandboxProperties props, String cidFile, boolean explain,
+                           boolean project) {
         String image = props.imageFor(language);
         if (image == null) {
             throw new IllegalArgumentException("不支持的语言：" + language);
         }
         String normalized = language.trim().toLowerCase(Locale.ROOT);
         boolean sql = "sql".equals(normalized);
+        if (project && sql) {
+            throw new IllegalArgumentException("SQL 不支持项目模式");
+        }
 
         List<String> command = new ArrayList<>(List.of(
                 "docker", "run",
@@ -223,8 +236,38 @@ final class DockerCommand {
         command.add(image);
         command.add("-c");
         // explain 只对 SQL 有意义：其它语言传进来也不该悄悄换成"普通运行"以外的东西
-        command.add(scriptFor(normalized, explain && sql));
+        command.add(project ? projectScriptFor(normalized) : scriptFor(normalized, explain && sql));
         return List.copyOf(command);
+    }
+
+    /**
+     * 项目模式的脚本（WORK-038）。
+     *
+     * <p>分帧与单文件模式同一个思路：第一行是文件数，之后每个文件是「路径一行、字节数一行、
+     * 内容恰好那么多字节」。这样用户代码里的换行、空行、甚至以数字开头的一行都不会被误读成控制行。
+     *
+     * <p>路径已由控制器限制在 `[A-Za-z0-9_./-]` 且不含 `..`，所以能安全地插进 shell 双引号里；
+     * 路径里没有空格与引号，`find` 的输出也不会被拆词。
+     *
+     * <p>运行的是**固定的测试入口**（Java `TestMain`、Python `test_main.py`），不是用户文件——
+     * 入口名来自常量，请求里的任何内容都进不了命令行。
+     */
+    private static String projectScriptFor(String language) {
+        String entry = "python".equals(language)
+                ? "cd /tmp/work && python test_main.py"
+                : "cd /tmp/work && javac -d /tmp/work/out $(find . -name '*.java') && java -cp /tmp/work/out TestMain";
+        return """
+                read -r count
+                i=0
+                mkdir -p /tmp/work
+                while [ "$i" -lt "$count" ]; do
+                  read -r path
+                  read -r size
+                  mkdir -p "/tmp/work/$(dirname "$path")"
+                  dd bs=1 count="$size" of="/tmp/work/$path" 2>/dev/null
+                  i=$((i+1))
+                done
+                """ + entry;
     }
 
     /**

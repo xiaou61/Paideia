@@ -70,6 +70,8 @@ export interface SandboxPort {
     stdin?: string
     /** SQL 专用：数据集 key，服务端按白名单取内容（WORK-032）。 */
     dataset?: string
+    /** 项目模式（WORK-038）：多文件一起提交。非空时 code 只进审计。 */
+    files?: { path: string; content: string }[]
     caseId?: string
   }): Promise<RunOutput>
   /**

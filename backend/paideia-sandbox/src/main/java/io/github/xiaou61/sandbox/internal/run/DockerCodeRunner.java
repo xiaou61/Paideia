@@ -67,7 +67,8 @@ class DockerCodeRunner implements CodeRunner {
         Path cidFile = cidDir.resolve("container.cid");
         try {
             return execute(request, DockerCommand.of(
-                    request.language(), properties, cidFile.toString(), request.explain()));
+                    request.language(), properties, cidFile.toString(), request.explain(),
+                    request.project()));
         } finally {
             try {
                 Files.deleteIfExists(cidFile);
@@ -181,16 +182,29 @@ class DockerCodeRunner implements CodeRunner {
         // 只有在同一会话里才是真的。结果集边界由 `--xml` 自己给出（见 SqlResultCodec）。
         try (OutputStream stdin = process.getOutputStream()) {
             boolean sql = isSql(request.language());
-            byte[] code = request.code().getBytes(StandardCharsets.UTF_8);
-            if (sql) {
-                byte[] dataset = (request.stdin() == null ? "" : request.stdin()).getBytes(StandardCharsets.UTF_8);
-                stdin.write((dataset.length + "\n").getBytes(StandardCharsets.UTF_8));
-                stdin.write(dataset);
-            }
-            stdin.write((code.length + "\n").getBytes(StandardCharsets.UTF_8));
-            stdin.write(code);
-            if (!sql && request.stdin() != null && !request.stdin().isEmpty()) {
-                stdin.write(request.stdin().getBytes(StandardCharsets.UTF_8));
+            if (request.project()) {
+                // 项目模式（WORK-038）：文件数 + 每个文件「路径 / 字节数 / 内容」。
+                // 不追加程序 stdin——项目跑的是测试入口，它不读输入。
+                stdin.write((request.files().size() + "\n").getBytes(StandardCharsets.UTF_8));
+                for (CodeRun.FileEntry file : request.files()) {
+                    stdin.write(file.path().getBytes(StandardCharsets.UTF_8));
+                    stdin.write('\n');
+                    byte[] body = file.content().getBytes(StandardCharsets.UTF_8);
+                    stdin.write((body.length + "\n").getBytes(StandardCharsets.UTF_8));
+                    stdin.write(body);
+                }
+            } else {
+                byte[] code = request.code().getBytes(StandardCharsets.UTF_8);
+                if (sql) {
+                    byte[] dataset = (request.stdin() == null ? "" : request.stdin()).getBytes(StandardCharsets.UTF_8);
+                    stdin.write((dataset.length + "\n").getBytes(StandardCharsets.UTF_8));
+                    stdin.write(dataset);
+                }
+                stdin.write((code.length + "\n").getBytes(StandardCharsets.UTF_8));
+                stdin.write(code);
+                if (!sql && request.stdin() != null && !request.stdin().isEmpty()) {
+                    stdin.write(request.stdin().getBytes(StandardCharsets.UTF_8));
+                }
             }
             stdin.flush();
         } catch (IOException cause) {
@@ -206,7 +220,11 @@ class DockerCodeRunner implements CodeRunner {
 
         boolean finished;
         try {
-            finished = process.waitFor(properties.timeoutMsFor(request.language()), TimeUnit.MILLISECONDS);
+            // 项目模式要编译多个文件再跑测试，冷容器里 10 秒常常不够；给到 30 秒下限。
+            long timeout = request.project()
+                    ? Math.max(properties.timeoutMsFor(request.language()), 30_000L)
+                    : properties.timeoutMsFor(request.language());
+            finished = process.waitFor(timeout, TimeUnit.MILLISECONDS);
         } catch (InterruptedException cause) {
             Thread.currentThread().interrupt();
             process.destroyForcibly();
