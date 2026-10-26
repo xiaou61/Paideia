@@ -116,10 +116,15 @@ public class TrackService {
                 List.copyOf(chapters), stages.size(), passedCount));
     }
 
-    /** 我的进度按 entryId 索引。上限取大一点：一条轨道几十关，500 够用。 */
+    /**
+     * 我的进度按 entryId 索引。
+     *
+     * <p>要的是"这个用户全部关卡的进度"，不是一页：上限截断会把较早通关的关卡当成未通关。
+     * 20 条轨道 × 几十关 + 知识库里的进度，几千行以内，取全量比漏算便宜。
+     */
     private Map<Long, LearningProgressService.View> progressByEntry(long userId) {
         Map<Long, LearningProgressService.View> mine = new LinkedHashMap<>();
-        for (LearningProgressService.View view : progress.listMine(userId, 500)) {
+        for (LearningProgressService.View view : progress.listMine(userId, 2000)) {
             mine.put(view.entryId(), view);
         }
         return mine;

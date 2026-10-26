@@ -325,7 +325,15 @@ async function importLanguage(client, language, lessons, options, allEntries) {
   //
   // 与 WORK-020 的区别：那时线只是分类标记；现在要有自己的顺序、章节与前置依赖，
   // 才能画成关卡地图。前置默认取"上一关"——轨道是有序的，不需要作者逐关手写 requires。
-  const stageTargets = lessons.map((lesson) => {
+  //
+  // **导读（order 0）不是关卡**：它没有小测也没有动手，永远无法通关。以前把它也登记成
+  // seq 0，于是每条线的"下一关"永远停在导读、进度永远到不了 100%，地图上还多出一格。
+  const stageLessons = lessons.filter((lesson) => Number(lesson.meta.order) !== 0)
+  if (stageLessons.length === 0) {
+    console.warn(`  ! ${spec.slug} 没有可登记的关卡（只有导读）`)
+    return { created: created.length, updated: updates, relations, stages: 0 }
+  }
+  const stageTargets = stageLessons.map((lesson) => {
     const match = byTitle.get(lesson.meta.title)
     const id = match?.id ?? created.find((item) => item.title === lesson.meta.title)?.id
     return { lesson, entryId: id }
@@ -339,6 +347,10 @@ async function importLanguage(client, language, lessons, options, allEntries) {
     // 难度：作者的 frontmatter 优先，缺省按章节推——老内容不改也有合理值
     level: item.lesson.meta.level ?? levelOfChapter(item.lesson.meta.chapter ?? '', index),
   }))
+  // 导读永远不可通关；一旦被漏回来，地图的"下一关"会永远停在它身上。
+  if (stages.some((stage) => stage.seq === 0)) {
+    throw new Error(`${spec.slug}：导读（order 0）不能登记成关卡`)
+  }
 
   if (options.dryRun) {
     console.log(`  [dry-run] 将登记轨道 ${spec.slug}（${stages.length} 关，${spec.mode}）`)

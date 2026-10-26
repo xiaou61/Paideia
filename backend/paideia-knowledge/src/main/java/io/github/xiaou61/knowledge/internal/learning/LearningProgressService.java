@@ -97,10 +97,15 @@ public class LearningProgressService {
                         null, 0, null, Map.of(), Map.of()));
     }
 
-    /** 我在学什么（只列仍已发布的条目），新的在前。 */
+    /**
+     * 我在学什么（只列仍已发布的条目），新的在前。
+     *
+     * <p>上限只防无界查询，不是分页语义：轨道地图要一次拿到全部关卡进度，
+     * 截断会让较早通关的关卡显示成"未通关"（内容扩容后更容易撞到）。
+     */
     public List<View> listMine(long userId, int limit) {
         return progressMapper.findVisibleByUser(userId).stream()
-                .limit(Math.max(1, Math.min(limit, 200)))
+                .limit(Math.max(1, Math.min(limit, 2000)))
                 .map(row -> toView(row, row.getTitle()))
                 .toList();
     }
