@@ -53,7 +53,8 @@ test.describe('从零开始', () => {
     await firstTrack(page).click()
     await expect(page.getByTestId('track-map')).toBeVisible({ timeout: 15_000 })
 
-    const stages = page.locator('[data-testid^="stage-"]')
+    // 带 data-status 的才是关卡格；`stage-state-N` / `stage-level-N` 是格子内部的图标与徽章
+    const stages = page.locator('[data-testid^="stage-"][data-status]')
     const count = await stages.count()
     expect(count).toBeGreaterThan(0)
 
@@ -75,7 +76,7 @@ test.describe('从零开始', () => {
     await expect(page.getByTestId('track-map')).toBeVisible({ timeout: 15_000 })
 
     // 直接点最后一关：没有解锁门槛，它必须能进
-    const last = page.locator('[data-testid^="stage-"]').last()
+    const last = page.locator('[data-testid^="stage-"][data-status]').last()
     await expect(last).toBeVisible()
     await last.click()
 
