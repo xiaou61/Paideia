@@ -35,8 +35,9 @@ public class TrackService {
         this.progress = progress;
     }
 
-    /** 列表页的一行：轨道 + 我的进度。 */
+    /** 列表页的一行：轨道 + 我的进度。`mode` 决定它落在理论栏还是实战栏（WORK-038）。 */
     public record TrackView(long id, String slug, String name, String summary, String kind,
+                            String mode, String theoryTrackSlug,
                             int stageCount, int passedCount, Long nextEntryId, String nextTitle) {
     }
 
@@ -50,7 +51,8 @@ public class TrackService {
     }
 
     /** 一条轨道的完整地图。 */
-    public record TrackMap(long id, String slug, String name, String summary,
+    public record TrackMap(long id, String slug, String name, String summary, String kind,
+                           String mode, String theoryTrackSlug,
                            List<ChapterView> chapters, int stageCount, int passedCount) {
     }
 
@@ -74,7 +76,8 @@ public class TrackService {
                 }
             }
             views.add(new TrackView(track.id(), track.slug(), track.name(), track.summary(),
-                    track.kind(), stages.size(), passed, nextEntry, nextTitle));
+                    track.kind(), track.mode(), track.theoryTrackSlug(),
+                    stages.size(), passed, nextEntry, nextTitle));
         }
         return List.copyOf(views);
     }
@@ -109,6 +112,7 @@ public class TrackService {
             chapters.add(new ChapterView(entry.getKey(), List.copyOf(entry.getValue())));
         }
         return Optional.of(new TrackMap(track.id(), track.slug(), track.name(), track.summary(),
+                track.kind(), track.mode(), track.theoryTrackSlug(),
                 List.copyOf(chapters), stages.size(), passedCount));
     }
 

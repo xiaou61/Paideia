@@ -41,6 +41,14 @@ function lineSpecOf(language, lessons) {
   if (!slug) {
     throw new Error(`${language}/ 的课程文件缺少 frontmatter category`)
   }
+  const mode = meta.line_mode ?? 'theory'
+  if (mode !== 'theory' && mode !== 'practice') {
+    throw new Error(`${language}/ 的 line_mode 只能是 theory / practice，实际是 ${mode}`)
+  }
+  // 实战轨道必须声明验收方式：否则关卡做完了判不了对错（WORK-038 REQ-006）
+  if (mode === 'practice' && !meta.verify) {
+    throw new Error(`${language}/ 是实战轨道，frontmatter 必须写 verify（sql / run / project）`)
+  }
   return {
     slug,
     name: meta.line_name ?? overview?.meta.title ?? slug,
@@ -48,6 +56,11 @@ function lineSpecOf(language, lessons) {
     summary: meta.line_summary ?? null,
     kind: meta.line_kind ?? 'course',
     sortOrder: Number(meta.line_sort ?? 100),
+    // 理论 / 实战（WORK-038）；缺省 theory，老内容不用改
+    mode,
+    // 实战轨道指向的理论轨道：只用于"建议先看 X"，不构成门禁
+    theoryTrackSlug: meta.line_theory ?? null,
+    verify: meta.verify ?? null,
   }
 }
 
@@ -328,17 +341,26 @@ async function importLanguage(client, language, lessons, options, allEntries) {
   }))
 
   if (options.dryRun) {
-    console.log(`  [dry-run] 将登记轨道 ${spec.slug}（${stages.length} 关）`)
+    console.log(`  [dry-run] 将登记轨道 ${spec.slug}（${stages.length} 关，${spec.mode}）`)
   } else if (options.track !== false) {
+    // 配对引用指向不存在的轨道时只警告不阻断：内容可以先写、后导入（WORK-038 已知限制）
+    if (spec.theoryTrackSlug) {
+      const known = await client.get('/api/v1/learn/tracks')
+      if (!known.some((item) => item.slug === spec.theoryTrackSlug)) {
+        console.warn(`  ! ${spec.slug} 的 line_theory 指向不存在的轨道 ${spec.theoryTrackSlug}`)
+      }
+    }
     await client.post('/api/v1/knowledge/admin/tracks', {
       slug: spec.slug,
       name: spec.name,
       summary: spec.summary,
       kind: spec.kind,
       sortOrder: spec.sortOrder,
+      mode: spec.mode,
+      theoryTrackSlug: spec.theoryTrackSlug,
       stages,
     })
-    console.log(`  ~ 轨道 ${spec.slug}（${stages.length} 关）`)
+    console.log(`  ~ 轨道 ${spec.slug}（${stages.length} 关，${spec.mode}）`)
   }
 
   return { created: created.length, updated: updates, relations, stages: stages.length }

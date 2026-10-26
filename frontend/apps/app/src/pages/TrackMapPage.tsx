@@ -58,6 +58,15 @@ export function TrackMapPage() {
     queryFn: () => learning.trackMap(slug),
     enabled: slug !== '',
   })
+  // 配对提示要显示的是轨道的**名字**而不是 slug，所以顺带取一次列表；
+  // `/learn` 已经取过同一份数据，正常路径下这是缓存命中。
+  const theorySlug = map.data?.theoryTrackSlug ?? null
+  const tracks = useQuery({
+    queryKey: ['learning-tracks'],
+    queryFn: () => learning.tracks(),
+    enabled: theorySlug !== null,
+  })
+  const theoryName = tracks.data?.find((track) => track.slug === theorySlug)?.name ?? theorySlug
   // 难度筛选：null = 全部。用户要能"只看入门"或"只看深入"，
   // 而地图本身不因此重排（顺序就是学习路径，筛选只减不加）。
   const [levelFilter, setLevelFilter] = useState<string | null>(null)
@@ -92,10 +101,24 @@ export function TrackMapPage() {
       {map.isSuccess ? (
         <>
           <PageHeader
-            eyebrow={`${map.data.stageCount} 关 · 已通关 ${map.data.passedCount}`}
+            eyebrow={`${map.data.mode === 'practice' ? '实战' : '理论'} · ${map.data.stageCount} 关 · 已通关 ${map.data.passedCount}`}
             title={map.data.name}
             description={map.data.summary ?? '沿着下面的关卡一关一关往下走。'}
           />
+
+          {/* 配对提示：实战轨道指向它假定的理论轨道。只是建议，不限制进入（WORK-038）。 */}
+          {map.data.theoryTrackSlug === null ? null : (
+            <p className="text-muted-foreground mb-4 text-sm" data-testid="learn-theory-hint">
+              建议先看{' '}
+              <Link
+                to={`/learn/${map.data.theoryTrackSlug}`}
+                className="text-primary underline-offset-2 hover:underline"
+              >
+                {theoryName}
+              </Link>
+              ，不过想直接动手也可以。
+            </p>
+          )}
 
           {/* 难度筛选：把"快速入门"与"深入"分开看 */}
           <div className="mb-4 flex flex-wrap items-center gap-2" data-testid="level-filter">
