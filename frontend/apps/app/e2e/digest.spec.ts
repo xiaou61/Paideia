@@ -114,4 +114,20 @@ test.describe('每日速递', () => {
     expect(href).toMatch(/^https?:\/\//)
     await expect(firstTitle).toHaveAttribute('target', '_blank')
   })
+
+  test('GitHub 组有内容时可在今日/本周之间切换', async ({ page }) => {
+    await page.goto('/#/digest')
+    await expect(page.getByTestId('digest-date-option').first()).toBeVisible({ timeout: 15_000 })
+
+    const github = page.getByTestId('digest-group-github')
+    if ((await github.count()) === 0) {
+      test.skip(true, '这一天没有 GitHub 组内容，切换无从验证')
+      return
+    }
+    await expect(page.getByTestId('digest-github-window')).toBeVisible()
+    await page.getByTestId('digest-github-window-week').click()
+    await expect(github).toContainText('按本周新增 star')
+    await page.getByTestId('digest-github-window-day').click()
+    await expect(github).toContainText('按昨日新增 star')
+  })
 })

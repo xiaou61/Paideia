@@ -23,8 +23,12 @@ export interface DigestItem {
   /** 我们自己写的一句话摘要；降级态为 null */
   summary: string | null
   url: string
-  /** 源自身的信号：HN 点数、GitHub 当日新增 star；其它源为 null */
+  /** 源自身的信号：HN 点数、GitHub 昨日新增 star；其它源为 null */
   heat: number | null
+  /** GitHub 的昨日新增 star（= heat）；其它源为 null */
+  starsDay: number | null
+  /** GitHub 的近 7 日新增 star；其它源为 null */
+  starsWeek: number | null
   meta: string | null
   /** 原文发布时间（epoch 毫秒） */
   publishedAt: number | null

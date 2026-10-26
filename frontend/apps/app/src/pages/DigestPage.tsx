@@ -20,7 +20,7 @@ import {
   TabsTrigger,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, ArrowRight, CalendarDays, ExternalLink, Flame, NotebookPen } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CalendarDays, ExternalLink, Flame, NotebookPen, Star } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 
@@ -48,6 +48,9 @@ const digest = createDigestApi(api)
 export function DigestPage() {
   /** undefined = 还没定（等日期列表回来），null = 用户明确要看今天。 */
   const [date, setDate] = useState<string | null | undefined>(undefined)
+
+  /** GitHub 组的口径：今日（d1）/ 本周（d7）。只影响该组，不影响顶部「日报/周报」页签。 */
+  const [githubWindow, setGithubWindow] = useState<'day' | 'week'>('day')
 
   const dates = useQuery({
     queryKey: ['digest-dates'],
@@ -166,17 +169,26 @@ export function DigestPage() {
               <AlertTitle>这一天还没有速递</AlertTitle>
               <AlertDescription>
                 {available.length === 0
-                  ? '采集每天 07:00 自动跑一次，跑完这里就会出现内容。'
+                  ? '采集每天 08:00 自动跑一次，跑完这里就会出现内容。'
                   : `最近一份是 ${available[0]}，点上面的日期就能看。`}
               </AlertDescription>
             </Alert>
           ) : (
             <div className="mt-6 space-y-10">
               {DIGEST_GROUPS.map((group) => {
-                const items = current.data?.[group.key] ?? []
-                if (items.length === 0) {
+                const raw = current.data?.[group.key] ?? []
+                if (raw.length === 0) {
                   return null
                 }
+                const isGithub = group.key === 'github'
+                // GitHub 组按真实增量重排；其它组保持服务端的 heat 顺序
+                const items = isGithub
+                  ? [...raw].sort((left, right) =>
+                      githubWindow === 'week'
+                        ? (right.starsWeek ?? -1) - (left.starsWeek ?? -1)
+                        : (right.starsDay ?? -1) - (left.starsDay ?? -1),
+                    )
+                  : raw
                 const withHeat = items.filter((item) => item.heat !== null)
                 const highCut = Math.ceil(withHeat.length * 0.25)
                 const midCut = Math.ceil(withHeat.length * 0.6)
@@ -185,13 +197,43 @@ export function DigestPage() {
                     <h2 className="mb-3 flex items-center gap-2 text-lg font-medium">
                       {group.title}
                       <Badge variant="secondary">{items.length}</Badge>
-                      <span className="text-muted-foreground text-xs font-normal">按热度排序</span>
+                      <span className="text-muted-foreground text-xs font-normal">
+                        {isGithub
+                          ? githubWindow === 'week'
+                            ? '按本周新增 star'
+                            : '按昨日新增 star'
+                          : '按热度排序'}
+                      </span>
+                      {isGithub ? (
+                        <div
+                          className="ml-auto flex items-center gap-1"
+                          data-testid="digest-github-window"
+                        >
+                          <Button
+                            variant={githubWindow === 'day' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setGithubWindow('day')}
+                            data-testid="digest-github-window-day"
+                          >
+                            今日
+                          </Button>
+                          <Button
+                            variant={githubWindow === 'week' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setGithubWindow('week')}
+                            data-testid="digest-github-window-week"
+                          >
+                            本周
+                          </Button>
+                        </div>
+                      ) : null}
                     </h2>
                     <div className="grid gap-3 md:grid-cols-2">
                       {items.map((item, index) => (
                         <DigestCard
                           key={item.id}
                           item={item}
+                          githubWindow={isGithub ? githubWindow : undefined}
                           tier={
                             item.heat === null
                               ? null
@@ -248,13 +290,18 @@ export function DigestPage() {
 function DigestCard({
   item,
   tier,
+  githubWindow,
 }: {
   item: DigestItem
   /** 组内热度档位：前 25% 高、40% 较高、其余不标。null = 这条没有热度信号。 */
   tier: 'high' | 'mid' | 'low' | null
+  /** 只对 GitHub 组有值：决定卡片显示昨日还是本周的数字。 */
+  githubWindow?: 'day' | 'week'
 }) {
   const degraded = item.summaryState === 'degraded'
   const tierLabel = tier === 'high' ? '高热' : tier === 'mid' ? '较热' : null
+  const github = item.groupKey === 'github'
+  const stars = github ? (githubWindow === 'week' ? item.starsWeek : item.starsDay) : null
   // 「存成笔记」是纯前端跳转（I-16）：把标题与摘要预填进新建笔记页，用户可改再存
   const noteLink = `/notes/new?title=${encodeURIComponent(item.title)}&content=${encodeURIComponent(
     (item.summary ?? '') + '\n\n> 来源：' + item.url,
@@ -268,12 +315,22 @@ function DigestCard({
       <CardContent className="flex flex-1 flex-col gap-2.5 pt-5">
         <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
           <Badge variant="outline">{item.sourceName}</Badge>
-          {item.heat === null ? null : (
+          {github ? (
+            <span className="flex items-center gap-1" data-testid="digest-github-stars">
+              <Star className="size-3.5" />
+              {githubWindow === 'week'
+                ? `本周 +${formatStars(stars)}★`
+                : `+${formatStars(stars)}★ 昨日`}
+            </span>
+          ) : item.heat === null ? null : (
             <span className="flex items-center gap-1" data-testid="digest-heat">
               <Flame className="size-3.5" />
               {item.heat}
             </span>
           )}
+          {github && githubWindow !== 'week' && item.starsWeek !== null ? (
+            <span className="text-muted-foreground">本周 +{formatStars(item.starsWeek)}★</span>
+          ) : null}
           {tierLabel === null ? null : (
             <Badge
               variant={tier === 'high' ? 'default' : 'secondary'}
@@ -312,4 +369,9 @@ function DigestCard({
       </CardContent>
     </Card>
   )
+}
+
+/** GitHub 的增量显示；null 只在旧数据/降级时出现。 */
+function formatStars(value: number | null): string {
+  return (value ?? 0).toLocaleString('zh-CN')
 }
