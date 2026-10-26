@@ -1,4 +1,4 @@
-# 四条告警（WORK-028 REQ-031..033）。
+# 六条告警（WORK-028 的四条 + WORK-042 的两条）。
 #
 # 为什么用 Grafana 而不是 Alertmanager：后者要多一个常驻进程与一套分组/抑制/静默配置，
 # 而这里只需要"红了就发一封邮件"。升级触发条件：需要按标签分组去重、抑制、多接收端。
@@ -43,7 +43,7 @@ groups:
         # 但**一封邮件都不发**。实测踩过：规则全部 ok、日志有 "Sending alerts to local
         # notifier"，却没有任何投递记录。
         notification_settings:
-          receiver: paideia-mail
+          receiver: paideia-ops
         annotations:
           summary: 有采集目标或外部依赖下线
           description: 打开运维面板看「采集目标与外部依赖」表，up=0 的那一项就是它。
@@ -72,7 +72,7 @@ groups:
         # 但**一封邮件都不发**。实测踩过：规则全部 ok、日志有 "Sending alerts to local
         # notifier"，却没有任何投递记录。
         notification_settings:
-          receiver: paideia-mail
+          receiver: paideia-ops
         annotations:
           summary: 磁盘可用不足 15%
           description: 现在最可能吃掉磁盘的是 Docker 镜像（8.35G 中 6.18G 可回收）。
@@ -102,7 +102,7 @@ groups:
         # 但**一封邮件都不发**。实测踩过：规则全部 ok、日志有 "Sending alerts to local
         # notifier"，却没有任何投递记录。
         notification_settings:
-          receiver: paideia-mail
+          receiver: paideia-ops
         annotations:
           summary: 数据库备份已过期或失败
           description: 看 journalctl -u paideia-backup。没有备份时，一次误删就是全部内容没了。
@@ -131,7 +131,59 @@ groups:
         # 但**一封邮件都不发**。实测踩过：规则全部 ok、日志有 "Sending alerts to local
         # notifier"，却没有任何投递记录。
         notification_settings:
-          receiver: paideia-mail
+          receiver: paideia-ops
         annotations:
           summary: Laya 内存贴近上限
           description: 2026-10-20 常态 85%。超过 90% 后 OOM 会静默降级成规则判断，功能还在但决策模型不在了。
+
+      # 应用 5xx 比例超过 5%（WORK-042）。用 Prometheus 指标而不是日志，避免日志格式变化让规则失真。
+      - uid: paideia-http-5xx
+        title: HTTP 5xx 比例超过 5%
+        condition: A
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: paideia-prometheus
+            model:
+              refId: A
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 1
+              # clamp_min 防分母为 0；bool 保证正常时返回 0 而不是空结果。
+              expr: >-
+                (sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+                 / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 0.000001))
+                > bool 0.05
+        noDataState: NoData
+        execErrState: Error
+        notification_settings:
+          receiver: paideia-ops
+        annotations:
+          summary: 近 5 分钟 5xx 比例超过 5%
+          description: 打开运维页的 AI 诊断区；诊断报告会带最近的 5xx 指标与 ERROR 日志。
+
+      # 应用 ERROR 类日志突增（WORK-042）。
+      # **NoData 当正常**：没有 error 日志时 count_over_time 返回空，这不等于采不到数。
+      # 与指标规则相反，这里不能设 NoData→Alerting，否则一条错误都没有时反而一直告警。
+      - uid: paideia-log-errors
+        title: 应用 ERROR 日志突增
+        condition: A
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: paideia-loki
+            model:
+              refId: A
+              queryType: instant
+              expr: >-
+                sum(count_over_time({unit="paideia.service"} |~ "(?i)(error|exception|failed)" [5m]))
+                > 20
+        noDataState: OK
+        execErrState: Error
+        notification_settings:
+          receiver: paideia-ops
+        annotations:
+          summary: 近 5 分钟应用 ERROR 类日志超过 20 条
+          description: 打开运维页的日志面板与 AI 诊断区；诊断证据会带最近日志摘录。

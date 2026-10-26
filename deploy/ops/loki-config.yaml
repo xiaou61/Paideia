@@ -1,0 +1,52 @@
+# Loki 单机配置（WORK-042）。
+#
+# 三条约束与其它监控单元一致：只绑回环、独立单元、有 MemoryMax。
+# 文件系统存储 + tsdb 索引；保留 30 天，与 Prometheus 对齐。
+# 不启用 ruler：告警由 Grafana 统一做，多一个 alertmanager 只会多一处要维护。
+
+auth_enabled: false
+
+server:
+  http_listen_address: 127.0.0.1
+  http_listen_port: 3100
+  grpc_listen_address: 127.0.0.1
+  grpc_listen_port: 9096
+  log_level: warn
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /var/lib/loki
+  storage:
+    filesystem:
+      chunks_directory: /var/lib/loki/chunks
+      rules_directory: /var/lib/loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2020-10-24
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  retention_period: 720h
+  # 超过 7 天的旧样本拒收：Alloy 正常只推新日志，出现旧时间戳说明时钟或缓冲异常。
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+  max_query_lookback: 720h
+
+compactor:
+  working_directory: /var/lib/loki/compactor
+  retention_enabled: true
+  delete_request_store: filesystem
+  compaction_interval: 10m
+
+analytics:
+  reporting_enabled: false

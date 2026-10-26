@@ -20,7 +20,18 @@ public class OpsProperties {
     /** Grafana 地址。反向代理唯一的目标。 */
     private String grafanaUrl = "http://127.0.0.1:3000";
 
+    /** Loki 查询地址（WORK-042）。只应指向回环。 */
+    private String lokiUrl = "http://127.0.0.1:3100";
+
+    /**
+     * Grafana webhook 的共享令牌（WORK-042）。为空时 webhook 一律拒绝，手动诊断不受影响。
+     * 真实值来自服务器 600 文件，经 systemd 环境变量注入；仓库里只有占位。
+     */
+    private String hookToken = "";
+
     private final Thresholds thresholds = new Thresholds();
+
+    private final Diagnosis diagnosis = new Diagnosis();
 
     public String getPrometheusUrl() {
         return prometheusUrl;
@@ -44,6 +55,26 @@ public class OpsProperties {
 
     public void setGrafanaUrl(String grafanaUrl) {
         this.grafanaUrl = grafanaUrl;
+    }
+
+    public String getLokiUrl() {
+        return lokiUrl;
+    }
+
+    public void setLokiUrl(String lokiUrl) {
+        this.lokiUrl = lokiUrl;
+    }
+
+    public String getHookToken() {
+        return hookToken;
+    }
+
+    public void setHookToken(String hookToken) {
+        this.hookToken = hookToken == null ? "" : hookToken;
+    }
+
+    public Diagnosis getDiagnosis() {
+        return diagnosis;
     }
 
     public Thresholds getThresholds() {
@@ -105,6 +136,77 @@ public class OpsProperties {
 
         public void setBackupStaleHours(long backupStaleHours) {
             this.backupStaleHours = backupStaleHours;
+        }
+    }
+
+    /**
+     * 诊断的开关与上限（WORK-042）。
+     *
+     * <p>`user-id` 是**告警触发**时记账的账号；手动触发用触发者自己的 id。0 表示未配置，
+     * webhook 只会记一条跳过日志。
+     */
+    public static class Diagnosis {
+
+        private boolean enabled = true;
+
+        private long userId = 0;
+
+        /** 同一告警名的冷却窗口；窗口内重复触发不建新行。 */
+        private long cooldownSeconds = 600;
+
+        private int maxLogLines = 60;
+
+        /** 证据总字符上限（摘要 + 指标 + 告警 + 日志 + 发版）。 */
+        private int maxEvidenceChars = 12000;
+
+        private int listLimit = 20;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public long getUserId() {
+            return userId;
+        }
+
+        public void setUserId(long userId) {
+            this.userId = userId;
+        }
+
+        public long getCooldownSeconds() {
+            return cooldownSeconds;
+        }
+
+        public void setCooldownSeconds(long cooldownSeconds) {
+            this.cooldownSeconds = cooldownSeconds;
+        }
+
+        public int getMaxLogLines() {
+            return maxLogLines;
+        }
+
+        public void setMaxLogLines(int maxLogLines) {
+            this.maxLogLines = maxLogLines;
+        }
+
+        public int getMaxEvidenceChars() {
+            return maxEvidenceChars;
+        }
+
+        public void setMaxEvidenceChars(int maxEvidenceChars) {
+            this.maxEvidenceChars = maxEvidenceChars;
+        }
+
+        public int getListLimit() {
+            return listLimit;
+        }
+
+        public void setListLimit(int listLimit) {
+            this.listLimit = listLimit;
         }
     }
 }

@@ -13,7 +13,7 @@ set -uo pipefail
 OUTPUT_DIR="${OUTPUT_DIR:-/var/lib/node_exporter/textfile}"
 OUTPUT_FILE="$OUTPUT_DIR/ops.prom"
 BACKUP_STATUS="${BACKUP_STATUS:-/opt/paideia-backup/last-status.json}"
-UNITS=(paideia laya rustfs mysql redis-server)
+UNITS=(paideia laya rustfs mysql redis-server loki alloy)
 CONTAINER_PREFIX="firecrawl-"
 
 mkdir -p "$OUTPUT_DIR"

@@ -56,6 +56,9 @@ public final class RunKind {
     /** 复习会话出题（WORK-034）。一次会话一次调用。 */
     public static final String REVIEW_GENERATE = "review_generate";
 
+    /** 运维诊断（WORK-042）。告警或管理员触发的一次性根因分析，与学习行为分开统计。 */
+    public static final String OPS_DIAGNOSIS = "ops_diagnosis";
+
     private RunKind() {
     }
 }

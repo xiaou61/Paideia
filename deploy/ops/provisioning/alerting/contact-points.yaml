@@ -1,19 +1,20 @@
-# 告警的收件人（WORK-028 REQ-032）。
+# 告警的收件人（WORK-028；WORK-042 合并为「邮件 + 诊断 webhook」）。
 #
 # **SMTP 口令不在这里**：它在 /etc/grafana/grafana.env（600），由 systemd 注入环境变量。
-# 本文件只写"发给谁"，进仓库也不会泄露任何凭据。
+# **webhook 令牌也不在这里**：仓库里只有占位符，install-ops.sh 用服务器上的
+# /etc/paideia-ops/hook.token（600）替换后再安装。
 #
-# 四条规则不分组（group_by 为空即每条独立通知），因为它们的处置动作完全不同：
-# 目标下线看面板、磁盘低了清镜像、备份过期看 journal、Laya 内存考虑重启。合成一封反而更难读。
+# 六条规则不分组（group_by 为空即每条独立通知），因为它们的处置动作完全不同：
+# 目标下线看面板、磁盘低了清镜像、备份过期看 journal、Laya 内存考虑重启、5xx/ERROR 看诊断。
 #
 # 邮件模板用 Grafana 内置的，不自定义——内容已足够（标题 + 摘要 + 面板链接）。
 apiVersion: 1
 
 contactPoints:
   - orgId: 1
-    name: paideia-mail
+    name: paideia-ops
     receivers:
-      - uid: paideia-mail-1
+      - uid: paideia-ops-mail
         type: email
         disableResolveMessage: false
         settings:
@@ -23,9 +24,22 @@ contactPoints:
           # 这三个值来自 /etc/grafana/grafana.env，写在 provisioning 里会被 GF_ 环境变量覆盖
           fromAddress: 3153566913@qq.com
           fromName: Paideia 运维
+
+      # WORK-042：把 firing 的告警交给应用的诊断编排。
+      # 端点只接受回环来源，并且要求 X-Paideia-Ops-Token；resolved 不发送（disableResolveMessage）。
+      - uid: paideia-ops-ai
+        type: webhook
+        disableResolveMessage: true
+        settings:
+          url: http://127.0.0.1:8081/api/v1/ops/hooks/grafana
+          httpMethod: POST
+          maxAlerts: 5
+          headers:
+            X-Paideia-Ops-Token: __PAIDEIA_OPS_HOOK_TOKEN__
+
 policies:
   - orgId: 1
-    receiver: paideia-mail
+    receiver: paideia-ops
     group_by: []
     group_wait: 30s
     group_interval: 5m

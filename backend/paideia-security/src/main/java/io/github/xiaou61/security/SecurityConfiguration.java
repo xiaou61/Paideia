@@ -143,6 +143,11 @@ public class SecurityConfiguration {
                         //   ② Grafana 反代是面板的唯一入口，它内部开匿名 Viewer——
                         //      这条规则一旦静默失效，等于把 Grafana 直接公开给任何登录用户。
                         .requestMatchers("/api/v1/ops/admin/**").hasRole("ADMIN")
+                        // 运维诊断的告警 webhook（WORK-042）：机器到机器，没有 JWT。
+                        // 只允许**回环来源**；共享令牌在控制器里用常量时间比较再验一次。
+                        // 必须排在 anyRequest() 之前，否则会被当成普通接口要求登录。
+                        .requestMatchers("/api/v1/ops/hooks/**")
+                        .access(LocalOnlyAuthorizationManager.INSTANCE)
                         // Grafana 反代**整体放行，安全边界交给 Grafana 自己**（WORK-028）。
                         //
                         // 试过而放弃的三条路，每条都有实测证据：

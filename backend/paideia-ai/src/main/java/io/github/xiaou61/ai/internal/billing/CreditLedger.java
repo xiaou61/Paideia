@@ -56,6 +56,12 @@ class CreditLedger {
     /** 复习会话出题（WORK-034）：一次会话一次调用，与训练营分开记，便于看单次复习成本。 */
     static final String KIND_REVIEW = "REVIEW";
 
+    /**
+     * 运维诊断（WORK-042）。它由告警或管理员触发，不是学习行为；与 SETTLE 分开记账，
+     * 才能回答"这套 AIOps 一个月花了多少"。
+     */
+    static final String KIND_OPS_DIAGNOSIS = "OPS_DIAGNOSIS";
+
     private Long id;
     private Long userId;
     private long delta;

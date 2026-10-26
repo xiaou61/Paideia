@@ -17,7 +17,8 @@ import org.springframework.stereotype.Service;
 @Service
 class OpsSummaryService {
 
-    private static final List<String> UNITS = List.of("paideia", "laya", "rustfs", "mysql", "redis-server");
+    private static final List<String> UNITS = List.of(
+            "paideia", "laya", "rustfs", "mysql", "redis-server", "loki", "alloy");
 
     private final OpsProperties properties;
     private final PrometheusClient prometheus;

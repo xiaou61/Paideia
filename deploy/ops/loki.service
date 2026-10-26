@@ -1,0 +1,22 @@
+# Loki（Paideia 日志，WORK-042）。
+# 与其它监控单元同一套纪律：只绑回环、独立 Restart、MemoryMax 兜底。
+[Unit]
+Description=Loki（Paideia 日志）
+After=network-online.target
+
+[Service]
+Type=simple
+User=loki
+Group=loki
+ExecStart=/usr/local/bin/loki -config.file=/etc/loki/loki-config.yaml
+Restart=on-failure
+RestartSec=5
+MemoryMax=512M
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/loki
+
+[Install]
+WantedBy=multi-user.target

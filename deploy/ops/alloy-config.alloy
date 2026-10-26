@@ -1,0 +1,38 @@
+# Alloy 采集配置（WORK-042）。
+#
+# 只采白名单 unit 的 journald 日志：白名单是常量，不接受任何外部输入，
+# 因此没有"把整台机器的日志都推给 Loki"的面。
+# 标签 `unit` 来自 journald 的 `_SYSTEMD_UNIT`；`level` 来自优先级关键字
+# （error / warning / info …），Loki 查询与告警都依赖这两个标签。
+
+loki.relabel "units" {
+  forward_to = []
+
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    regex         = "paideia\\.service|laya\\.service|rustfs\\.service|mysql\\.service|redis-server\\.service"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__journal_priority_keyword"]
+    target_label  = "level"
+  }
+}
+
+loki.source.journal "units" {
+  labels        = { job = "systemd-journal" }
+  relabel_rules = loki.relabel.units.rules
+  forward_to    = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://127.0.0.1:3100/loki/api/v1/push"
+  }
+}

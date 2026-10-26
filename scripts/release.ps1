@@ -284,13 +284,36 @@ Step '等待健康检查' {
     throw '健康检查超时：服务未在 60 秒内就绪'
 }
 
+# 发版标记（WORK-042）：写进 node_exporter 的 textfile 目录，供 Prometheus 与 AI 诊断读取
+# "最近一次成功发版是什么时候、哪个版本"。**只在健康检查通过后写**；写失败只告警，
+# 不让一次标记失败把已经成功的发版判成失败。
+$head = (& git -C $repo rev-parse HEAD 2>$null)
+$version = if ($LASTEXITCODE -eq 0 -and $head) { $head.Trim().Substring(0, 7) } else { 'unknown' }
+$epoch = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+$deployProm = @"
+# HELP paideia_deploy_epoch_seconds 最近一次成功发版的 Unix 时间
+# TYPE paideia_deploy_epoch_seconds gauge
+paideia_deploy_epoch_seconds $epoch
+# HELP paideia_build_info 当前运行的版本
+# TYPE paideia_build_info gauge
+paideia_build_info{version="$version"} 1
+"@
+$deployB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($deployProm))
+try {
+    Step '写发版标记' {
+        Remote "echo $deployB64 | base64 -d > /var/lib/node_exporter/textfile/deploy.prom.tmp && mv -f /var/lib/node_exporter/textfile/deploy.prom.tmp /var/lib/node_exporter/textfile/deploy.prom"
+    }
+} catch {
+    Write-Warning "发版标记写入失败（不影响本次部署）：$($_.Exception.Message)"
+}
+
 $total.Stop()
 
 # 只有走到这里（解包 + 重启 + 健康检查全过了）才更新标记：失败的发布不能让下一次
 # 误以为"前端已经是最新的"。即使这次跳过了前端构建也照样写——因为跳过的前提正是
 # "frontend/ 自上次发版起没动过"，所以线上那份 dist 与 HEAD 的前端内容是一致的。
 # git rev-parse 失败时留空，下次 Test-FrontendChanged 会当作"改过"而重建（安全方向）。
-$head = (& git -C $repo rev-parse HEAD 2>$null)
+# 上一次成功发版的提交同上（$head 在上面的发版标记里已经取过）。
 if ($LASTEXITCODE -eq 0 -and $head) {
     Set-Content -Path $lastReleaseMarker -Value $head.Trim() -NoNewline
 }

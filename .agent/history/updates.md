@@ -6656,6 +6656,27 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
 
+## 2026-10-26 15:56:45 +0800 · WORK-041 · WORK-041 开独立 worktree
+
+- 类型：decision
+- 变更：在 .worktrees/work-041 新建工作树，分支 work/WORK-041；主树保持 master 只用于合并与部署。
+- 决策：按用户要求用 worktree 隔离实施；测试库口令文件复制到工作树（被忽略，不入库）。
+- 依据：AGENTS.md 的并发会话约定；project-lifecycle 的 Worktree 协议。
+- 验证：git worktree list 显示 F:/Paideia/.worktrees/work-041 [work/WORK-041]。
+- 本地提交：工件已在主树 ae7b96a 提交
+- 远端推送：未执行
+
+## 2026-10-26 16:26:12 +0800 · WORK-025 · 发布线上 36 条面经草稿
+
+- 类型：implementation
+- 变更：生产库 knowledge_entries 中 fingerprint 非空的 36 条（分类 essay-java「八股文 · 面经真题」）由 draft 批量改为 published，published_at 写 UTC_TIMESTAMP(3)。
+- 决策：按用户「可以的开始吧」发布积压草稿；**保留 publish-directly=false**——无人值守直发属于产品决定，本次未改。
+- 依据：线上配置 paideia.ai.essay.enabled=true，定时任务 fixedDelay 24h；近 7 天日志 39 次成功、0 次抓取失败；抽检 4 条，题目均为技术题、解析带结论与分点。
+- 验证：生产库复查 published=36、draft=0，essay-java 分类下 status=published 共 36 条；/api/v1/knowledge/* 匿名仍返回 401（与既有鉴权一致），未做带登录的 e2e。
+- 遗留：帖子 2932449 每次抽题都报「模型输出不是合法 JSON」，单篇失败未修。
+- 本地提交：未提交（updates.md 内另有别的会话未提交的 WORK-041 条目，不并入本次）
+- 远端推送：未执行
+
 ## 2026-10-26 16:20 +0800 · 项目 · e2e 失败时保留 trace（原配置永不触发）
 
 - 类型：fix
@@ -6672,6 +6693,25 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
   （于是打到上一轮的库、globalSetup 登录失败）。跑前先确认 8080 上没有遗留进程。
 - 本地提交：仅四份 `playwright.config.ts` 与本条更新历史；远端推送：按用户本轮授权推送 master。
 
+## 2026-10-26 16:35 +0800 · 项目 · 管理端分类下拉按学习线分组
+
+- 类型：feature
+- 变更：`CategoryNode` 补 `lineKind`（后端 `CategoryTree.Node` 本来就返回，前端类型漏了）；
+  `categoryOptions` 换成 `categoryGroups`，按 `course` / `reading` / 无标记分「实战课 / 阅读线 / 其他分类」三档；
+  条目筛选、条目表单、概念表单、分类的上级选择四处共用同一份分组。
+- 决策：不加二级分类、不动数据。用户问「可选择的项太多，能不能分类后下拉」时，线上 21 条学习线
+  全是并列一级（`import-course.mjs` 建线时 `parentId: null`），所以分层只能借 `lineKind`，不新建目录层级。
+- 依据：分类树里 3 条 course + 18 条 reading（content/courses、content/reading），
+  再混着 `后端基础 / 架构 / 八股文 · 面经真题` 这类手工分类。
+- 验证：`pnpm --filter @paideia/admin typecheck` 通过；`scripts/test-db.sh` 跑
+  `playwright test e2e/knowledge.spec.ts e2e/concepts.spec.ts e2e/layout.mobile.spec.ts` 14 passed；
+  `knowledge.spec.ts` 新增断言「分类下拉里要出现『其他分类』组标题」后 3 passed。
+  全量 admin e2e 有 6 条红（ai-runs 2 条 + 窄屏 4 条），**在暂存本次改动后复跑同样红**：
+  ai-runs 是派生空库没有调用数据，窄屏是连续登录触发限流（单跑 4 条全绿）。
+- 旁注：e2e 用 `PAIDEIA_BACKEND_PORT/PAIDEIA_ADMIN_PORT` 另起端口，避免复用别的会话遗留的服务。
+- 本地提交：5abe939（仅 6 个前端文件；本文件另有别的会话未提交条目，不并入本次提交）
+- 远端推送：未执行
+
 ## 2026-10-26 16:52:39 +0800 · WORK-041 · WORK-041 实施：真实增量 + 官方候选 + 今日/本周切换
 
 - 类型：implementation
@@ -6681,6 +6721,25 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：单元 306/0/13；集成 10/0；迁移闸 9/0；前端 typecheck 0 error；日期/门禁/唯一键三条反向验证先红后绿；报告 status=partial（e2e 与部署未做）
 - 复验：rebase 到 master `5abe939` 后，集成 10/0、前端 typecheck 0 error；主树有并发会话未提交改动，**本分支未合并**。
 - 本地提交：8d2468e, c28e4db, d02dfa5（未推送）
+- 远端推送：未执行
+
+## 2026-10-26 17:10 +0800 · 项目 · 学习者端页头导航改为分组下拉
+
+- 类型：feature
+- 变更：`LearnerHeader` 的 5 个横排链接 + 「更多」改成四个下拉组：学习 / 知识 / 练习 / 求职。
+  组内顺序固定，**组间顺序跟身份的 `preferredNav` 走**（取组内最早出现的位置，`sort` 稳定）；
+  不隐藏任何入口。激活态挂在组触发器上（菜单收起时只有它可见）。窄屏抽屉用同一份分组，多一行组名。
+- 决策：上一轮我按"管理端分类下拉"理解错了用户的意思（他要的是页头导航），
+  那一版分组保留（本身是改进），本次按他的原话重做页头。
+- 依据：2026-10-22 加到 10 项时 1280 宽下标签被挤成竖排断字，当时拆成"主干 + 更多"；
+  用户 2026-10-26 仍反馈"可选择的项太多，要分类可下拉"。
+- 验证：`pnpm --filter @paideia/app typecheck` 通过；`scripts/test-db.sh` 跑
+  identity / home / notes / review / digest / layout.mobile 共 **44 passed / 4 failed**，
+  4 条红全是速递里**依赖已有数据**的用例（GitHub 组有内容、往日可翻），派生空库跑不了；
+  navigation.spec（6 条，含"每组下拉一项不缺"）与 identity.spec（含"求职组排第一"）单跑全绿。
+- 顺带修：`identity.spec` 里 `getByText('不影响你能做什么')` 会同时命中登录方式那一段
+  （strict mode 违例，与本次导航改动无关但是同一文件里的既有红），改用更长的前缀。
+- 本地提交：430ffd3（仅学习者端 8 个文件）
 - 远端推送：未执行
 
 ## 2026-10-26 17:20 +0800 · WORK-041 · 部署：反代 + 发版
@@ -6693,3 +6752,77 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 未验证：线上 e2e（本会话没有 e2e-learner 口令）；新代码首次采集在 2026-10-27 08:00，今天的 GitHub 组仍是旧数据（stars 字段 NULL）。
 - 本地提交：仅 WORK-041 的 report/tasks 与这条记录；主树另有并发会话未提交改动，未并入。
 - 远端推送：未执行。
+
+## 2026-10-26 17:25 +0800 · 项目 · 关卡地图去掉压错位置的连线
+
+- 类型：fix
+- 变更：`TrackMapPage` 删除 `li` 里那条 1px 竖线（原本想画"上一关 → 这一关"的连接线），
+  `<ol className="space-y-0">` 退成 `<ol>`，两处讲连线的注释同步改掉。
+- 依据：卡片零间距，连线却是 `h-6` + `-translate-y-full`，没有空隙可落，直接压在上一张卡片上；
+  `left-[19px]` 又偏在圆圈中心（32px）左侧 13px，于是看起来是一条来路不明的断线。
+  用户 2026-10-26 截图问"这一条线是什么玩意"。
+- 决策：不做"真正的连接线"（那需要给列表加间距并重新对齐圆圈中心），因为编号 0…N 已表达顺序；
+  用户若要闯关感再按那个方向加。
+- 验证：`pnpm --filter @paideia/app typecheck` 通过；无单测覆盖 TrackMapPage，learn.spec 只断
+  `track-map` 容器与格子状态，不依赖这条装饰线。
+- 本地提交：489f868
+- 远端推送：未执行
+
+## 2026-10-26 18:09 +0800 · WORK-042 · 需求与三件下游工件起草
+
+- 类型：docs
+- 变更：新建 `.agent/changes/WORK-042-AIOps自建诊断层/`，含 requirements / proposal / design / tasks 与 testing/plan.md；未改任何源码、配置或线上服务。
+- 决策：诊断采用「确定性采集 + 单次模型调用」，不做工具循环；日志出站前强制脱敏；webhook 走回环 + `X-Paideia-Ops-Token`（生产 Grafana 13.2.4 支持 Extra Headers）；发版标记用 textfile 指标，不新增 Grafana API 令牌；不提供任何自动修复。
+- 依据：用户 2026-10-26 三项裁决（自建 / 上 Loki / 接受脱敏后出站）。
+- 验证：`project-lifecycle validate . --strict` 未通过；WORK-042 唯一错误是「需求尚未形成，但已存在下游工件」——需用户先签 requirements，签署后才会消失；另有 WORK-041 历史报告为 partial 的既有错误，与本项无关。工件标题、frontmatter、任务状态与验收映射已按模板自检。
+- 未验证：未安装 Loki/Alloy，未改 Prometheus 保留期，未跑任何测试（都需批准后执行）。
+- 本地提交：未提交
+- 远端推送：未执行
+
+## 2026-10-26 18:20 +0800 · 项目 · 知识库接回学习轨道分类 + 五条线补内容
+
+- 类型：fix + content
+- 变更：
+  1. 后端 `CategoryService.tree()` 不再过滤 `line_kind` 非空的分类；新增单测 `CategoryServiceTest`
+     固定"轨道分类必须出现在学习者浏览树里"。接口契约快照 `api-shape.json` 同步重录
+     （含此前漏录的 `learn/tracks` 的 `mode` / `theoryTrackSlug`）。
+  2. 学习者端：知识库分类卡给轨道分类加「从零开始」徽章；分类页加「这是一条学习轨道 →
+     打开关卡地图」横幅；关卡点进正文时带来源 state，正文页顶部的「返回知识库」变成
+     「返回「<轨道名>」关卡地图」。
+  3. 内容：给 Git / Spring / Redis / Linux 排查 / 设计模式五条线各新增 2 篇，共 10 篇
+     （reflog 事故恢复、stash/cherry-pick/tag/bisect、Spring 请求链路、循环依赖与三级缓存、
+     Redis 主从哨兵集群、大 key/热 key/慢命令、日志与 OOM、整机变慢排查顺序、模式重构案例、
+     模式误用清单），并同步更新各线总览的篇数、走法与 learning-path。
+- 决策：把轨道分类放回知识库，而不是在知识库另做一份"从零开始"入口。理由：关卡正文本来就是
+  knowledge_entries，学习者从 `/learn` 点进去落到的也是 `/knowledge/entries/{id}`；藏掉分类会
+  让人在知识库里找不到刚读过的内容。引导式入口仍只有 `/learn`，知识库这边是"按分类翻阅"。
+- 依据：用户 2026-10-26「从0开始里面这个会自动跳转到知识库……但是知识库里面为什么没有这些呢？
+  这个难道说不是互相关联的吗？」以及「讲的都有点太少了，你要多加一点的啊」。
+- 验证：
+  - `pnpm --filter @paideia/app exec tsc -b` 通过。
+  - `mvn -B -pl paideia-knowledge -am test` 通过；新增 `CategoryServiceTest` 通过。
+  - 生产库导入：五条线各 `created 2 / updated 1`，轨道关卡数变为 Git 8 / Spring 9 / Redis 9 /
+    Linux 8 / 设计模式 8；新文章正文已可从 `/api/v1/knowledge/entries/{id}` 读到（reflog 篇 4974 字符）。
+  - 发版 146.7 秒；`/actuator/health` UP；线上 `/api/v1/knowledge/categories` 由 4 个顶层分类
+    变为 22 个（Git/Spring/Redis/Linux/设计模式/Java 等轨道分类均可见）。
+  - 线上 e2e `knowledge.spec.ts`：8 passed / 1 skipped（32.1 秒）；另用临时用例验证
+    「Git 分类 → 关卡地图 → 关卡正文 → 返回关卡地图」链路，1 passed（已删除临时用例）。
+  - 全量学习者端 e2e（误触发）：108 passed / 11 failed / 2 skipped（9.8 分钟）。11 条失败全部在
+    `digest.spec` 与 `learn.spec`，原因是测试库没有速递与学习轨道数据（`db/devdata` 不含
+    `learning_tracks`），与本次改动无关；单跑 `knowledge.spec` 全绿。
+  - `ApiWalkthroughTest` 164/167：3 条 500 是 `GET /api/v1/ai/admin/runs/{overview,meta,reconcile}`
+    的既有失败（与本次改动无关，未修）；契约快照已重录且保留这三个端点。
+- 遗留：未验证"从零开始 → 正文 → 返回关卡地图"在窄屏下的表现；内容只补了最近新增的五条线，
+  其余轨道（Java/Python/MySQL、并发、JVM、算法等）未加篇。
+- 本地提交：未提交（用户未授权提交）
+- 远端推送：未执行
+
+## 2026-10-26 18:11:29 +0800 · WORK-042 · 签署 .agent/changes/WORK-042-AIOps自建诊断层/requirements.md、.agent/changes/WORK-042-AIOps自建诊断层/proposal.md、.agent/changes/WORK-042-AIOps自建诊断层/design.md、.agent/changes/WORK-042-AIOps自建诊断层/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-042-AIOps自建诊断层/requirements.md、.agent/changes/WORK-042-AIOps自建诊断层/proposal.md、.agent/changes/WORK-042-AIOps自建诊断层/design.md、.agent/changes/WORK-042-AIOps自建诊断层/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-042-AIOps自建诊断层/requirements.md、.agent/changes/WORK-042-AIOps自建诊断层/proposal.md、.agent/changes/WORK-042-AIOps自建诊断层/design.md、.agent/changes/WORK-042-AIOps自建诊断层/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行

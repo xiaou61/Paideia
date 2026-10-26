@@ -1,0 +1,13 @@
+# Grafana 数据源：Loki（WORK-042）。
+# uid 固定，面板 JSON 与诊断证据都靠它引用。
+apiVersion: 1
+
+datasources:
+  - name: Loki
+    uid: paideia-loki
+    type: loki
+    access: proxy
+    url: http://127.0.0.1:3100
+    editable: false
+    jsonData:
+      maxLines: 1000

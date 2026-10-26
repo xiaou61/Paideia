@@ -1,0 +1,30 @@
+# Alloy（Paideia 日志采集，WORK-042）。
+#
+# 读 journald 需要 `adm` 与 `systemd-journal` 组；install-ops.sh 负责加组，
+# 这里再用 SupplementaryGroups 兜一层（组不生效时 Alloy 会"启动成功但一条日志都没有"）。
+[Unit]
+Description=Alloy（Paideia 日志采集）
+After=network-online.target loki.service
+Wants=loki.service
+
+[Service]
+Type=simple
+User=alloy
+Group=alloy
+SupplementaryGroups=adm systemd-journal
+ExecStart=/usr/local/bin/alloy run \
+    --storage.path=/var/lib/alloy \
+    --server.http.listen-addr=127.0.0.1:12345 \
+    --disable-reporting \
+    /etc/alloy/config.alloy
+Restart=on-failure
+RestartSec=5
+MemoryMax=256M
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/alloy
+
+[Install]
+WantedBy=multi-user.target

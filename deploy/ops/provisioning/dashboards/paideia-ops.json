@@ -213,6 +213,28 @@
           "legendFormat": "查询/秒"
         }
       ]
+    },
+    {
+      "id": 10,
+      "type": "logs",
+      "title": "应用与 Laya 最近错误日志（Loki）",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 19 },
+      "datasource": { "type": "loki", "uid": "paideia-loki" },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{unit=~\"paideia.service|laya.service\"} |~ \"(?i)(error|exception|failed)\"",
+          "queryType": "range",
+          "editorMode": "code"
+        }
+      ]
     }
   ]
 }

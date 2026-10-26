@@ -181,6 +181,16 @@ public class CreditService {
     }
 
     /**
+     * 运维诊断的结算（WORK-042）。系统触发的调用没有 ref_message_id——它不产生会话消息；
+     * 混进 SETTLE 会让对账时出现"一笔没有对应消息的扣费"。
+     */
+    @Transactional
+    public int settleOpsDiagnosis(long userId, long reserved, String model,
+                                  Integer inputTokens, Integer outputTokens) {
+        return settleAs(userId, reserved, CreditLedger.KIND_OPS_DIAGNOSIS, model, inputTokens, outputTokens, null);
+    }
+
+    /**
      * 结算的公共实现。
      *
      * <p>返回**真正扣掉的那一笔**（WORK-022）：观测要记"这一轮花了多少"，

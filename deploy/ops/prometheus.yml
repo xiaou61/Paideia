@@ -30,6 +30,15 @@ scrape_configs:
     static_configs:
       - targets: ['127.0.0.1:9121']
 
+  # 日志链路自身（WORK-042）：它们挂了日志告警会静默失效，所以要让 up 能看到。
+  - job_name: loki
+    static_configs:
+      - targets: ['127.0.0.1:3100']
+
+  - job_name: alloy
+    static_configs:
+      - targets: ['127.0.0.1:12345']
+
   # ── 外部依赖探活 ─────────────────────────────────────────────────────────
   # 三个 job 共用一个 blackbox 实例；instance 标签被钉成短名（laya/rustfs/firecrawl），
   # 摘要接口按它取值。**不要**把 instance 改成目标 URL，那会让摘要里的名字变成一串地址。

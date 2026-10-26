@@ -19,11 +19,13 @@ Group=prometheus
 ExecStart=/usr/local/bin/prometheus \
     --config.file=/etc/prometheus/prometheus.yml \
     --storage.tsdb.path=/var/lib/prometheus \
-    --storage.tsdb.retention.time=3d \
+    --storage.tsdb.retention.time=30d \
     --web.listen-address=127.0.0.1:9090
 Restart=on-failure
 RestartSec=5
-MemoryMax=512M
+# 保留 30 天（WORK-042）：3 天连"上周同一时刻"都比不了，诊断只能看当前值。
+# 实测 3 天 96MB，30 天约 1GB；磁盘余量足够。
+MemoryMax=768M
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
