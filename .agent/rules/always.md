@@ -86,6 +86,9 @@ Paideia 是「千人千面的 AI 个性化学习平台」。目标不是把同�
 - **审查工具与报告归档**（2026-10-09 用户决定）：使用 `ocr`（`alibaba/open-code-review`，已全局安装于本机）。报告写入 `.agent/reviews/`，文件名 `<YYYY-MM-DD>-<范围>.md`——审 ref 区间写 `<base7>..<head7>`，全库扫描写 `scan-<head7>`——随仓库提交（用户决定报告进 Git）。报告只记录范围、结论与证据，**不得回显 provider / api_key 等配置**；ocr 自身配置目录（`config.json` 含 API key）位于本机用户目录，绝不得进入仓库。
 - **审查按需触发，不装自动化**（2026-10-09 用户决定）：不设置 `post-commit` 钩子、不由 CI 触发，避免每个 commit 都消耗模型额度；由用户发起。ocr 默认只审代码文件（`.md` 等按 `unsupported_ext` 跳过），纯文档改动不产生报告。
 - **审查结论只修严重项**（2026-10-10 用户决定）：**只修 critical 与 high**（以及由它们推出的必修簇）；**medium 与 low 不修**，既不作为待办积压，也不再逐条分诊。报告仍全量归档——它是证据，与"改哪些"是两件事。
+- **运维脚本与一次性脚本不进审查范围**（2026-10-26 用户决定）：`ocr` 一律加这组排除——
+  `--exclude 'deploy/**,scripts/**,*.ps1,*.sh,*.py,*.mjs'`。
+  理由：2026-10-26 那次 84 条 high 里有三成落在这类文件上（`release.ps1` 的引号拼接、`grafana.ini` 的 `cookie_secure`、`reorder-java-course.py`/`seed-demo-data.py`/`gen-arch-diagram.mjs` 这类跑一次就丢的内容脚本），人肉筛掉它们每次都要重做一遍。`content/` **不在排除清单里**（题库与课程正文是产品数据，值得看），但它的 findings 默认按 medium 处理。
 - 元规则：若项目代码出现与本节同等长期有效的规则变更，更新本文件而不是只写进单个工作项。
 
 ## 前端结构：四个面与设计系统（2026-10-09 由 WORK-002 确立）
