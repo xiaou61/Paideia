@@ -144,7 +144,9 @@ paideia:
     max-stdin-chars: 4000
     max-output-bytes: 65536
     max-concurrency: 2
-    daily-limit: 50
+    # WORK-038 从 50 提到 1000：实战关卡（调试/项目式）每题要跑多次，50 会和日常练习抢额度。
+    # 真正的容量闸仍是每人并发 1；这个数字只当熔断器。
+    daily-limit: 1000
     memory: 256m
     cpus: "0.5"
     pids-limit: 64
@@ -161,8 +163,9 @@ paideia:
     # 20 s = 启动实测 3.3 s 的 6 倍余量（冷缓存、宿主机负载波动）。
     sql-timeout-ms: 20000
     # WORK-035 T-17 从 20 提到 500：SQL 跑在自己服务器上、不花 AI 积分，20 次没有成本依据，
-    # 只是让人紧张。真正的保护是 RunSlot 的**每人并发 1**；这个数字是熔断器（写脚本刷的天花板）。
-    sql-daily-limit: 500
+    # 只是让人紧张。WORK-038 再提到 1000，与代码沙箱对齐——实战关卡要反复试错。
+    # 真正的保护是 RunSlot 的**每人并发 1**；这个数字是熔断器（写脚本刷的天花板）。
+    sql-daily-limit: 1000
 
 management:
   # 运维监控（WORK-028）：多暴露一个 prometheus 端点给本机 Prometheus 抓取。

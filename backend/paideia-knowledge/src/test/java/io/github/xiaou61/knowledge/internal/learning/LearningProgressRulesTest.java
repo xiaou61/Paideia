@@ -48,6 +48,43 @@ class LearningProgressRulesTest {
     }
 
     @Test
+    @DisplayName("理论规则只认小测：只有小测也能过，只有动手题反而不过")
+    void theoryOnlyNeedsQuiz() {
+        assertThat(LearningProgressRules.passed(LearningProgressRules.Rule.THEORY,
+                Map.of(), scores("q", 4, 5))).isTrue();
+        assertThat(LearningProgressRules.passed(LearningProgressRules.Rule.THEORY,
+                scores("c", 5, 5), Map.of())).isFalse();
+        assertThat(LearningProgressRules.passed(LearningProgressRules.Rule.THEORY,
+                Map.of(), scores("q", 3, 4))).isFalse();
+    }
+
+    @Test
+    @DisplayName("实战规则只认动手题：只有动手也能过，只有小测反而不过")
+    void practiceOnlyNeedsChallenge() {
+        assertThat(LearningProgressRules.passed(LearningProgressRules.Rule.PRACTICE,
+                scores("c", 5, 5), Map.of())).isTrue();
+        assertThat(LearningProgressRules.passed(LearningProgressRules.Rule.PRACTICE,
+                Map.of(), scores("q", 5, 5))).isFalse();
+        assertThat(LearningProgressRules.passed(LearningProgressRules.Rule.PRACTICE,
+                scores("c", 7, 10), Map.of())).isFalse();
+    }
+
+    @Test
+    @DisplayName("同一条 entry 属于多条轨道时取最严：课程 > 实战 > 理论；无线时按课程")
+    void ruleResolutionTakesTheStrictest() {
+        assertThat(LearningProgressRules.resolveRule(java.util.List.of(
+                LearningProgressRules.Rule.THEORY, LearningProgressRules.Rule.COURSE)))
+                .isEqualTo(LearningProgressRules.Rule.COURSE);
+        assertThat(LearningProgressRules.resolveRule(java.util.List.of(
+                LearningProgressRules.Rule.THEORY, LearningProgressRules.Rule.PRACTICE)))
+                .isEqualTo(LearningProgressRules.Rule.PRACTICE);
+        assertThat(LearningProgressRules.resolveRule(java.util.List.of(LearningProgressRules.Rule.THEORY)))
+                .isEqualTo(LearningProgressRules.Rule.THEORY);
+        assertThat(LearningProgressRules.resolveRule(java.util.List.of()))
+                .isEqualTo(LearningProgressRules.Rule.COURSE);
+    }
+
+    @Test
     @DisplayName("合并取更高分：重做一次手滑不会把已通过的降级")
     void mergeKeepsTheBetterScore() {
         Map<String, BlockScore> merged = LearningProgressRules.merge(

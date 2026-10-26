@@ -109,12 +109,19 @@ export interface ConceptGraph {
  * <p>与 `LearningLine` 的区别：轨道是**独立实体**，关卡有自己的顺序、章节分组与前置依赖；
  * 线只是知识库分类的一个标记。用户要求"从零开始不要是知识库"，所以轨道另起一套类型。
  */
+/** 理论 / 实战（WORK-038）。`theory` 读完能解释，`practice` 做完能验收。 */
+export type TrackMode = 'theory' | 'practice'
+
 export interface TrackSummary {
   id: number
   slug: string
   name: string
   summary: string | null
   kind: string
+  /** 决定它落在 /learn 的理论栏还是实战栏。 */
+  mode: TrackMode
+  /** 实战轨道指向它假定的理论轨道；只用于"建议先看 X"，不构成限制。 */
+  theoryTrackSlug: string | null
   stageCount: number
   passedCount: number
   nextEntryId: number | null
@@ -143,6 +150,10 @@ export interface TrackMap {
   slug: string
   name: string
   summary: string | null
+  kind: string
+  mode: TrackMode
+  /** 有值时地图页显示「建议先看 X」；只是提示，不限制进入。 */
+  theoryTrackSlug: string | null
   chapters: TrackChapter[]
   stageCount: number
   passedCount: number

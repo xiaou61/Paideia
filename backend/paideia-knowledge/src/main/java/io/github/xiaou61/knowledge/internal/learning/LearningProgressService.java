@@ -53,10 +53,13 @@ public class LearningProgressService {
 
     private final LearningProgressMapper progressMapper;
     private final EntryMapper entryMapper;
+    private final io.github.xiaou61.knowledge.internal.track.TrackMapper trackMapper;
 
-    LearningProgressService(LearningProgressMapper progressMapper, EntryMapper entryMapper) {
+    LearningProgressService(LearningProgressMapper progressMapper, EntryMapper entryMapper,
+                            io.github.xiaou61.knowledge.internal.track.TrackMapper trackMapper) {
         this.progressMapper = progressMapper;
         this.entryMapper = entryMapper;
+        this.trackMapper = trackMapper;
     }
 
     /** 对外的完整视图。`challenges`/`quizzes` 是块 id → 得分。 */
@@ -102,6 +105,24 @@ public class LearningProgressService {
                 .toList();
     }
 
+    /**
+     * 这一关按哪套规则判（WORK-038）。
+     *
+     * <p>轨道类型优先于 mode：课程（`kind=course`）永远按"动手 + 小测"判，保持既有语义；
+     * 剩下的按 `mode` 分理论（只认小测）与实战（只认动手题）。
+     * 不属于任何轨道时返回课程规则——不给未接轨道的条目放宽。
+     */
+    private LearningProgressRules.Rule ruleFor(long entryId) {
+        List<LearningProgressRules.Rule> rules = trackMapper.findTracksOfEntry(entryId).stream()
+                .map(track -> "course".equals(track.kind())
+                        ? LearningProgressRules.Rule.COURSE
+                        : "practice".equals(track.mode())
+                                ? LearningProgressRules.Rule.PRACTICE
+                                : LearningProgressRules.Rule.THEORY)
+                .toList();
+        return LearningProgressRules.resolveRule(rules);
+    }
+
     @Transactional
     public View update(long userId, long entryId, Report report) {
         Entry entry = requirePublished(entryId);
@@ -121,7 +142,7 @@ public class LearningProgressService {
                 existing == null ? 0 : existing.getTourStep(),
                 report.tourStep() == null ? 0 : report.tourStep());
 
-        boolean passed = LearningProgressRules.passed(challenges, quizzes);
+        boolean passed = LearningProgressRules.passed(ruleFor(entryId), challenges, quizzes);
         boolean wasPassed = existing != null && STATUS_PASSED.equals(existing.getStatus());
 
         Instant now = Instant.now();
