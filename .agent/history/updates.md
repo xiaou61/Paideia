@@ -6427,3 +6427,33 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：工作树内后端 `mvn -B -pl paideia-ai,paideia-knowledge,paideia-sandbox,paideia-mcp,paideia-account -am test` **BUILD SUCCESS 0 失败**（含 `CampServiceTest` 10/10——该用例原本断言"只记修复轮用量"，已按新语义改为累加断言）；前端 `pnpm -r typecheck` 11 包全过、`pnpm -r test` **410 条全过**（ui 209、assistant 41、sql-workbench 44、knowledge 51…）。**未跑 e2e**。
 - 本地提交：`fa9acad`（工作树）+ `1a2e10d`（合并回 master）；工作树与分支已按规矩回收
 - 远端推送：见本轮
+
+## 2026-10-26 12:55 +0800 · WORK-038 · S1–S3 + 调试实战落地（读代码实战/项目式/理论补四块未做）
+
+- 类型：implementation
+- **一、轨道分理论与实战**：迁移 `V20261026120000` 给 `learning_tracks` 加 `mode` 与
+  `theory_track_slug`；`/learn` 分理论栏与实战栏（空栏给明确空状态）；地图页显示
+  「建议先看 X」，只是提示不构成门禁。既有 14 条轨道全部 `mode=theory`（默认值，未 UPDATE）。
+- **二、修掉一个真缺陷**：通关判定原先要求「动手题 + 小测都非空」，而 62 篇阅读正文里只有 1 篇
+  有动手题——**11 条阅读线上的关卡永远无法通关、也永远进不了复习**。现在按轨道类型分支：
+  课程（`kind=course`）维持旧语义，理论只认小测，实战只认可验收的块；同一 entry 属多条轨道
+  取最严。线上实测：给 git 线第 2 关只报小测 3/3，返回 `status=passed`（改前必然是 in_progress）。
+- **三、两条实战线（第三类未做）**：
+  - `SQL 数据分析实战`：5 关 10 题，期望哈希由参考解在 `orders-public` 与 `orders-hidden-a`
+    上真跑生成；alternatives 验证与参考解同结果、antiPatterns 验证至少一个数据集上不同。
+    线上抽查：同一参考解在两种数据集上算出的哈希与题面一致（MATCH）。
+  - `Java 调试实战`：2 关 4 题（`run` 题型）。期望输出由修正版真跑生成，并验证缺陷版输出不同。
+- **四、限流**：代码与 SQL 日限都提到 1000（`application.yml` 与 `SandboxProperties` 默认值），
+  并改了服务器上的 `/opt/paideia-app/application.yml`（原 50 / 20，已备份 `.bak-20261026`）。
+  线上 `/sandbox/status` 返回 `dailyLimit=1000, sqlDailyLimit=1000`。
+- **五、一次线上事故（约 5 分钟不可用，已恢复）**：首次部署后服务起不来，健康检查超时。
+  根因**不在本项**：另一个会话提交的 `TelemetrySummaryMapper` 在 `<script>` 块里写了
+  `started_at < #{to}`，MyBatis 把注解当 XML 解析，裸 `<` 直接让 SAXParseException 炸掉整个上下文。
+  修法：脚本块里的 `<` 写成 `&lt;`。恢复用时 64.7 秒，之后 health=200。
+- 验证：后端 `-pl '!paideia-app'` **291 执行 / 0 失败 / 13 跳过**；迁移四件套 9/0；
+  前端 `pnpm -r typecheck` 全过；线上 learn e2e **7 passed**（含新增的"两栏各自有卡片或空状态"）；
+  线上 `learn/tracks` 16 条、2 条 practice 且带理论配对。
+- 本地提交：`bbb8cb6`、`5b33916`、`2a3d812`、`ecdd2be`、`50c09c7`（另有合并提交 `44886d3`）；
+  已部署；**未推送**。
+- 未做（明确留在 tasks.md）：TASK-010 读代码实战、TASK-012~014 项目式实战（沙箱多文件 +
+  预置测试）、TASK-015 理论补四块（并发/JVM/数据库原理/系统设计）、TASK-017 全量 e2e。
