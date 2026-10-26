@@ -48,22 +48,32 @@ const camps = createCampApi(api)
  */
 export function CampDetailPage() {
   const params = useParams()
+  // 路由参数可能是任意串（旧链接、手改地址）：NaN 会让 5 个 query 都以 NaN 为 key 发请求。
+  // 与 KnowledgeEntryPage 同一写法：先判有效，无效直接禁用查询。
   const campId = Number(params.id)
+  const valid = Number.isFinite(campId)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const camp = useQuery({ queryKey: ['camp', campId], queryFn: () => camps.get(campId) })
+  const camp = useQuery({
+    queryKey: ['camp', campId],
+    queryFn: () => camps.get(campId),
+    enabled: valid,
+  })
   const diagnosticItems = useQuery({
     queryKey: ['camp-items', campId, 'diagnostic'],
     queryFn: () => camps.items(campId, 'diagnostic'),
+    enabled: valid,
   })
   const retestItems = useQuery({
     queryKey: ['camp-items', campId, 'retest'],
     queryFn: () => camps.items(campId, 'retest'),
+    enabled: valid,
   })
   const diagnosticResult = useQuery({
     queryKey: ['camp-result', campId, 'diagnostic'],
     queryFn: () => camps.result(campId, 'diagnostic'),
+    enabled: valid,
     // 没交卷时后端返回 400；那不是"出错"，只是还没有结果
     retry: false,
   })
@@ -71,11 +81,13 @@ export function CampDetailPage() {
     queryKey: ['camp-result', campId, 'retest'],
     queryFn: () => camps.result(campId, 'retest'),
     retry: false,
+    enabled: valid,
   })
   const plan = useQuery({
     queryKey: ['camp-plan', campId],
     queryFn: () => camps.plan(campId),
     retry: false,
+    enabled: valid,
   })
 
   const submit = useMutation({

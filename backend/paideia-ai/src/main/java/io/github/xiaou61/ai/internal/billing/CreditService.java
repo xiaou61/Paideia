@@ -174,6 +174,7 @@ public class CreditService {
     }
 
     /** 复习出题的结算（WORK-034）：与训练营同一套预留/结算，只是流水种类分开。 */
+    @Transactional
     public int settleReview(long userId, long reserved, String model,
                             Integer inputTokens, Integer outputTokens) {
         return settleAs(userId, reserved, CreditLedger.KIND_REVIEW, model, inputTokens, outputTokens, null);

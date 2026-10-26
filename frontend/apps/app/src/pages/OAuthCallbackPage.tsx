@@ -39,6 +39,9 @@ export function OAuthCallbackPage() {
     // 这里**不消费**它——消费了应用就拿不到。所以只跳转、不调 completeOAuth。
     // 浏览器已在本页，说明用户是从应用外部的浏览器回来的；跳转会唤起应用。
     if (params.get('desktop') === '1') {
+      // 先给一条提示再跳：协议未注册时浏览器是**静默失败**的，
+      // 不提示的话页面会永远停在"正在完成登录"，用户既不知道为什么也退不出去。
+      setError('已尝试唤起桌面客户端。若没有自动打开，请回到应用里重新登录。')
       window.location.assign(`paideia://oauth?handoff=${encodeURIComponent(handoff)}`)
       return
     }

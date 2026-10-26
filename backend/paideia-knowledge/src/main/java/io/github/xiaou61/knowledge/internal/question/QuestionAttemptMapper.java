@@ -64,9 +64,16 @@ public interface QuestionAttemptMapper {
             """)
     List<MasteryRow> findMastery(@Param("userId") long userId);
 
+    /**
+     * 专供"读-改-写"路径使用：加行锁，避免并发交卷/答题时两次读同一份旧值、互相覆盖。
+     *
+     * <p>没有行时拿不到锁（这也对）：此时 upsert 的 INSERT 靠唯一键兜底，
+     * 后到的那次会走 ON DUPLICATE KEY UPDATE，不会丢计数。
+     */
     @Select("""
             SELECT user_id, concept_id, mastery, attempts, correct FROM concept_mastery_state
             WHERE user_id = #{userId} AND concept_id = #{conceptId}
+            FOR UPDATE
             """)
     Optional<MasteryRow> findMasteryOf(@Param("userId") long userId, @Param("conceptId") long conceptId);
 

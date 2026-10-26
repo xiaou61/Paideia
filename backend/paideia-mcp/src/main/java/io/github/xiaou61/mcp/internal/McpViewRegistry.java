@@ -4,6 +4,7 @@ import io.github.xiaou61.platform.ToolCatalog;
 import io.github.xiaou61.platform.ToolContext;
 import io.github.xiaou61.platform.ToolDescriptor;
 import io.github.xiaou61.platform.ToolResult;
+import io.github.xiaou61.platform.ToolQuery;
 import io.github.xiaou61.platform.ToolScope;
 import io.modelcontextprotocol.server.McpServer;
 import io.modelcontextprotocol.server.McpSyncServer;
@@ -87,8 +88,11 @@ class McpViewRegistry {
     }
 
     private McpView build(McpViews view, String endpoint, Set<String> allowedToolsets) {
-        List<ToolDescriptor> descriptors = catalog.view(view.queryFor(
-                Set.of(ToolScope.READ, ToolScope.WRITE), allowedToolsets));
+        // 这里只取"视图这一侧的组过滤"（清单本身）；**不要把 scope 写死成 READ+WRITE** ——
+        // 那会让只读视图也把写工具列进清单。scope 的裁剪发生在调用时的
+        // `view.queryFor(caller.scopes(), caller.toolsets())`，那里才拿得到真实凭据。
+        List<ToolDescriptor> descriptors = catalog.view(
+                ToolQuery.view(allowedToolsets, view.write(), null, Set.of(ToolScope.READ, ToolScope.WRITE)));
         HttpServletStreamableServerTransportProvider transport =
                 HttpServletStreamableServerTransportProvider.builder()
                         .mcpEndpoint(endpoint)

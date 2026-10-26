@@ -26,25 +26,49 @@ public interface TelemetrySummaryMapper {
     List<CountBy> countByStatus(@Param("from") Instant from, @Param("to") Instant to);
 
     @Select("""
+            <script>
             SELECT kind AS name, COUNT(*) AS count FROM ai_runs
             WHERE started_at >= #{from} AND started_at < #{to}
-            GROUP BY kind ORDER BY count DESC
+            <if test="kind != null">AND kind = #{kind}</if>
+            <if test="status != null">AND status = #{status}</if>
+            <if test="model != null">AND model = #{model}</if>
+            <if test="userId != null">AND user_id = #{userId}</if>
+                        GROUP BY kind ORDER BY count DESC
+            </script>
             """)
-    List<CountBy> countByKind(@Param("from") Instant from, @Param("to") Instant to);
+    List<CountBy> countByKind(@Param("from") Instant from, @Param("to") Instant to,
+            @Param("kind") String kind, @Param("status") String status,
+            @Param("model") String model, @Param("userId") Long userId);
 
     @Select("""
+            <script>
             SELECT COALESCE(model, '(unknown)') AS name, COUNT(*) AS count FROM ai_runs
             WHERE started_at >= #{from} AND started_at < #{to}
-            GROUP BY model ORDER BY count DESC
+            <if test="kind != null">AND kind = #{kind}</if>
+            <if test="status != null">AND status = #{status}</if>
+            <if test="model != null">AND model = #{model}</if>
+            <if test="userId != null">AND user_id = #{userId}</if>
+                        GROUP BY model ORDER BY count DESC
+            </script>
             """)
-    List<CountBy> countByModel(@Param("from") Instant from, @Param("to") Instant to);
+    List<CountBy> countByModel(@Param("from") Instant from, @Param("to") Instant to,
+            @Param("kind") String kind, @Param("status") String status,
+            @Param("model") String model, @Param("userId") Long userId);
 
     @Select("""
+            <script>
             SELECT error_type AS name, COUNT(*) AS count FROM ai_runs
             WHERE started_at >= #{from} AND started_at < #{to} AND error_type IS NOT NULL
-            GROUP BY error_type ORDER BY count DESC LIMIT 10
+            <if test="kind != null">AND kind = #{kind}</if>
+            <if test="status != null">AND status = #{status}</if>
+            <if test="model != null">AND model = #{model}</if>
+            <if test="userId != null">AND user_id = #{userId}</if>
+                        GROUP BY error_type ORDER BY count DESC LIMIT 10
+            </script>
             """)
-    List<CountBy> countByErrorType(@Param("from") Instant from, @Param("to") Instant to);
+    List<CountBy> countByErrorType(@Param("from") Instant from, @Param("to") Instant to,
+            @Param("kind") String kind, @Param("status") String status,
+            @Param("model") String model, @Param("userId") Long userId);
 
     @Select("""
             SELECT name, COUNT(*) AS count FROM ai_run_spans
@@ -59,34 +83,56 @@ public interface TelemetrySummaryMapper {
      * <p>`duration_ms` 为 NULL 的行（仍在 running）不参与——把它们当 0 会把 p50 拉低到失真。
      */
     @Select("""
+            <script>
             WITH ranked AS (
               SELECT duration_ms,
                      ROW_NUMBER() OVER (ORDER BY duration_ms) AS rn,
                      COUNT(*) OVER () AS n
               FROM ai_runs
               WHERE started_at >= #{from} AND started_at < #{to}
-                AND status IN ('ok', 'failed', 'timeout') AND duration_ms IS NOT NULL
+                AND duration_ms IS NOT NULL
+              <choose>
+                <when test="status != null">AND status = #{status}</when>
+                <otherwise>AND status IN ('ok', 'failed', 'timeout')</otherwise>
+              </choose>
+              <if test="kind != null">AND kind = #{kind}</if>
+              <if test="model != null">AND model = #{model}</if>
+              <if test="userId != null">AND user_id = #{userId}</if>
             )
             SELECT MAX(CASE WHEN rn = CEIL(n * 0.50) THEN duration_ms END) AS p50,
                    MAX(CASE WHEN rn = CEIL(n * 0.95) THEN duration_ms END) AS p95
             FROM ranked
+            </script>
             """)
-    Percentiles durationPercentiles(@Param("from") Instant from, @Param("to") Instant to);
+    Percentiles durationPercentiles(@Param("from") Instant from, @Param("to") Instant to,
+            @Param("kind") String kind, @Param("status") String status,
+            @Param("model") String model, @Param("userId") Long userId);
 
     @Select("""
+            <script>
             WITH ranked AS (
               SELECT ttft_ms,
                      ROW_NUMBER() OVER (ORDER BY ttft_ms) AS rn,
                      COUNT(*) OVER () AS n
               FROM ai_runs
               WHERE started_at >= #{from} AND started_at < #{to}
-                AND status = 'ok' AND ttft_ms IS NOT NULL
+                AND ttft_ms IS NOT NULL
+              <choose>
+                <when test="status != null">AND status = #{status}</when>
+                <otherwise>AND status = 'ok'</otherwise>
+              </choose>
+              <if test="kind != null">AND kind = #{kind}</if>
+              <if test="model != null">AND model = #{model}</if>
+              <if test="userId != null">AND user_id = #{userId}</if>
             )
             SELECT MAX(CASE WHEN rn = CEIL(n * 0.50) THEN ttft_ms END) AS p50,
                    MAX(CASE WHEN rn = CEIL(n * 0.95) THEN ttft_ms END) AS p95
             FROM ranked
+            </script>
             """)
-    Percentiles ttftPercentiles(@Param("from") Instant from, @Param("to") Instant to);
+    Percentiles ttftPercentiles(@Param("from") Instant from, @Param("to") Instant to,
+            @Param("kind") String kind, @Param("status") String status,
+            @Param("model") String model, @Param("userId") Long userId);
 
     @Select("""
             SELECT COALESCE(SUM(input_tokens), 0) AS inputTokens,
@@ -196,9 +242,13 @@ public interface TelemetrySummaryMapper {
                        PARTITION BY DATE_FORMAT(DATE_ADD(started_at, INTERVAL #{offsetMinutes} MINUTE), #{fmt})) AS n
               FROM ai_runs
               WHERE started_at &gt;= #{from} AND started_at &lt; #{to}
-                AND status IN ('ok', 'failed', 'timeout') AND duration_ms IS NOT NULL
+                AND duration_ms IS NOT NULL
+              <!-- 不传 status 时只看已终态的三种；传了就以调用方为准（否则条件互斥、分位数恒 NULL） -->
+              <choose>
+                <when test="status != null">AND status = #{status}</when>
+                <otherwise>AND status IN ('ok', 'failed', 'timeout')</otherwise>
+              </choose>
               <if test="kind != null">AND kind = #{kind}</if>
-              <if test="status != null">AND status = #{status}</if>
               <if test="model != null">AND model = #{model}</if>
               <if test="userId != null">AND user_id = #{userId}</if>
             )
@@ -227,9 +277,13 @@ public interface TelemetrySummaryMapper {
                        PARTITION BY DATE_FORMAT(DATE_ADD(started_at, INTERVAL #{offsetMinutes} MINUTE), #{fmt})) AS n
               FROM ai_runs
               WHERE started_at &gt;= #{from} AND started_at &lt; #{to}
-                AND status = 'ok' AND ttft_ms IS NOT NULL
+                AND ttft_ms IS NOT NULL
+              <!-- 首字只对成功轮次有意义：调用方不指定状态时锁 ok，指定了则以它为准 -->
+              <choose>
+                <when test="status != null">AND status = #{status}</when>
+                <otherwise>AND status = 'ok'</otherwise>
+              </choose>
               <if test="kind != null">AND kind = #{kind}</if>
-              <if test="status != null">AND status = #{status}</if>
               <if test="model != null">AND model = #{model}</if>
               <if test="userId != null">AND user_id = #{userId}</if>
             )
