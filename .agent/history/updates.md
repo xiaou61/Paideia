@@ -6357,3 +6357,33 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：后端全量 322/0/0/4；前端全仓单测 0 失败；本地 e2e（review + sql-practice）9 passed；
   线上全量 **89 passed / 0 failed**；线上 health=200，三条迁移 success=1。
 - 本地提交：`64621b4`；已推送 `72f8c65..64621b4`；已部署（73 秒）。
+
+## 2026-10-26 10:40 +0800 · 从零开始解锁 + 五条新阅读线（用户指示直接做，未建项）
+
+- 类型：feature
+- **一、关卡不再加锁**：用户原话「其实不一定非要解锁什么的，就是全部就是默认全部都解锁」。
+  判定只在一处（`TrackService.map()`），改成 `status = done ? "done" : "current"`，永不产出
+  `locked`。前置关系 `requires_entry_id` 保持不动——它表达顺序，不是门槛。
+  前端同步删掉锁定渲染（`Lock` 图标、`cursor-not-allowed`、不可点 `div`、
+  「通过上一关后解锁」文案），`TrackStage.status` 收窄为 `'done' | 'current'`，
+  `/learn` 页那句「通关后解锁下一关」改成「顺序是建议的走法，想先看哪一关都可以」。
+- **二、新增五条阅读线**：`content/reading/{git,spring,redis,linux,patterns}`，
+  共 5 篇总览 + 27 篇正文。补的是原 8 条线完全没覆盖、而求职面试高频的主题：
+  Git（5）、Spring（6：IoC/生命周期/自动配置/AOP/事务失效/启动失败）、
+  Redis（6：为什么快/五类型/过期淘汰/持久化/缓存三问题/分布式锁）、
+  Linux 排查（5：CPU/内存/磁盘/网络/进程信号）、设计模式（5，按真实代码分组不背 23 个）。
+  `line_sort` 取 5/15/35/45/65，插在既有线之间，不打乱原有顺序。
+- **三、e2e 自身的一个缺陷**：原选择器 `[data-testid^="stage-"]` 也会匹配
+  `stage-state-N` 与 `stage-level-N` 两个 span。旧断言用的是 `.some()`，所以从未暴露；
+  改成 `every()` 后立刻红。修法是收紧到 `[data-testid^="stage-"][data-status]`。
+- 验证：后端 `paideia-knowledge` 93/0/0/1；前端 `pnpm -r typecheck` 与 `pnpm -r test` 全过；
+  线上导入后 `GET /learn/tracks` **14 条轨道**（原 9 + 新 5），
+  spring/git/java-from-zero 三条的 `status` 分布全是 `current`、**0 个 locked**；
+  线上 learn e2e **6 passed**（含"每一关都是链接"与"最后一关也能点进正文"）；
+  抽查新条目：总览 5048 字节含 learning-path，正文 8891 字节含 quiz 与误区。
+- 内容校验：自写脚本核对 5 条线——learning-path 步数 = 正文篇数、quiz JSON 可解析
+  且 answer 下标合法、每篇 ≥2 条误区、frontmatter 字段齐全，全部通过。
+- 本地提交：`ee5a074`（解锁）、`f4d8c8f`（内容）、`c6f20d1`（e2e 选择器）；
+  已部署（307.8 秒，前端重建）；**未推送**。
+- 未做：新阅读线没写 e2e（沿用 track-map 的通用断言，未逐线验证渲染）；
+  `requireEntryId` 仍在接口里返回但没有消费方，暂不动契约。
