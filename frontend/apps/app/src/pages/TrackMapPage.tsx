@@ -42,12 +42,13 @@ function levelMeta(level: string): typeof BEGINNER {
 /**
  * 一条轨道的关卡地图（WORK-024）。
  *
- * <p><b>形态是关卡，不是列表</b>：每一关是一格，格与格之间用连线表达先后；三种状态
+ * <p><b>形态是关卡，不是列表</b>：每一关是一格，编号与排列表达先后；三种状态
  * 一眼可辨——已通关（实心 + 对勾）、当前可进（高亮 + 播放）、被前置锁住（灰 + 锁）。
  * 用户要的就是"闯关/图谱"这种感觉，而不是又一张文章列表。
  *
- * <p>**连线用 CSS 画，不引图库**：依赖图只有"上一关 → 这一关"这一种形状（轨道是有序的），
- * 为它引入 sigma/graphology 是几十 KB 换个直上直下的竖线。
+ * <p><b>格与格之间不画连线</b>：卡片是零间距排列的，之前那条 24px 的竖线没有空隙可落，
+ * 压强在上一张卡片上、还偏在圆圈中心左侧，看起来像一条来路不明的断线（用户 2026-10-26 直接问
+ * "这一条线是什么玩意"）。顺序由 0…N 的编号表达，够了。
  *
  * <p>章节按服务端给的分组显示；没有章节名的（空串）不显示标题。
  */
@@ -164,18 +165,11 @@ export function TrackMapPage() {
                     {chapter.chapter}
                   </h2>
                 )}
-                <ol className="space-y-0">
+                <ol>
                   {chapter.stages
                     .filter((stage) => levelFilter === null || stage.level === levelFilter)
-                    .map((stage, index) => (
-                    <li key={stage.entryId} className="relative">
-                      {/* 连线：从上一格底部到这一格顶部。第一格不画。 */}
-                      {index > 0 ? (
-                        <span
-                          aria-hidden
-                          className="bg-border absolute top-0 left-[19px] h-6 w-px -translate-y-full"
-                        />
-                      ) : null}
+                    .map((stage) => (
+                    <li key={stage.entryId}>
                       <StageCell stage={stage} />
                     </li>
                   ))}
@@ -192,7 +186,7 @@ export function TrackMapPage() {
 /**
  * 一格关卡。两种状态：已通关（实心 + 对勾）与可开始（高亮 + 播放）。
  *
- * <p><b>没有锁定态</b>：任何一关都能直接点进去。顺序由格子的排列与连线表达，
+ * <p><b>没有锁定态</b>：任何一关都能直接点进去。顺序由格子的排列与编号表达，
  * 但不拦人——想跳着看某一关的人不该被挡住。
  */
 function StageCell({ stage }: { stage: TrackStage }) {
