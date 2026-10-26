@@ -77,7 +77,7 @@ approver_role: CTO
 
 ## S4 · 读代码实战 + 调试实战
 
-### TASK-010 | pending | 「读懂一个 Spring Boot 请求链路」读代码实战
+### TASK-010 | done | 「读懂一个 Spring Boot 请求链路」读代码实战
 
 - 用 `code-tour` 组织，素材取自本仓库真实代码，文末标来源与许可。
 - 验证：沙箱不可用时仍可完整作答（断掉 sandbox 依赖后页面无空按钮）。
@@ -108,7 +108,7 @@ approver_role: CTO
 
 ## S6 · 理论补四块
 
-### TASK-015 | pending | 并发 / JVM / 数据库原理 / 系统设计 四条理论线
+### TASK-015 | pending | 理论补四块：并发已做（4 篇），JVM / 数据库原理 / 系统设计未做
 
 - 每条 5–6 篇，格式与既有阅读线一致（frontmatter、learning-path、quiz、≥2 误区）。
 - 写前对照既有 62 篇标题与结论段，重叠处改写成接续。

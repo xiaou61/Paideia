@@ -6498,3 +6498,27 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
   报告绑定提交 `f4c544c`，之后 master 上的提交只有内容线与导航测试（不涉及后端）。
 - 本地提交：`8aca2e6`（合并 master 到分支后快进 master）
 - 远端推送：`origin/master = 8aca2e6`（已核验）
+
+## 2026-10-26 14:20 +0800 · WORK-038 · 读代码实战 + Java 并发线 + 全量 e2e
+
+- 类型：implementation
+- **读代码实战**（TASK-010）：3 关，读的是本仓库自己的代码，钉在**已推送**的提交 `93989e0`
+  （未推送的提交做 permalink 会 404，所以没用 HEAD）。三关分别是路由与路径变量、
+  「找不到」与「没权限」为什么不区分、可见性过滤写在 SQL 里。每关一个 `code-tour` +
+  一道 `fill` 填空，不依赖沙箱。生成脚本按该提交 `git show` 逐字取代码，并逐行比对过
+  行号与内容一致。
+- **Java 并发线**（TASK-015 的一部分）：4 篇——可见性与 volatile、synchronized 锁对象、
+  CAS 与原子类、线程池。与操作系统线不重复（OS 讲进程/调度机制，这条只讲 Java 的坑）。
+- **全量学习者端 e2e（打线上）**：84 passed / **6 failed** / 29 skipped。六条里：
+  - **1 条是我引入的真回归**：两栏改造后不再有 `learn-tracks` 单一容器，
+    `navigation.spec` 等它可见而超时。改成 `learn-theory` 后单跑 **13 passed**。
+  - 4 条是 graph 的夹具失败（`管理员登录失败：夹具没法造`）——这轮只传了学习者凭据，
+    没有给夹具用的管理员凭据，与本项无关。
+  - 1 条是 digest「周报页签无内容时显示尚未生成」——线上已经生成了周报，
+    这条的数据前提不成立，属数据驱动，与本项无关。
+- 线上现状：`/learn/tracks` **18 条**（15 theory + 3 practice）：sql-practice 6 关、
+  java-debug 3 关、code-reading 4 关，concurrency 5 关。
+- 本地提交：`12f0fad`（读代码实战）、`2e0afa5`（navigation 断言）、`bf4887c`（并发线）；
+  已导入线上；**未推送**。
+- 仍缺：S5 项目式实战（TASK-012~014）、JVM / 数据库原理 / 系统设计三条理论线、
+  TASK-017 的收口（全量 e2e 没有带管理员凭据重跑）。
