@@ -108,7 +108,7 @@ approver_role: CTO
 
 ## S6 · 理论补四块
 
-### TASK-015 | pending | 理论补四块：并发（4 篇）、系统设计（4 篇）已做；JVM 未做，数据库原理因与 MySQL 课重叠而不做
+### TASK-015 | done | 理论补四块：并发 / 系统设计 / JVM 已做；数据库原理明确不做（与 MySQL 课四课重叠）
 
 - 每条 5–6 篇，格式与既有阅读线一致（frontmatter、learning-path、quiz、≥2 误区）。
 - 写前对照既有 62 篇标题与结论段，重叠处改写成接续。
