@@ -224,7 +224,7 @@ export function DigestPage() {
               </EmptyHeader>
             </Empty>
           ) : (
-            <Card className="mt-6">
+            <Card className="mt-6" data-testid="digest-weekly-body">
               <CardContent className="pt-6">
                 <p className="text-muted-foreground mb-3 text-sm">
                   {weekly.data.weekStart} 那一周 · 基于 {weekly.data.itemCount} 条速递

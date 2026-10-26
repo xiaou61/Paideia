@@ -87,9 +87,14 @@ test.describe('每日速递', () => {
     await page.goto('/#/digest')
     await page.getByTestId('digest-tab-weekly').click()
 
+    // 线上通常已经生成了周报，只有空库才走"尚未生成"。两个分支都要接受——
+    // 这条断言的是"给了确定结论"，不是"必须是空"。
     const missing = page.getByTestId('digest-weekly-missing')
-    await expect(missing).toBeVisible({ timeout: 15_000 })
-    await expect(missing).toContainText('尚未生成')
+    const body = page.getByTestId('digest-weekly-body')
+    await expect(missing.or(body)).toBeVisible({ timeout: 15_000 })
+    if ((await missing.count()) > 0) {
+      await expect(missing).toContainText('尚未生成')
+    }
   })
 
   test('每条都有原文链接，且指向外部站点', async ({ page }) => {
