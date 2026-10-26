@@ -15,7 +15,9 @@ import {
   PageHeader,
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
   Table,
@@ -29,7 +31,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link2, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
 
-import { ConfirmDeleteDialog, Loading, admin, categoryOptions, flatten } from '../knowledge-shared'
+import { ConfirmDeleteDialog, Loading, admin, categoryGroups, flatten } from '../knowledge-shared'
 
 /**
  * 概念维护（WORK-021）。
@@ -58,10 +60,7 @@ export function KnowledgeConceptsPage() {
   const entries = useQuery({ queryKey: ['admin-knowledge-entries'], queryFn: () => admin.entries() })
 
   const flat = useMemo(() => flatten(categories.data ?? []), [categories.data])
-  const options = useMemo(
-    () => categoryOptions(flat, '不指定分类').filter((option) => option.value !== null),
-    [flat],
-  )
+  const grouped = useMemo(() => categoryGroups(flat), [flat])
 
   const report = (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause))
   const invalidate = async () => {
@@ -224,7 +223,7 @@ export function KnowledgeConceptsPage() {
         key={editing?.id ?? 'new'}
         open={creating || editing !== null}
         initial={editing}
-        options={options}
+        options={grouped}
         submitting={save.isPending}
         onCancel={() => {
           setCreating(false)
@@ -270,7 +269,7 @@ function ConceptFormDialog({
 }: {
   open: boolean
   initial: { id: number; name: string; summary: string; categoryId: number | null } | null
-  options: { value: number | null; label: string }[]
+  options: { label: string; options: { value: number | null; label: string }[] }[]
   submitting: boolean
   onCancel: () => void
   onSubmit: (value: ConceptFormValue) => void
@@ -326,10 +325,15 @@ function ConceptFormDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">不指定分类</SelectItem>
-                {options.map((option) => (
-                  <SelectItem key={String(option.value)} value={String(option.value)}>
-                    {option.label}
-                  </SelectItem>
+                {options.map((group) => (
+                  <SelectGroup key={group.label}>
+                    <SelectLabel>{group.label}</SelectLabel>
+                    {group.options.map((option) => (
+                      <SelectItem key={String(option.value)} value={String(option.value)}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 ))}
               </SelectContent>
             </Select>

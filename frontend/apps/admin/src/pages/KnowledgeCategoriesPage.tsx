@@ -15,7 +15,9 @@ import {
   PageHeader,
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
   Table,
@@ -29,7 +31,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
 
-import { ConfirmDeleteDialog, Loading, admin, categoryOptions, flatten, type FlatCategory } from '../knowledge-shared'
+import { ConfirmDeleteDialog, Loading, admin, categoryGroups, flatten, type FlatCategory } from '../knowledge-shared'
 
 /**
  * 分类管理。
@@ -281,7 +283,11 @@ function CreateCategoryDialog({
   const [slug, setSlug] = useState('')
   const [parentId, setParentId] = useState<number | null>(null)
 
-  const options = categoryOptions(categories, '（作为根分类）')
+  const grouped = categoryGroups(categories)
+  const options = [
+    { value: null as number | null, label: '（作为根分类）' },
+    ...grouped.flatMap((group) => group.options),
+  ]
 
   const create = useMutation({
     mutationFn: () => admin.createCategory({ parentId, name: name.trim(), slug: slug.trim() }),
@@ -318,10 +324,16 @@ function CreateCategoryDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {options.map((option) => (
-                  <SelectItem key={option.value ?? 'none'} value={option.value}>
-                    {option.label}
-                  </SelectItem>
+                <SelectItem value={null}>（作为根分类）</SelectItem>
+                {grouped.map((group) => (
+                  <SelectGroup key={group.label}>
+                    <SelectLabel>{group.label}</SelectLabel>
+                    {group.options.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 ))}
               </SelectContent>
             </Select>

@@ -72,6 +72,11 @@ test('管理员从首页进知识库管理区，完成录入到发布的链路',
   // 建草稿
   await page.getByTestId('admin-entry-new').click()
   await page.getByTestId('admin-entry-title').fill(entryTitle)
+  // 分类下拉按学习线类型分组：所有学习线都是并列一级，平铺要滚十几屏；
+  // 这条用例刚建的分类没有 lineKind，所以必须落在「其他分类」组里
+  await page.getByTestId('admin-entry-category').click()
+  await expect(page.getByText('其他分类', { exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
   await page.getByTestId('admin-entry-body').fill('## 小节标题\n\n这是正文。')
   await page.getByTestId('admin-entry-save').click()
 
