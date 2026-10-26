@@ -150,10 +150,12 @@ groups:
               instant: true
               intervalMs: 1000
               maxDataPoints: 1
-              # clamp_min 防分母为 0；bool 保证正常时返回 0 而不是空结果。
+              # 分子/分母都用 or vector(0) 兜底：没有请求时两者都是空集，整条会变空 → NoData
+              # （2026-10-26 实测：Grafana 因此产生 DatasourceNoData 活动告警）。
+              # bool 保证正常时返回 0 而不是空结果。
               expr: >-
-                (sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
-                 / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 0.000001))
+                ((sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) or vector(0))
+                 / clamp_min((sum(rate(http_server_requests_seconds_count[5m])) or vector(0)), 0.000001))
                 > bool 0.05
         noDataState: NoData
         execErrState: Error
