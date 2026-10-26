@@ -67,13 +67,16 @@ test.describe('导航覆盖', () => {
    *
    * <p>改成断"落到了正确的页、且页面给了确定的结论"：有轨道就显示轨道，没有就显示空状态。
    * 两者都能证明入口是通的，而两者都不依赖库里恰好有什么。
+   *
+   * <p>WORK-038 之后轨道分两栏，`learn-tracks` 不再是单一容器；理论栏在两条线都在时也会渲染，
+   * 所以拿它当锚点同样稳定。
    */
   test('「从零开始」点进去落到学习页，且有轨道或明确空状态', async ({ page }) => {
     await page.goto('/#/')
     await page.getByTestId('learner-nav-learn').click()
     await expect(page).toHaveURL(/#\/learn/)
 
-    const tracks = page.getByTestId('learn-tracks')
+    const tracks = page.getByTestId('learn-theory')
     const empty = page.getByTestId('learn-empty')
     // 加载中（learn-state）不算结论，所以等到两者之一出现为止
     await expect(tracks.or(empty)).toBeVisible({ timeout: 15_000 })
