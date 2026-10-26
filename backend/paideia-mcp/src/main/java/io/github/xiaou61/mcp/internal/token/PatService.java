@@ -88,8 +88,14 @@ public class PatService {
         }
     }
 
+    /**
+     * 建一张凭据。
+     *
+     * @param callerRole 建凭据的账号角色。管理能力是两把锁：凭据要带 admin scope，账号要是
+     *                   ADMIN 角色——这里拒绝非管理员申请 admin scope，不静默降级。
+     */
     public CreatedToken create(long userId, String name, Set<ToolScope> scopes,
-                               Set<String> toolsets, Integer expiresInDays) {
+                               Set<String> toolsets, Integer expiresInDays, String callerRole) {
         String trimmedName = name == null ? "" : name.trim();
         if (trimmedName.isEmpty()) {
             throw new BizException(ErrorCode.INVALID_ARGUMENT, "凭据名称不能为空");
@@ -100,9 +106,8 @@ public class PatService {
         if (scopes == null || scopes.isEmpty()) {
             throw new BizException(ErrorCode.INVALID_ARGUMENT, "至少要选择一个权限范围");
         }
-        if (scopes.contains(ToolScope.ADMIN)) {
-            // 一期没有管理类工具，也就不发 admin scope：发了只会让持有者误以为能调管理能力
-            throw new BizException(ErrorCode.INVALID_ARGUMENT, "不支持 admin 权限范围");
+        if (scopes.contains(ToolScope.ADMIN) && !"admin".equalsIgnoreCase(callerRole)) {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT, "只有管理员可以创建带 admin 权限的凭据");
         }
 
         String plaintext = TOKEN_PREFIX + randomToken();

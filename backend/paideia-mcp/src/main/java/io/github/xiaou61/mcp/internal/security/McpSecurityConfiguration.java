@@ -1,6 +1,7 @@
 package io.github.xiaou61.mcp.internal.security;
 
 import io.github.xiaou61.mcp.internal.token.PatService;
+import io.github.xiaou61.platform.RoleLookup;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -28,8 +29,9 @@ class McpSecurityConfiguration {
 
     @Bean
     @Order(1)
-    SecurityFilterChain mcpSecurityFilterChain(HttpSecurity http, PatService tokens) throws Exception {
-        PatAuthenticationFilter patFilter = new PatAuthenticationFilter(tokens);
+    SecurityFilterChain mcpSecurityFilterChain(HttpSecurity http, PatService tokens, RoleLookup roles)
+            throws Exception {
+        PatAuthenticationFilter patFilter = new PatAuthenticationFilter(tokens, roles);
         http
                 // Spring Security 7 移除了 AntPathRequestMatcher；用 lambda 表达同一条规则。
                 // **必须同时覆盖 `/mcp` 与 `/mcp/**`**：只写前者会让子视图落到主链（JWT）上，

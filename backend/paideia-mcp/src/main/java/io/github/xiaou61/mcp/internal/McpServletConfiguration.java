@@ -44,7 +44,10 @@ class McpServletConfiguration {
                         instanceof java.util.Set<?> set
                         ? set.stream().map(String::valueOf).collect(java.util.stream.Collectors.toSet())
                         : java.util.Set.of();
-                view = registry.view(request.getPathInfo(), toolsets);
+                String role = request.getAttribute(McpViewRegistry.ATTR_ROLE) instanceof String value
+                        ? value
+                        : "";
+                view = registry.view(request.getPathInfo(), toolsets, role);
             } catch (McpViewRegistry.ViewNotFoundException missing) {
                 // 视图不存在与"端点不存在"给同一个响应，不告诉探测者哪些组存在
                 response.sendError(jakarta.servlet.http.HttpServletResponse.SC_NOT_FOUND);

@@ -1,6 +1,7 @@
 package io.github.xiaou61.mcp.internal.security;
 
 import io.github.xiaou61.mcp.internal.token.PatService;
+import io.github.xiaou61.platform.RoleLookup;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,11 +38,14 @@ class PatAuthenticationFilter extends OncePerRequestFilter {
     static final String ATTR_TOKEN_ID = "pd.pat.tokenId";
     static final String ATTR_SCOPES = "pd.pat.scopes";
     static final String ATTR_TOOLSETS = "pd.pat.toolsets";
+    static final String ATTR_ROLE = "pd.pat.role";
 
     private final PatService tokens;
+    private final RoleLookup roles;
 
-    PatAuthenticationFilter(PatService tokens) {
+    PatAuthenticationFilter(PatService tokens, RoleLookup roles) {
         this.tokens = tokens;
+        this.roles = roles;
     }
 
     @Override
@@ -58,14 +62,18 @@ class PatAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
         PatService.PatPrincipal found = principal.get();
+        // 角色每次请求从账号表解析：降权后旧凭据必须立刻失去管理能力，不能靠 token 里的快照
+        String role = roles.roleOf(found.userId()).orElse("");
         request.setAttribute(ATTR_USER_ID, found.userId());
         request.setAttribute(ATTR_TOKEN_ID, found.tokenId());
         request.setAttribute(ATTR_SCOPES, found.scopes());
         request.setAttribute(ATTR_TOOLSETS, found.toolsets());
+        request.setAttribute(ATTR_ROLE, role);
 
         var authentication = new UsernamePasswordAuthenticationToken(
                 String.valueOf(found.userId()), null,
-                Set.of(new SimpleGrantedAuthority("ROLE_USER")));
+                Set.of(new SimpleGrantedAuthority(
+                        "admin".equalsIgnoreCase(role) ? "ROLE_ADMIN" : "ROLE_USER")));
         SecurityContextHolder.getContext().setAuthentication(authentication);
         try {
             chain.doFilter(request, response);

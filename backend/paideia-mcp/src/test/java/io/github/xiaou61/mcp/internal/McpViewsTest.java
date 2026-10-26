@@ -69,7 +69,8 @@ class McpViewsTest {
         McpViews write = McpViews.parse("/x/note/write").orElseThrow();
 
         // 只读 token 在写视图上仍然拿不到写工具：查询里没有 WRITE scope
-        var readOnlyQuery = write.queryFor(java.util.Set.of(io.github.xiaou61.platform.ToolScope.READ));
+        var readOnlyQuery = write.queryFor(
+                java.util.Set.of(io.github.xiaou61.platform.ToolScope.READ), "learner");
         assertThat(readOnlyQuery.readOnly()).isFalse();
         assertThat(readOnlyQuery.scopes())
                 .doesNotContain(io.github.xiaou61.platform.ToolScope.WRITE);

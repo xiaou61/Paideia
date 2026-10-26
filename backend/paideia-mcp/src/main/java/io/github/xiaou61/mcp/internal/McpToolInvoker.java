@@ -5,6 +5,7 @@ import io.github.xiaou61.platform.ToolCatalog;
 import io.github.xiaou61.platform.ToolContext;
 import io.github.xiaou61.platform.ToolDescriptor;
 import io.github.xiaou61.platform.ToolResult;
+import io.github.xiaou61.platform.ToolScope;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -67,14 +68,18 @@ class McpToolInvoker {
         }
         ToolDescriptor descriptor = found.get().descriptor();
 
-        // 视图校验：当前视图的清单是唯一权威（按调用者的 scope 过滤后仍须包含它）
-        boolean visible = catalog.view(view.queryFor(caller.scopes(), caller.toolsets()))
+        // 视图校验：当前视图的清单是唯一权威（按调用者的 scope 与角色过滤后仍须包含它）
+        boolean visible = catalog.view(view.queryFor(caller.scopes(), caller.toolsets(), caller.role()))
                 .stream().anyMatch(candidate -> candidate.name().equals(toolName));
         if (!visible) {
             return ToolResult.fail("没有名为「" + toolName + "」的工具");
         }
         if (!caller.scopes().contains(descriptor.scope())) {
             return ToolResult.fail("当前凭据没有执行这个工具的权限");
+        }
+        // 角色再判一次：清单过滤已经拦过，但"清单可见 ≠ 可调"必须两处一致
+        if (descriptor.scope() == ToolScope.ADMIN && !caller.isAdmin()) {
+            return ToolResult.fail("没有名为「" + toolName + "」的工具");
         }
         if (!limiter.allow(caller.tokenId())) {
             return ToolResult.fail("调用过于频繁，请稍后再试");
@@ -101,6 +106,6 @@ class McpToolInvoker {
     }
 
     static ToolContext contextOf(McpViewRegistry.PatCaller caller) {
-        return new ToolContext(caller.userId(), null, caller.scopes(), ToolContext.Origin.EXTERNAL);
+        return new ToolContext(caller.userId(), caller.role(), caller.scopes(), ToolContext.Origin.EXTERNAL);
     }
 }

@@ -61,7 +61,7 @@ class McpTokenController {
                 : (days == null ? PatService.DEFAULT_EXPIRES_IN_DAYS : days);
         Set<String> toolsets = parseToolsets(request == null ? null : request.toolsets());
         var created = tokens.create(userId, request == null ? null : request.name(), scopes,
-                toolsets, effectiveDays);
+                toolsets, effectiveDays, CurrentUser.role());
         return ApiResponse.ok(new CreatedView(created.id(), created.plaintext(), created.prefix(),
                 created.scopes().stream().map(ToolScope::key).sorted().toList(),
                 created.toolsets().stream().sorted().toList(), created.expiresAt()));

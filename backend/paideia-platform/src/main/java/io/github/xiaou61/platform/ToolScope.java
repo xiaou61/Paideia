@@ -17,7 +17,12 @@ public enum ToolScope {
     /** 写入（创建、修改、追加）。默认视图**不含**它。 */
     WRITE("write"),
 
-    /** 管理类能力（当前没有工具使用，为将来预留；必须同时是 ADMIN 角色）。 */
+    /**
+     * 管理类能力（WORK-038 起由 7 个 `admin_*` 工具组使用）；必须同时是 ADMIN 角色。
+     *
+     * <p><b>管理写工具也声明它，不要声明 WRITE</b>：{@link ToolCatalog#view} 的角色过滤只作用于
+     * ADMIN scope；改成 WRITE 会让非管理员仅凭「admin 工具组 + write」就看见并调用管理写工具。
+     */
     ADMIN("admin");
 
     private final String key;

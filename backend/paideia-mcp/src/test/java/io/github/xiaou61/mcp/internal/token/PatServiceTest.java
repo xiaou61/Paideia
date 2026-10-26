@@ -37,7 +37,7 @@ class PatServiceTest {
             return 1;
         });
 
-        PatService.CreatedToken created = service.create(7L, "笔记本", Set.of(ToolScope.READ), Set.of(), 90);
+        PatService.CreatedToken created = service.create(7L, "笔记本", Set.of(ToolScope.READ), Set.of(), 90, "learner");
 
         assertThat(created.plaintext()).startsWith(PatService.TOKEN_PREFIX);
         assertThat(created.plaintext().length()).isGreaterThan(PatService.TOKEN_PREFIX.length() + 30);
@@ -54,18 +54,33 @@ class PatServiceTest {
             return 1;
         });
 
-        assertThat(service.create(7L, "长期", Set.of(ToolScope.READ), Set.of(), null).expiresAt()).isNull();
+        assertThat(service.create(7L, "长期", Set.of(ToolScope.READ), Set.of(), null, "learner").expiresAt()).isNull();
     }
 
     @Test
     void rejectsBlankNameAndMissingScopes() {
-        assertThatThrownBy(() -> service.create(7L, "  ", Set.of(ToolScope.READ), Set.of(), 90))
+        assertThatThrownBy(() -> service.create(7L, "  ", Set.of(ToolScope.READ), Set.of(), 90, "learner"))
                 .isInstanceOf(BizException.class).hasMessageContaining("名称");
-        assertThatThrownBy(() -> service.create(7L, "x", Set.of(), Set.of(), 90))
+        assertThatThrownBy(() -> service.create(7L, "x", Set.of(), Set.of(), 90, "learner"))
                 .isInstanceOf(BizException.class).hasMessageContaining("权限范围");
-        assertThatThrownBy(() -> service.create(7L, "x", Set.of(ToolScope.ADMIN), Set.of(), 90))
-                .isInstanceOf(BizException.class).hasMessageContaining("admin");
+        // 管理能力是两把锁：非管理员申请 admin scope 必须被拒，不能静默降级
+        assertThatThrownBy(() -> service.create(7L, "x", Set.of(ToolScope.ADMIN), Set.of(), 90, "learner"))
+                .isInstanceOf(BizException.class).hasMessageContaining("管理员");
         verify(mapper, never()).insert(any());
+    }
+
+    @Test
+    void adminScopeIsIssuedOnlyToAdminRole() {
+        when(mapper.insert(any())).thenAnswer(invocation -> {
+            ((McpAccessToken) invocation.getArgument(0)).setId(1L);
+            return 1;
+        });
+
+        PatService.CreatedToken created = service.create(7L, "管理", Set.of(ToolScope.ADMIN),
+                Set.of("admin_users"), 90, "admin");
+
+        assertThat(created.scopes()).containsExactly(ToolScope.ADMIN);
+        assertThat(created.toolsets()).containsExactly("admin_users");
     }
 
     @Test

@@ -44,6 +44,7 @@ class McpViewRegistry {
     static final String ATTR_TOKEN_ID = "pd.pat.tokenId";
     static final String ATTR_SCOPES = "pd.pat.scopes";
     static final String ATTR_TOOLSETS = "pd.pat.toolsets";
+    static final String ATTR_ROLE = "pd.pat.role";
 
     private final ToolCatalog catalog;
     private final McpToolInvoker invoker;
@@ -72,8 +73,9 @@ class McpViewRegistry {
      * 表现为"勾了只授权知识库，清单里却仍是全部 11 个工具"（线上实测就是这样）。
      *
      * @param allowedToolsets 凭据的工具组白名单；空集合表示不限制
+     * @param role            本次调用者的角色（来自账号表，每次请求解析）；缓存键必须带上它
      */
-    McpView view(String path, Set<String> allowedToolsets) {
+    McpView view(String path, Set<String> allowedToolsets, String role) {
         McpViews parsed = McpViews.parse(path)
                 .orElseThrow(() -> new ViewNotFoundException(path));
         // **形状合法不等于存在**：`/mcp/x/nope` 能解析出组名 `nope`，但目录里没有这个组。
@@ -82,13 +84,24 @@ class McpViewRegistry {
         if (!parsed.toolsets().isEmpty() && !catalog.toolsets().containsAll(parsed.toolsets())) {
             throw new ViewNotFoundException(path);
         }
-        String key = parsed.name() + "|" + String.join(",", new java.util.TreeSet<>(allowedToolsets));
-        return views.computeIfAbsent(key, ignored -> build(parsed, pathOf(path), allowedToolsets));
+        String key = cacheKey(parsed, allowedToolsets, role);
+        return views.computeIfAbsent(key, ignored -> build(parsed, pathOf(path), allowedToolsets, role));
     }
 
-    private McpView build(McpViews view, String endpoint, Set<String> allowedToolsets) {
-        List<ToolDescriptor> descriptors = catalog.view(view.queryFor(
-                Set.of(ToolScope.READ, ToolScope.WRITE), allowedToolsets));
+    /**
+     * 视图缓存键。
+     *
+     * <p><b>角色必须进键</b>（WORK-038）：SDK 在构建时固化清单，漏了角色会让管理员先建好的
+     * 管理视图把管理工具清单缓存给非管理员。用布尔而非角色字符串，避免按角色数膨胀。
+     */
+    static String cacheKey(McpViews view, Set<String> allowedToolsets, String role) {
+        Set<String> toolsets = allowedToolsets == null ? Set.of() : allowedToolsets;
+        return view.name() + "|" + String.join(",", new java.util.TreeSet<>(toolsets))
+                + "|" + (isAdmin(role) ? "admin" : "user");
+    }
+
+    private McpView build(McpViews view, String endpoint, Set<String> allowedToolsets, String role) {
+        List<ToolDescriptor> descriptors = catalog.view(view.query(role));
         HttpServletStreamableServerTransportProvider transport =
                 HttpServletStreamableServerTransportProvider.builder()
                         .mcpEndpoint(endpoint)
@@ -98,7 +111,8 @@ class McpViewRegistry {
                                         ATTR_USER_ID, request.getAttribute(ATTR_USER_ID),
                                         ATTR_TOKEN_ID, request.getAttribute(ATTR_TOKEN_ID),
                                         ATTR_SCOPES, request.getAttribute(ATTR_SCOPES),
-                                        ATTR_TOOLSETS, request.getAttribute(ATTR_TOOLSETS))))
+                                        ATTR_TOOLSETS, request.getAttribute(ATTR_TOOLSETS),
+                                        ATTR_ROLE, request.getAttribute(ATTR_ROLE))))
                         .build();
 
         var specification = McpServer.sync(transport)
@@ -170,7 +184,8 @@ class McpViewRegistry {
         Set<String> toolsets = context.get(ATTR_TOOLSETS) instanceof Set<?> set
                 ? (Set<String>) set
                 : Set.of();
-        PatCaller caller = new PatCaller(userId, tokenId, scopes, toolsets);
+        String role = context.get(ATTR_ROLE) instanceof String value ? value : "";
+        PatCaller caller = new PatCaller(userId, tokenId, role, scopes, toolsets);
         ToolResult result = invoker.invoke(caller, view, toolName, arguments == null ? Map.of() : arguments);
         var builder = McpSchema.CallToolResult.builder().addTextContent(result.text());
         if (result.structured() != null) {
@@ -183,7 +198,16 @@ class McpViewRegistry {
     }
 
     /** 调用者身份（来自 PAT 解析结果）。`toolsets` 为空表示不限制工具组。 */
-    record PatCaller(long userId, long tokenId, Set<ToolScope> scopes, Set<String> toolsets) {
+    record PatCaller(long userId, long tokenId, String role, Set<ToolScope> scopes, Set<String> toolsets) {
+
+        boolean isAdmin() {
+            return "admin".equalsIgnoreCase(role);
+        }
+    }
+
+    /** 角色判定只认 `admin`（与账号模块的取值一致），大小写不敏感。 */
+    static boolean isAdmin(String role) {
+        return "admin".equalsIgnoreCase(role);
     }
 
     /** 路径不是一个已知视图。 */
@@ -199,8 +223,4 @@ class McpViewRegistry {
         return McpViews.parse(path).map(McpViews::name);
     }
 
-    /** 某个视图会看到的工具名（测试用；不建 server）。 */
-    List<String> toolNames(McpViews view) {
-        return catalog.view(view.query()).stream().map(ToolDescriptor::name).toList();
-    }
 }

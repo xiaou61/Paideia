@@ -6357,3 +6357,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：后端全量 322/0/0/4；前端全仓单测 0 失败；本地 e2e（review + sql-practice）9 passed；
   线上全量 **89 passed / 0 failed**；线上 health=200，三条迁移 success=1。
 - 本地提交：`64621b4`；已推送 `72f8c65..64621b4`；已部署（73 秒）。
+
+## 2026-10-26 10:27:08 +0800 · WORK-038 · 签署 .agent/changes/WORK-038-管理端MCP工具/requirements.md、.agent/changes/WORK-038-管理端MCP工具/proposal.md、.agent/changes/WORK-038-管理端MCP工具/design.md、.agent/changes/WORK-038-管理端MCP工具/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-038-管理端MCP工具/requirements.md、.agent/changes/WORK-038-管理端MCP工具/proposal.md、.agent/changes/WORK-038-管理端MCP工具/design.md、.agent/changes/WORK-038-管理端MCP工具/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-038-管理端MCP工具/requirements.md、.agent/changes/WORK-038-管理端MCP工具/proposal.md、.agent/changes/WORK-038-管理端MCP工具/design.md、.agent/changes/WORK-038-管理端MCP工具/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行

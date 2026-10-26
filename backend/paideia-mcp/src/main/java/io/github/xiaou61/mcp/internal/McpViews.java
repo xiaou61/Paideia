@@ -77,8 +77,8 @@ record McpViews(String name, Set<String> toolsets, boolean write, boolean defaul
      * <p>write 视图要求 token 带 write scope；这里把 scope 也带进查询，于是"清单里有、但 scope 不够"
      * 的工具在调用阶段同样不可见——两道判断用的是同一份过滤链。
      */
-    ToolQuery queryFor(Set<ToolScope> scopes) {
-        return ToolQuery.view(toolsets, write, null, scopes);
+    ToolQuery queryFor(Set<ToolScope> scopes, String role) {
+        return ToolQuery.view(toolsets, write, role, scopes);
     }
 
     /**
@@ -87,22 +87,27 @@ record McpViews(String name, Set<String> toolsets, boolean write, boolean defaul
      * <p>空白名单（老凭据）时保持原语义。两者取交集：视图说"只看 knowledge"、
      * 凭据只准 `note` 时结果是空——这正是"缩小权限"该有的样子。
      */
-    ToolQuery queryFor(Set<ToolScope> scopes, Set<String> allowedToolsets) {
+    ToolQuery queryFor(Set<ToolScope> scopes, Set<String> allowedToolsets, String role) {
         if (allowedToolsets == null || allowedToolsets.isEmpty()) {
-            return queryFor(scopes);
+            return queryFor(scopes, role);
         }
         Set<String> intersected = toolsets.isEmpty()
                 ? allowedToolsets
                 : toolsets.stream().filter(allowedToolsets::contains)
                         .collect(java.util.stream.Collectors.toSet());
-        return ToolQuery.view(intersected, write, null, scopes);
+        return ToolQuery.view(intersected, write, role, scopes);
     }
 
-    /** 构建视图时用的查询（服务端视角：按视图自身是否含写来决定 scope）。 */
-    ToolQuery query() {
+    /**
+     * 构建视图时用的查询（服务端视角）。
+     *
+     * <p>scope 带全三档：清单要按视图的 write 设置过滤，而**不能**按某张凭据的 scope 过滤——
+     * 否则管理员的第一张凭据会把清单固化成它自己那一份。凭据的真实 scope 在调用阶段校验。
+     */
+    ToolQuery query(String role) {
         Set<ToolScope> scopes = write
-                ? Set.of(ToolScope.READ, ToolScope.WRITE)
-                : Set.of(ToolScope.READ);
-        return ToolQuery.view(toolsets, write, null, scopes);
+                ? Set.of(ToolScope.READ, ToolScope.WRITE, ToolScope.ADMIN)
+                : Set.of(ToolScope.READ, ToolScope.ADMIN);
+        return ToolQuery.view(toolsets, write, role, scopes);
     }
 }

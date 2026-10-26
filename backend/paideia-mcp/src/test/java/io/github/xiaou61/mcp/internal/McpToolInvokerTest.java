@@ -22,21 +22,24 @@ import org.junit.jupiter.api.Test;
 class McpToolInvokerTest {
 
     private static final McpViewRegistry.PatCaller READER =
-            new McpViewRegistry.PatCaller(7L, 1L, Set.of(ToolScope.READ), Set.of());
+            new McpViewRegistry.PatCaller(7L, 1L, "learner", Set.of(ToolScope.READ), Set.of());
     private static final McpViewRegistry.PatCaller WRITER =
-            new McpViewRegistry.PatCaller(7L, 1L, Set.of(ToolScope.READ, ToolScope.WRITE), Set.of());
+            new McpViewRegistry.PatCaller(7L, 1L, "learner", Set.of(ToolScope.READ, ToolScope.WRITE), Set.of());
 
     private final AtomicReference<ToolContext> lastContext = new AtomicReference<>();
     private final AtomicReference<Map<String, Object>> lastArguments = new AtomicReference<>();
 
     private PaideiaTool recording(String name, String toolset, boolean readOnly) {
+        return recording(name, toolset, readOnly, readOnly ? ToolScope.READ : ToolScope.WRITE);
+    }
+
+    private PaideiaTool recording(String name, String toolset, boolean readOnly, ToolScope scope) {
         return new PaideiaTool() {
             @Override
             public ToolDescriptor descriptor() {
                 return new ToolDescriptor(name, toolset, name, "描述 " + name,
                         Map.of("type", "object", "properties", Map.of()), null,
-                        readOnly, false, true,
-                        readOnly ? ToolScope.READ : ToolScope.WRITE, false);
+                        readOnly, false, true, scope, false);
             }
 
             @Override
@@ -53,6 +56,13 @@ class McpToolInvokerTest {
                 recording("knowledge_search", "knowledge", true),
                 recording("note_create", "note", false)));
         return new McpToolInvoker(catalog, new McpRateLimiter(perMinute));
+    }
+
+    private McpToolInvoker invokerWithAdminTool() {
+        ToolCatalog catalog = new ToolCatalog(List.of(
+                recording("knowledge_search", "knowledge", true),
+                recording("admin_users_list", "admin_users", true, ToolScope.ADMIN)));
+        return new McpToolInvoker(catalog, new McpRateLimiter(100));
     }
 
     @Test
@@ -176,5 +186,39 @@ class McpToolInvokerTest {
 
         assertThat(result.error()).isTrue();
         assertThat(lastContext.get()).isNull();
+    }
+
+    /**
+     * 管理工具是两把锁（WORK-038）。
+     *
+     * <p>过期未清理的 admin scope + 已降权账号必须调不动；只靠"清单里没有"不够——
+     * 猜到名字直接调也必须失败。
+     */
+    @Test
+    void adminToolRequiresAdminRoleEvenWithAdminScope() {
+        McpViewRegistry.PatCaller demoted = new McpViewRegistry.PatCaller(
+                7L, 1L, "learner", Set.of(ToolScope.READ, ToolScope.ADMIN), Set.of());
+
+        ToolResult result = invokerWithAdminTool()
+                .invoke(demoted, McpViews.parse("/x/admin_users").orElseThrow(),
+                        "admin_users_list", Map.of());
+
+        assertThat(result.error()).isTrue();
+        assertThat(result.text()).contains("没有名为");
+        assertThat(lastContext.get()).as("不该执行").isNull();
+    }
+
+    @Test
+    void adminToolRunsForAdminRoleAndCarriesRoleIntoContext() {
+        McpViewRegistry.PatCaller admin = new McpViewRegistry.PatCaller(
+                7L, 1L, "admin", Set.of(ToolScope.ADMIN), Set.of());
+
+        ToolResult result = invokerWithAdminTool()
+                .invoke(admin, McpViews.parse("/x/admin_users").orElseThrow(),
+                        "admin_users_list", Map.of());
+
+        assertThat(result.error()).isFalse();
+        assertThat(lastContext.get().admin()).isTrue();
+        assertThat(lastContext.get().role()).isEqualTo("admin");
     }
 }
