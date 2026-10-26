@@ -18,7 +18,7 @@ import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/** AI 观测工具的不变量与一次真实返回形状（WORK-038 TASK-004）。 */
+/** AI 观测工具的不变量与一次真实返回形状（WORK-039 TASK-004）。 */
 class AiAdminToolsTest {
 
     private static final ToolContext ADMIN =

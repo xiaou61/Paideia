@@ -1,6 +1,6 @@
 ---
 artifact: test-report
-work_id: WORK-038
+work_id: WORK-039
 work: 管理端 MCP 工具
 status: passed
 evidence: required
@@ -9,7 +9,7 @@ created: 2026-10-26
 updated: 2026-10-26
 ---
 
-# WORK-038 验证报告
+# WORK-039 验证报告
 
 日期：2026-10-26。每条结论对应一次真实执行；命令都在 `.worktrees/work-038/backend` 或
 `.worktrees/work-038/frontend/apps/app` 下执行，数据库经 `scripts/test-db.sh` 分配独占库。

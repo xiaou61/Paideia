@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/** 运维摘要工具（WORK-038 TASK-006）：只读、按组渲染。 */
+/** 运维摘要工具（WORK-039 TASK-006）：只读、按组渲染。 */
 class OpsAdminToolsTest {
 
     private static final ToolContext ADMIN =

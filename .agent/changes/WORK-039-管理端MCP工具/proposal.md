@@ -1,6 +1,6 @@
 ---
 artifact: proposal
-work_id: WORK-038
+work_id: WORK-039
 work: 管理端 MCP 工具
 status: approved
 created: 2026-10-26

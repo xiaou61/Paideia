@@ -12,7 +12,7 @@ import java.util.Map;
 import org.springframework.stereotype.Component;
 
 /**
- * 每日速递的管理工具组（WORK-038 TASK-006，2 个）。
+ * 每日速递的管理工具组（WORK-039 TASK-006，2 个）。
  *
  * <p>删除是硬删：抓来的公开新闻没有审计价值。删掉之后同一天重跑**会**再抓回来
  * （指纹已不在库里），要做永久屏蔽得另做黑名单，一期不做——与 `DigestAdminController`

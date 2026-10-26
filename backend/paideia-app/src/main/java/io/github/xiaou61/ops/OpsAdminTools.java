@@ -11,7 +11,7 @@ import java.util.Map;
 import org.springframework.stereotype.Component;
 
 /**
- * 运维摘要的管理工具（WORK-038 TASK-006）。
+ * 运维摘要的管理工具（WORK-039 TASK-006）。
  *
  * <p>**只读**：运维面不该成为第二个能被写坏的地方（与 `OpsSummaryController` 同一条裁决）。
  * Grafana iframe 代理不做成工具：它依赖会话 Cookie，PAT 架构根本走不通。

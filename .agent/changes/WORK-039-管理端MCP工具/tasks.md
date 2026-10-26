@@ -1,6 +1,6 @@
 ---
 artifact: tasks
-work_id: WORK-038
+work_id: WORK-039
 work: 管理端 MCP 工具
 status: approved
 created: 2026-10-26
@@ -170,6 +170,6 @@ approver_role: CTO
 - 步骤：
   1. 后端：`scripts/test-db.sh mvn -B -T 1C -pl '!paideia-app' test` 与集成套件切片。
   2. 前端：`pnpm -r typecheck` + `mcp-tokens` e2e。
-  3. 更新 `.agent/history/updates.md` 与 WORK-038 的验证报告。
+  3. 更新 `.agent/history/updates.md` 与 WORK-039 的验证报告。
   4. 分切片本地提交（不 push）。
 - 验证：见验证报告的五列证据表。

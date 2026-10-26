@@ -19,7 +19,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
- * 管理内容工具的不变量与最关键的行为（WORK-038 TASK-002）。
+ * 管理内容工具的不变量与最关键的行为（WORK-039 TASK-002）。
  *
  * <p>重点是"先读后写"：底层服务把 null 当清空，工具不补原值就会让模型少写一个字段时
  * 静默抹掉正文。

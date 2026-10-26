@@ -96,7 +96,7 @@ class McpViewRegistry {
     /**
      * 视图缓存键。
      *
-     * <p><b>角色必须进键</b>（WORK-038）：SDK 在构建时固化清单，漏了角色会让管理员先建好的
+     * <p><b>角色必须进键</b>（WORK-039）：SDK 在构建时固化清单，漏了角色会让管理员先建好的
      * 管理视图把管理工具清单缓存给非管理员。用布尔而非角色字符串，避免按角色数膨胀。
      */
     static String cacheKey(McpViews view, Set<String> allowedToolsets, String role) {

@@ -1,6 +1,6 @@
 ---
 artifact: requirements
-work_id: WORK-038
+work_id: WORK-039
 work: 管理端 MCP 工具
 status: approved
 mode: strict
@@ -19,6 +19,9 @@ approver_role: CTO
 ## 本项状态与本轮变化
 
 - **2026-10-26 建项**。用户在调研管理端 MCP 覆盖面后指示「可以的给我补充吧，开始吧」。
+- **编号说明**：起草时 `brief` 给出的下一个编号是 WORK-038，但同一时间段另一个并发会话已在
+  master 上占用了 WORK-038（理论线与实战线）。合并 master 时发现撞号，本项统一改为 **WORK-039**；
+  早期本地提交信息里的「WORK-038」指本项历史。
 - 本文件只写期望行为与边界；分组命名、角色贯通方式与缓存键等实现细节在 proposal / design。
 - 交付目标是把管理端 49 个端点按意图收敛成 38 个工具，**不是**把 REST 接口 1:1 包一层。
 

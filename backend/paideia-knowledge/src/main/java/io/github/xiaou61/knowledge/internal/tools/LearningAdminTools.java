@@ -14,7 +14,7 @@ import java.util.Map;
 import org.springframework.stereotype.Component;
 
 /**
- * 题目标注的管理工具组（WORK-038 TASK-006，4 个）。
+ * 题目标注的管理工具组（WORK-039 TASK-006，4 个）。
  *
  * <p>题目标注是内容质量的一部分：模型可以读题目、看候选概念、提交标注，但**只写标注表**，
  * 不改题目本身（题目在条目正文的围栏块里）。

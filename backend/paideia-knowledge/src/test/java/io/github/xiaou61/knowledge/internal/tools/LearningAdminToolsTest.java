@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/** 题目标注工具（WORK-038 TASK-006）：整组替换与权重夹取。 */
+/** 题目标注工具（WORK-039 TASK-006）：整组替换与权重夹取。 */
 class LearningAdminToolsTest {
 
     private static final ToolContext ADMIN =

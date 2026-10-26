@@ -18,7 +18,7 @@ import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/** 速递工具（WORK-038 TASK-006）：默认日期、坏日期、硬删。 */
+/** 速递工具（WORK-039 TASK-006）：默认日期、坏日期、硬删。 */
 class DigestAdminToolsTest {
 
     private static final ToolContext ADMIN =

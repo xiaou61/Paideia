@@ -19,7 +19,7 @@ import java.util.Map;
 import org.springframework.stereotype.Component;
 
 /**
- * 知识库的管理工具组（WORK-038 TASK-002，15 个）。
+ * 知识库的管理工具组（WORK-039 TASK-002，15 个）。
  *
  * <p>**为什么集中在一个文件**：它们共享同一份 schema/参数辅助函数，而且"这一组能做什么"应该
  * 一眼看全。与 `KnowledgeTools` 同一组织方式。

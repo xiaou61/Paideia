@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 /**
- * 账号与积分的管理工具组（WORK-038 TASK-003，6 个）。
+ * 账号与积分的管理工具组（WORK-039 TASK-003，6 个）。
  *
  * <p><b>为什么放在 `paideia-app` 的 console 包</b>：用户列表要同时读账号与 AI 用量，
  * 而 `account` 与 `ai` 互不依赖，只有装配根同时看得见两者——与 `AdminUserController` 同一先例。

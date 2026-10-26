@@ -16,7 +16,7 @@ import java.util.List;
 public interface AiAdminApi {
 
     /**
-     * 积分流水（管理端审计的分页视图，WORK-038 供管理工具使用）。
+     * 积分流水（管理端审计的分页视图，WORK-039 供管理工具使用）。
      *
      * <p>返回公共记录而不是内部 `CreditService.LedgerRow`：内部类型穿过模块边界会让
      * `paideia-app` 必须 import `ai.internal`，Modulith 边界就破了。

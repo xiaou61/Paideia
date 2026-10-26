@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/** 笔记举报工具（WORK-038 TASK-005）。 */
+/** 笔记举报工具（WORK-039 TASK-005）。 */
 class NoteAdminToolsTest {
 
     private static final ToolContext ADMIN =

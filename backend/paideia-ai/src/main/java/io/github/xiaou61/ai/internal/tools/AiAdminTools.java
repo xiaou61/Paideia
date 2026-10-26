@@ -16,7 +16,7 @@ import java.util.Map;
 import org.springframework.stereotype.Component;
 
 /**
- * AI 观测的管理工具组（WORK-038 TASK-004，5 个）。
+ * AI 观测的管理工具组（WORK-039 TASK-004，5 个）。
  *
  * <p>全部只读：统计系统不该成为第二个能被写坏的地方（与 `AiRunAdminController` 同一条裁决）。
  *

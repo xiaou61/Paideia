@@ -30,7 +30,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 /**
- * 管理工具的两把锁（WORK-038 AC-001~005）。
+ * 管理工具的两把锁（WORK-039 AC-001~005）。
  *
  * <p>钉住四条"错了不会报错、只会静默放权"的东西：非管理员拿不到 admin scope、
  * 非管理员看不到管理组（404 而不是空清单）、管理员先访问后学习者不串清单、

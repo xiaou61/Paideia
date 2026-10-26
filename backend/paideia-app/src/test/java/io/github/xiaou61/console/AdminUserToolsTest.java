@@ -20,7 +20,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
- * 账号与积分工具的不变量与自伤防护（WORK-038 TASK-003）。
+ * 账号与积分工具的不变量与自伤防护（WORK-039 TASK-003）。
  */
 class AdminUserToolsTest {
 

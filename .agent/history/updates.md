@@ -6409,12 +6409,12 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 变更：.agent/changes/WORK-038-理论线与实战线/requirements.md、.agent/changes/WORK-038-理论线与实战线/proposal.md、.agent/changes/WORK-038-理论线与实战线/design.md、.agent/changes/WORK-038-理论线与实战线/tasks.md 由 xiaou61 签署为 approved
 - 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
 - 依据：.agent/changes/WORK-038-理论线与实战线/requirements.md、.agent/changes/WORK-038-理论线与实战线/proposal.md、.agent/changes/WORK-038-理论线与实战线/design.md、.agent/changes/WORK-038-理论线与实战线/tasks.md
-## 2026-10-26 10:27:08 +0800 · WORK-038 · 签署 .agent/changes/WORK-038-管理端MCP工具/requirements.md、.agent/changes/WORK-038-管理端MCP工具/proposal.md、.agent/changes/WORK-038-管理端MCP工具/design.md、.agent/changes/WORK-038-管理端MCP工具/tasks.md
+## 2026-10-26 10:27:08 +0800 · WORK-039 · 签署 .agent/changes/WORK-039-管理端MCP工具/requirements.md、.agent/changes/WORK-039-管理端MCP工具/proposal.md、.agent/changes/WORK-039-管理端MCP工具/design.md、.agent/changes/WORK-039-管理端MCP工具/tasks.md
 
 - 类型：decision
-- 变更：.agent/changes/WORK-038-管理端MCP工具/requirements.md、.agent/changes/WORK-038-管理端MCP工具/proposal.md、.agent/changes/WORK-038-管理端MCP工具/design.md、.agent/changes/WORK-038-管理端MCP工具/tasks.md 由 xiaou61 签署为 approved
+- 变更：.agent/changes/WORK-039-管理端MCP工具/requirements.md、.agent/changes/WORK-039-管理端MCP工具/proposal.md、.agent/changes/WORK-039-管理端MCP工具/design.md、.agent/changes/WORK-039-管理端MCP工具/tasks.md 由 xiaou61 签署为 approved
 - 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
-- 依据：.agent/changes/WORK-038-管理端MCP工具/requirements.md、.agent/changes/WORK-038-管理端MCP工具/proposal.md、.agent/changes/WORK-038-管理端MCP工具/design.md、.agent/changes/WORK-038-管理端MCP工具/tasks.md
+- 依据：.agent/changes/WORK-039-管理端MCP工具/requirements.md、.agent/changes/WORK-039-管理端MCP工具/proposal.md、.agent/changes/WORK-039-管理端MCP工具/design.md、.agent/changes/WORK-039-管理端MCP工具/tasks.md
 - 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
@@ -6463,7 +6463,7 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
   已部署；**未推送**。
 - 未做（明确留在 tasks.md）：TASK-010 读代码实战、TASK-012~014 项目式实战（沙箱多文件 +
   预置测试）、TASK-015 理论补四块（并发/JVM/数据库原理/系统设计）、TASK-017 全量 e2e。
-## 2026-10-26 11:20 +0800 · WORK-038 · 管理端 MCP 工具实现完成
+## 2026-10-26 11:20 +0800 · WORK-039 · 管理端 MCP 工具实现完成
 
 - 类型：implementation
 - 变更：新增 7 个管理工具组共 38 个工具（`admin_content` 15、`admin_users` 6、`admin_ai` 5、
@@ -6472,8 +6472,8 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
   非管理员访问 `/mcp/x/admin_*` 返回 404；前端凭据页补 7 个管理组与缺失的 `sql` 组。
 - 决策：管理写工具声明 `ADMIN` 而不是 `WRITE`——角色过滤只作用于 ADMIN scope，改成 WRITE
   会让非管理员仅凭「admin 工具组 + write」就看见管理写工具。
-- 依据：.agent/changes/WORK-038-管理端MCP工具/requirements.md、proposal.md、design.md、tasks.md
-- 验证：见 `.agent/changes/WORK-038-管理端MCP工具/testing/report.md`。关键数字：后端非 app 切片
+- 依据：.agent/changes/WORK-039-管理端MCP工具/requirements.md、proposal.md、design.md、tasks.md
+- 验证：见 `.agent/changes/WORK-039-管理端MCP工具/testing/report.md`。关键数字：后端非 app 切片
   616 执行 / 0 失败 / 14 跳过；MCP 单测 34、全链路 10、模块与迁移闸 9；mcp-tokens e2e 6 passed；
   两条反向验证各 1 条失败（恢复后全绿）。实施中抓到并修掉一个真缺陷：视图构建漏了凭据工具组
   交集，由既有 `McpStartupSmokeTest` 抓到。

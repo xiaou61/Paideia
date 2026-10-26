@@ -3,7 +3,7 @@ package io.github.xiaou61.platform;
 import java.util.Optional;
 
 /**
- * 按账号 id 读角色（WORK-038）。
+ * 按账号 id 读角色（WORK-039）。
  *
  * <p><b>为什么是一个纯接口放在平台库</b>：`paideia-mcp` 只依赖契约、不 import 任何业务包
  * （WORK-019 的边界约定）。PAT 里只有 userId，没有角色，而管理类工具必须判角色——

@@ -11,7 +11,7 @@ import java.util.Map;
 import org.springframework.stereotype.Component;
 
 /**
- * 笔记举报的管理工具组（WORK-038 TASK-005，2 个）。
+ * 笔记举报的管理工具组（WORK-039 TASK-005，2 个）。
  *
  * <p>下架是人做的决定：工具只负责"列出"与"下架"，不做自动判定（与 `NoteReportAdminController`
  * 同一条裁决）。下架后链接立刻不可读，且**不可恢复**。

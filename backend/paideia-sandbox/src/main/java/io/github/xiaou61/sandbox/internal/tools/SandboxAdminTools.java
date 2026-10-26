@@ -12,7 +12,7 @@ import java.util.Map;
 import org.springframework.stereotype.Component;
 
 /**
- * SQL 数据集的管理工具组（WORK-038 TASK-005，3 个）。
+ * SQL 数据集的管理工具组（WORK-039 TASK-005，3 个）。
  *
  * <p>**只能让它不可见，不能编辑别人的内容**（与 `SqlDatasetAdminController` 同一条口径）。
  * 状态只有 `published` 与 `taken_down` 两个可写值；下架时同时把未处理的举报标成已处理。

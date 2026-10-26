@@ -18,7 +18,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/** 数据集治理工具（WORK-038 TASK-005）：只允许碰社区集，只允许两个状态。 */
+/** 数据集治理工具（WORK-039 TASK-005）：只允许碰社区集，只允许两个状态。 */
 class SandboxAdminToolsTest {
 
     private static final ToolContext ADMIN =
