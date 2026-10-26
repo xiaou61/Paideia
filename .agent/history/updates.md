@@ -6630,3 +6630,18 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：报告内含复现命令与全部数字；研究阶段无代码改动，未跑测试。
 - 本地提交：只提交本报告与这条更新历史；**未推送**。
 - 旁注：`mcp__paideia__admin_digest_list_items` 与 `admin_ops_summary` 当前都返回 MCP 500，本次改用日志取证。
+
+## 2026-10-26 15:43 +0800 · 项目 · GitHub 热榜调研五项裁决落定
+
+- 类型：decision
+- 变更：把 `.agent/notes/2026-10-26-github-trending-research.md` 的「未决问题」改成「已裁决」，
+  P2 的网络修法从 `/etc/hosts` 改成**本机反向代理**。**未改代码、未部署。**
+- 裁决：① cron 08:00 北京；② 页面网络用本机反代（不用 hosts）；③ 周榜在 GitHub 组内「今日/本周」切换；
+  ④ 页面不可达时显示「GitHub 新项目」，不隐藏；⑤ 一期不做 watchlist。
+- 对比结论（回答「我们的好不好用」）：**产品面优于参考实现，数据面落后**。
+  参考项目（huchenme / trendkit / github-star-tracker / github-trends-mcp / OSS Insight / HelloGitHub）
+  大多是 API、CLI 或 MCP，没有中文摘要、卡片、存笔记、周报与历史；但它们的增量/快照纪律比我们现在的
+  「总 star + 页面数字」更接近真实热度。P0+P1 后数据面可追平，产品面继续领先。
+- 下一步：按 P0+P1 同批开 WORK-041；P2 需先在生产机装 nginx/caddy。
+- 验证：无代码改动，未跑测试。
+- 本地提交：只提交报告与这条更新历史；**未推送**。
