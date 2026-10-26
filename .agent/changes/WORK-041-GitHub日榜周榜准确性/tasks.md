@@ -47,7 +47,7 @@ approver_role: CTO
 
 ## 任务
 
-### TASK-001 | pending | history 客户端与同 host 重定向
+### TASK-001 | done | history 客户端与同 host 重定向
 
 - 对应：`REQ-002`、`AC-003`、`AC-008`
 - 依赖：无
@@ -66,7 +66,7 @@ approver_role: CTO
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-ai -am -Dtest=GithubStarHistoryTest -Dsurefire.failIfNoSpecifiedTests=false test` → 期望 0 failed、0 skipped
 - 反向验证：把 `plusDays(i + 1)` 改成 `plusDays(i)`，`weekLabelIsSundayButDaysStartMonday` 必须红。
 
-### TASK-002 | pending | 页面解析与日/周候选合并
+### TASK-002 | done | 页面解析与日/周候选合并
 
 - 对应：`REQ-001`、`REQ-004`、`AC-001`
 - 依赖：无
@@ -81,7 +81,7 @@ approver_role: CTO
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-ai -am -Dtest=GithubTrendingSourceTest -Dsurefire.failIfNoSpecifiedTests=false test` → 期望 0 failed
 - 反向验证：把 `<h2>` 匹配放宽回「块内第一个 repo 链接」，赞助商用例必须红。
 
-### TASK-003 | pending | GithubTrendingSource 集成：history、并发、兜底门禁、标签
+### TASK-003 | done | GithubTrendingSource 集成：history、并发、兜底门禁、标签
 
 - 对应：`REQ-001`、`REQ-002`、`REQ-003`、`REQ-006`、`REQ-009`、`AC-001`、`AC-002`、`AC-007`
 - 依赖：TASK-001、TASK-002
@@ -97,7 +97,7 @@ approver_role: CTO
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-ai -am -Dtest=GithubTrendingSourceTest -Dsurefire.failIfNoSpecifiedTests=false test` → 期望 0 failed
 - 反向验证：去掉门禁，`fallbackGateDropsFreshSpam` 必须红；把 history 失败改成抛异常，`historyFailureFallsBackToPagePeriodStars` 必须红。
 
-### TASK-004 | pending | 迁移、Mapper、Controller 两字段
+### TASK-004 | done | 迁移、Mapper、Controller 两字段
 
 - 对应：`REQ-011`、`REQ-012`、`AC-004`、`AC-005`、`AC-009`
 - 依赖：无
@@ -115,7 +115,7 @@ approver_role: CTO
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=DigestIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test` → 期望 0 failed
 - 反向验证：把唯一键改回 `(fingerprint)`，跨天用例必须红。
 
-### TASK-005 | pending | 采集编排：按组预检、stars 字段、标题固定
+### TASK-005 | done | 采集编排：按组预检、stars 字段、标题固定
 
 - 对应：`REQ-005`、`REQ-004`、`AC-004`、`AC-005`、`AC-012`
 - 依赖：TASK-003、TASK-004
@@ -130,7 +130,7 @@ approver_role: CTO
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-ai -am -Dtest=DigestCollectionServiceTest,DigestSummarizerTest -Dsurefire.failIfNoSpecifiedTests=false test` → 期望 0 failed
 - 反向验证：把 GitHub 预检窗口改回 ±1 天，`newsStillUsesNeighborWindow` 的对偶用例（GitHub 昨天在榜今天可入）必须红。
 
-### TASK-006 | pending | 前端：类型、今日/本周切换、卡片
+### TASK-006 | done | 前端：类型、今日/本周切换、卡片
 
 - 对应：`REQ-004`、`AC-006`
 - 依赖：TASK-004
@@ -145,7 +145,7 @@ approver_role: CTO
 - 验证：`cd frontend && pnpm -r typecheck` → 0 error；`pnpm --filter @paideia/app test:e2e -- digest.spec.ts`（视本地数据）
 - 反向验证：把周榜排序改成仍按 `starsDay`，切换用例必须红（或手工观察顺序不变）。
 
-### TASK-007 | pending | 配置与反代部署准备
+### TASK-007 | blocked | 配置与反代部署准备
 
 - 对应：`REQ-007`、`REQ-008`、`AC-010`、`AC-011`
 - 依赖：无
@@ -157,9 +157,10 @@ approver_role: CTO
   2. 准备反代配置（监听 127.0.0.1、`proxy_ssl_name github.com`、多 upstream）；写部署说明。
   3. 部署前检查 `git log --all -- <迁移目录>` 无更晚时间戳；确认 jar 内只有一个 `V20261026160000`。
 - 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-ai -am -Dtest=DigestPropertiesTest -Dsurefire.failIfNoSpecifiedTests=false test`（若存在）；部署说明人工核对
+- 执行记录：配置已完成（cron 08:00、`github-trending-url` 占位）；**反代安装、生产配置与发版未执行，等待单独授权**。
 - 反向验证：无（配置与部署准备，靠启动日志与人工核对）
 
-### TASK-008 | pending | 验证与报告
+### TASK-008 | done | 验证与报告
 
 - 对应：全部 `AC-*`
 - 依赖：TASK-001–007
@@ -170,7 +171,8 @@ approver_role: CTO
   2. 跑内环：`scripts/test-db.sh mvn -B -T 1C -pl '!paideia-app' test`；跑集成：`-Dtest=Digest*Test`。
   3. 跑前端 `pnpm -r typecheck` 与相关 e2e。
   4. 写报告：每条 AC 的命令、退出码、结果、证据；未验证项如实写。
-- 验证：报告 `status: passed` 或 `partial`（按实际结果）
+- 验证：报告 `status: partial`（AC-006 的 e2e 未跑；页面/部署真验未做）
+- 执行记录：单测 304/0/13、集成 10/0、迁移闸 9/0、前端 typecheck 0 error；三条反向验证均先红后绿。
 - 反向验证：日期映射、跨天唯一键、兜底门禁三条各做一次 red-green。
 
 ## 完成条件

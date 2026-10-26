@@ -6671,3 +6671,14 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 旁注：e2e 结束后后端 java 子进程有时会残留，下一轮 `reuseExistingServer` 会静默复用它
   （于是打到上一轮的库、globalSetup 登录失败）。跑前先确认 8080 上没有遗留进程。
 - 本地提交：仅四份 `playwright.config.ts` 与本条更新历史；远端推送：按用户本轮授权推送 master。
+
+## 2026-10-26 16:52:39 +0800 · WORK-041 · WORK-041 实施：真实增量 + 官方候选 + 今日/本周切换
+
+- 类型：implementation
+- 变更：在 .worktrees/work-041 实现 P0+P1：GithubStarHistory（30 周端点、301 同 host、week 周日/日期周一映射）、页面日/周候选、d1/d7 排序、兜底门禁与「GitHub 新项目」标签、复合唯一键 + stars_day/stars_week、API 两字段、GitHub 组今日/本周切换、提示词 digest-v3、cron 08:00 与反代地址配置。未安装反代、未改生产配置、未发版。
+- 决策：不用 z 分（回测只 +0.01）；页面只当候选源；GitHub 预检只查当天，其它组保持 ±1 天；GitHub 标题服务端固定为 owner/repo；部署单独授权。
+- 依据：WORK-041 requirements/proposal/design/tasks；.agent/notes/2026-10-26-github-trending-research.md
+- 验证：单元 306/0/13；集成 10/0；迁移闸 9/0；前端 typecheck 0 error；日期/门禁/唯一键三条反向验证先红后绿；报告 status=partial（e2e 与部署未做）
+- 复验：rebase 到 master `5abe939` 后，集成 10/0、前端 typecheck 0 error；主树有并发会话未提交改动，**本分支未合并**。
+- 本地提交：8d2468e, c28e4db, d02dfa5（未推送）
+- 远端推送：未执行
