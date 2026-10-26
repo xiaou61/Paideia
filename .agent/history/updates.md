@@ -6656,6 +6656,21 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
 
+## 2026-10-26 16:20 +0800 · 项目 · e2e 失败时保留 trace（原配置永不触发）
+
+- 类型：fix
+- 变更：学习端、管理端、ui-kit 三处 `trace: 'on-first-retry'` 改为 `'retain-on-failure'`；
+  桌面端原本没有 trace，补上同一行。原因：全仓没有设 `retries`（默认 0），
+  `on-first-retry` 要求「发生首次重试」才开始录，所以这三处等于死配置，失败时没有任何可回放现场。
+- 验证：① 探针实测同一失败用例——旧值只产 `error-context.md`，新值产 `trace.zip`；
+  ② 真实配置下故意失败的探针确实在 `test-results/*/trace.zip` 落盘，报告给出 show-trace 命令；
+  ③ `playwright test --list` 四端均可解析（120/29/5/1 条）；
+  ④ 开销：`e2e/home.spec.ts` 8 条全绿，`--trace=off` 1.7 分钟 vs 新配置 1.2 分钟，无可测差异。
+- 旁证：本轮全量跑出 10 条红（3 速递 + 7 学习线），全是「没有内容/数据」；
+  用 `--trace=off` 复现同一批红，与本改动无关——那些用例依赖已导入的课程与速递数据，派生空库跑不了。
+- 旁注：e2e 结束后后端 java 子进程有时会残留，下一轮 `reuseExistingServer` 会静默复用它
+  （于是打到上一轮的库、globalSetup 登录失败）。跑前先确认 8080 上没有遗留进程。
+- 本地提交：仅四份 `playwright.config.ts` 与本条更新历史；远端推送：按用户本轮授权推送 master。
 ## 2026-10-26 17:00 +0800 · 内容 · Java 从零开始扩到 35 课；实战线补题与「先修理论」
 
 - 类型：content + fix

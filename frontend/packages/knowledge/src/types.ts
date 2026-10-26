@@ -4,6 +4,8 @@ export interface CategoryNode {
   id: number
   name: string
   slug: string
+  /** 非空表示这是一条学习线（`course` / `reading`）；为 null 时后端可能整个字段都不出现。 */
+  lineKind?: string | null
   children: CategoryNode[]
 }
 

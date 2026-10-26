@@ -38,8 +38,8 @@ export default defineConfig({
     // PWA 预览不跑 globalSetup，AUTH_FILE 不会被生成：这时带上它要么 ENOENT 让整个 run 挂掉，
     // 要么静默复用上次留下的过期令牌。PWA 用例本身不需要身份。
     ...(process.env.PWA_BASE_URL === undefined ? { storageState: AUTH_FILE } : {}),
-    // 首次重试才留 trace：稳定运行时零开销，失败时会话可完整回放
-    trace: 'on-first-retry',
+    // 失败就留 trace：retries 默认 0，`on-first-retry` 永远不会触发（2026-10-26 实测）
+    trace: 'retain-on-failure',
   },
   /**
    * 两个 project（WORK-016）：

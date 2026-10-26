@@ -29,6 +29,8 @@ export interface FlatCategory {
   id: number
   name: string
   slug: string
+  /** `course` / `reading` 是学习线，null 是手工分类。 */
+  lineKind: string | null
   depth: number
   /** 上级分类名：表格里显式列出来，光靠缩进说不清"缩进到哪一层算谁的孩子"。 */
   parentName: string | null
@@ -36,20 +38,33 @@ export interface FlatCategory {
 
 export function flatten(nodes: CategoryNode[], depth = 0, parentName: string | null = null): FlatCategory[] {
   return nodes.flatMap((node) => [
-    { id: node.id, name: node.name, slug: node.slug, depth, parentName },
+    { id: node.id, name: node.name, slug: node.slug, lineKind: node.lineKind ?? null, depth, parentName },
     ...flatten(node.children, depth + 1, node.name),
   ])
 }
 
-/** 分类下拉的选项：`null` 是"未分类/根分类"，用 `null` 而不是空串——空串是一个合法值，当哨兵会混淆。 */
-export function categoryOptions(flat: FlatCategory[], noneLabel: string) {
+/**
+ * 分类下拉的分组：`null` 是"未分类/根分类"，用 `null` 而不是空串——空串是一个合法值，当哨兵会混淆。
+ *
+ * <p>分类树只有两层，可 21 条学习线全是并列的一级分类、还混着手工分类，平铺下来要滚十几屏。
+ * 按学习线自己的类型分两档（实战课 / 阅读线），其余归「其他分类」；层级仍用缩进表示。
+ */
+export function categoryGroups(flat: FlatCategory[]) {
   return [
-    { value: null as number | null, label: noneLabel },
-    ...flat.map((category) => ({
-      value: category.id as number | null,
-      label: `${'\u3000'.repeat(category.depth)}${category.name}`,
-    })),
+    { label: '实战课', kind: 'course' as string | null },
+    { label: '阅读线', kind: 'reading' as string | null },
+    { label: '其他分类', kind: null as string | null },
   ]
+    .map(({ label, kind }) => ({
+      label,
+      options: flat
+        .filter((category) => category.lineKind === kind)
+        .map((category) => ({
+          value: category.id as number | null,
+          label: `${'\u3000'.repeat(category.depth)}${category.name}`,
+        })),
+    }))
+    .filter((group) => group.options.length > 0)
 }
 
 export function Loading({ label }: { label: string }) {

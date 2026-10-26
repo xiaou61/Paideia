@@ -23,7 +23,9 @@ import {
   PageHeader,
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
   Spinner,
@@ -39,7 +41,7 @@ import { Plus, RotateCcw, Upload } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
 
 import { API_BASE_URL } from '../env'
-import { ConfirmDeleteDialog, Loading, admin, categoryOptions, flatten, type FlatCategory } from '../knowledge-shared'
+import { ConfirmDeleteDialog, Loading, admin, categoryGroups, flatten, type FlatCategory } from '../knowledge-shared'
 
 /** 每页条数。列表用前端分页：接口一次给一页（size=200），条目量到千级再改成服务端分页。 */
 const PAGE_SIZE = 10
@@ -107,6 +109,7 @@ export function KnowledgeEntriesPage() {
   })
 
   const flat = useMemo(() => flatten(categories.data ?? []), [categories.data])
+  const grouped = useMemo(() => categoryGroups(flat), [flat])
 
   const report = (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause))
 
@@ -187,9 +190,13 @@ export function KnowledgeEntriesPage() {
             </Select>
 
             <Select
-              items={[{ value: 'all', label: '全部分类' }, ...categoryOptions(flat, '未分类')
-                .filter((option) => option.value !== null)
-                .map((option) => ({ value: String(option.value), label: option.label }))]}
+              items={[
+                { value: 'all', label: '全部分类' },
+                ...grouped.flatMap((group) => group.options).map((option) => ({
+                  value: String(option.value),
+                  label: option.label,
+                })),
+              ]}
               value={categoryFilter}
               onValueChange={(value) => {
                 setCategoryFilter(value as string)
@@ -201,13 +208,16 @@ export function KnowledgeEntriesPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">全部分类</SelectItem>
-                {categoryOptions(flat, '未分类')
-                  .filter((option) => option.value !== null)
-                  .map((option) => (
-                    <SelectItem key={option.value} value={String(option.value)}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
+                {grouped.map((group) => (
+                  <SelectGroup key={group.label}>
+                    <SelectLabel>{group.label}</SelectLabel>
+                    {group.options.map((option) => (
+                      <SelectItem key={option.value} value={String(option.value)}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
               </SelectContent>
             </Select>
 
@@ -522,7 +532,11 @@ function EntryForm({
   const [relationTarget, setRelationTarget] = useState<number | null>(null)
   const [relationType, setRelationType] = useState('prerequisite')
 
-  const categoryItems = categoryOptions(categories, '（未分类）')
+  const categoryGroupsList = categoryGroups(categories)
+  const categoryItems = [
+    { value: null as number | null, label: '（未分类）' },
+    ...categoryGroupsList.flatMap((group) => group.options),
+  ]
   // 关系目标不能是自己（后端也会拒，但下拉里就不该出现这个选项）
   const targetItems = entries
     .filter((entry) => entry.id !== detail?.id)
@@ -607,10 +621,16 @@ function EntryForm({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {categoryItems.map((option) => (
-                    <SelectItem key={option.value ?? 'none'} value={option.value}>
-                      {option.label}
-                    </SelectItem>
+                  <SelectItem value={null}>（未分类）</SelectItem>
+                  {categoryGroupsList.map((group) => (
+                    <SelectGroup key={group.label}>
+                      <SelectLabel>{group.label}</SelectLabel>
+                      {group.options.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   ))}
                 </SelectContent>
               </Select>
