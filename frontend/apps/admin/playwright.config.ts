@@ -31,7 +31,7 @@ export default defineConfig({
   reporter: [['list']],
   use: {
     baseURL: REMOTE_BASE_URL ?? `http://127.0.0.1:${ADMIN_PORT}`,
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
   },
   /** 同学习者端：桌面跑全部既有用例，移动 project 只跑 `*.mobile.spec.ts`（WORK-016）。 */
   projects: [

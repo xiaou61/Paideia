@@ -15,6 +15,8 @@ export default defineConfig({
   reporter: [['list']],
   // 启动 Electron 需要真实窗口，超时给宽一些
   timeout: 60_000,
+  // 同其他两端：retries 默认 0，失败就留 trace 才有现场
+  use: { trace: 'retain-on-failure' },
   webServer: [
     {
       command: 'java -jar paideia-app/target/paideia-app-0.0.1-SNAPSHOT.jar --spring.profiles.active=local',
