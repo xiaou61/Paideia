@@ -20,7 +20,7 @@ public interface TelemetrySummaryMapper {
     /** 按状态分组的计数。 */
     @Select("""
             SELECT status, COUNT(*) AS count FROM ai_runs
-            WHERE started_at >= #{from} AND started_at < #{to}
+            WHERE started_at >= #{from} AND started_at &lt; #{to}
             GROUP BY status
             """)
     List<CountBy> countByStatus(@Param("from") Instant from, @Param("to") Instant to);
@@ -28,7 +28,7 @@ public interface TelemetrySummaryMapper {
     @Select("""
             <script>
             SELECT kind AS name, COUNT(*) AS count FROM ai_runs
-            WHERE started_at >= #{from} AND started_at < #{to}
+            WHERE started_at >= #{from} AND started_at &lt; #{to}
             <if test="kind != null">AND kind = #{kind}</if>
             <if test="status != null">AND status = #{status}</if>
             <if test="model != null">AND model = #{model}</if>
@@ -43,7 +43,7 @@ public interface TelemetrySummaryMapper {
     @Select("""
             <script>
             SELECT COALESCE(model, '(unknown)') AS name, COUNT(*) AS count FROM ai_runs
-            WHERE started_at >= #{from} AND started_at < #{to}
+            WHERE started_at >= #{from} AND started_at &lt; #{to}
             <if test="kind != null">AND kind = #{kind}</if>
             <if test="status != null">AND status = #{status}</if>
             <if test="model != null">AND model = #{model}</if>
@@ -58,7 +58,7 @@ public interface TelemetrySummaryMapper {
     @Select("""
             <script>
             SELECT error_type AS name, COUNT(*) AS count FROM ai_runs
-            WHERE started_at >= #{from} AND started_at < #{to} AND error_type IS NOT NULL
+            WHERE started_at >= #{from} AND started_at &lt; #{to} AND error_type IS NOT NULL
             <if test="kind != null">AND kind = #{kind}</if>
             <if test="status != null">AND status = #{status}</if>
             <if test="model != null">AND model = #{model}</if>
@@ -72,7 +72,7 @@ public interface TelemetrySummaryMapper {
 
     @Select("""
             SELECT name, COUNT(*) AS count FROM ai_run_spans
-            WHERE kind = 'tool' AND started_at >= #{from} AND started_at < #{to}
+            WHERE kind = 'tool' AND started_at >= #{from} AND started_at &lt; #{to}
             GROUP BY name ORDER BY count DESC LIMIT 10
             """)
     List<CountBy> countByTool(@Param("from") Instant from, @Param("to") Instant to);
@@ -89,7 +89,7 @@ public interface TelemetrySummaryMapper {
                      ROW_NUMBER() OVER (ORDER BY duration_ms) AS rn,
                      COUNT(*) OVER () AS n
               FROM ai_runs
-              WHERE started_at >= #{from} AND started_at < #{to}
+              WHERE started_at >= #{from} AND started_at &lt; #{to}
                 AND duration_ms IS NOT NULL
               <choose>
                 <when test="status != null">AND status = #{status}</when>
@@ -115,7 +115,7 @@ public interface TelemetrySummaryMapper {
                      ROW_NUMBER() OVER (ORDER BY ttft_ms) AS rn,
                      COUNT(*) OVER () AS n
               FROM ai_runs
-              WHERE started_at >= #{from} AND started_at < #{to}
+              WHERE started_at >= #{from} AND started_at &lt; #{to}
                 AND ttft_ms IS NOT NULL
               <choose>
                 <when test="status != null">AND status = #{status}</when>
@@ -138,19 +138,19 @@ public interface TelemetrySummaryMapper {
             SELECT COALESCE(SUM(input_tokens), 0) AS inputTokens,
                    COALESCE(SUM(output_tokens), 0) AS outputTokens,
                    COALESCE(SUM(credits), 0) AS credits
-            FROM ai_runs WHERE started_at >= #{from} AND started_at < #{to}
+            FROM ai_runs WHERE started_at >= #{from} AND started_at &lt; #{to}
             """)
     Totals totals(@Param("from") Instant from, @Param("to") Instant to);
 
     @Select("""
             SELECT kind AS name, COUNT(*) AS count FROM ai_runs
-            WHERE started_at >= #{from} AND started_at < #{to} AND kind IS NOT NULL
+            WHERE started_at >= #{from} AND started_at &lt; #{to} AND kind IS NOT NULL
             GROUP BY kind
             """)
     List<CountBy> distinctKinds(@Param("from") Instant from, @Param("to") Instant to);
 
     @Select("SELECT COALESCE(model, '(unknown)') AS name, COUNT(*) AS count FROM ai_runs "
-            + "WHERE started_at >= #{from} AND started_at < #{to} AND model IS NOT NULL "
+            + "WHERE started_at >= #{from} AND started_at &lt; #{to} AND model IS NOT NULL "
             + "GROUP BY model")
     List<CountBy> distinctModels(@Param("from") Instant from, @Param("to") Instant to);
 
@@ -309,7 +309,7 @@ public interface TelemetrySummaryMapper {
             SELECT DATE_FORMAT(DATE_ADD(started_at, INTERVAL #{offsetMinutes} MINUTE), '%Y-%m-%d') AS day,
                    COALESCE(SUM(credits), 0) AS amount
             FROM ai_runs
-            WHERE started_at >= #{from} AND started_at < #{to}
+            WHERE started_at >= #{from} AND started_at &lt; #{to}
             GROUP BY day
             """)
     List<DayAmount> creditsByDay(@Param("from") Instant from, @Param("to") Instant to,
