@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 import { LEARNER } from './env'
-import { signIn } from './session'
+import { clickNav, signIn } from './session'
 
 /**
  * 学习者端的端到端检查。
@@ -91,7 +91,7 @@ test('登出后回到登录页', async ({ page }) => {
 test('登录后从页头就能进入知识库，不必手输地址', async ({ page }) => {
   await signIn(page)
 
-  await page.getByTestId('learner-nav-knowledge').click()
+  await clickNav(page, 'learner-nav-knowledge')
   await expect(page).toHaveURL(/#\/knowledge$/)
   // 首屏是分类网格（二级结构的第一级），条目在点进去之后
   await expect(page.getByTestId('category-grid')).toBeVisible()
@@ -102,15 +102,13 @@ test('登录后从页头就能进入知识库，不必手输地址', async ({ pa
   // 条目页的地址是 /knowledge/entries/:id，仍该算在"知识库"这一档里（前缀匹配）
   await page.getByTestId('entry-list').locator('a[data-testid^="entry-link-"]').first().click()
   await expect(page).toHaveURL(/#\/knowledge\/entries\/\d+$/)
-  await expect(page.getByTestId('learner-nav-knowledge')).toHaveAttribute('aria-current', 'page')
+  // 菜单收起时只有分组触发器可见，所以"我在哪一类"看触发器
+  await expect(page.getByTestId('learner-nav-group-knowledge')).toHaveAttribute('aria-current', 'page')
 
-  // 「我的自评」在「更多」菜单里（页头横排只放主干）。点完菜单会关闭，
-  // 所以激活态要看「更多」这个触发器本身——它在当前页属于「更多」那一档时被标成 current。
-  await page.getByTestId('learner-nav-more').click()
-  await expect(page.getByTestId('learner-nav-my-assessments')).toBeVisible()
-  await page.getByTestId('learner-nav-my-assessments').click()
+  // 「我的自评」在「练习」组里。点完菜单会关闭，激活态同样看分组触发器。
+  await clickNav(page, 'learner-nav-my-assessments')
   await expect(page).toHaveURL(/#\/my-assessments$/)
-  await expect(page.getByTestId('learner-nav-more')).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByTestId('learner-nav-group-practice')).toHaveAttribute('aria-current', 'page')
 })
 
 /**
@@ -137,7 +135,7 @@ test('首页有去处；笔记页与知识库页共用同一套外壳', async ({
   await expect(shellFooter).toBeVisible()
 
   // 再从页头切到知识库，外壳不变
-  await page.getByTestId('learner-nav-knowledge').click()
+  await clickNav(page, 'learner-nav-knowledge')
   await expect(page.getByTestId('category-grid')).toBeVisible()
   await expect(shellFooter).toBeVisible()
 })

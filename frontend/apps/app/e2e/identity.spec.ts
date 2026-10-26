@@ -16,8 +16,9 @@ test('身份与目标：能改画像并读回，且明写"不影响你能做什�
   await signIn(page)
   await page.goto('/#/profile')
 
-  // 这句话是这一页最要紧的文案：身份不是第二套权限
-  await expect(page.getByText('不影响你能做什么')).toBeVisible()
+  // 这句话是这一页最要紧的文案：身份不是第二套权限。
+  // 用更长的前缀定位：登录方式那一段也有"不影响你能做什么"，短词会同时命中两处（strict mode）。
+  await expect(page.getByText('身份只影响推荐顺序与助手的形态')).toBeVisible()
 
   // 身份选择是弹窗式卡片：一期只有求职者可点，其余在弹窗里标「准备中」
   await page.getByTestId('profile-identity').click()
@@ -45,11 +46,16 @@ test('导航按身份重排：求职者有面试入口、且排在第一', async
 
   await page.goto('/#/knowledge')
   const nav = page.getByRole('navigation', { name: '主导航' })
-  await expect(nav.getByTestId('learner-nav-interview')).toBeVisible()
 
-  // 排在第一个：身份的 preferredNav 里 interview 在首位，这是 AC-002 在导航上的观察点
-  const first = nav.locator('a').first()
-  await expect(first).toHaveAttribute('data-testid', 'learner-nav-interview')
+  // 2026-10-26 起导航分成四个下拉组，所以"面试排第一"落在**组间顺序**上：
+  // 身份的 preferredNav 里 interview 在首位 ⇒「求职」组是第一个触发器。
+  const firstGroup = nav.locator('button').first()
+  await expect(firstGroup).toHaveAttribute('data-testid', 'learner-nav-group-job')
+  await expect(firstGroup).toHaveText('求职')
+
+  // 组里确实有面试入口，不是只挂了个组名
+  await firstGroup.click()
+  await expect(page.getByTestId('learner-nav-interview')).toBeVisible()
 })
 
 test('面试页：能发起会话，且无论余额够不够都给出确定状态（不静默失败）', async ({ page }) => {

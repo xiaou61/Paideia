@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test'
 import type { ReviewDueList, ReviewSession, ReviewSubmitResult } from '@paideia/knowledge'
 
 import { REMOTE } from './env'
-import { signIn } from './session'
+import { clickNav, signIn } from './session'
 
 /** 复习页与入口（WORK-034 S1）。线上没有种子进度，只验入口与页面可达。 */
 test.describe('复习', () => {
@@ -12,10 +12,9 @@ test.describe('复习', () => {
     test.skip(REMOTE, '依赖本地种子账号；线上只验过接口')
   })
 
-  test('从「更多」进复习页，列表或空态二选一', async ({ page }) => {
+  test('从「学习」组进复习页，列表或空态二选一', async ({ page }) => {
     await signIn(page)
-    await page.getByTestId('learner-nav-more').click()
-    await page.getByTestId('learner-nav-review').click()
+    await clickNav(page, 'learner-nav-review')
     await expect(page).toHaveURL(/#\/review/)
 
     await expect(

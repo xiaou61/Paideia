@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { signIn } from './session'
+import { clickNav, signIn } from './session'
 
 /**
  * 每日速递的端到端检查（WORK-027）。
@@ -20,7 +20,7 @@ test.describe('每日速递', () => {
 
   test('从导航栏能进，日报与周报两个页签都在', async ({ page }) => {
     await page.goto('/#/')
-    await page.getByTestId('learner-nav-digest').click()
+    await clickNav(page, 'learner-nav-digest')
 
     await expect(page).toHaveURL(/#\/digest/)
     await expect(page.getByTestId('digest-tab-daily')).toBeVisible()

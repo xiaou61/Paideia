@@ -46,40 +46,40 @@ import { api } from '../api'
  * 仍然只有一处。
  */
 /**
- * 导航项。`key` 与 `@paideia/identity` 的 `preferredNav` 对齐，用来按身份重排。
+ * 导航项。`key` 与 `@paideia/identity` 的 `preferredNav` 对齐，`group` 决定它落在哪个下拉里。
  *
- * <p>**面试入口不是所有人都有**：它只在身份的配置包含 `interview` 时出现（一期就是求职者）。
- * 这是"按身份推荐"唯一一处会改变**入口集合**的地方——其余都只是顺序差别。
- */
-/**
- * 导航项。**分两排**：`primary` 直接横排在页头，其余进「更多」菜单。
+ * <p>**不按身份隐藏入口**：身份只决定"哪一组排前面"，四个组对所有身份都出现。
  *
- * <p>为什么不全部横排：2026-10-22 补上「从零开始 / 知识图谱 / SQL 练习」之后一共 10 项，
- * 实测 1280 宽下每个标签都被挤成竖排断字（"每日速/递"），页头高度从 32 涨到 54。
- * 全都在但全都读不出来，等于没加。
- *
- * <p>分档标准是**用户一天会点几次**：主干是每天进的（学、看、读），
- * 更多里是阶段性才用的（自评、简历、图谱、SQL 随手练）。
- * **两档都算"有入口"**——AGENTS.md 那条规则要的是"用户能找到"，不是"必须横排"。
+ * <p>为什么不横排：2026-10-22 加到 10 项时，1280 宽下每个标签被挤成竖排断字（"每日速/递"），
+ * 于是拆成"主干 + 更多"；2026-10-26 用户仍说"可选择的项太多，要分类可下拉"，改成四组。
+ * 分组之后页头只有四个触发器和一条搜索框，窄屏下也塞得进去。
  */
 const NAV = [
-  { key: 'learn' as const, to: '/learn', label: '从零开始', testId: 'learner-nav-learn', primary: true },
-  { key: 'digest' as const, to: '/digest', label: '每日速递', testId: 'learner-nav-digest', primary: true },
-  { key: 'knowledge' as const, to: '/knowledge', label: '知识库', testId: 'learner-nav-knowledge', primary: true },
-  { key: 'notes' as const, to: '/notes', label: '我的笔记', testId: 'learner-nav-notes', primary: true },
-  // 复习（WORK-034）：每天要看的入口，但页头已经很挤，放「更多」里仍然算有入口。
-  { key: 'review' as const, to: '/review', label: '复习', testId: 'learner-nav-review', primary: false },
-  // 训练营（WORK-029）：它是"还没有学习记录的人"的入口，与简历并列。
+  { key: 'learn' as const, group: 'learn' as const, to: '/learn', label: '从零开始', testId: 'learner-nav-learn' },
+  { key: 'digest' as const, group: 'learn' as const, to: '/digest', label: '每日速递', testId: 'learner-nav-digest' },
+  // 复习（WORK-034）：每天要看的入口。
+  { key: 'review' as const, group: 'learn' as const, to: '/review', label: '复习', testId: 'learner-nav-review' },
+  // 训练营（WORK-029）：它是"还没有学习记录的人"的入口。
   // 不进 preferredNav —— 身份排序只管那几个老入口，新入口固定排在后面。
-  { key: 'camp' as const, to: '/camp', label: '训练营', testId: 'learner-nav-camp', primary: false },
-  { key: 'interview' as const, to: '/interview', label: '模拟面试', testId: 'learner-nav-interview', primary: true },
+  { key: 'camp' as const, group: 'learn' as const, to: '/camp', label: '训练营', testId: 'learner-nav-camp' },
+  { key: 'knowledge' as const, group: 'knowledge' as const, to: '/knowledge', label: '知识库', testId: 'learner-nav-knowledge' },
+  { key: 'graph' as const, group: 'knowledge' as const, to: '/graph', label: '知识图谱', testId: 'learner-nav-graph' },
+  { key: 'notes' as const, group: 'knowledge' as const, to: '/notes', label: '我的笔记', testId: 'learner-nav-notes' },
+  { key: 'sql-practice' as const, group: 'practice' as const, to: '/practice/sql', label: 'SQL 练习', testId: 'learner-nav-sql-practice' },
+  { key: 'my-assessments' as const, group: 'practice' as const, to: '/my-assessments', label: '我的自评', testId: 'learner-nav-my-assessments' },
+  { key: 'interview' as const, group: 'job' as const, to: '/interview', label: '模拟面试', testId: 'learner-nav-interview' },
   // 简历（WORK-018）：求职者面上每次投递都要用的入口。
   // **不复用 `interview` 这个 key**：身份排序按 key 匹配，复用会让"面试排第一"这条既有
   // 验收失去观察点（2026-10-18 实测：identity.spec 里首链接断言因此变红）。
-  { key: 'resume' as const, to: '/resume', label: '我的简历', testId: 'learner-nav-resume', primary: false },
-  { key: 'my-assessments' as const, to: '/my-assessments', label: '我的自评', testId: 'learner-nav-my-assessments', primary: false },
-  { key: 'graph' as const, to: '/graph', label: '知识图谱', testId: 'learner-nav-graph', primary: false },
-  { key: 'sql-practice' as const, to: '/practice/sql', label: 'SQL 练习', testId: 'learner-nav-sql-practice', primary: false },
+  { key: 'resume' as const, group: 'job' as const, to: '/resume', label: '我的简历', testId: 'learner-nav-resume' },
+]
+
+/** 组的顺序与文案。`key` 与上面 NAV 的 `group` 对应。 */
+const GROUPS = [
+  { key: 'learn' as const, label: '学习', testId: 'learner-nav-group-learn' },
+  { key: 'knowledge' as const, label: '知识', testId: 'learner-nav-group-knowledge' },
+  { key: 'practice' as const, label: '练习', testId: 'learner-nav-group-practice' },
+  { key: 'job' as const, label: '求职', testId: 'learner-nav-group-job' },
 ]
 
 export function LearnerHeader() {
@@ -93,20 +93,20 @@ export function LearnerHeader() {
     staleTime: 5 * 60_000,
     retry: false,
   })
-  const nav = useMemo(() => {
-    const config = configFor(profile?.identity)
-    const ordered = config.preferredNav
-      .map((key) => NAV.find((item) => item.key === key))
-      .filter((item): item is (typeof NAV)[number] => item !== undefined)
-    // 配置里没提到的项追加在后面：配置只表达"谁排前面"，不表达"谁被藏起来"
-    return [...ordered, ...NAV.filter((item) => !(config.preferredNav as readonly string[]).includes(item.key))]
+  /**
+   * 组内顺序固定，**组间按身份重排**：取组内最早出现的那个 `preferredNav` 位置当这组的名次，
+   * 没被配置提到的组排最后（`sort` 稳定，所以并列时仍按 GROUPS 的顺序）。
+   */
+  const grouped = useMemo(() => {
+    const preferred = configFor(profile?.identity).preferredNav as readonly string[]
+    return GROUPS.map((group) => {
+      const items = NAV.filter((item) => item.group === group.key)
+      const ranks = items.map((item) => preferred.indexOf(item.key)).filter((rank) => rank >= 0)
+      return { ...group, items, rank: ranks.length === 0 ? Number.MAX_SAFE_INTEGER : Math.min(...ranks) }
+    }).sort((left, right) => left.rank - right.rank)
   }, [profile?.identity])
-  const primaryNav = nav.filter((item) => item.primary)
-  const moreNav = nav.filter((item) => !item.primary)
-  /** 当前页在「更多」里吗？是的话把「更多」也标成激活态，否则用户看不出自己在哪。 */
-  const moreActive = moreNav.some(
-    (item) => pathname === item.to || pathname.startsWith(`${item.to}/`),
-  )
+  /** 条目页的地址是 /knowledge/entries/:id，所以前缀匹配也算在那一项里。 */
+  const isActive = (to: string) => pathname === to || pathname.startsWith(`${to}/`)
   const navigate = useNavigate()
   const [deleting, setDeleting] = useState(false)
   const [password, setPassword] = useState('')
@@ -189,26 +189,33 @@ export function LearnerHeader() {
             <DialogDescription>跳到知识库、笔记或自评。</DialogDescription>
           </DialogHeader>
 
-          <nav aria-label="移动导航" className="flex flex-col gap-1">
-            {nav.map((item) => {
-              const active = pathname === item.to || pathname.startsWith(`${item.to}/`)
-              return (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  aria-current={active ? 'page' : undefined}
-                  data-testid={`${item.testId}-drawer`}
-                  onClick={() => setNavOpen(false)}
-                  className={`flex min-h-11 items-center rounded-lg border px-3 text-sm transition-colors ${
-                    active
-                      ? 'bg-accent text-accent-foreground border-border font-medium'
-                      : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground border-transparent'
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              )
-            })}
+          <nav aria-label="移动导航" className="flex flex-col gap-3">
+            {grouped.map((group) => (
+              <div key={group.key} className="flex flex-col gap-1">
+                <p className="text-muted-foreground px-3 text-xs" data-testid={`${group.testId}-drawer`}>
+                  {group.label}
+                </p>
+                {group.items.map((item) => {
+                  const active = isActive(item.to)
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      aria-current={active ? 'page' : undefined}
+                      data-testid={`${item.testId}-drawer`}
+                      onClick={() => setNavOpen(false)}
+                      className={`flex min-h-11 items-center rounded-lg border px-3 text-sm transition-colors ${
+                        active
+                          ? 'bg-accent text-accent-foreground border-border font-medium'
+                          : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground border-transparent'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  )
+                })}
+              </div>
+            ))}
           </nav>
 
           {/* 搜索在窄屏原来是 `hidden md:block`，等于手机上根本没有入口——放进抽屉补回来 */}
@@ -229,50 +236,32 @@ export function LearnerHeader() {
       </Dialog>
 
       <nav aria-label="主导航" className="hidden items-center gap-0.5 whitespace-nowrap md:flex">
-        {primaryNav.map((item) => {
-          // 条目页的地址是 /knowledge/entries/:id，所以前缀匹配也算在知识库里
-          const active = pathname === item.to || pathname.startsWith(`${item.to}/`)
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              aria-current={active ? 'page' : undefined}
-              data-testid={item.testId}
-              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                active
-                  ? 'bg-accent text-accent-foreground border-border font-medium'
-                  : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground border-transparent'
-              }`}
-            >
-              {item.label}
-            </Link>
-          )
-        })}
-
-        {moreNav.length === 0 ? null : (
-          <DropdownMenu>
+        {grouped.map((group) => (
+          <DropdownMenu key={group.key}>
             <DropdownMenuTrigger
-              data-testid="learner-nav-more"
+              data-testid={group.testId}
               render={
                 <button
                   type="button"
-                  aria-current={moreActive ? 'page' : undefined}
+                  // 菜单收起时只有触发器可见，所以"我在哪一类"由触发器自己表示
+                  aria-current={group.items.some((item) => isActive(item.to)) ? 'page' : undefined}
                   className={`flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                    moreActive
+                    group.items.some((item) => isActive(item.to))
                       ? 'bg-accent text-accent-foreground border-border font-medium'
                       : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground border-transparent'
                   }`}
                 />
               }
             >
-              更多
+              {group.label}
               <ChevronDown className="size-3.5" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-48">
-              {moreNav.map((item) => (
+            <DropdownMenuContent align="start" className="w-44">
+              {group.items.map((item) => (
                 <DropdownMenuItem
                   key={item.to}
                   data-testid={item.testId}
+                  aria-current={isActive(item.to) ? 'page' : undefined}
                   onClick={() => { void navigate(item.to) }}
                 >
                   {item.label}
@@ -280,7 +269,7 @@ export function LearnerHeader() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-        )}
+        ))}
       </nav>
 
       <form onSubmit={submitSearch} className="ml-2 hidden md:block">

@@ -33,3 +33,30 @@ export async function signIn(page: Page): Promise<void> {
   // 深链 `goto` 会被这次跳转覆盖回首页——2026-10-17 整套跑里偶发落到首页、单跑不复现。
   await expect(page).toHaveURL(/#\/$/)
 }
+
+/**
+ * 页头导航按用途分了组，点某一项之前要先展开它所在的那一组。
+ *
+ * <p>分组是 2026-10-26 用户要求的（"可选择的项太多，要分类可下拉"）。这份表是**测试侧的镜像**：
+ * `LearnerHeader` 里改了分组，这里得跟着改，否则用例会停在"点不到那一项"上——这比静默点到
+ * 别的页面好，但仍然是每次调导航都要付的成本，所以只在这一处维护。
+ */
+const NAV_GROUP_OF = {
+  'learner-nav-learn': 'learner-nav-group-learn',
+  'learner-nav-digest': 'learner-nav-group-learn',
+  'learner-nav-review': 'learner-nav-group-learn',
+  'learner-nav-camp': 'learner-nav-group-learn',
+  'learner-nav-knowledge': 'learner-nav-group-knowledge',
+  'learner-nav-graph': 'learner-nav-group-knowledge',
+  'learner-nav-notes': 'learner-nav-group-knowledge',
+  'learner-nav-sql-practice': 'learner-nav-group-practice',
+  'learner-nav-my-assessments': 'learner-nav-group-practice',
+  'learner-nav-interview': 'learner-nav-group-job',
+  'learner-nav-resume': 'learner-nav-group-job',
+} as const
+
+/** 从页头导航点进某一项：先展开它那一组，再点它。 */
+export async function clickNav(page: Page, testId: keyof typeof NAV_GROUP_OF): Promise<void> {
+  await page.getByTestId(NAV_GROUP_OF[testId]).click()
+  await page.getByTestId(testId).click()
+}

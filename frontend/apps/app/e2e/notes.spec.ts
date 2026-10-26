@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-import { signIn } from './session'
+import { clickNav, signIn } from './session'
 
 /**
  * 我的笔记（AC-010 的界面一半）。
@@ -35,7 +35,7 @@ async function createNote(page: Page, title: string, body: string): Promise<void
 test('新建走独立页：建档→改一次并保存→重载仍在→删除', async ({ page }) => {
   await signIn(page)
   // 入口在主导航里（"某个页面忘了加入口"是 2026-10-12 修过的真缺陷，这里顺带钉住）
-  await page.getByTestId('learner-nav-notes').click()
+  await clickNav(page, 'learner-nav-notes')
   await expect(page.getByTestId('notes-placeholder')).toBeVisible()
 
   const title = `e2e 笔记 ${Date.now()}`
@@ -58,7 +58,7 @@ test('新建走独立页：建档→改一次并保存→重载仍在→删除',
 
   // 重新加载：内容是从库里读回来的，不是内存里的草稿
   await page.reload()
-  await page.getByTestId('learner-nav-notes').click()
+  await clickNav(page, 'learner-nav-notes')
   await page.getByTestId('notes-list').getByText(title).click()
   await expect(page.getByTestId('note-body')).toHaveValue('正文第二版')
 
@@ -73,7 +73,7 @@ test('新建走独立页：建档→改一次并保存→重载仍在→删除',
 
 test('新建页能预览 markdown；详情里改没改说得清', async ({ page }) => {
   await signIn(page)
-  await page.getByTestId('learner-nav-notes').click()
+  await clickNav(page, 'learner-nav-notes')
 
   const title = `e2e 状态 ${Date.now()}`
   await page.getByTestId('notes-create').click()
@@ -119,7 +119,7 @@ test('新建时可以把笔记挂到一条知识库条目上', async ({ page }) 
   const entryTitle = (await page.getByTestId('entry-list').locator('[data-testid=entry-title]').first().innerText()).trim()
   expect(entryTitle).not.toBe('')
 
-  await page.getByTestId('learner-nav-notes').click()
+  await clickNav(page, 'learner-nav-notes')
   const title = `e2e 挂靠 ${Date.now()}`
   await page.getByTestId('notes-create').click()
   await page.getByTestId('new-note-title').fill(title)
@@ -143,7 +143,7 @@ test('新建时可以把笔记挂到一条知识库条目上', async ({ page }) 
 
 test('分享：链接免登录可读，撤回后立刻失效', async ({ page, browser }) => {
   await signIn(page)
-  await page.getByTestId('learner-nav-notes').click()
+  await clickNav(page, 'learner-nav-notes')
 
   const title = `e2e 分享 ${Date.now()}`
   await createNote(page, title, '分享出去的正文')
@@ -181,7 +181,7 @@ test('分享：链接免登录可读，撤回后立刻失效', async ({ page, br
 
 test('带着未保存的改动切走，会先问一句而不是静默丢掉', async ({ page }) => {
   await signIn(page)
-  await page.getByTestId('learner-nav-notes').click()
+  await clickNav(page, 'learner-nav-notes')
 
   const kept = `e2e 拦截A ${Date.now()}`
   await createNote(page, kept, '先保存下来的那条')
@@ -217,7 +217,7 @@ test('带着未保存的改动切走，会先问一句而不是静默丢掉', as
 
 test('新建页没写东西就能直接返回；写了东西才拦一下', async ({ page }) => {
   await signIn(page)
-  await page.getByTestId('learner-nav-notes').click()
+  await clickNav(page, 'learner-nav-notes')
 
   // 空着返回：不该多问一句
   await page.getByTestId('notes-create').click()
