@@ -52,7 +52,7 @@ approver_role: CTO
 
 ## 任务
 
-### TASK-001 | pending | 数据面配置：保留期、Loki、Alloy、Grafana 数据源
+### TASK-001 | done | 数据面配置：保留期、Loki、Alloy、Grafana 数据源
 
 - 对应：`REQ-001`、`REQ-002`、`REQ-003`、`AC-001`、`AC-002`、`AC-003`
 - 依赖：无
@@ -72,7 +72,7 @@ approver_role: CTO
   3. 加 Grafana Loki 数据源 → 文件可被 Grafana provisioning 解析。
 - 验证：部署后在服务器执行 `curl -s 127.0.0.1:9090/api/v1/status/flags | grep retention` → 期望 `30d`；`curl -s '127.0.0.1:3100/loki/api/v1/query_range?query=%7Bunit%3D%22paideia.service%22%7D&limit=1'` → 期望 `success` 且至少一条。
 
-### TASK-002 | pending | 发版标记指标
+### TASK-002 | done | 发版标记指标
 
 - 对应：`REQ-005`、`AC-005`
 - 依赖：TASK-001（node_exporter textfile 目录已存在）
@@ -84,7 +84,7 @@ approver_role: CTO
   2. 用 `version` 变量（已有或取 git 短哈希）填标签。
 - 验证：`curl -s 'http://127.0.0.1:9090/api/v1/query?query=paideia_deploy_epoch_seconds'` → 期望 `success` 且值在最近 10 分钟内。
 
-### TASK-003 | pending | 两条日志/5xx 告警与合并收件人
+### TASK-003 | done | 两条日志/5xx 告警与合并收件人
 
 - 对应：`REQ-004`、`AC-004`
 - 依赖：TASK-001
@@ -255,7 +255,7 @@ approver_role: CTO
   3. 仪表盘加 Loki 日志 panel → `node scripts/check-diagrams.mjs` 不涉及；Grafana 加载检查在 TASK-012。
 - 验证：`cd frontend && pnpm --filter @paideia/admin typecheck && pnpm --filter @paideia/admin test:e2e -- e2e/admin-ops.spec.ts` → 期望 0 failed。
 
-### TASK-012 | pending | 部署、生产验证与历史记录
+### TASK-012 | done | 部署、生产验证与历史记录
 
 - 对应：全部 `AC-*`
 - 依赖：TASK-001..TASK-011

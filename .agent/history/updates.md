@@ -6826,3 +6826,63 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
+
+## 2026-10-26 19:05 +0800 · 内容 · 其余轨道统一加篇与实战修复
+
+- 类型：content
+- 变更：
+  1. 11 条课程/理论线各新增 1–2 篇，共 21 篇：
+     Java 24 综合项目（命令行记账本）、25 常见编译运行错误速查；
+     Python 19 CSV 清洗报表、20 常见错误与调试清单；
+     MySQL 13 博客库设计、14 常见 SQL 错误；
+     并发 05 happens-before、06 并发容器与阻塞队列；
+     JVM 05 线程栈与死锁诊断、06 JIT 与逃逸分析；
+     OS 06 文件系统与 inode、07 系统调用与中断；
+     网络 09 HTTPS 与 TLS、10 代理负载均衡与 CDN；
+     AI 05 提示词/结构化输出/工具调用、06 模型选型与成本；
+     系统设计 05 幂等重试与最终一致、06 分布式事务；
+     智能体 14 可观测性与回放；算法 07 动态规划、08 回溯与剪枝。
+     各线总览的篇数、走法与 learning-path 同步更新。
+  2. 实战/源码线补 4 篇：读代码实战「登录请求怎么被拦住」、Java 调试实战
+     「集合与字符串的坑」、Java 项目实战「实现 LRU 缓存」、源码解读
+     「一次 AI 对话怎么计费」。
+  3. 修复两篇既有 Java 项目实战：`01-取前k个最大的`、`02-解析并报平均` 原为 GBK
+     且 starter 类名 `Stats`/`Report` 与运行器固定的 `Main.java` 不匹配，实际会编译失败；
+     已转 UTF-8、类名改 `Main`、expected 用参考解重跑生成。
+  4. Python 课程 12–17 六节原缺 `<!-- run -->` 可运行示例（`verify_course.py` 的既有红），
+     每节补一个自包含示例与逐字期望输出。
+  5. `scripts/import-course.mjs` 的 `existingEntries` 改为翻页取全：库已 244 条，
+     服务端 size 上限 200，只取第一页会把老条目当新条目重复创建。
+- 决策：理论/课程线按"缺什么补什么"各加 1–2 篇高价值主题，不再平均加篇；课程各补一个综合
+  项目 + 一个排错清单；实战线各补一道可运行/可读的题；**SQL 数据分析实战暂不加题**——
+  新题要对隐藏数据集重算期望哈希并真跑判题，风险与工作量都高于本轮其它线的加篇。
+- 依据：用户 2026-10-26「只补了最近新增的五条线，其余轨道（Java/Python/MySQL、并发、JVM、
+  算法等）本次没加篇。哪些也都详细一点，开始吧」。
+- 验证：
+  - `python scripts/verify_course.py --dir content/courses/java` → 26 个文件通过（含执行）。
+  - `... --dir content/courses/python` → 21 个文件通过（含执行，补齐 12–17 后）。
+  - `... --dir content/courses/mysql` → 15 个文件通过（含真实 SQL 执行）。
+  - 所有新增/修改内容的 quiz、learning-path、code-tour、code-challenge JSON 解析通过；
+    Java 项目三道题的 starter 与参考解用 javac/java 实际跑过（starter 有失败、参考解全 ok）。
+  - 线上导入 15 条线：新文章均 `created`，总览/被指向的旧文 `updated`；轨道关卡数
+    Java 26 / Python 21 / MySQL 15 / 并发 7 / JVM 7 / OS 8 / 网络 11 / AI 7 / 系统设计 7 /
+    智能体 15 / 算法 9 / 读代码 5 / 调试 4 / 项目 4 / 源码解读 2，与导入脚本输出一致。
+  - 线上按分类核对条目：新增分类无重复标题；Java/Python/OS/AI/算法分类里的多出条目是
+    既有草稿或旧文章（如 Java 09–12 旧草稿、OS/AI/算法早期两条），不是本次重复创建。
+  - 线上抽查 6 条正文可读、无 U+FFFD；Java 项目 01/02 已不再是乱码。
+- 未做：SQL 数据分析实战加题；沙箱真跑新挑战（本机无 Docker）。
+- 补充渲染验证：线上抽查 6 篇，覆盖 code-tour / challenge / quiz / learning-path 四种围栏块，
+  全部可见且没有 block-fallback（临时 Playwright 用例，验证后已删除）。
+- 本地提交：未提交（用户未授权提交）
+- 远端推送：未执行
+
+## 2026-10-26 19:45 +0800 · WORK-042 · 实施、发版与生产验证
+
+- 类型：implementation
+- 变更：新增 Loki/Alloy 数据面、Prometheus 30 天保留、5xx/ERROR 两条告警、发版标记；新增 `OpsDiagnoser` 端口、证据采集与脱敏、`ops_diagnoses` 表、手动与 Grafana webhook 触发、冷却/单飞、三个只读工具；管理端运维页加 AI 诊断区与 Loki 日志面板。
+- 决策/修复：诊断走「确定性采集 + 单次模型调用」；告警只对 firing 动作；日志出站前强制脱敏；发版标记用 textfile 指标（不新增 Grafana API 令牌）。实测修掉四处问题：Grafana 13.2.4 后台插件自动升级在 `ProtectSystem=strict` 下失败并注销 Prometheus 插件（关闭 preinstall）、`release.ps1` 写 textfile 用 CRLF 被整份拒绝（转 LF）、Alloy 注释误用 `#`、5xx 规则分子/分母为空导致 `DatasourceNoData`。
+- 依据：用户 2026-10-26「1 自建 / 2 可以上 / 3 可以接受」。
+- 验证：`paideia-ai` 8 条、应用切片 34 条、模块/迁移 9 条、管理端 e2e 2 条，均 0 failed；生产两次真实诊断 `DONE`（1054/3157、1058/2721 tokens，报告 2394/3077 字符，积分 -13/-11）；Loki 查到 `paideia.service`/`laya.service` 日志；6 条规则 health ok、活动告警 0；`paideia_build_info=84ba364`。
+- 未验证：生产管理端手动按钮未用管理员 JWT 实测（集成与 e2e 覆盖）；Grafana→应用的真实告警投递未制造；生产 MCP 管理员 PAT 未实调；报告质量无金集评测。
+- 本地提交：e6f2657、84ba364；报告/任务状态另有一笔待落。
+- 远端推送：未执行
