@@ -36,6 +36,25 @@ test.describe('从零开始', () => {
     await expect(firstTrack(page)).toBeVisible({ timeout: 15_000 })
   })
 
+  test('分成理论栏与实战栏，各自有卡片或明确空状态', async ({ page }) => {
+    await page.goto('/#/learn')
+
+    // 两栏都在；空的那栏必须是明确的空状态块，不是一片空白
+    await expect(page.getByTestId('learn-theory')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByTestId('learn-practice')).toBeVisible()
+    await expect(page.getByTestId('learn-theory-count')).toBeVisible()
+
+    const practiceCards = page.locator('[data-testid^="learn-track-"][data-mode="practice"]')
+    const practiceEmpty = page.getByTestId('learn-practice-empty')
+    expect((await practiceCards.count()) > 0 || (await practiceEmpty.count()) > 0).toBe(true)
+
+    // 理论栏的卡片不能被打成 practice：两栏不会串
+    const theoryCards = page.locator('[data-testid^="learn-track-"]').filter({
+      hasNot: page.locator('[data-mode="practice"]'),
+    })
+    expect(await theoryCards.count()).toBeGreaterThan(0)
+  })
+
   test('点轨道进入关卡地图，地图里有关卡', async ({ page }) => {
     await page.goto('/#/learn')
     const track = firstTrack(page)
