@@ -4,14 +4,14 @@ work_id: WORK-039
 work: 管理端 MCP 工具
 status: passed
 evidence: required
-verified_commit: e6f9629
+verified_commit: f4c544c
 created: 2026-10-26
 updated: 2026-10-26
 ---
 
 # WORK-039 验证报告
 
-日期：2026-10-26。每条结论对应一次真实执行；命令都在 `.worktrees/work-038/backend` 或
+日期：2026-10-26。每条结论对应一次真实执行；**最后一轮在合并 master 之后重跑**，命令都在 `.worktrees/work-038/backend` 或
 `.worktrees/work-038/frontend/apps/app` 下执行，数据库经 `scripts/test-db.sh` 分配独占库。
 
 ## 检查证据
@@ -29,11 +29,11 @@ updated: 2026-10-26
 | AC-009 | `... -Dtest=AdminUserToolsTest ... test` | 0 | 通过 | `cannotAdjustOwnCredits`、`adjustRequiresNoteAndNonZeroDelta`、`listMergesUsageIntoRows` |
 | AC-010 | `... -Dtest=SandboxAdminToolsTest ... test` | 0 | 通过 | `privateDatasetCannotBeTakenDown`、`onlyTwoStatusesAreAccepted`、`takedownAlsoMarksReportsHandled` |
 | AC-011 | `scripts/test-db.sh pnpm exec playwright test e2e/mcp-tokens.spec.ts` | 0 | 通过 | 6 passed，含「非管理员看不到管理工具组与管理范围」；管理员侧只有代码路径，见第二节 |
-| AC-012 | `scripts/test-db.sh mvn -B -T 1C -pl '!paideia-app' test` | 0 | 通过 | 10 个模块合计 **616 执行 / 0 失败 / 14 跳过** |
+| AC-012 | `scripts/test-db.sh mvn -B -T 1C -pl '!paideia-app' test`（合并 master 后） | 0 | 通过 | 10 个模块合计 **620 执行 / 0 失败 / 14 跳过** |
 | MCP 单测 | `... -Dtest=PatServiceTest,McpToolInvokerTest,McpViewRegistryTest,McpViewsTest ... test` | 0 | 通过 | 34 执行 / 0 失败 |
-| MCP 全链路 | `... -Dtest=McpStartupSmokeTest,McpAdminIntegrationTest ... test` | 0 | 通过 | 10 执行 / 0 失败（含真实 HTTP initialize + tools/list） |
+| MCP 全链路 | `... -Dtest=McpStartupSmokeTest,McpAdminIntegrationTest ... test`（合并 master 后） | 0 | 通过 | 10 执行 / 0 失败（含真实 HTTP initialize + tools/list） |
 | 模块与迁移闸 | `... -Dtest=ModularityTest,MigrationVersionFormatTest,MigrationChecksumTest,MigrationSeedOverlapTest ... test` | 0 | 通过 | 9 执行 / 0 失败 |
-| 前端类型检查 | `pnpm --filter @paideia/app typecheck` | 0 | 通过 | tsc 无输出 |
+| 前端类型检查 | `pnpm -r typecheck` | 0 | 通过 | 11 个包全部 Done，tsc 无输出 |
 | 反向验证：管理组 404 | 移除 `McpViewRegistry` 的非管理员管理组判定后跑 `-Dtest=McpViewRegistryTest` | 1 | 通过 | 1 条失败（`adminGroupIsNotFoundForLearner`），恢复后 6/0 |
 | 反向验证：admin scope 发放 | 移除 `PatService` 的管理员判定后跑 `-Dtest=PatServiceTest` | 1 | 通过 | 1 条失败（`rejectsBlankNameAndMissingScopes`），恢复后 10/0 |
 
@@ -50,7 +50,18 @@ updated: 2026-10-26
 这印证了方案里那句"两道判断用同一份过滤链"：新增角色维度时，最容易漏的是**旧维度在重构中被
 顺手删掉**，而不是新维度没加上。
 
-## 二、未覆盖与已知限制
+## 二、合并 master 时发现的第二处真缺陷（不是本项引入）
+
+另一个并发会话在 master 上做了 WORK-038（理论线与实战线），其中把
+`McpViewRegistry.build` 改成 `ToolQuery.view(allowedToolsets, view.write(), null, READ+WRITE)`。
+**那等于只按凭据白名单过滤、丢掉了视图自身的工具组**：不受限的凭据访问 `/mcp/x/knowledge`
+会拿到全部 12 个工具，而不是 knowledge 组。
+
+反向验证：临时换回 master 的写法跑 `McpStartupSmokeTest#subViewRoutesToSingleToolset`，
+**1 条失败**；换回本分支写法后 5/0。本分支合并时保留了"视图组 ∩ 凭据组 + 角色"的那一版，
+所以这条回归在合并后不存在。
+
+## 三、未覆盖与已知限制
 
 - **管理员侧的前端渲染没有 e2e**：`mcp-tokens` 用例的账号是 `seed-learner`（非管理员），
   它只证明"管理组与 admin 选项对非管理员不可见"。管理员的可见性由代码路径保证
