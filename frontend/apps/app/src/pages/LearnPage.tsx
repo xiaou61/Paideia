@@ -55,7 +55,7 @@ export function LearnPage() {
       <PageHeader
         eyebrow="从零开始"
         title="挑一条轨道，一关一关往下走"
-        description="每关一篇长文 + 可运行示例 + 小测。通关后解锁下一关，隔天提醒复习。"
+        description="每关一篇长文 + 可运行示例 + 小测。顺序是建议的走法，想先看哪一关都可以，隔天提醒复习。"
       />
 
       {tracks.isPending ? (

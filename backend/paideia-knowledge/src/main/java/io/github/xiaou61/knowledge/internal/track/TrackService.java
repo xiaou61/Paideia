@@ -19,11 +19,10 @@ import org.springframework.stereotype.Service;
  * <p><b>关卡状态怎么算</b>：
  * <ul>
  *   <li>`done`：该关的条目在 `learning_progress` 里是 passed；</li>
- *   <li>`locked`：有前置且前置**没通关**；</li>
- *   <li>`current`：没锁且没通关——这是用户该点的那一格。</li>
+ *   <li>`current`：没通关——任何一关都可以直接点进去。</li>
  * </ul>
- * 锁的判定只看**直接前置**，不递归：递归会让"跳着学"变成不可能，
- * 而地图上已经用连线表达了顺序，硬锁死是多余的。
+ * 不做前置锁定：地图上的顺序与连线已经表达了"建议先学哪一关"，再锁住只会挡住
+ * 只想查某一关的人。前置关系（`requires_entry_id`）仍然保留在数据里，它表达依赖，不表达门槛。
  */
 @Service
 public class TrackService {
@@ -89,24 +88,15 @@ public class TrackService {
         Map<Long, LearningProgressService.View> mine = progressByEntry(userId);
         List<TrackMapper.Stage> stages = tracks.findStages(track.id());
 
-        // 先算谁通了，再判锁：一关的状态取决于前置是否"已通过"，所以两遍
-        Map<Long, Boolean> passed = new LinkedHashMap<>();
-        for (TrackMapper.Stage stage : stages) {
-            LearningProgressService.View view = mine.get(stage.entryId());
-            passed.put(stage.entryId(),
-                    view != null && LearningProgressService.STATUS_PASSED.equals(view.status()));
-        }
-
         Map<String, List<StageView>> byChapter = new LinkedHashMap<>();
         int passedCount = 0;
         for (TrackMapper.Stage stage : stages) {
-            boolean done = Boolean.TRUE.equals(passed.get(stage.entryId()));
+            LearningProgressService.View view = mine.get(stage.entryId());
+            boolean done = view != null && LearningProgressService.STATUS_PASSED.equals(view.status());
             if (done) {
                 passedCount++;
             }
-            boolean locked = stage.requiresEntryId() != null
-                    && !Boolean.TRUE.equals(passed.get(stage.requiresEntryId()));
-            String status = done ? "done" : locked ? "locked" : "current";
+            String status = done ? "done" : "current";
             byChapter.computeIfAbsent(stage.chapter() == null ? "" : stage.chapter(),
                             key -> new ArrayList<>())
                     .add(new StageView(stage.entryId(), stage.seq(), stage.title(), status,

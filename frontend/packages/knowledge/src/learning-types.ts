@@ -121,13 +121,13 @@ export interface TrackSummary {
   nextTitle: string | null
 }
 
-/** 地图上的一格。`locked` 表示前置关卡还没通过。 */
+/** 地图上的一格。`done` 表示这一关已经通过；没有锁定态，任何一关都能直接点进去。 */
 export interface TrackStage {
   entryId: number
   seq: number
   title: string
-  status: 'done' | 'current' | 'locked'
-  /** 前置关卡的 entryId；前端据此画连线。 */
+  status: 'done' | 'current'
+  /** 前置关卡的 entryId；前端据此画连线，它表达顺序不表达门槛。 */
   requiresEntryId: number | null
   /** 难度：beginner / intermediate / advanced。 */
   level: string

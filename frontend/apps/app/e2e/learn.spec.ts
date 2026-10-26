@@ -48,7 +48,7 @@ test.describe('从零开始', () => {
     await expect(page.locator('[data-testid^="stage-"]').first()).toBeVisible()
   })
 
-  test('关卡状态可辨：至少有 current 或 done，locked 不可点', async ({ page }) => {
+  test('关卡全部可进：只有 done 与 current，没有锁定态', async ({ page }) => {
     await page.goto('/#/learn')
     await firstTrack(page).click()
     await expect(page.getByTestId('track-map')).toBeVisible({ timeout: 15_000 })
@@ -60,24 +60,24 @@ test.describe('从零开始', () => {
     const statuses = await stages.evaluateAll((nodes) =>
       nodes.map((node) => node.getAttribute('data-status')),
     )
-    // 一进地图，第一关应该是 current（或已做过则 done），其余可能是 locked
-    expect(statuses.some((status) => status === 'current' || status === 'done')).toBe(true)
+    // 解锁不再拦人：每一关都只能是 done 或 current，任何一关都不该是 locked
+    expect(statuses.every((status) => status === 'done' || status === 'current')).toBe(true)
+    expect(statuses).not.toContain('locked')
 
-    // 锁住的关卡是 div 而不是链接：点了不该跳走
-    const locked = page.locator('[data-status="locked"]').first()
-    if ((await locked.count()) > 0) {
-      expect(await locked.evaluate((node) => node.tagName)).toBe('DIV')
-    }
+    // 而且它们都是链接：最后一关也能点进去
+    const last = stages.last()
+    expect(await last.evaluate((node) => node.tagName)).toBe('A')
   })
 
-  test('从可进入的关卡点到正文', async ({ page }) => {
+  test('从任意一关都能点到正文（含最后一关）', async ({ page }) => {
     await page.goto('/#/learn')
     await firstTrack(page).click()
     await expect(page.getByTestId('track-map')).toBeVisible({ timeout: 15_000 })
 
-    const open = page.locator('[data-status="current"], [data-status="done"]').first()
-    await expect(open).toBeVisible()
-    await open.click()
+    // 直接点最后一关：没有解锁门槛，它必须能进
+    const last = page.locator('[data-testid^="stage-"]').last()
+    await expect(last).toBeVisible()
+    await last.click()
 
     await expect(page).toHaveURL(/#\/knowledge\/entries\/\d+/)
     await expect(page.getByTestId('markdown-body')).toBeVisible({ timeout: 20_000 })

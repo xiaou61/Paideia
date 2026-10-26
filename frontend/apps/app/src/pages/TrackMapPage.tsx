@@ -10,7 +10,7 @@ import {
   Spinner,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Check, Lock, Play } from 'lucide-react'
+import { ArrowLeft, Check, Play } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 
@@ -153,7 +153,7 @@ export function TrackMapPage() {
                           className="bg-border absolute top-0 left-[19px] h-6 w-px -translate-y-full"
                         />
                       ) : null}
-                      <StageCell stage={stage} slug={slug} />
+                      <StageCell stage={stage} />
                     </li>
                   ))}
                 </ol>
@@ -166,24 +166,20 @@ export function TrackMapPage() {
   )
 }
 
-/** 一格关卡。三种状态各有不同的图标、颜色与可点性。 */
-function StageCell({ stage, slug }: { stage: TrackStage; slug: string }) {
+/**
+ * 一格关卡。两种状态：已通关（实心 + 对勾）与可开始（高亮 + 播放）。
+ *
+ * <p><b>没有锁定态</b>：任何一关都能直接点进去。顺序由格子的排列与连线表达，
+ * 但不拦人——想跳着看某一关的人不该被挡住。
+ */
+function StageCell({ stage }: { stage: TrackStage }) {
   const done = stage.status === 'done'
-  const locked = stage.status === 'locked'
 
-  const icon = done ? (
-    <Check className="size-4" />
-  ) : locked ? (
-    <Lock className="size-4" />
-  ) : (
-    <Play className="size-4" />
-  )
+  const icon = done ? <Check className="size-4" /> : <Play className="size-4" />
 
   const circle = done
     ? 'bg-success text-success-foreground'
-    : locked
-      ? 'bg-muted text-muted-foreground border-border border'
-      : 'bg-primary text-primary-foreground'
+    : 'bg-primary text-primary-foreground'
 
   const body = (
     <>
@@ -195,7 +191,7 @@ function StageCell({ stage, slug }: { stage: TrackStage; slug: string }) {
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-2">
-          <span className={`text-sm ${locked ? 'text-muted-foreground' : 'font-medium'}`}>
+          <span className="text-sm font-medium">
             {stage.seq}. {stage.title}
           </span>
           {/* 难度就写在标题旁边：用户要的是"一眼看出哪些适合初学者" */}
@@ -208,30 +204,16 @@ function StageCell({ stage, slug }: { stage: TrackStage; slug: string }) {
           </span>
         </span>
         <span className="text-muted-foreground mt-0.5 block text-xs">
-          {done ? '已通关' : locked ? '通过上一关后解锁' : '可以开始'}
+          {done ? '已通关' : '可以开始'}
         </span>
       </span>
     </>
   )
 
-  const className =
-    'flex items-center gap-3 rounded-lg border px-3 py-3 transition-colors ' +
-    (locked
-      ? 'border-border bg-card/50 cursor-not-allowed'
-      : 'border-border bg-card hover:border-primary/40')
-
-  // 锁住的关卡不给链接：点了也不该有反应，改成不可点的 div 更诚实
-  if (locked) {
-    return (
-      <div className={className} data-testid={`stage-${stage.seq}`} data-status="locked" aria-disabled>
-        {body}
-      </div>
-    )
-  }
   return (
     <Link
       to={`/knowledge/entries/${stage.entryId}`}
-      className={className}
+      className="border-border bg-card hover:border-primary/40 flex items-center gap-3 rounded-lg border px-3 py-3 transition-colors"
       data-testid={`stage-${stage.seq}`}
       data-status={stage.status}
     >
