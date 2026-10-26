@@ -48,18 +48,23 @@ class DigestIntegrationTest {
 
     private void insert(String fingerprint, LocalDate date, String group) {
         mapper.insert(date, group, "test-source", "测试源", "标题 " + fingerprint, "摘要",
-                "https://example.com/" + fingerprint, fingerprint, 10, null,
+                "https://example.com/" + fingerprint, fingerprint, 10, null, null, null,
                 1_800_000_000_000L, "ready", java.time.Instant.now());
     }
 
     @Test
-    @DisplayName("TASK-001：两张表存在且唯一键生效")
+    @DisplayName("TASK-001/WORK-041：两张表存在，指纹唯一键按日生效")
     void tablesAndKeysExist() {
         assertThat(jdbc.queryForObject("""
                 SELECT COUNT(*) FROM information_schema.statistics
                 WHERE table_schema = DATABASE() AND table_name = 'digest_items'
-                  AND index_name = 'uk_digest_items_fingerprint'
+                  AND index_name = 'uk_digest_items_edition_fingerprint'
                 """, Integer.class)).isGreaterThan(0);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = 'digest_items'
+                  AND index_name = 'uk_digest_items_fingerprint'
+                """, Integer.class)).as("旧的全局唯一键必须已删除").isZero();
         assertThat(jdbc.queryForObject("""
                 SELECT COUNT(*) FROM information_schema.statistics
                 WHERE table_schema = DATABASE() AND table_name = 'digest_items'
@@ -78,6 +83,29 @@ class DigestIntegrationTest {
                         .containsIgnoringCase("Duplicate"));
 
         assertThat(mapper.findByDate(TODAY)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("WORK-041：同一指纹可以跨天重复（热榜连续在榜）")
+    void sameFingerprintOnDifferentDaysIsAllowed() {
+        insert("fp-cross", TODAY, "github");
+        insert("fp-cross", TODAY.plusDays(1), "github");
+
+        assertThat(mapper.findByDate(TODAY)).hasSize(1);
+        assertThat(mapper.findByDate(TODAY.plusDays(1))).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("WORK-041：GitHub 两列落库并随查询返回")
+    void githubStarsAreStored() {
+        mapper.insert(TODAY, "github", "github-trending", "GitHub 热榜", "owner/repo", "摘要",
+                "https://github.com/owner/repo", "fp-stars", 250, 250, 850,
+                "Python · 12345★", 1_800_000_000_000L, "ready", java.time.Instant.now());
+
+        DigestMapper.Row row = mapper.findByDate(TODAY).get(0);
+        assertThat(row.heat()).isEqualTo(250);
+        assertThat(row.starsDay()).isEqualTo(250);
+        assertThat(row.starsWeek()).isEqualTo(850);
     }
 
     @Test
@@ -116,11 +144,11 @@ class DigestIntegrationTest {
     @DisplayName("TASK-005：按日查询按 heat 降序，heat 为空的排后面")
     void findByDateOrdersByHeat() {
         mapper.insert(TODAY, "news", "s1", "源一", "无热度", "摘要", "https://example.com/n1",
-                "fp-noheat", null, null, 1_000L, "ready", java.time.Instant.now());
+                "fp-noheat", null, null, null, null, 1_000L, "ready", java.time.Instant.now());
         mapper.insert(TODAY, "news", "s2", "源二", "高热度", "摘要", "https://example.com/hi",
-                "fp-hi", 999, null, 2_000L, "ready", java.time.Instant.now());
+                "fp-hi", 999, null, null, null, 2_000L, "ready", java.time.Instant.now());
         mapper.insert(TODAY, "news", "s3", "源三", "低热度", "摘要", "https://example.com/lo",
-                "fp-lo", 1, null, 3_000L, "ready", java.time.Instant.now());
+                "fp-lo", 1, null, null, null, 3_000L, "ready", java.time.Instant.now());
 
         assertThat(mapper.findByDate(TODAY)).extracting(DigestMapper.Row::title)
                 .containsExactly("高热度", "低热度", "无热度");

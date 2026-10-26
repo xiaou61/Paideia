@@ -2,6 +2,7 @@ package io.github.xiaou61.ai.internal.digest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -9,20 +10,47 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * GitHub 热榜的通路与兜底顺序（WORK-027 TASK-004）。
+ * GitHub 日榜/周榜的候选、真实增量与兜底（WORK-041）。
  *
- * <p><b>2026-10-22 复测后改成页面优先</b>：部署机上 `github.com/trending?since=daily`
- * 是服务端渲染（12 行、带 stars today），拿到的是真正的今日热榜；而 Search API 的
- * "一周内新建"语义会让同一批仓库连续几天重复，线上因此只剩 2 条。这组用例把新顺序钉住。
+ * <p>页面只当候选源；热度必须来自 `/stargazers/history` 的 `d1`，不是总 star。
+ * 页面不可达时才走 Search，并标「GitHub 新项目」、套门禁。
  */
 class GithubTrendingSourceTest {
 
-    private final GithubTrendingSource source = new GithubTrendingSource();
+    /** 2026-10-26 08:00 北京 = 2026-10-26 00:00 UTC；referenceDay = 2026-10-25（周日）。 */
+    private static final long NOW = Instant.parse("2026-10-26T00:00:00Z").toEpochMilli();
+
+    private static final String PAGE = """
+            <article class="Box-row">
+              <h2 class="h3 lh-condensed"><a href="/trending-owner/hot-repo">hot-repo</a></h2>
+              <p class="col-9 d-inline-block">The hot project description</p>
+              <a href="/trending-owner/hot-repo/stargazers">12,345</a>
+              <span class="d-inline-block float-sm-right">3,856 stars today</span>
+              <span itemprop="programmingLanguage">Python</span>
+            </article>
+            """;
+
+    private static final String WEEKLY_PAGE = """
+            <article class="Box-row">
+              <h2 class="h3 lh-condensed"><a href="/trending-owner/hot-repo">hot-repo</a></h2>
+              <p class="col-9 d-inline-block">The hot project description</p>
+              <a href="/trending-owner/hot-repo/stargazers">12,345</a>
+              <span class="d-inline-block float-sm-right">8,000 stars this week</span>
+              <span itemprop="programmingLanguage">Python</span>
+            </article>
+            """;
+
+    /** week=2026-10-18（周日），days 从周一开始；周日 10-25 是 250，d7=850。 */
+    private static final String HISTORY = """
+            [{"week":1792281600,"total":850,"days":[100,100,100,100,100,100,250]}]
+            """;
+
+    private final GithubTrendingSource source = new GithubTrendingSource(new GithubStarHistory());
 
     /** 记录被请求过的 URL，并按预设返回内容或抛异常。 */
     private static class StubHttp extends DigestHttp {
 
-        final List<String> requested = new ArrayList<>();
+        final List<String> requested = java.util.Collections.synchronizedList(new ArrayList<>());
         private final java.util.function.Function<String, String> responder;
 
         StubHttp(java.util.function.Function<String, String> responder) {
@@ -35,76 +63,111 @@ class GithubTrendingSourceTest {
             requested.add(url);
             return responder.apply(url);
         }
+
+        @Override
+        String getTextFollowingSameHostRedirects(String url, String userAgent,
+                                                 Map<String, String> headers, String allowedHost,
+                                                 int maxHops) {
+            requested.add(url);
+            return responder.apply(url);
+        }
     }
 
-    private static DigestProperties properties(String token) {
-        DigestProperties properties = new DigestProperties();
-        properties.setGithubToken(token);
-        return properties;
+    private static DigestProperties properties() {
+        return new DigestProperties();
     }
-
-    private static final String PAGE = """
-            <article class="Box-row">
-              <h2 class="h3 lh-condensed"><a href="/trending-owner/hot-repo">hot-repo</a></h2>
-              <p class="col-9 d-inline-block">The hot project description</p>
-              <span class="d-inline-block float-sm-right">3,856 stars today</span>
-              <span itemprop="programmingLanguage">Python</span>
-            </article>
-            """;
 
     @Test
-    @DisplayName("有 token 也先走页面：拿到的是真正的今日热榜")
-    void prefersTrendingPageEvenWithToken() {
+    @DisplayName("页面候选 + history：heat 是 d1，starsWeek 是 d7，来源是热榜")
+    void pageCandidatesUseRealDeltas() {
         StubHttp http = new StubHttp(url -> {
-            if (url.contains("github.com/trending")) {
-                return PAGE;
+            if (url.contains("stargazers/history")) {
+                return HISTORY;
             }
-            throw new DigestSource.DigestSourceException("不该走到 Search API");
+            if (url.contains("github.com/trending")) {
+                return url.contains("since=weekly") ? WEEKLY_PAGE : PAGE;
+            }
+            throw new DigestSource.DigestSourceException("不该请求：" + url);
         });
 
-        List<FetchedItem> items = source.fetch(properties("ghp_x"), http, 1_800_000_000_000L);
+        List<FetchedItem> items = source.fetch(properties(), http, NOW);
 
         assertThat(items).hasSize(1);
-        assertThat(items.get(0).title()).isEqualTo("trending-owner/hot-repo");
-        assertThat(items.get(0).heat()).as("heat 来自当日新增 star").isEqualTo(3856);
-        assertThat(items.get(0).meta()).isEqualTo("Python");
-        assertThat(items.get(0).groupKey()).isEqualTo("github");
-        assertThat(http.requested).allMatch(url -> url.contains("github.com/trending"));
+        FetchedItem item = items.get(0);
+        assertThat(item.title()).isEqualTo("trending-owner/hot-repo");
+        assertThat(item.heat()).as("heat 来自 history 的 d1").isEqualTo(250);
+        assertThat(item.starsWeek()).as("starsWeek 来自 history 的 d7").isEqualTo(850);
+        assertThat(item.meta()).isEqualTo("Python · 12345★");
+        assertThat(item.sourceName()).isEqualTo("GitHub 热榜");
+        assertThat(http.requested).anyMatch(url -> url.contains("since=daily"));
+        assertThat(http.requested).anyMatch(url -> url.contains("since=weekly"));
+        assertThat(http.requested).anyMatch(url -> url.contains("stargazers/history"));
     }
 
     @Test
-    @DisplayName("页面没有 article 块（改版/被拦）：退回 Search API")
-    void emptyPageFallsBackToSearchApi() {
-        String spa = """
-                <html><head><title>Trending repositories on GitHub today</title></head>
-                <body><main></main></body></html>
+    @DisplayName("页面全空：走 Search，门禁挡掉新垃圾、保留真爆款，来源改「新项目」")
+    void emptyPageFallsBackToSearchWithGate() {
+        String search = """
+                {"items":[
+                  {"full_name":"new/spam","html_url":"https://github.com/new/spam",
+                   "description":"spam","language":"Java","stargazers_count":100,
+                   "forks_count":0,"created_at":"2026-10-24T00:00:00Z"},
+                  {"full_name":"new/hot","html_url":"https://github.com/new/hot",
+                   "description":"hot","language":"Rust","stargazers_count":3200,
+                   "forks_count":424,"created_at":"2026-10-24T00:00:00Z"}
+                ]}
                 """;
         StubHttp http = new StubHttp(url -> {
-            if (url.contains("github.com/trending")) {
-                return spa;
+            if (url.contains("search/repositories")) {
+                return search;
             }
-            return """
-                    {"items":[{"full_name":"owner/repo","html_url":"https://github.com/owner/repo",
-                               "description":"a project","language":"Java","stargazers_count":1234}]}
-                    """;
+            if (url.contains("stargazers/history")) {
+                return url.contains("new/hot")
+                        ? "[{\"week\":1792281600,\"days\":[0,0,0,0,0,0,1292]}]"
+                        : "[{\"week\":1792281600,\"days\":[0,0,0,0,0,0,10]}]";
+            }
+            if (url.contains("github.com/trending")) {
+                return "<html><body>no articles</body></html>";
+            }
+            throw new DigestSource.DigestSourceException("不该请求：" + url);
         });
 
-        List<FetchedItem> items = source.fetch(properties(""), http, 1_800_000_000_000L);
+        List<FetchedItem> items = source.fetch(properties(), http, NOW);
 
         assertThat(items).hasSize(1);
-        assertThat(items.get(0).heat()).isEqualTo(1234);
-        assertThat(http.requested.get(0)).contains("github.com/trending");
-        assertThat(http.requested.get(1)).contains("api.github.com");
+        assertThat(items.get(0).title()).isEqualTo("new/hot");
+        assertThat(items.get(0).heat()).isEqualTo(1292);
+        assertThat(items.get(0).sourceName()).isEqualTo("GitHub 新项目");
     }
 
     @Test
-    @DisplayName("两条通路都坏时返回空列表，不抛异常")
+    @DisplayName("history 单条失败：回退页面 period stars，不影响整组")
+    void historyFailureFallsBackToPagePeriodStars() {
+        StubHttp http = new StubHttp(url -> {
+            if (url.contains("stargazers/history")) {
+                throw new DigestSource.DigestSourceException("boom");
+            }
+            if (url.contains("github.com/trending")) {
+                return url.contains("since=weekly") ? WEEKLY_PAGE : PAGE;
+            }
+            throw new DigestSource.DigestSourceException("不该请求：" + url);
+        });
+
+        List<FetchedItem> items = source.fetch(properties(), http, NOW);
+
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).heat()).as("回退到页面 stars today").isEqualTo(3856);
+        assertThat(items.get(0).starsWeek()).as("回退到页面 stars this week").isEqualTo(8000);
+    }
+
+    @Test
+    @DisplayName("页面两条与 Search 都坏：返回空，不抛异常")
     void bothPathsBrokenReturnsEmpty() {
         StubHttp http = new StubHttp(url -> {
             throw new DigestSource.DigestSourceException("网络不通");
         });
 
-        List<FetchedItem> items = source.fetch(properties("ghp_x"), http, 1_800_000_000_000L);
+        List<FetchedItem> items = source.fetch(properties(), http, NOW);
 
         assertThat(items).isEmpty();
         assertThat(http.requested).anyMatch(url -> url.contains("github.com/trending"));
@@ -112,7 +175,7 @@ class GithubTrendingSourceTest {
     }
 
     @Test
-    @DisplayName("页面里的赞助商与非仓库链接不会被当成热榜条目")
+    @DisplayName("赞助商与非仓库链接不会被当成热榜条目")
     void ignoresNonRepoLinks() {
         String page = """
                 <article class="Box-row sponsor">
@@ -125,13 +188,16 @@ class GithubTrendingSourceTest {
                 </article>
                 """;
         StubHttp http = new StubHttp(url -> {
-            if (url.contains("github.com/trending")) {
-                return page;
+            if (url.contains("stargazers/history")) {
+                throw new DigestSource.DigestSourceException("boom");
             }
-            return "{\"items\":[]}";
+            if (url.contains("github.com/trending")) {
+                return url.contains("since=weekly") ? "" : page;
+            }
+            throw new DigestSource.DigestSourceException("不该请求：" + url);
         });
 
-        List<FetchedItem> items = source.fetch(properties(""), http, 1_800_000_000_000L);
+        List<FetchedItem> items = source.fetch(properties(), http, NOW);
 
         assertThat(items).extracting(FetchedItem::title).containsExactly("real/repo");
     }

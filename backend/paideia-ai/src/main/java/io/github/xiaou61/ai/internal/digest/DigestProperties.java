@@ -21,11 +21,17 @@ public class DigestProperties {
     private boolean enabled = false;
 
     /**
-     * GitHub token。**可选增强**：配置后 GitHub 主通路走 Search API（5000/时、稳定）；
-     * 不配则走页面解析、失败再退回匿名 Search API（60/时，一天一次够用）。
+     * GitHub token。**强烈建议配置**：star 历史端点按 core 限额计费，带 token 5000/时，
+     * 25 个候选一天一次毫无压力；不带时匿名 60/时，候选池必须收缩。
      * **值只进被忽略的本地配置文件**，仓库里只留环境变量占位。
      */
     private String githubToken = "";
+
+    /**
+     * GitHub trending 页面基地址。生产机直连 `github.com` 会超时，配置成本机反向代理地址
+     * （例如 `http://127.0.0.1:8082/trending`）；默认值只给本地与测试用。
+     */
+    private String githubTrendingUrl = "https://github.com/trending";
 
     /** 单次运行最多入库条数。**这是成本闸**：决定喂给 AI 的候选池上限。 */
     private int maxItemsPerRun = 60;
@@ -43,13 +49,16 @@ public class DigestProperties {
     private String zone = "Asia/Shanghai";
 
     /**
-     * 采集时刻（Spring cron，按 {@link #zone} 解释）。默认每天 07:00。
+     * 采集时刻（Spring cron，按 {@link #zone} 解释）。默认每天 08:00。
+     *
+     * <p>**08:00 北京 = 00:00 UTC**：GitHub 的 star 历史按 UTC 自然日分桶，08:00 跑才能让
+     * 「昨天」是一个完整桶。07:00 跑会差一小时（约 4%），虽然对所有仓库一致，但口径不干净。
      *
      * <p>**必须是固定时刻，不能用 fixedDelay**：后者的锚点是「上次跑完」，
      * 部署重启时补跑一轮就把锚点推到那一刻，之后每天顺延漂移（线上实测漂到了 19:04，
      * 正好落在「日期已翻篇、内容还没到」的那段空窗里）。
      */
-    private String cron = "0 0 7 * * *";
+    private String cron = "0 0 8 * * *";
 
     /** 抓多久以内的内容（小时）。30 覆盖「昨天至今」并留容错。 */
     private int lookbackHours = 30;
@@ -135,6 +144,14 @@ public class DigestProperties {
 
     public void setGithubToken(String githubToken) {
         this.githubToken = githubToken;
+    }
+
+    public String getGithubTrendingUrl() {
+        return githubTrendingUrl;
+    }
+
+    public void setGithubTrendingUrl(String githubTrendingUrl) {
+        this.githubTrendingUrl = githubTrendingUrl;
     }
 
     public int getMaxItemsPerRun() {

@@ -37,18 +37,18 @@ class DigestSummarizerLiveTest {
     private static final List<FetchedItem> ITEMS = List.of(
             new FetchedItem("Introducing the new reasoning model", "https://example.com/a",
                     "A lab released a new model focused on multi-step reasoning.",
-                    1200, null, 1_800_000_000_000L, "test", "测试源", "news"),
+                    1200, null, null, 1_800_000_000_000L, "test", "测试源", "news"),
             new FetchedItem("AI 推理模型发布，长链思考更强", "https://example.com/b",
-                    "某实验室发布新模型，主打多步推理。", 800, null, 1_800_000_000_000L, "test",
+                    "某实验室发布新模型，主打多步推理。", 800, null, null, 1_800_000_000_000L, "test",
                     "测试源", "news"),
             new FetchedItem("owner/awesome-repo", "https://github.com/owner/awesome-repo",
-                    "A toolkit for building agent workflows.", 3400, "TypeScript",
+                    "A toolkit for building agent workflows.", 3400, null, "TypeScript",
                     1_800_000_000_000L, "github-trending", "GitHub 热榜", "github"),
             new FetchedItem("Ask HN: is Rust worth learning in 2026", "https://news.ycombinator.com/item?id=1",
-                    "", 220, "88 条评论", 1_800_000_000_000L, "hackernews", "Hacker News",
+                    "", 220, null, "88 条评论", 1_800_000_000_000L, "hackernews", "Hacker News",
                     "hackernews"),
             new FetchedItem("Tauri 2.0 ships stable mobile support", "https://example.com/c",
-                    "The desktop framework now targets iOS and Android.", 150, null,
+                    "The desktop framework now targets iOS and Android.", 150, null, null,
                     1_800_000_000_000L, "test", "测试源", "community"));
 
     @Test

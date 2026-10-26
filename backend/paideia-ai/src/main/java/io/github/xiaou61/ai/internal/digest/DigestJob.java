@@ -36,8 +36,8 @@ class DigestJob {
         this.properties = properties;
     }
 
-    /** 每天 {@code paideia.ai.digest.cron} 时刻采集（按 {@code zone} 解释，默认北京 07:00）。 */
-    @Scheduled(cron = "${paideia.ai.digest.cron:0 0 7 * * *}",
+    /** 每天 {@code paideia.ai.digest.cron} 时刻采集（按 {@code zone} 解释，默认北京 08:00）。 */
+    @Scheduled(cron = "${paideia.ai.digest.cron:0 0 8 * * *}",
             zone = "${paideia.ai.digest.zone:Asia/Shanghai}")
     void collectDaily() {
         run("定时");

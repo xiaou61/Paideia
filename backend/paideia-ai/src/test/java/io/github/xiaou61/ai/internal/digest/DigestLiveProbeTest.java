@@ -46,17 +46,13 @@ class DigestLiveProbeTest {
     }
 
     @Test
-    @DisplayName("页面解析当前返回 0 条（GitHub 已改 SPA）——这条记录的是事实，不是回归")
-    void githubTrendingPageIsNowSpa() {
-        List<FetchedItem> repos = new GithubTrendingSource()
-                .trendingPage(http, System.currentTimeMillis());
-        System.out.printf("[live] github trending 页面解析出 %d 条%n", repos.size());
-        // 2026-10-21 实测：github.com/trending 的服务端 HTML 里没有仓库数据（仓库行由 JS 注入）。
-        // 所以这里**断言为空**——若哪天它非空，说明 GitHub 改回了服务端渲染，
-        // 那时应把这个测试改回 isNotEmpty 并重新评估主次通路。
-        assertThat(repos)
-                .as("页面解析目前拿不到数据（SPA）；若此断言失败说明 GitHub 改回服务端渲染了")
-                .isEmpty();
+    @DisplayName("GitHub 抓取能返回条目（页面优先，页面不可达时走 Search）")
+    void githubTrendingPageParsesRepos() {
+        List<FetchedItem> repos = new GithubTrendingSource(new GithubStarHistory())
+                .fetch(new DigestProperties(), http, System.currentTimeMillis());
+        System.out.printf("[live] github 热榜返回 %d 条；首条：%s%n", repos.size(),
+                repos.isEmpty() ? "(无)" : repos.get(0).title());
+        assertThat(repos).as("页面或 Search 兜底至少有一条能用").isNotEmpty();
     }
 
     @Test
@@ -70,14 +66,14 @@ class DigestLiveProbeTest {
     }
 
     @Test
-    @DisplayName("GitHub Search API 通路也能返回（有 token 时是主通路）")
-    void githubSearchApiWorks() {
+    @DisplayName("GitHub 抓取通路能返回（有 token 时 history 限额更高）")
+    void githubFetchWorks() {
         DigestProperties properties = new DigestProperties();
         properties.setGithubToken(System.getProperty("paideia.digest.githubToken", ""));
-        List<FetchedItem> items = new GithubTrendingSource()
+        List<FetchedItem> items = new GithubTrendingSource(new GithubStarHistory())
                 .fetch(properties, http, System.currentTimeMillis());
         System.out.printf("[live] GitHub 双通路共 %d 条（token=%s）%n", items.size(),
                 properties.getGithubToken().isBlank() ? "无" : "有");
-        assertThat(items).as("两条通路至少有一条能用").isNotEmpty();
+        assertThat(items).as("页面或兜底至少有一条能用").isNotEmpty();
     }
 }

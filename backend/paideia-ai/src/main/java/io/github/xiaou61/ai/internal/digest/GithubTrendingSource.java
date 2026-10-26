@@ -3,34 +3,48 @@ package io.github.xiaou61.ai.internal.digest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * GitHub 每日热榜（WORK-027）。
+ * GitHub 日榜/周榜（WORK-027、WORK-041）。
  *
- * <p><b>双通路，页面优先</b>
+ * <p><b>候选来自官方页面，排序来自 star 历史。</b>
  * <ul>
- *   <li><b>主通路：页面解析</b>：`github.com/trending?since=daily`。2026-10-22 在部署机复测为
- *       服务端渲染（12 行、每行带「stars today」），拿到的是真正的今日热榜。</li>
- *   <li><b>兜底：Search API</b>：`search/repositories?q=created:>=<3天前> stars:>50&sort=stars`。
- *       2026-10-22 线上实测：页面从部署机也会超时（curl 60 秒无响应），所以兜底是常态通路；
- *       原先用 7 天窗口 + 100 星，同一批仓库被指纹去重后每天只剩 2 条——改成 3 天 + 50 星。</li>
+ *   <li>主通路：`trending?since=daily` 与 `?since=weekly`。页面本身是 GitHub 的编辑结果，
+ *       我们只拿它当候选池，不拿它的顺序当排名。</li>
+ *   <li>每个候选查一次 `/stargazers/history`，得到 `d1`（昨日）与 `d7`（近 7 日）；
+ *       `heat = d1`，前端「本周」按 `starsWeek = d7` 重排。</li>
+ *   <li>页面两条都不可达时才走 Search 兜底，并标「GitHub 新项目」——不冒充热榜。</li>
  * </ul>
- * **任何通路失败都要留记录**（REQ-003），不静默整组为空；两条都坏时返回空列表并由编排层记日志。
  *
- * <p><b>页面解析要注意的坑</b>：不能直接匹配 `href="/([^"]+)"`——会撞到赞助商链接。
- * 必须先定位 `<article class="Box-row">` 块，在块内取 `<h2>` 里的链接。
+ * <p><b>为什么放弃总 star 排序</b>：2026-10-26 回测，`created:>=3d stars:>50` 的 30 条与
+ * 官方日榜 0/11 重叠、其中 10 条昨日新增 &lt; 20；按 `d1` 排序的前 10 有 9 条来自官方榜。
+ * 总 star 衡量的是「大」，不是「热」。
+ *
+ * <p><b>页面解析的坑</b>：不能直接匹配 `href="/([^"]+)"`——会撞到赞助商链接。先按 `<article`
+ * 切块，再在 `<h2>` 里取仓库链接；总 star 取 `href="/owner/repo/stargazers"` 的锚文本。
  */
 @Component
 class GithubTrendingSource {
 
     private static final Logger log = LoggerFactory.getLogger(GithubTrendingSource.class);
-
-    private static final String TRENDING_URL = "https://github.com/trending?since=daily";
 
     private static final String SEARCH_URL =
             "https://api.github.com/search/repositories?q=%s&sort=stars&per_page=30";
@@ -40,81 +54,248 @@ class GithubTrendingSource {
     /** 前端分组。 */
     static final String GROUP = "github";
 
+    private static final String SOURCE_PAGE = "GitHub 热榜";
+    private static final String SOURCE_FALLBACK = "GitHub 新项目";
+
+    /** 日榜/周榜各取前 10，并集最多 20。 */
+    private static final int PAGE_LIMIT = 10;
+
+    /** history 并发度：25 个候选约 5 秒，远低于顺序的 40 秒。 */
+    private static final int MAX_HISTORY_THREADS = 6;
+
+    private static final Pattern PERIOD_STARS =
+            Pattern.compile("([\\d,]+)\\s*stars?\\s*(today|this week)", Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern H2_REPO = Pattern.compile(
+            "<h2[^>]*>.*?href=\"/(?!topics/|sponsors/|login|features/|marketplace|collections)"
+                    + "([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)\"",
+            Pattern.DOTALL);
+
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final GithubStarHistory starHistory;
+
+    GithubTrendingSource(GithubStarHistory starHistory) {
+        this.starHistory = starHistory;
+    }
 
     /**
      * 抓热榜。
      *
-     * <p><b>主次在 2026-10-21 实跑后反转了</b>：原设计是「有 token 走 Search API，无 token 走页面解析」，
-     * 但实测发现 **`github.com/trending` 已经改成 SPA**——服务端返回的 HTML 里一个仓库链接都没有
-     * （`title` 是 Trending，但 `<article>`/`Box-row`/`stars today` 全为 0 次，仓库行由 JS 注入）。
-     * 也就是说"页面解析"这条路**在当前页面结构下永不命中**，把它放在无 token 时的主通路等于
-     * 每天拿一次空结果。
-     *
-     * <p>所以改为：**Search API 永远是主通路**（有 token 时限额高，无 token 时 60/时，一天一次够用），
-     * 页面解析保留为"万一 GitHub 把服务端渲染改回来"的补充——它先试，命中就多一条更准的数据源。
-     *
-     * <p>**两条都失败返回空列表**（不抛异常）：这一组空掉，其它组照常。
+     * <p>任何一条通路失败都留日志；两条都坏返回空列表，由编排层决定这一组为空。
      */
     List<FetchedItem> fetch(DigestProperties properties, DigestHttp http, long nowMillis) {
         String token = properties.getGithubToken();
-        boolean hasToken = token != null && !token.isBlank();
+        LocalDate referenceDay = Instant.ofEpochMilli(nowMillis)
+                .atZone(ZoneOffset.UTC).toLocalDate().minusDays(1);
 
-        // 主通路：官方 Trending 页面。2026-10-22 在部署机上复测：服务端渲染、12 行可解析，
-        // 且带「stars today」——这才是真正的「今日热榜」。
-        List<FetchedItem> viaPage = trendingPage(http, nowMillis);
-        if (!viaPage.isEmpty()) {
-            return viaPage;
+        List<PageRepo> daily = fetchPage(http, properties.getGithubTrendingUrl(), false);
+        List<PageRepo> weekly = fetchPage(http, properties.getGithubTrendingUrl(), true);
+        List<Candidate> candidates = merge(daily, weekly);
+        if (!candidates.isEmpty()) {
+            Scored scored = score(candidates, token, http, referenceDay);
+            List<Candidate> selected = select(scored.items());
+            log.info("GitHub 候选：日榜 {}、周榜 {}、去重 {}；history 成功 {}、失败 {}；入候选 {}",
+                    daily.size(), weekly.size(), candidates.size(), scored.success(), scored.failed(),
+                    selected.size());
+            return toItems(selected, nowMillis, SOURCE_PAGE);
         }
 
-        // 兜底：Search API。给的是「一周内新建且星多」的项目，语义偏一些，但页面改版时仍有内容。
-        List<FetchedItem> viaSearch = searchApi(hasToken ? token : "", http, nowMillis);
-        if (!viaSearch.isEmpty()) {
-            log.info("GitHub 页面解析无结果，Search API 拿到 {} 条", viaSearch.size());
-            return viaSearch;
+        List<Candidate> fresh = searchApi(token, http, referenceDay);
+        if (!fresh.isEmpty()) {
+            Scored scored = score(fresh, token, http, referenceDay);
+            List<Candidate> gated = scored.items().stream()
+                    .filter(candidate -> passesGate(candidate, referenceDay))
+                    .toList();
+            log.info("GitHub 页面不可达，改用 Search：{} 条（门禁后 {}，history 成功 {}、失败 {}）",
+                    fresh.size(), gated.size(), scored.success(), scored.failed());
+            return toItems(gated, nowMillis, SOURCE_FALLBACK);
         }
-        log.warn("GitHub 热榜两条通路都没有结果（页面解析与 Search API），这一组本次为空");
+        log.warn("GitHub 热榜两条通路都没有结果（页面与 Search API），这一组本次为空");
         return List.of();
     }
 
+    private List<PageRepo> fetchPage(DigestHttp http, String baseUrl, boolean weekly) {
+        String url = appendSince(baseUrl, weekly ? "weekly" : "daily");
+        try {
+            return parsePage(http.getText(url, USER_AGENT), weekly);
+        } catch (DigestSource.DigestSourceException exception) {
+            log.warn("GitHub trending 页面不可达（{}）：{}",
+                    weekly ? "weekly" : "daily", exception.getMessage());
+            return List.of();
+        }
+    }
+
+    /** 解析 trending 页面。包级可见，单测直接喂 HTML fixture。 */
+    List<PageRepo> parsePage(String html, boolean weekly) {
+        List<PageRepo> result = new ArrayList<>();
+        // 按 <article 切块：每个块要么是一个仓库行，要么是别的公告
+        for (String block : html.split("<article")) {
+            Matcher matcher = H2_REPO.matcher(block);
+            if (!matcher.find()) {
+                continue;
+            }
+            String repo = matcher.group(1);
+            String description = firstByAttribute(block, "col-9");
+            String language = firstByItemprop(block, "programmingLanguage");
+            result.add(new PageRepo(repo, truncate(stripTags(description)), language,
+                    firstTotalStars(block, repo), firstPeriodStars(block, weekly)));
+        }
+        return result;
+    }
+
+    /** 日/周合并：同一个 repo 只留一条，日榜与周榜的 period stars 各存一份。 */
+    static List<Candidate> merge(List<PageRepo> daily, List<PageRepo> weekly) {
+        Map<String, Candidate> byRepo = new LinkedHashMap<>();
+        for (PageRepo page : daily) {
+            Candidate candidate = byRepo.computeIfAbsent(page.repo(), Candidate::new);
+            candidate.description = blankToNull(page.description());
+            candidate.language = page.language();
+            candidate.totalStars = page.totalStars();
+            candidate.dailyPeriodStars = page.periodStars();
+        }
+        for (PageRepo page : weekly) {
+            Candidate candidate = byRepo.computeIfAbsent(page.repo(), Candidate::new);
+            if (candidate.description == null) {
+                candidate.description = blankToNull(page.description());
+            }
+            if (candidate.language == null) {
+                candidate.language = page.language();
+            }
+            if (candidate.totalStars == null) {
+                candidate.totalStars = page.totalStars();
+            }
+            candidate.weeklyPeriodStars = page.periodStars();
+        }
+        return new ArrayList<>(byRepo.values());
+    }
+
     /**
-     * 走 Search API。任何异常都返回空列表，由上层决定兜底。
+     * 给候选补上真实增量。
      *
-     * <p><b>查询串必须整体 URL 编码</b>：`created:>=2026-10-14 stars:>100` 里的 `>` 是 URI 的
-     * 非法字符，{@code URI.create} 会直接抛 {@code IllegalArgumentException}（2026-10-21 实测：
-     * 这条通路静默返回空，而同一串用 curl 手打是正常的——只有实跑才暴露）。
+     * <p>单条失败时回退页面的 period stars（没有就 0）；**不把总 star 当热度**。
      */
-    private List<FetchedItem> searchApi(String token, DigestHttp http, long nowMillis) {
-        // 3 天窗口 + 50 星：7 天窗口的同一批仓库会被指纹去重掉，线上实测每天只剩 2 条；
-        // 3 天窗口每天都有新面孔，且 50 星仍能筛掉噪声（2026-10-22 实测 191 条候选）。
-        String since = java.time.Instant.ofEpochMilli(nowMillis)
-                .atZone(java.time.ZoneOffset.UTC).toLocalDate().minusDays(3).toString();
+    private Scored score(List<Candidate> candidates, String token, DigestHttp http,
+                         LocalDate referenceDay) {
+        int success = 0;
+        int failed = 0;
+        ExecutorService executor = Executors.newFixedThreadPool(MAX_HISTORY_THREADS);
+        try {
+            List<Future<GithubStarHistory.Stats>> futures = new ArrayList<>();
+            for (Candidate candidate : candidates) {
+                futures.add(executor.submit(
+                        () -> starHistory.fetch(candidate.repo, token, http, referenceDay)));
+            }
+            for (int index = 0; index < candidates.size(); index++) {
+                Candidate candidate = candidates.get(index);
+                GithubStarHistory.Stats stats = null;
+                try {
+                    stats = futures.get(index).get();
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                } catch (ExecutionException exception) {
+                    log.warn("GitHub star 历史任务失败（{}）：{}", candidate.repo,
+                            exception.getCause() == null
+                                    ? exception.getClass().getSimpleName()
+                                    : exception.getCause().getClass().getSimpleName());
+                }
+                if (stats != null) {
+                    candidate.dayStars = stats.dayStars();
+                    candidate.weekStars = stats.weekStars();
+                    success++;
+                } else {
+                    candidate.dayStars = candidate.dailyPeriodStars == null ? 0 : candidate.dailyPeriodStars;
+                    candidate.weekStars = candidate.weeklyPeriodStars;
+                    failed++;
+                }
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+        return new Scored(candidates, success, failed);
+    }
+
+    /**
+     * 入选集合 = 日榜前 10 ∪ 周榜前 10；返回时按 `d1` 降序，保证前排是今天真正热的。
+     *
+     * <p>必须并集：只按 `d1` 取会让「本周一直涨但今天平」的项目进不来，周榜切换就没内容。
+     */
+    static List<Candidate> select(List<Candidate> candidates) {
+        List<Candidate> dailyTop = candidates.stream()
+                .sorted((left, right) -> Integer.compare(value(right.dayStars), value(left.dayStars)))
+                .limit(PAGE_LIMIT).toList();
+        List<Candidate> weeklyTop = candidates.stream()
+                .sorted((left, right) -> Integer.compare(value(right.weekStars), value(left.weekStars)))
+                .limit(PAGE_LIMIT).toList();
+        Set<String> seen = new LinkedHashSet<>();
+        List<Candidate> union = new ArrayList<>();
+        for (Candidate candidate : dailyTop) {
+            if (seen.add(candidate.repo)) {
+                union.add(candidate);
+            }
+        }
+        for (Candidate candidate : weeklyTop) {
+            if (seen.add(candidate.repo)) {
+                union.add(candidate);
+            }
+        }
+        union.sort((left, right) -> {
+            int byDay = Integer.compare(value(right.dayStars), value(left.dayStars));
+            return byDay != 0 ? byDay : Integer.compare(value(right.weekStars), value(left.weekStars));
+        });
+        return union;
+    }
+
+    /** 兜底门禁：7 天以上直接放行；新仓库只放「真爆款」（昨日 1000+ 且 100+ fork）。 */
+    static boolean passesGate(Candidate candidate, LocalDate referenceDay) {
+        if (candidate.createdOn == null) {
+            return true;
+        }
+        long age = ChronoUnit.DAYS.between(candidate.createdOn, referenceDay);
+        return age >= 7
+                || (value(candidate.dayStars) >= 1000 && value(candidate.forks) >= 100);
+    }
+
+    private static List<FetchedItem> toItems(List<Candidate> candidates, long nowMillis,
+                                             String sourceName) {
+        List<FetchedItem> items = new ArrayList<>(candidates.size());
+        for (Candidate candidate : candidates) {
+            items.add(new FetchedItem(
+                    candidate.repo,
+                    "https://github.com/" + candidate.repo,
+                    candidate.description == null ? "" : candidate.description,
+                    value(candidate.dayStars),
+                    candidate.weekStars,
+                    meta(candidate.language, candidate.totalStars),
+                    nowMillis,
+                    "github-trending",
+                    sourceName,
+                    GROUP));
+        }
+        return items;
+    }
+
+    private List<Candidate> searchApi(String token, DigestHttp http, LocalDate referenceDay) {
+        // 3 天窗口 + 50 星：更长的窗口会被指纹去重吃掉，更短会漏掉周末。
+        String since = referenceDay.minusDays(3).toString();
         String query = java.net.URLEncoder.encode("created:>=" + since + " stars:>50",
                 java.nio.charset.StandardCharsets.UTF_8);
-        String url = SEARCH_URL.formatted(query);
         try {
-            String body = http.getTextWithHeaders(url, USER_AGENT, githubHeaders(token));
+            String body = http.getTextWithHeaders(SEARCH_URL.formatted(query), USER_AGENT,
+                    githubHeaders(token));
             JsonNode items = objectMapper.readTree(body).path("items");
-            List<FetchedItem> result = new ArrayList<>();
+            List<Candidate> result = new ArrayList<>();
             for (JsonNode item : items) {
                 String fullName = item.path("full_name").asText("");
-                String htmlUrl = item.path("html_url").asText("");
-                if (htmlUrl.isBlank()) {
+                if (fullName.isBlank() || item.path("html_url").asText("").isBlank()) {
                     continue;
                 }
-                String description = item.path("description").asText("");
-                String language = item.path("language").asText("");
-                int stars = item.path("stargazers_count").asInt(0);
-                result.add(new FetchedItem(
-                        fullName,
-                        htmlUrl,
-                        truncate(description),
-                        stars,
-                        language.isBlank() ? null : language,
-                        nowMillis,
-                        "github-trending",
-                        "GitHub 热榜",
-                        GROUP));
+                Candidate candidate = new Candidate(fullName);
+                candidate.description = truncate(item.path("description").asText(""));
+                candidate.language = blankToNull(item.path("language").asText(""));
+                candidate.totalStars = item.path("stargazers_count").asInt(0);
+                candidate.forks = item.path("forks_count").asInt(0);
+                candidate.createdOn = parseDate(item.path("created_at").asText(""));
+                result.add(candidate);
             }
             return result;
         } catch (DigestSource.DigestSourceException exception) {
@@ -126,78 +307,80 @@ class GithubTrendingSource {
         }
     }
 
-    /**
-     * 解析 trending 页面。
-     *
-     * <p>**先在 `<article` 边界里切块**，再在块内找第一个 `/owner/repo` 链接。
-     * 直接全文匹配 href 会抓到赞助商与导航链接——这是 research.md 记录过的坑。
-     */
-    List<FetchedItem> trendingPage(DigestHttp http, long nowMillis) {
-        String html;
-        try {
-            html = http.getText(TRENDING_URL, USER_AGENT);
-        } catch (DigestSource.DigestSourceException exception) {
-            log.warn("GitHub trending 页面不可达：{}", exception.getMessage());
-            return List.of();
-        }
-        List<FetchedItem> result = new ArrayList<>();
-        // 按 <article 切块：每个块要么是一个仓库行，要么是别的公告
-        String[] blocks = html.split("<article");
-        for (String block : blocks) {
-            String repo = firstRepoLink(block);
-            if (repo == null) {
-                continue;
-            }
-            String description = firstByAttribute(block, "col-9");
-            String stars = firstStarsToday(block);
-            String language = firstByItemprop(block, "programmingLanguage");
-            result.add(new FetchedItem(
-                    repo,
-                    "https://github.com/" + repo,
-                    truncate(stripTags(description)),
-                    parseStars(stars),
-                    language,
-                    nowMillis,
-                    "github-trending",
-                    "GitHub 热榜",
-                    GROUP));
-        }
-        return result;
+    private static String appendSince(String baseUrl, String since) {
+        String base = baseUrl == null || baseUrl.isBlank()
+                ? "https://github.com/trending" : baseUrl;
+        return base + (base.contains("?") ? "&" : "?") + "since=" + since;
     }
 
-    /**
-     * 块内第一个看起来像 `owner/repo` 的链接。
-     *
-     * <p>排除 `/topics/`、`/sponsors/`、`/login` 这些非仓库路径——trending 页确实会带它们。
-     */
-    private static String firstRepoLink(String block) {
-        java.util.regex.Matcher matcher =
-                java.util.regex.Pattern.compile("href=\"/(?!topics/|sponsors/|login|features/|marketplace)"
-                        + "([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)\"").matcher(block);
-        return matcher.find() ? matcher.group(1) : null;
-    }
-
-    /** 取带某个 class 的元素的文本（用来捞描述）。刻意宽松：GitHub 改版时会加类名。 */
     private static String firstByAttribute(String block, String className) {
-        java.util.regex.Matcher matcher = java.util.regex.Pattern
-                .compile("<p[^>]*class=\"[^\"]*" + className + "[^\"]*\"[^>]*>(.*?)</p>",
-                        java.util.regex.Pattern.DOTALL)
+        Matcher matcher = Pattern
+                .compile("<p[^>]*class=\"[^\"]*" + className + "[^\"]*\"[^>]*>(.*?)</p>", Pattern.DOTALL)
                 .matcher(block);
         return matcher.find() ? matcher.group(1) : "";
     }
 
     private static String firstByItemprop(String block, String itemprop) {
-        java.util.regex.Matcher matcher = java.util.regex.Pattern
-                .compile("itemprop=\"" + itemprop + "\"[^>]*>\\s*([^<]+)", java.util.regex.Pattern.DOTALL)
+        Matcher matcher = Pattern
+                .compile("itemprop=\"" + itemprop + "\"[^>]*>\\s*([^<]+)", Pattern.DOTALL)
                 .matcher(block);
         return matcher.find() ? matcher.group(1).strip() : null;
     }
 
-    private static String firstStarsToday(String block) {
-        java.util.regex.Matcher matcher = java.util.regex.Pattern
-                .compile("([\\d,]+)\\s*stars?\\s*today", java.util.regex.Pattern.CASE_INSENSITIVE)
+    private static Integer firstTotalStars(String block, String repo) {
+        Matcher matcher = Pattern
+                .compile("href=\"/" + Pattern.quote(repo) + "/stargazers\"[^>]*>(.*?)</a>", Pattern.DOTALL)
                 .matcher(block);
-        return matcher.find() ? matcher.group(1) : null;
+        if (!matcher.find()) {
+            return null;
+        }
+        Matcher digits = Pattern.compile("[\\d,]+").matcher(stripTags(matcher.group(1)));
+        return digits.find() ? parseStars(digits.group()) : null;
+    }
+
+    private static Integer firstPeriodStars(String block, boolean weekly) {
+        Matcher matcher = PERIOD_STARS.matcher(block);
+        String expected = weekly ? "this week" : "today";
+        while (matcher.find()) {
+            if (expected.equalsIgnoreCase(matcher.group(2))) {
+                return parseStars(matcher.group(1));
+            }
+        }
+        return null;
+    }
+
+    private static String meta(String language, Integer totalStars) {
+        StringBuilder builder = new StringBuilder();
+        if (language != null && !language.isBlank()) {
+            builder.append(language);
+        }
+        if (totalStars != null) {
+            if (builder.length() > 0) {
+                builder.append(" · ");
+            }
+            builder.append(totalStars).append('★');
+        }
+        String value = builder.toString();
+        return value.isBlank() ? null : value;
+    }
+
+    private static int value(Integer number) {
+        return number == null ? 0 : number;
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
+    }
+
+    private static LocalDate parseDate(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return Instant.parse(raw).atZone(ZoneOffset.UTC).toLocalDate();
+        } catch (RuntimeException exception) {
+            return null;
+        }
     }
 
     /** `3,856` → 3856。解析不了返回 null（heat 是可选字段）。 */
@@ -224,12 +407,40 @@ class GithubTrendingSource {
         return value.length() <= 200 ? value : value.substring(0, 200);
     }
 
-    private static java.util.Map<String, String> githubHeaders(String token) {
-        java.util.Map<String, String> headers = new java.util.LinkedHashMap<>();
+    private static Map<String, String> githubHeaders(String token) {
+        Map<String, String> headers = new LinkedHashMap<>();
         headers.put("accept", "application/vnd.github+json");
+        headers.put("x-github-api-version", "2026-03-10");
         if (token != null && !token.isBlank()) {
             headers.put("authorization", "Bearer " + token);
         }
         return headers;
+    }
+
+    /** 页面的一行。 */
+    record PageRepo(String repo, String description, String language,
+                    Integer totalStars, Integer periodStars) {
+    }
+
+    /** 合并后的候选；`dayStars/weekStars` 由 history 回填。 */
+    static final class Candidate {
+
+        final String repo;
+        String description;
+        String language;
+        Integer totalStars;
+        Integer dailyPeriodStars;
+        Integer weeklyPeriodStars;
+        Integer dayStars;
+        Integer weekStars;
+        LocalDate createdOn;
+        Integer forks;
+
+        Candidate(String repo) {
+            this.repo = repo;
+        }
+    }
+
+    private record Scored(List<Candidate> items, int success, int failed) {
     }
 }

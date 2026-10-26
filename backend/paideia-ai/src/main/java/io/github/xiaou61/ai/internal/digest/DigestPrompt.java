@@ -14,7 +14,7 @@ import java.util.List;
 final class DigestPrompt {
 
     /** 日报压缩提示词的版本号，写进 `ai_runs.prompt_version`。改规则必须改它。 */
-    static final String VERSION = "digest-v2";
+    static final String VERSION = "digest-v3";
 
     private DigestPrompt() {
     }
@@ -44,6 +44,8 @@ final class DigestPrompt {
                 6. 给每条打一个 0-100 的重要性分（heat），用来在组内排序：
                    90 以上 = 当天必看的大新闻，60 左右 = 值得一看，30 以下 = 可略过。
                    不要给所有条目同一个分数，也不要按顺序递减。
+                7. 来源是 GitHub 的条目，标题必须**原样保留** `owner/repo`，不要翻译、不要加中文名；
+                   中文只写在摘要里。
 
                 只输出 JSON，不要 markdown 代码围栏，不要任何解释文字：
                 {"items":[{"fingerprint":"...","title":"中文标题","summary":"一句话摘要","heat":0}]}
@@ -66,6 +68,9 @@ final class DigestPrompt {
             builder.append("   标题: ").append(item.title()).append('\n');
             if (item.heat() != null) {
                 builder.append("   热度: ").append(item.heat()).append('\n');
+            }
+            if (item.starsWeek() != null) {
+                builder.append("   本周: ").append(item.starsWeek()).append('\n');
             }
             if (item.meta() != null && !item.meta().isBlank()) {
                 builder.append("   附加: ").append(item.meta()).append('\n');

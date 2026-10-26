@@ -31,10 +31,15 @@ paideia:
     digest:
       # 每日技术速递（WORK-027）。**默认关闭**：它要访问多个外部站点、每天花一次 AI 调用。
       enabled: false
-      # GitHub token：**可选增强**。配置后热榜主通路走 Search API（稳定、限额高）；
-      # 不配则走页面解析、失败退回匿名 Search API（60/时，一天一次够用）。
+      # GitHub token：**强烈建议配置**。star 历史端点按 core 限额计费，
+      # 带 token 5000/时；不带时匿名 60/时，候选池必须收缩。
       # 值只进被忽略的本地配置文件，仓库里只留环境变量占位。
       github-token: ${DIGEST_GITHUB_TOKEN:}
+      # trending 页面基地址。生产机直连 github.com 会超时，配成本机反向代理地址
+      # （例如 http://127.0.0.1:8082/trending）；默认值只给本地与测试用。
+      github-trending-url: ${DIGEST_GITHUB_TRENDING_URL:https://github.com/trending}
+      # 采集时刻（按 zone 解释）。08:00 北京 = 00:00 UTC，保证「昨天」是完整桶。
+      cron: "${DIGEST_CRON:0 0 8 * * *}"
       # 成本闸：单次最多入库条数，也决定喂给 AI 的候选池上限。
       max-items-per-run: 60
       # 周报素材上限。

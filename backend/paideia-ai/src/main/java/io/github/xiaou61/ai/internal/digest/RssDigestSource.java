@@ -37,7 +37,7 @@ class RssDigestSource {
         return entries.stream()
                 .filter(entry -> entry.publishedAt() >= sinceMillis)
                 .map(entry -> new FetchedItem(entry.title(), entry.link(), entry.summaryHint(),
-                        null, null, entry.publishedAt(), source.getKey(), source.getName(),
+                        null, null, null, entry.publishedAt(), source.getKey(), source.getName(),
                         source.getGroup()))
                 .toList();
     }

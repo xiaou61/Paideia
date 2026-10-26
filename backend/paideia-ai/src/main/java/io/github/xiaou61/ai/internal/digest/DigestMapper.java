@@ -17,7 +17,8 @@ public interface DigestMapper {
     /** 一条入库行。 */
     record Row(long id, LocalDate editionDate, String groupKey, String sourceKey, String sourceName,
                String title, String summary, String url, String fingerprint, Integer heat,
-               String meta, Long publishedAt, String summaryState, Instant createdAt) {
+               Integer starsDay, Integer starsWeek, String meta, Long publishedAt,
+               String summaryState, Instant createdAt) {
     }
 
     /** 周报行。 */
@@ -53,17 +54,18 @@ public interface DigestMapper {
     /** 入库一条。重复指纹由唯一约束挡住，调用方捕获异常按"已存在"处理。 */
     @Insert("""
             INSERT INTO digest_items (edition_date, group_key, source_key, source_name, title,
-                                      summary, url, fingerprint, heat, meta, published_at,
-                                      summary_state, created_at)
+                                      summary, url, fingerprint, heat, stars_day, stars_week,
+                                      meta, published_at, summary_state, created_at)
             VALUES (#{editionDate}, #{groupKey}, #{sourceKey}, #{sourceName}, #{title},
-                    #{summary}, #{url}, #{fingerprint}, #{heat}, #{meta}, #{publishedAt},
-                    #{summaryState}, #{createdAt})
+                    #{summary}, #{url}, #{fingerprint}, #{heat}, #{starsDay}, #{starsWeek},
+                    #{meta}, #{publishedAt}, #{summaryState}, #{createdAt})
             """)
     int insert(@Param("editionDate") LocalDate editionDate, @Param("groupKey") String groupKey,
                @Param("sourceKey") String sourceKey, @Param("sourceName") String sourceName,
                @Param("title") String title, @Param("summary") String summary,
                @Param("url") String url, @Param("fingerprint") String fingerprint,
-               @Param("heat") Integer heat, @Param("meta") String meta,
+               @Param("heat") Integer heat, @Param("starsDay") Integer starsDay,
+               @Param("starsWeek") Integer starsWeek, @Param("meta") String meta,
                @Param("publishedAt") Long publishedAt, @Param("summaryState") String summaryState,
                @Param("createdAt") Instant createdAt);
 
@@ -71,11 +73,13 @@ public interface DigestMapper {
      * 某天的全部条目。
      *
      * <p>排序：`heat` 降序，`heat` 为空的排后面（MySQL 里 `NULL` 在 `DESC` 中排最后，
-     * 正是想要的），同热度按发布时间新到旧。
+     * 正是想要的），同热度按发布时间新到旧。GitHub 的 `heat` 就是 `d1`；
+     * 周榜由前端按 `stars_week` 重排，不在这里加第二套顺序。
      */
     @Select("""
             SELECT id, edition_date, group_key, source_key, source_name, title, summary, url,
-                   fingerprint, heat, meta, published_at, summary_state, created_at
+                   fingerprint, heat, stars_day, stars_week, meta, published_at, summary_state,
+                   created_at
             FROM digest_items
             WHERE edition_date = #{date}
             ORDER BY heat DESC, published_at DESC, id

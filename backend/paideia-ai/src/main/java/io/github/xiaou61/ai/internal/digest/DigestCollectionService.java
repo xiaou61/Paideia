@@ -133,10 +133,18 @@ public class DigestCollectionService {
             byFingerprint.putIfAbsent(fingerprint, item);
         }
 
-        // 4. 查库剔除（只查今天±1 天）
+        // 4. 查库剔除：GitHub 只查当天（允许同一仓库连续在榜），其它组保持 ±1 天
         List<String> candidates = new ArrayList<>(byFingerprint.keySet());
-        Set<String> existing = new LinkedHashSet<>(
-                mapper.existingFingerprints(today.minusDays(1), today.plusDays(1), candidates));
+        List<String> githubCandidates = candidates.stream()
+                .filter(fp -> GithubTrendingSource.GROUP.equals(byFingerprint.get(fp).groupKey()))
+                .toList();
+        List<String> otherCandidates = candidates.stream()
+                .filter(fp -> !GithubTrendingSource.GROUP.equals(byFingerprint.get(fp).groupKey()))
+                .toList();
+        Set<String> existing = new LinkedHashSet<>();
+        existing.addAll(mapper.existingFingerprintsSafe(today, today, githubCandidates));
+        existing.addAll(mapper.existingFingerprintsSafe(
+                today.minusDays(1), today.plusDays(1), otherCandidates));
         List<String> fresh = candidates.stream().filter(fp -> !existing.contains(fp)).toList();
         if (fresh.isEmpty()) {
             log.info("速递本次候选 {} 条全部已存在", candidates.size());
@@ -193,13 +201,22 @@ public class DigestCollectionService {
                 degraded++;
             }
             try {
-                // 热度优先用源自己的信号（HN 点数 / GitHub 今日新增 star）；
+                // 热度优先用源自己的信号（HN 点数 / GitHub 昨日新增 star）；
                 // 没有信号的源（RSS 新闻、社区）用 AI 给的重要性分，这样每组都能排序。
-                Integer heat = item.heat() != null ? item.heat() : (ready ? result.heat() : null);
+                boolean github = GithubTrendingSource.GROUP.equals(item.groupKey());
+                Integer starsDay = github ? (item.heat() == null ? 0 : item.heat()) : null;
+                Integer heat = github
+                        ? starsDay
+                        : (item.heat() != null ? item.heat() : (ready ? result.heat() : null));
+                // GitHub 标题固定为 owner/repo：仓库名被翻译掉，用户就搜不到、也对不上 GitHub
+                String title = github
+                        ? item.title()
+                        : (ready && !result.title().isBlank() ? result.title() : item.title());
                 mapper.insert(today, item.groupKey(), item.sourceKey(), item.sourceName(),
-                        ready && !result.title().isBlank() ? result.title() : item.title(),
-                        ready ? result.summary() : null,
-                        item.url(), fingerprint, heat, item.meta(), item.publishedAt(),
+                        title, ready ? result.summary() : null,
+                        item.url(), fingerprint, heat, starsDay,
+                        github ? item.starsWeek() : null,
+                        item.meta(), item.publishedAt(),
                         ready ? STATE_READY : STATE_DEGRADED, now);
                 created++;
             } catch (RuntimeException exception) {

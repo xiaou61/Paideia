@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 class DigestTakeByGroupTest {
 
     private static FetchedItem item(String group, String url) {
-        return new FetchedItem("t", url, "", null, null, 0L, "s-" + group, "源" + group, group);
+        return new FetchedItem("t", url, "", null, null, null, 0L, "s-" + group, "源" + group, group);
     }
 
     private static Map<String, FetchedItem> index(List<FetchedItem> items) {
