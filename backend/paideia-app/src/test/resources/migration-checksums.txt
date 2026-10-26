@@ -28,6 +28,7 @@ src/main/resources/db/migration/V20261023110000__create_sql_dataset_tables.sql -
 src/main/resources/db/migration/V20261023120000__create_review_sessions.sql -206923658
 src/main/resources/db/migration/V20261023140000__create_ai_feedback.sql -1994570702
 src/main/resources/db/migration/V20261023150000__oauth_identities.sql 911404296
+src/main/resources/db/migration/V20261026120000__add_track_mode.sql -1271398781
 src/main/resources/db/migration/V20__add_entry_read_indexes.sql -1148086735
 src/main/resources/db/migration/V21__create_ai_telemetry_tables.sql -891669932
 src/main/resources/db/migration/V22__create_learning_tracks.sql -976007377
