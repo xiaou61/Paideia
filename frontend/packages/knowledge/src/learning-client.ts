@@ -65,7 +65,7 @@ export function createLearningApi(client: ApiClient) {
     /** 学习轨道（WORK-024）。与知识库无关的独立入口。 */
     tracks: () => client.requestEnvelope<TrackSummary[]>('/api/v1/learn/tracks'),
 
-    /** 一条轨道的关卡地图：按章节分组，每格带 done/current/locked。 */
+    /** 一条轨道的关卡地图：按章节分组，每格带 done/current。 */
     trackMap: (slug: string) =>
       client.requestEnvelope<TrackMap>(`/api/v1/learn/tracks/${encodeURIComponent(slug)}`),
   }

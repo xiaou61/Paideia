@@ -130,9 +130,14 @@ class AgentScopeConversation implements AssistantConversation {
                     .sessionId("req-" + System.nanoTime())
                     .build();
 
+            // 超时语义：`requestTimeoutSeconds` 原本是**每一轮**的静默阈值（旧实现是
+            // model.stream(...).timeout(...)，一轮结束重新计时）。这里若直接 blockLast(超时)，
+            // 它变成整条工具循环的硬上限 —— maxIters(4) 下 4 次串行上游调用很容易超 60s，
+            // 用户会在已经有产出之后被整条掐断。按轮数放大总预算，保持"每轮一份"的语义。
+            long totalSeconds = (long) properties.getRequestTimeoutSeconds() * Math.max(1, MAX_TOOL_ROUNDS);
             agent.streamEvents(conversation(request), ctx)
                     .doOnNext(turn::observe)
-                    .blockLast(Duration.ofSeconds(properties.getRequestTimeoutSeconds()));
+                    .blockLast(Duration.ofSeconds(totalSeconds));
 
             listener.onUsage(turn.total);
             if (turn.failed == null) {

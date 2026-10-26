@@ -17,7 +17,7 @@ function Tabs({
       // 只写 data-orientation 会出现"看着是竖排、键盘却按横排走"的不一致。
       orientation={orientation}
       className={cn(
-        "group/tabs flex gap-2 data-[orientation=horizontal]:flex-col",
+        "group/tabs flex gap-2 data-[orientation=vertical]:flex-col",
         className
       )}
       {...props}

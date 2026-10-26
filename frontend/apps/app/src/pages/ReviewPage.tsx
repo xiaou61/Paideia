@@ -50,7 +50,9 @@ export function ReviewPage() {
     },
   })
   const submit = useMutation({
-    mutationFn: () => learning.submitReview(session?.sessionId ?? 0, answers),
+    // 取显式传入的答案：交卷那一题刚 setAnswers 还没生效，闭包里的 answers 少一题
+    mutationFn: (payload: { itemId: number; choice: number }[]) =>
+      learning.submitReview(session?.sessionId ?? 0, payload),
     onSuccess: (data) => setResult(data),
   })
 
@@ -91,11 +93,11 @@ export function ReviewPage() {
       {result !== null ? (
         <section className="mt-6 space-y-3" data-testid="review-result">
           <h2 className="text-lg font-medium">这次的结果</h2>
-          {result.results.map((item) => (
+          {result.results.map((item, i) => (
             <Card key={item.itemId} className={item.correct ? 'border-success/40' : 'border-destructive/40'}>
               <CardContent className="pt-5 text-sm">
                 <p className="font-medium">
-                  第 {item.itemId + 1} 题 · {item.correct ? '答对了' : '答错了'}
+                  第 {i + 1} 题 · {item.correct ? '答对了' : '答错了'}
                 </p>
                 <p className="text-muted-foreground mt-1 leading-6">{item.explanation}</p>
               </CardContent>
@@ -151,13 +153,20 @@ export function ReviewPage() {
                     if (index + 1 < session.items.length) {
                       setIndex(index + 1)
                     } else {
-                      submit.mutate()
+                      submit.mutate(next)
                     }
                   }}
                 >
                   {index + 1 < session.items.length ? '下一题' : '交卷'}
                 </Button>
               </div>
+              {/* 交卷失败必须看得见：否则用户停在最后一题、按钮又恢复可点，只会反复重试 */}
+              {submit.isError ? (
+                <Alert variant="destructive" className="mt-4" data-testid="review-submit-error">
+                  <AlertTitle>没能交卷</AlertTitle>
+                  <AlertDescription>{(submit.error as Error).message}</AlertDescription>
+                </Alert>
+              ) : null}
             </CardContent>
           </Card>
         </section>

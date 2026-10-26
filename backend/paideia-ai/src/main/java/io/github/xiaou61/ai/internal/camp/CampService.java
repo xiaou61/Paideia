@@ -524,7 +524,22 @@ public class CampService {
         validated.accepted().forEach(item -> merged.add(item.item()));
         second.accepted().forEach(item -> merged.add(item.item()));
         ItemValidator.Validated combined = ItemValidator.validate(merged, concepts);
-        return new Generation(combined, repaired.usage() == null ? usage : repaired.usage());
+        // 修复是**另一次独立的上游调用**：两轮的 token 都要算，否则用户为两次真实调用只付一次钱，
+        // 观测里的用量也偏低。
+        return new Generation(combined, addUsage(usage, repaired.usage()));
+    }
+
+    private static TokenUsage addUsage(TokenUsage first, TokenUsage second) {
+        if (first == null) {
+            return second;
+        }
+        if (second == null) {
+            return first;
+        }
+        return new TokenUsage(first.inputTokens() + second.inputTokens(),
+                first.outputTokens() + second.outputTokens(),
+                first.totalTokens() + second.totalTokens(),
+                first.cacheReadTokens() + second.cacheReadTokens());
     }
 
     private long persistProgram(long userId, ResumeDocumentService.Detail resume, int days,

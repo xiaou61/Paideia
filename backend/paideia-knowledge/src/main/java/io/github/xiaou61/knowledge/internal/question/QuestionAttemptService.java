@@ -191,7 +191,13 @@ public class QuestionAttemptService {
         return mapper.recentAttempts(Math.max(1, Math.min(5000, limit)));
     }
 
-    /** 复习会话用：按一次作答更新某个概念的 BKT 掌握度（WORK-034 TASK-005 冻结点）。 */
+    /**
+     * 复习会话用：按一次作答更新某个概念的 BKT 掌握度（WORK-034 TASK-005 冻结点）。
+     *
+     * <p>必须开事务：这是"读当前掌握度 → 计算 → upsert"的复合操作，`findMasteryOf` 的
+     * `FOR UPDATE` 只在事务里才拿锁，否则并发交卷会各自读到同一份旧值、互相覆盖计数。
+     */
+    @Transactional
     public void recordMastery(long userId, long conceptId, boolean correct, int optionCount) {
         Instant now = Instant.now();
         QuestionAttemptMapper.MasteryRow current = mapper.findMasteryOf(userId, conceptId).orElse(null);

@@ -1,5 +1,7 @@
 package io.github.xiaou61.sandbox.internal.dataset;
 
+import io.github.xiaou61.platform.BizException;
+import io.github.xiaou61.platform.ErrorCode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -94,6 +96,13 @@ public final class SqlStatementGuard {
             }
             // 块注释：/* 到 */
             if (current == '/' && index + 1 < sql.length() && sql.charAt(index + 1) == '*') {
+                // `/*!50000 ... */` 是 MySQL 的**可执行**注释（版本条件指令），不是注释。
+                // 把它当注释剔掉，校验看到的就没有这条语句，而真正执行的是原始 SQL——
+                // 等于给白名单开了个后门。直接判为非法。
+                if (index + 2 < sql.length() && sql.charAt(index + 2) == '!') {
+                    throw new BizException(ErrorCode.INVALID_ARGUMENT,
+                            "不支持 MySQL 的可执行注释（/*! ... */）");
+                }
                 index += 2;
                 while (index + 1 < sql.length() && !(sql.charAt(index) == '*' && sql.charAt(index + 1) == '/')) {
                     index++;

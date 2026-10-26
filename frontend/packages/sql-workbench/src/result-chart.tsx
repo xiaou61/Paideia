@@ -39,8 +39,12 @@ export function ResultChart({ table }: { table: ResultTable }) {
   const [yColumn, setYColumn] = useState<number | null>(null)
 
   const yCandidates = useMemo(() => numericColumns(table), [table])
+  // 换结果集时把列索引夹回合法范围：组件在同一个位置复用，重新执行 SQL 后
+  // 上一次选的 xColumn 可能越界（列变少了），会让 X 轴标签全空。
+  const safeX = xColumn < table.columns.length ? xColumn : 0
+  const safeY = yColumn !== null && yColumn < table.columns.length ? yColumn : null
   // 默认选第一个非 X 的数值列；没有就保持 null（让用户看到提示而不是一张空图）
-  const effectiveY = yColumn ?? yCandidates.find((index) => index !== xColumn) ?? null
+  const effectiveY = safeY ?? yCandidates.find((index) => index !== safeX) ?? null
 
   if (yCandidates.length === 0) {
     return (

@@ -10,7 +10,7 @@ import {
   Spinner,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Check, Lock, Play } from 'lucide-react'
+import { ArrowLeft, Check, Play } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 
@@ -58,6 +58,15 @@ export function TrackMapPage() {
     queryFn: () => learning.trackMap(slug),
     enabled: slug !== '',
   })
+  // 配对提示要显示的是轨道的**名字**而不是 slug，所以顺带取一次列表；
+  // `/learn` 已经取过同一份数据，正常路径下这是缓存命中。
+  const theorySlug = map.data?.theoryTrackSlug ?? null
+  const tracks = useQuery({
+    queryKey: ['learning-tracks'],
+    queryFn: () => learning.tracks(),
+    enabled: theorySlug !== null,
+  })
+  const theoryName = tracks.data?.find((track) => track.slug === theorySlug)?.name ?? theorySlug
   // 难度筛选：null = 全部。用户要能"只看入门"或"只看深入"，
   // 而地图本身不因此重排（顺序就是学习路径，筛选只减不加）。
   const [levelFilter, setLevelFilter] = useState<string | null>(null)
@@ -92,10 +101,24 @@ export function TrackMapPage() {
       {map.isSuccess ? (
         <>
           <PageHeader
-            eyebrow={`${map.data.stageCount} 关 · 已通关 ${map.data.passedCount}`}
+            eyebrow={`${map.data.mode === 'practice' ? '实战' : '理论'} · ${map.data.stageCount} 关 · 已通关 ${map.data.passedCount}`}
             title={map.data.name}
             description={map.data.summary ?? '沿着下面的关卡一关一关往下走。'}
           />
+
+          {/* 配对提示：实战轨道指向它假定的理论轨道。只是建议，不限制进入（WORK-038）。 */}
+          {map.data.theoryTrackSlug === null ? null : (
+            <p className="text-muted-foreground mb-4 text-sm" data-testid="learn-theory-hint">
+              建议先看{' '}
+              <Link
+                to={`/learn/${map.data.theoryTrackSlug}`}
+                className="text-primary underline-offset-2 hover:underline"
+              >
+                {theoryName}
+              </Link>
+              ，不过想直接动手也可以。
+            </p>
+          )}
 
           {/* 难度筛选：把"快速入门"与"深入"分开看 */}
           <div className="mb-4 flex flex-wrap items-center gap-2" data-testid="level-filter">
@@ -153,7 +176,7 @@ export function TrackMapPage() {
                           className="bg-border absolute top-0 left-[19px] h-6 w-px -translate-y-full"
                         />
                       ) : null}
-                      <StageCell stage={stage} slug={slug} />
+                      <StageCell stage={stage} />
                     </li>
                   ))}
                 </ol>
@@ -166,24 +189,20 @@ export function TrackMapPage() {
   )
 }
 
-/** 一格关卡。三种状态各有不同的图标、颜色与可点性。 */
-function StageCell({ stage, slug }: { stage: TrackStage; slug: string }) {
+/**
+ * 一格关卡。两种状态：已通关（实心 + 对勾）与可开始（高亮 + 播放）。
+ *
+ * <p><b>没有锁定态</b>：任何一关都能直接点进去。顺序由格子的排列与连线表达，
+ * 但不拦人——想跳着看某一关的人不该被挡住。
+ */
+function StageCell({ stage }: { stage: TrackStage }) {
   const done = stage.status === 'done'
-  const locked = stage.status === 'locked'
 
-  const icon = done ? (
-    <Check className="size-4" />
-  ) : locked ? (
-    <Lock className="size-4" />
-  ) : (
-    <Play className="size-4" />
-  )
+  const icon = done ? <Check className="size-4" /> : <Play className="size-4" />
 
   const circle = done
     ? 'bg-success text-success-foreground'
-    : locked
-      ? 'bg-muted text-muted-foreground border-border border'
-      : 'bg-primary text-primary-foreground'
+    : 'bg-primary text-primary-foreground'
 
   const body = (
     <>
@@ -195,7 +214,7 @@ function StageCell({ stage, slug }: { stage: TrackStage; slug: string }) {
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-2">
-          <span className={`text-sm ${locked ? 'text-muted-foreground' : 'font-medium'}`}>
+          <span className="text-sm font-medium">
             {stage.seq}. {stage.title}
           </span>
           {/* 难度就写在标题旁边：用户要的是"一眼看出哪些适合初学者" */}
@@ -208,30 +227,16 @@ function StageCell({ stage, slug }: { stage: TrackStage; slug: string }) {
           </span>
         </span>
         <span className="text-muted-foreground mt-0.5 block text-xs">
-          {done ? '已通关' : locked ? '通过上一关后解锁' : '可以开始'}
+          {done ? '已通关' : '可以开始'}
         </span>
       </span>
     </>
   )
 
-  const className =
-    'flex items-center gap-3 rounded-lg border px-3 py-3 transition-colors ' +
-    (locked
-      ? 'border-border bg-card/50 cursor-not-allowed'
-      : 'border-border bg-card hover:border-primary/40')
-
-  // 锁住的关卡不给链接：点了也不该有反应，改成不可点的 div 更诚实
-  if (locked) {
-    return (
-      <div className={className} data-testid={`stage-${stage.seq}`} data-status="locked" aria-disabled>
-        {body}
-      </div>
-    )
-  }
   return (
     <Link
       to={`/knowledge/entries/${stage.entryId}`}
-      className={className}
+      className="border-border bg-card hover:border-primary/40 flex items-center gap-3 rounded-lg border px-3 py-3 transition-colors"
       data-testid={`stage-${stage.seq}`}
       data-status={stage.status}
     >

@@ -72,7 +72,11 @@ class KnowledgeAdminController {
     ApiResponse<Void> upsertTrack(@Valid @RequestBody TrackRequest body) {
         Instant now = Instant.now();
         trackMapper.upsertTrack(body.slug(), body.name(), body.summary(), body.kind(),
-                body.sortOrder() == null ? 100 : body.sortOrder(), now);
+                body.sortOrder() == null ? 100 : body.sortOrder(),
+                body.mode() == null || body.mode().isBlank() ? "theory" : body.mode(),
+                body.theoryTrackSlug() == null || body.theoryTrackSlug().isBlank()
+                        ? null : body.theoryTrackSlug(),
+                now);
         io.github.xiaou61.knowledge.internal.track.TrackMapper.Track track =
                 trackMapper.findBySlug(body.slug());
         if (track == null) {
@@ -98,6 +102,10 @@ class KnowledgeAdminController {
             /** course / reading */
             @Size(max = 16) String kind,
             Integer sortOrder,
+            /** theory / practice；省略按 theory（WORK-038） */
+            @Size(max = 16) String mode,
+            /** 实战轨道指向的理论轨道 slug；只用于提示，不构成限制 */
+            @Size(max = 64) String theoryTrackSlug,
             List<StageRequest> stages) {
     }
 

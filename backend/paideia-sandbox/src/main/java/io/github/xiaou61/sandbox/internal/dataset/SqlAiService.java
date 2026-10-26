@@ -69,6 +69,10 @@ public class SqlAiService {
         }
         SqlQuestionPort.Question question = generated.questions().get(0);
 
+        // 参考解必须先过语句门禁再执行：这是模型产出的 SQL，和用户上传同一条信任边界。
+        // 门禁原本只在上传路径生效，这里不过就等于让模型绕过白名单直接跑任意语句。
+        SqlStatementGuard.check(question.referenceSql());
+
         // 参考解必须在同一个数据集上真跑：期望结果集只能来自实际执行
         CodeRun.Result result = runOn(userId, datasetKey, question.referenceSql());
         if (result.exitCode() != 0 || result.timedOut() || result.outOfMemory()) {
@@ -115,9 +119,16 @@ public class SqlAiService {
                     runner.unavailableReason() == null ? "代码执行不可用" : runner.unavailableReason());
         }
         quota.requireQuota(userId, "sql");
+        CodeRun.Result result;
         try (RunSlot.Slot ignored = slots.acquire(userId)) {
-            return runner.run(new CodeRun.Request("sql", sql, datasets.sql(userId, datasetKey), "ai-question", false));
+            result = runner.run(new CodeRun.Request("sql", sql, datasets.sql(userId, datasetKey), "ai-question", false));
         }
+        // 执行完必须记账：不记录的话 requireQuota 永远看到同一个已用数，
+        // 这条路径可以无限触发容器而不消耗配额。
+        quota.record(userId, null, "ai-question", "sql",
+                SandboxQuotaService.statusOf(result), result.exitCode(), result.durationMs(),
+                result.stdout().length() + result.stderr().length(), result.truncated(), sql);
+        return result;
     }
 
     private static String shorten(String stderr) {

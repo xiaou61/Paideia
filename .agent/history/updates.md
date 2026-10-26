@@ -6358,6 +6358,57 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
   线上全量 **89 passed / 0 failed**；线上 health=200，三条迁移 success=1。
 - 本地提交：`64621b4`；已推送 `72f8c65..64621b4`；已部署（73 秒）。
 
+## 2026-10-26 10:40 +0800 · 从零开始解锁 + 五条新阅读线（用户指示直接做，未建项）
+
+- 类型：feature
+- **一、关卡不再加锁**：用户原话「其实不一定非要解锁什么的，就是全部就是默认全部都解锁」。
+  判定只在一处（`TrackService.map()`），改成 `status = done ? "done" : "current"`，永不产出
+  `locked`。前置关系 `requires_entry_id` 保持不动——它表达顺序，不是门槛。
+  前端同步删掉锁定渲染（`Lock` 图标、`cursor-not-allowed`、不可点 `div`、
+  「通过上一关后解锁」文案），`TrackStage.status` 收窄为 `'done' | 'current'`，
+  `/learn` 页那句「通关后解锁下一关」改成「顺序是建议的走法，想先看哪一关都可以」。
+- **二、新增五条阅读线**：`content/reading/{git,spring,redis,linux,patterns}`，
+  共 5 篇总览 + 27 篇正文。补的是原 8 条线完全没覆盖、而求职面试高频的主题：
+  Git（5）、Spring（6：IoC/生命周期/自动配置/AOP/事务失效/启动失败）、
+  Redis（6：为什么快/五类型/过期淘汰/持久化/缓存三问题/分布式锁）、
+  Linux 排查（5：CPU/内存/磁盘/网络/进程信号）、设计模式（5，按真实代码分组不背 23 个）。
+  `line_sort` 取 5/15/35/45/65，插在既有线之间，不打乱原有顺序。
+- **三、e2e 自身的一个缺陷**：原选择器 `[data-testid^="stage-"]` 也会匹配
+  `stage-state-N` 与 `stage-level-N` 两个 span。旧断言用的是 `.some()`，所以从未暴露；
+  改成 `every()` 后立刻红。修法是收紧到 `[data-testid^="stage-"][data-status]`。
+- 验证：后端 `paideia-knowledge` 93/0/0/1；前端 `pnpm -r typecheck` 与 `pnpm -r test` 全过；
+  线上导入后 `GET /learn/tracks` **14 条轨道**（原 9 + 新 5），
+  spring/git/java-from-zero 三条的 `status` 分布全是 `current`、**0 个 locked**；
+  线上 learn e2e **6 passed**（含"每一关都是链接"与"最后一关也能点进正文"）；
+  抽查新条目：总览 5048 字节含 learning-path，正文 8891 字节含 quiz 与误区。
+- 内容校验：自写脚本核对 5 条线——learning-path 步数 = 正文篇数、quiz JSON 可解析
+  且 answer 下标合法、每篇 ≥2 条误区、frontmatter 字段齐全，全部通过。
+- 本地提交：`ee5a074`（解锁）、`f4d8c8f`（内容）、`c6f20d1`（e2e 选择器）；
+  已部署（307.8 秒，前端重建）；**未推送**。
+- 未做：新阅读线没写 e2e（沿用 track-map 的通用断言，未逐线验证渲染）；
+  `requireEntryId` 仍在接口里返回但没有消费方，暂不动契约。
+
+## 2026-10-26 10:58:24  · 项目 · 第六次区间审查（`c259084..c236b9e`，228 个提交）：6 critical + 81 high，修掉 4 条 critical
+
+- 类型：implementation
+- 变更：① 用**本地 magpie 网关**（`http://127.0.0.1:3425/v1`，模型 `workbuddy/deepseek-v4.1-flash`）审查基线之后的**全部 228 个提交**（811 文件 / +103,584 −1,488 行，跨 WORK-022..WORK-037），报告 `.agent/reviews/2026-10-21-c259084..c236b9e.md`：**694 条（critical 6、high 81、medium 326、low 281）**，原始 839 条按行号收敛。② 修掉 **4 条 critical**（另 1 条经核实是已修好的过期条目）：
+  - **`ReviewPage` 交卷必失败**：最后一题先 `setAnswers(next)` 再 `submit.mutate()`，而 `mutationFn` 读的是同一次渲染闭包里的 `answers`（不含最后一题），服务端因"每道题都要作答"直接拒绝——整次复习交不上去。改为把 `next` 显式传给 mutation。
+  - **`tabs.tsx` 方向写反**（我上一轮引入的回归）：`data-[orientation=horizontal]:flex-col` 让横排 Tabs 变成上下堆叠。改为 `data-[orientation=vertical]:flex-col`。
+  - **SQL「看执行计划」会真实执行第二条语句**：脚本只给第一段加 `EXPLAIN FORMAT=TREE` 前缀，多语句时第二条按普通语句执行，与 `CodeRun.Request` 明文承诺的"写操作不会真的落数据"相反。在 `Request` 的紧凑构造器里限单语句并去尾分号（`EXPLAIN ...;` 本身也是语法错误），补了 `DockerCommandTest` 用例。
+  - **`sql-editor` 重建把用户输入回退**：重建 effect 不依赖 `value`，却用闭包里的旧 `value` 建 doc；而 `schema` 每次渲染新建引用，结构快照一到就重建 → 已输入内容被还原。加 `valueRef`（照同文件 `onChangeRef` 的写法）。
+  - 过期条目（不修）：`OpsPage` 的 `api.request` 用错——代码里已是 `requestEnvelope`，注释还写着"实测踩过"。
+- 决策：**81 条 high 本轮未修**（时间与额度已大量用于审查本身，约 1.86 亿 tokens）。按"高必修"的口径它们仍欠着，下一轮应优先处理。
+- 依据：`.agent/reviews/2026-10-21-c259084..c236b9e.md`；用户 2026-10-26 指示"审全部 228 个提交"并指定 magpie 网关与 `workbuddy/deepseek-v4.1-flash`
+- 验证：前端 `pnpm -r typecheck` 11 包全过、`pnpm -r test` **410 条全过**（ui 209、assistant 41、sql-workbench 44、knowledge 51、camp 7…）；后端 `mvn -B -pl paideia-sandbox -am test` **70 条 0 失败**，其中 `DockerCommandTest` 13/13（含新增的单语句约束用例）。审查分段：第 4 段曾 4 个分组整组失败，已 `--resume` 补齐；第 7、8 段状态 `partial`（个别文件重试耗尽，无整组失败）。基线已推进到 `c236b9e`，`review_baseline.sh` 报"已全覆盖"。
+- 本地提交：见本轮提交
+- 远端推送：见本轮
+
+## 2026-10-26 11:03:31 +0800 · WORK-038 · 签署 .agent/changes/WORK-038-理论线与实战线/requirements.md、.agent/changes/WORK-038-理论线与实战线/proposal.md、.agent/changes/WORK-038-理论线与实战线/design.md、.agent/changes/WORK-038-理论线与实战线/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-038-理论线与实战线/requirements.md、.agent/changes/WORK-038-理论线与实战线/proposal.md、.agent/changes/WORK-038-理论线与实战线/design.md、.agent/changes/WORK-038-理论线与实战线/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-038-理论线与实战线/requirements.md、.agent/changes/WORK-038-理论线与实战线/proposal.md、.agent/changes/WORK-038-理论线与实战线/design.md、.agent/changes/WORK-038-理论线与实战线/tasks.md
 ## 2026-10-26 10:27:08 +0800 · WORK-038 · 签署 .agent/changes/WORK-038-管理端MCP工具/requirements.md、.agent/changes/WORK-038-管理端MCP工具/proposal.md、.agent/changes/WORK-038-管理端MCP工具/design.md、.agent/changes/WORK-038-管理端MCP工具/tasks.md
 
 - 类型：decision
@@ -6368,6 +6419,50 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
 
+## 2026-10-26 11:36:48  · 项目 · 修掉审查 84 条 high 里影响钱/安全/主流程的 16 条（worktree 隔离作业）
+
+- 类型：implementation
+- 变更：在 `.worktrees/high-fixes`（分支 `fix/review-high-2026-10-26`）里逐条修，验完合并回 master 并删除工作树。**20 个文件、+233 −59**：
+  - **钱（4 条）**：`CreditService.settleReview` 补 `@Transactional`（余额与流水分别提交会对不上账）；`AiUsageMapper` 的"已用积分"排除 `ADJUST`（管理员扣分被显示成用户消耗）；`CampService` 两轮上游调用用量相加（此前只记修复轮，用户为两次真实调用只付一次钱）；`ResumeImportService` 结算之后的异常不再落进 catch 二次结算（重复扣费 + 多写流水）。
+  - **安全（4 条）**：`SqlStatementGuard` 拒绝 `/*! ... */` MySQL 可执行注释（此前被当注释剔掉，校验看到空语句而真正执行的是原文，等于白名单后门）；`SqlAiService` 模型产出的 `referenceSql` 先过门禁再执行、执行后补配额审计（此前可无限触发容器不扣配额）；`SqlDatasetUploadService` 干跑按 `userId` 取槽（此前绕过每人并发 1）；`McpViewRegistry` 建视图按 `write` 标志过滤（只读视图此前会列出写工具）。
+  - **并发正确性（3 条）**：`QuestionAttemptMapper` 掌握度读改写加 `FOR UPDATE` + `recordMastery` 补事务（并发交卷互相覆盖计数）；`LearningReviewService` 掌握度记录移到交卷幂等闸**之后**（并发时失败的那次也累加了）；`AgentScopeConversation` 超时按轮数放大（`blockLast` 把"每轮阈值"变成"整条硬上限"，4 轮工具循环必被掐断）。
+  - **观测（3 条）**：`TelemetrySummaryMapper` 的分位查询与动态 `status` 不再互斥（传 `running`/`failed` 时分位数恒 NULL）；排行查询也带上同一组筛选（此前顶部卡片是筛选后的、下面排行是全平台的）；`AiRunAdminService` token 求和不再 int 溢出（溢出成负数会被 `creditsFor` 当成 0，名义成本静默变 0）。
+  - **前端（5 条）**：`quiz.tsx` 把 `recordAttempt` 移出 state updater（StrictMode 会调两次 → 重复上报作答与进度）；`ReviewPage` 交卷失败可见（此前无 `onError`，用户只看到按钮恢复可点）、结果题号改用下标（此前用主键 `+1` 会显示"第 1042 题"）；`CampDetailPage` 非法路由 id 不再发 NaN 请求；`result-chart` 换结果集时夹住列索引；`OAuthCallbackPage` 桌面跳转前给出提示（协议未注册是静默失败）。
+- 决策：**84 条 high 里修 16 条**，其余 68 条**不修**并说明理由——多为运维/脚本边界（`release.ps1` 引号拼接、`grafana.ini` cookie_secure、`install-ops.sh` 复用业务账号）、一次性内容脚本（`reorder-java-course.py`、`seed-demo-data.py`、`gen-arch-diagram.mjs`）、以及 `AccountSecuritySection` 那条**经核实是误报**（`canUnbindAnything` 是 `bound.length - 1 + hasPassword`，两个绑定可解、唯一方式才禁用，逻辑正确）。
+- 依据：`.agent/reviews/2026-10-21-c259084..c236b9e.md`（84 条 high）；用户 2026-10-26 指示"开 worktree 一个一个修""尤其是有用的"
+- 验证：工作树内后端 `mvn -B -pl paideia-ai,paideia-knowledge,paideia-sandbox,paideia-mcp,paideia-account -am test` **BUILD SUCCESS 0 失败**（含 `CampServiceTest` 10/10——该用例原本断言"只记修复轮用量"，已按新语义改为累加断言）；前端 `pnpm -r typecheck` 11 包全过、`pnpm -r test` **410 条全过**（ui 209、assistant 41、sql-workbench 44、knowledge 51…）。**未跑 e2e**。
+- 本地提交：`fa9acad`（工作树）+ `1a2e10d`（合并回 master）；工作树与分支已按规矩回收
+- 远端推送：见本轮
+
+## 2026-10-26 12:55 +0800 · WORK-038 · S1–S3 + 调试实战落地（读代码实战/项目式/理论补四块未做）
+
+- 类型：implementation
+- **一、轨道分理论与实战**：迁移 `V20261026120000` 给 `learning_tracks` 加 `mode` 与
+  `theory_track_slug`；`/learn` 分理论栏与实战栏（空栏给明确空状态）；地图页显示
+  「建议先看 X」，只是提示不构成门禁。既有 14 条轨道全部 `mode=theory`（默认值，未 UPDATE）。
+- **二、修掉一个真缺陷**：通关判定原先要求「动手题 + 小测都非空」，而 62 篇阅读正文里只有 1 篇
+  有动手题——**11 条阅读线上的关卡永远无法通关、也永远进不了复习**。现在按轨道类型分支：
+  课程（`kind=course`）维持旧语义，理论只认小测，实战只认可验收的块；同一 entry 属多条轨道
+  取最严。线上实测：给 git 线第 2 关只报小测 3/3，返回 `status=passed`（改前必然是 in_progress）。
+- **三、两条实战线（第三类未做）**：
+  - `SQL 数据分析实战`：5 关 10 题，期望哈希由参考解在 `orders-public` 与 `orders-hidden-a`
+    上真跑生成；alternatives 验证与参考解同结果、antiPatterns 验证至少一个数据集上不同。
+    线上抽查：同一参考解在两种数据集上算出的哈希与题面一致（MATCH）。
+  - `Java 调试实战`：2 关 4 题（`run` 题型）。期望输出由修正版真跑生成，并验证缺陷版输出不同。
+- **四、限流**：代码与 SQL 日限都提到 1000（`application.yml` 与 `SandboxProperties` 默认值），
+  并改了服务器上的 `/opt/paideia-app/application.yml`（原 50 / 20，已备份 `.bak-20261026`）。
+  线上 `/sandbox/status` 返回 `dailyLimit=1000, sqlDailyLimit=1000`。
+- **五、一次线上事故（约 5 分钟不可用，已恢复）**：首次部署后服务起不来，健康检查超时。
+  根因**不在本项**：另一个会话提交的 `TelemetrySummaryMapper` 在 `<script>` 块里写了
+  `started_at < #{to}`，MyBatis 把注解当 XML 解析，裸 `<` 直接让 SAXParseException 炸掉整个上下文。
+  修法：脚本块里的 `<` 写成 `&lt;`。恢复用时 64.7 秒，之后 health=200。
+- 验证：后端 `-pl '!paideia-app'` **291 执行 / 0 失败 / 13 跳过**；迁移四件套 9/0；
+  前端 `pnpm -r typecheck` 全过；线上 learn e2e **7 passed**（含新增的"两栏各自有卡片或空状态"）；
+  线上 `learn/tracks` 16 条、2 条 practice 且带理论配对。
+- 本地提交：`bbb8cb6`、`5b33916`、`2a3d812`、`ecdd2be`、`50c09c7`（另有合并提交 `44886d3`）；
+  已部署；**未推送**。
+- 未做（明确留在 tasks.md）：TASK-010 读代码实战、TASK-012~014 项目式实战（沙箱多文件 +
+  预置测试）、TASK-015 理论补四块（并发/JVM/数据库原理/系统设计）、TASK-017 全量 e2e。
 ## 2026-10-26 11:20 +0800 · WORK-038 · 管理端 MCP 工具实现完成
 
 - 类型：implementation

@@ -119,7 +119,9 @@ public class SqlDatasetUploadService {
 
         // 数据集作为 stdin，PROBE 作为用户 SQL：容器先灌数据集、再跑探测
         CodeRun.Result result;
-        try (RunSlot.Slot ignored = slots.acquire()) {
+        // 必须按 userId 取槽：上传干跑会真起一个容器（3–5 秒），用无参 acquire 会绕过
+        // 「每人并发 1」的上限，一个用户可以并发发起多个上传把全局槽占满。
+        try (RunSlot.Slot ignored = slots.acquire(userId)) {
             result = runner.run(new CodeRun.Request("sql", PROBE, sql, "dataset-upload", false));
         }
 

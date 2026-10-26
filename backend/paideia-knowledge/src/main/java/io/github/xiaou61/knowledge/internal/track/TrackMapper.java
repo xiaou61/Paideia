@@ -18,14 +18,14 @@ import org.apache.ibatis.annotations.Select;
 public interface TrackMapper {
 
     @Select("""
-            SELECT id, slug, name, summary, kind, sort_order
+            SELECT id, slug, name, summary, kind, sort_order, mode, theory_track_slug
             FROM learning_tracks
             ORDER BY sort_order, id
             """)
     List<Track> findAll();
 
     @Select("""
-            SELECT id, slug, name, summary, kind, sort_order
+            SELECT id, slug, name, summary, kind, sort_order, mode, theory_track_slug
             FROM learning_tracks WHERE slug = #{slug}
             """)
     Track findBySlug(@Param("slug") String slug);
@@ -47,15 +47,19 @@ public interface TrackMapper {
     List<Stage> findStages(@Param("trackId") long trackId);
 
     @Insert("""
-            INSERT INTO learning_tracks (slug, name, summary, kind, sort_order, created_at, updated_at)
-            VALUES (#{slug}, #{name}, #{summary}, #{kind}, #{sortOrder}, #{now}, #{now})
+            INSERT INTO learning_tracks
+                (slug, name, summary, kind, sort_order, mode, theory_track_slug, created_at, updated_at)
+            VALUES (#{slug}, #{name}, #{summary}, #{kind}, #{sortOrder}, #{mode}, #{theoryTrackSlug},
+                    #{now}, #{now})
             ON DUPLICATE KEY UPDATE
                 name = VALUES(name), summary = VALUES(summary), kind = VALUES(kind),
-                sort_order = VALUES(sort_order), updated_at = VALUES(updated_at)
+                sort_order = VALUES(sort_order), mode = VALUES(mode),
+                theory_track_slug = VALUES(theory_track_slug), updated_at = VALUES(updated_at)
             """)
     int upsertTrack(@Param("slug") String slug, @Param("name") String name,
                     @Param("summary") String summary, @Param("kind") String kind,
-                    @Param("sortOrder") int sortOrder, @Param("now") Instant now);
+                    @Param("sortOrder") int sortOrder, @Param("mode") String mode,
+                    @Param("theoryTrackSlug") String theoryTrackSlug, @Param("now") Instant now);
 
     /**
      * 整体替换前清空一条轨道的关卡。
@@ -80,8 +84,27 @@ public interface TrackMapper {
                     @Param("requiresEntryId") Long requiresEntryId,
                     @Param("level") String level, @Param("now") Instant now);
 
-    /** 一条轨道：路径标识、名字、一句话介绍。 */
-    record Track(long id, String slug, String name, String summary, String kind, int sortOrder) {
+    /**
+     * 一条 entry 属于哪些轨道（只取判定需要的两列）。
+     *
+     * <p>通过判定要按轨道类型分支（WORK-038）：课程仍要"动手 + 小测"，理论只认小测，
+     * 实战只认动手题。同一 entry 可能在多条轨道里，调用方取最严的那套。
+     */
+    @Select("""
+            SELECT DISTINCT t.kind, t.mode
+            FROM learning_track_stages s
+            JOIN learning_tracks t ON t.id = s.track_id
+            WHERE s.entry_id = #{entryId}
+            """)
+    List<EntryTrack> findTracksOfEntry(@Param("entryId") long entryId);
+
+    /** 一条轨道：路径标识、名字、一句话介绍，以及理论/实战与配对引用（WORK-038）。 */
+    record Track(long id, String slug, String name, String summary, String kind, int sortOrder,
+                 String mode, String theoryTrackSlug) {
+    }
+
+    /** entry 所属轨道的判定相关列。 */
+    record EntryTrack(String kind, String mode) {
     }
 
     /** 一个关卡：地图上的一格。 */

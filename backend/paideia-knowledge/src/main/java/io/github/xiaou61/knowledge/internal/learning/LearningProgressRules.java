@@ -33,9 +33,48 @@ public final class LearningProgressRules {
      * <p>三条同时成立：有挑战记录、有小测记录、每一条都 ≥ 80%。**没有 total 的记录视为不通过**
      * ——空块（total=0）既不能算对也不能算 100%。
      */
+    /**
+     * 这一关该按哪套规则判（WORK-038）。
+     *
+     * <ul>
+     *   <li>`COURSE`：既有课程语义——动手题与小测都非空且各自 ≥80%；</li>
+     *   <li>`THEORY`：理论线——只认小测（阅读线没有动手题，按旧规则永远过不了）；</li>
+     *   <li>`PRACTICE`：实战线——只认可验收的块（动手题）。</li>
+     * </ul>
+     */
+    public enum Rule {
+        COURSE, THEORY, PRACTICE
+    }
+
+    /**
+     * 一条 entry 属于多条轨道时取**最严**的那套规则：COURSE > PRACTICE > THEORY。
+     *
+     * <p>不属于任何轨道时返回 COURSE——保持既有语义，不给未接轨道的条目放宽。
+     */
+    public static Rule resolveRule(java.util.Collection<Rule> rules) {
+        if (rules == null || rules.isEmpty()) {
+            return Rule.COURSE;
+        }
+        if (rules.contains(Rule.COURSE)) {
+            return Rule.COURSE;
+        }
+        return rules.contains(Rule.PRACTICE) ? Rule.PRACTICE : Rule.THEORY;
+    }
+
+    /** 既有课程规则：动手题与小测都要有，且各自 ≥80%。 */
     public static boolean passed(Map<String, BlockScore> challenges, Map<String, BlockScore> quizzes) {
-        return !challenges.isEmpty() && !quizzes.isEmpty()
-                && allStrong(challenges) && allStrong(quizzes);
+        return passed(Rule.COURSE, challenges, quizzes);
+    }
+
+    /** 按规则判定。理论只看小测，实战只看动手题，课程两者都要。 */
+    public static boolean passed(Rule rule, Map<String, BlockScore> challenges,
+                                 Map<String, BlockScore> quizzes) {
+        return switch (rule) {
+            case COURSE -> !challenges.isEmpty() && !quizzes.isEmpty()
+                    && allStrong(challenges) && allStrong(quizzes);
+            case THEORY -> !quizzes.isEmpty() && allStrong(quizzes);
+            case PRACTICE -> !challenges.isEmpty() && allStrong(challenges);
+        };
     }
 
     private static boolean allStrong(Map<String, BlockScore> scores) {

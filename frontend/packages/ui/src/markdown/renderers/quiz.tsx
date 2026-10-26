@@ -24,27 +24,27 @@ export function Quiz({ code }: CustomRendererProps) {
   const complete = answered === quiz.questions.length
 
   const choose = (questionIndex: number, optionIndex: number) => {
-    setAnswers((previous) => {
-      const next = [...previous]
-      if (next[questionIndex] !== null && next[questionIndex] !== undefined) {
-        return previous
-      }
-      next[questionIndex] = optionIndex
-      // 每次首次选择都上报一次；对错由服务端按正文判定，前端只发选择了哪个
-      if (quiz.id !== undefined) {
-        recordAttempt?.({
-          blockKey: quiz.id,
-          questionKey: `${quiz.id}#${questionIndex}`,
-          choice: optionIndex,
-        })
-      }
-      const finished = next.filter((answer) => answer !== null && answer !== undefined).length === quiz.questions.length
-      if (finished && quiz.id !== undefined) {
-        const final = scoreQuiz(quiz, next)
-        progress?.update({ quizzes: { [quiz.id]: { score: final.correct, total: final.total } } })
-      }
-      return next
+    // 已经选过就不重复上报（与原先 updater 里的守卫等价）
+    if (answers[questionIndex] !== null && answers[questionIndex] !== undefined) {
+      return
+    }
+    // 在 updater **外面**算好再提交：updater 必须是纯函数（StrictMode 会调两次），
+    // 而副作用也不能依赖 updater 里的赋值——React 可能延后执行它。
+    const next = [...answers]
+    next[questionIndex] = optionIndex
+    setAnswers(next)
+    if (quiz.id === undefined) {
+      return
+    }
+    recordAttempt?.({
+      blockKey: quiz.id,
+      questionKey: `${quiz.id}#${questionIndex}`,
+      choice: optionIndex,
     })
+    if (next.filter((a) => a !== null && a !== undefined).length === quiz.questions.length) {
+      const final = scoreQuiz(quiz, next)
+      progress?.update({ quizzes: { [quiz.id]: { score: final.correct, total: final.total } } })
+    }
   }
 
   const reset = () => setAnswers([])
