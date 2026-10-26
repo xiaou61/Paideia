@@ -6367,3 +6367,20 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
+
+## 2026-10-26 11:20 +0800 · WORK-038 · 管理端 MCP 工具实现完成
+
+- 类型：implementation
+- 变更：新增 7 个管理工具组共 38 个工具（`admin_content` 15、`admin_users` 6、`admin_ai` 5、
+  `admin_review` 5、`admin_learning` 4、`admin_ops` 1、`admin_digest` 2）；打通 PAT 角色通道
+  （`RoleLookup` + 视图缓存键带角色 + 调用前二次判定）；非管理员申请 admin scope 直接 400；
+  非管理员访问 `/mcp/x/admin_*` 返回 404；前端凭据页补 7 个管理组与缺失的 `sql` 组。
+- 决策：管理写工具声明 `ADMIN` 而不是 `WRITE`——角色过滤只作用于 ADMIN scope，改成 WRITE
+  会让非管理员仅凭「admin 工具组 + write」就看见管理写工具。
+- 依据：.agent/changes/WORK-038-管理端MCP工具/requirements.md、proposal.md、design.md、tasks.md
+- 验证：见 `.agent/changes/WORK-038-管理端MCP工具/testing/report.md`。关键数字：后端非 app 切片
+  616 执行 / 0 失败 / 14 跳过；MCP 单测 34、全链路 10、模块与迁移闸 9；mcp-tokens e2e 6 passed；
+  两条反向验证各 1 条失败（恢复后全绿）。实施中抓到并修掉一个真缺陷：视图构建漏了凭据工具组
+  交集，由既有 `McpStartupSmokeTest` 抓到。
+- 本地提交：ca1e6a6、5ca3b81、7cc79db、e68fa21、ee16de8、7fe3dc7、a558042、7fc9375、e6f9629
+- 远端推送：未执行

@@ -43,7 +43,7 @@ approver_role: CTO
 
 ## 任务
 
-### TASK-001 | pending | 角色通道与 admin 鉴权
+### TASK-001 | done | 角色通道与 admin 鉴权
 
 - 对应：REQ-001~005、REQ-009、REQ-013、AC-001~005、AC-007~008
 - 依赖：无
@@ -63,7 +63,7 @@ approver_role: CTO
   6. 测试：`RoleLookup` 桩、视图缓存隔离、scope 发放、越权调用。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-platform,paideia-mcp -am test`
 
-### TASK-002 | pending | admin_content 15 个工具
+### TASK-002 | done | admin_content 15 个工具
 
 - 对应：REQ-006~010、AC-006~007
 - 依赖：TASK-001
@@ -84,7 +84,7 @@ approver_role: CTO
   4. 测试：描述符不变量 + create/update 分支 + 错误文本。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-knowledge -am test`
 
-### TASK-003 | pending | admin_users 6 个工具
+### TASK-003 | done | admin_users 6 个工具
 
 - 对应：REQ-010、AC-009
 - 依赖：TASK-001
@@ -102,7 +102,7 @@ approver_role: CTO
   4. 测试：拒绝自调、空原因、非法角色。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-app -am test`
 
-### TASK-004 | pending | admin_ai 5 个工具
+### TASK-004 | done | admin_ai 5 个工具
 
 - 对应：REQ-006、AC-007
 - 依赖：TASK-001
@@ -119,7 +119,7 @@ approver_role: CTO
   4. 测试：描述符不变量、非法时间返回错误。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-ai -am test`
 
-### TASK-005 | pending | admin_review 5 个工具
+### TASK-005 | done | admin_review 5 个工具
 
 - 对应：REQ-010、AC-010
 - 依赖：TASK-001
@@ -136,7 +136,7 @@ approver_role: CTO
   3. 测试：非社区数据集被拒、非法状态被拒。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-note,paideia-sandbox -am test`
 
-### TASK-006 | pending | admin_learning 4 + admin_ops 1 + admin_digest 2
+### TASK-006 | done | admin_learning 4 + admin_ops 1 + admin_digest 2
 
 - 对应：REQ-006、AC-007
 - 依赖：TASK-001
@@ -152,7 +152,7 @@ approver_role: CTO
   3. 测试：描述符 + 日期错误。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-knowledge,paideia-ai,paideia-app -am test`
 
-### TASK-007 | pending | 前端工具组与 admin 权限范围
+### TASK-007 | done | 前端工具组与 admin 权限范围
 
 - 对应：REQ-012、AC-011
 - 依赖：TASK-002~006
@@ -163,7 +163,7 @@ approver_role: CTO
   3. 跑 `mcp-tokens` e2e。
 - 验证：`cd frontend && pnpm --filter @paideia/app test:e2e -- mcp-tokens.spec.ts`
 
-### TASK-008 | pending | 全量验证、文档与提交
+### TASK-008 | done | 全量验证、文档与提交
 
 - 对应：AC-012、REQ-013~014、REQ-011
 - 依赖：TASK-001~007
