@@ -7154,3 +7154,22 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：回读 frontmatter：approved_by=xiaou61，1 个工件同批签署
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
+
+## 2026-10-27 17:35 +0800 · WORK-044 · 部署到生产并验证
+
+- 类型：implementation
+- 变更：从**干净 worktree**（`git worktree add .worktrees/release-clean HEAD --detach`）发版，避免把主树里其他会话未提交的 `CategoryService.java` 打进生产包。`release.ps1` 全量（含前端重建）**200.0 秒**：前端 55.9s、staging 压缩 28.7s、上传 jar 17.2s、上传 web 3.7s、健康检查 25.1s。
+- 为什么不直接在主树发版：主树有 71 个未提交改动（34 M + 37 ??），其中 `CategoryService.java` 是别的会话在飞的工作（把学习轨道分类恢复进知识库）。`release.ps1` 从工作区 `mvn package`，无脏树防护（只有前端有 `porcelain` 判断）。
+- 验证（生产实测）：
+  - 应用 `status UP`；jar 时间戳 17:02。
+  - **两个迁移已执行**：`20261027160000 add mcp token daily limit`、`20261027160100 create mcp token usage`，`success=1`。
+  - `mcp_access_tokens.daily_call_limit` 列已存在（老数据全为 NULL，与"不限"语义一致）。
+  - 用临时插入的凭据真实调 MCP：`paideia_mcp_tool_calls_total{result="ok",toolset="knowledge"} 1`、`tool_duration_seconds{tool="knowledge_list_categories"}` 出现。
+  - 探测 `/mcp/x/nope` 返回 404 且 `paideia_mcp_denied_total{reason="view_not_found"} 1`。
+  - Prometheus 已抓取到该指标（`sum(paideia_mcp_tool_calls_total)` = 1）。
+  - 临时凭据验证完**立即删除**（`DELETE ... WHERE name='verify-work044'`，影响 1 行）。
+- Grafana 面板：`release.ps1` **不部署 `deploy/ops/`**，手工 scp 面板 JSON 到 `/etc/grafana/provisioning/dashboards/` 并重启 Grafana。下发前先比对：仓库版本是服务器版本的超集（服务器独有面板为空），可安全覆盖。重启后 `grafana.db` 里出现「外部 MCP」2 处、健康检查 200。
+- 发版后修掉一个面板缺陷：耗时面板在 5 分钟窗口无调用时 `sum(_sum)/sum(_count)` 是 0/0 → Prometheus 返回 NaN → 面板断线。改成 `... / (... > 0)` 过滤分母为 0，实测查询从 `NaN` 变成空结果（预期）。提交 `82ae774`。
+- **发现一个既有问题（非本项引入）**：生产 `mcp_access_tokens` 里有 **69 条** `e2e-*`/`scoped-*`/`revoke-*` 凭据，最早 2026-10-22，是历来 e2e 打到生产库累积的（`E2E_BASE_URL` 指向线上时每个用例都建一条）。本项 e2e 又加了 3 条。**未清理**——它们都是已吊销或测试用，但该由用户决定是否清。
+- 本地提交：82ae774（面板修复）；发版内容 = master `c70ad44`
+- 远端推送：未执行
