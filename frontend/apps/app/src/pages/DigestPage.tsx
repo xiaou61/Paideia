@@ -52,6 +52,9 @@ export function DigestPage() {
   /** GitHub 组的口径：今日（d1）/ 本周（d7）。只影响该组，不影响顶部「日报/周报」页签。 */
   const [githubWindow, setGithubWindow] = useState<'day' | 'week'>('day')
 
+  /** GitHub 组的语言筛选：null = 全部。只影响该组，新闻/HN/社区没有语言概念。 */
+  const [language, setLanguage] = useState<string | null>(null)
+
   const dates = useQuery({
     queryKey: ['digest-dates'],
     queryFn: () => digest.dates(30),
@@ -180,14 +183,40 @@ export function DigestPage() {
                   return null
                 }
                 const isGithub = group.key === 'github'
+                /**
+                 * 语言：优先用独立字段；字段为空时从旧 `meta` 里解析。
+                 *
+                 * <p>为什么留这条兼容：`language` 列是 2026-10-27 才加的，**此前入库的行
+                 * 全是 NULL**，而旧 meta 的格式恰好是 `JavaScript · 48530★`。不留兼容的话，
+                 * 新代码上线当天到第二天 08:00 之间，语言筛选器整个不出现——用户看到的是
+                 * "改了个寂寞"。下一次采集把旧行覆盖掉之后，这个 fallback 自然失效。
+                 */
+                const languageOf = (item: DigestItem): string | null => {
+                  if (item.language !== null) {
+                    return item.language
+                  }
+                  const legacy = item.meta?.match(/^([A-Za-z+#.\s]+?)\s*·/)
+                  return legacy?.[1]?.trim() ?? null
+                }
                 // GitHub 组按真实增量重排；其它组保持服务端的 heat 顺序
-                const items = isGithub
+                const sorted = isGithub
                   ? [...raw].sort((left, right) =>
                       githubWindow === 'week'
                         ? (right.starsWeek ?? -1) - (left.starsWeek ?? -1)
                         : (right.starsDay ?? -1) - (left.starsDay ?? -1),
                     )
                   : raw
+                // 语言筛选只作用于 GitHub 组：新闻/HN/社区没有语言概念
+                const items = isGithub && language !== null
+                  ? sorted.filter((item) => languageOf(item) === language)
+                  : sorted
+                // 语言清单按条数降序，取前 8 个（再多就变成一堵墙）
+                const languages = isGithub
+                  ? [...new Set(sorted.map(languageOf).filter((value): value is string => value !== null))]
+                      .map((name) => ({ name, count: sorted.filter((item) => languageOf(item) === name).length }))
+                      .sort((left, right) => right.count - left.count)
+                      .slice(0, 8)
+                  : []
                 const withHeat = items.filter((item) => item.heat !== null)
                 const highCut = Math.ceil(withHeat.length * 0.25)
                 const midCut = Math.ceil(withHeat.length * 0.6)
@@ -233,6 +262,36 @@ export function DigestPage() {
                         </div>
                       ) : null}
                     </h2>
+
+                    {/* 语言筛选：GitHub 组原来是一坨混排，30 条里 Python/Rust/TS 各占几条，
+                        想看某一门语言只能自己扫。按条数降序给前 8 个语言做开关。 */}
+                    {languages.length > 1 ? (
+                      <div className="mb-3 flex flex-wrap items-center gap-1.5" data-testid="digest-language-filter">
+                        <button
+                          type="button"
+                          onClick={() => { setLanguage(null) }}
+                          data-testid="digest-language-all"
+                          className={`rounded-md border px-2 py-0.5 text-xs transition-colors ${
+                            language === null ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/40'
+                          }`}
+                        >
+                          全部 {sorted.length}
+                        </button>
+                        {languages.map((entry) => (
+                          <button
+                            key={entry.name}
+                            type="button"
+                            onClick={() => { setLanguage(language === entry.name ? null : entry.name) }}
+                            data-testid={`digest-language-${entry.name}`}
+                            className={`rounded-md border px-2 py-0.5 text-xs transition-colors ${
+                              language === entry.name ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/40'
+                            }`}
+                          >
+                            {entry.name} {entry.count}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
                     {/*
                       热榜用**排名行**，不是 60 张同尺寸卡片。
                       原来每条都是一张 205px 高的卡、3 个药丸标签加一个常驻按钮，
@@ -301,6 +360,42 @@ export function DigestPage() {
  * 是链接，点卡片别处没反应。内容做三行截断，卡片高度才齐。
  */
 /**
+ * GitHub 自动封面。
+ *
+ * <p>GitHub 会给每个仓库生成一张 1200×600 的 OG 图（仓库名、描述、语言占比条、star/贡献者数）。
+ * 用它当封面比自己造占位图强：**信息是真的**，而且是零维护——仓库改描述，图跟着变。
+ *
+ * <p>哈希位固定写 `1`：实测随机哈希会 429，写死 `1` 稳定 200。
+ *
+ * <p>**只给前 3 名显示**。这不是审美取舍，是实测逼出来的：14 张并发时，
+ * 9 秒只加载完 5 张（GitHub OG 对同源并发有限流），用户滚动到这里看到的是
+ * 一排空白框逐个冒出来——比没有封面更糟。单张实测 0.3 秒，3 张并发能稳定在 1 秒内。
+ * 顺带的好处是前三名本来就是这个榜单的视觉焦点，封面正好用在该用的地方。
+ *
+ * <p>代价如实记在这里：**这张图是英文的**，与全站中文界面不一致。所以它压到 96px 高，
+ * 读者读的是我们写的中文摘要，封面只负责"这仓库长什么样"。
+ * `loading="lazy"` + 失败即隐藏，不留破图标。
+ */
+function RepoCover({ repo }: { repo: string }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) {
+    return null
+  }
+  return (
+    <img
+      src={`https://opengraph.githubassets.com/1/${repo}`}
+      alt=""
+      aria-hidden
+      loading="lazy"
+      decoding="async"
+      onError={() => { setFailed(true) }}
+      className="border-border hidden h-16 w-32 shrink-0 rounded-md border object-cover object-left-top sm:block"
+      data-testid="digest-repo-cover"
+    />
+  )
+}
+
+/**
  * 一条热榜行。
  *
  * <p>形态是**排名 + 标题 + 摘要 + 一行元信息**，不是卡片。理由：
@@ -353,6 +448,9 @@ function DigestRow({
       >
         {rank}
       </span>
+
+      {/* 只给前三名出封面：14 张并发 9 秒才加载 5 张，用户看到的是逐个冒出的空白框 */}
+      {github && rank <= 3 ? <RepoCover repo={item.title} /> : null}
 
       <div className="min-w-0 flex-1">
         <a

@@ -41,7 +41,7 @@ class DigestController {
     /** 一条速递给前端的样子。 */
     record ItemView(long id, String groupKey, String sourceKey, String sourceName, String title,
                     String summary, String url, Integer heat, Integer starsDay, Integer starsWeek,
-                    String meta, Long publishedAt, String summaryState) {
+                    String meta, String language, Long publishedAt, String summaryState) {
     }
 
     /** 某日的全部条目，按 groupKey 分组。不传 date 取业务时区的今天。 */
@@ -93,6 +93,6 @@ class DigestController {
     private static ItemView toView(DigestMapper.Row row) {
         return new ItemView(row.id(), row.groupKey(), row.sourceKey(), row.sourceName(), row.title(),
                 row.summary(), row.url(), row.heat(), row.starsDay(), row.starsWeek(), row.meta(),
-                row.publishedAt(), row.summaryState());
+                row.language(), row.publishedAt(), row.summaryState());
     }
 }

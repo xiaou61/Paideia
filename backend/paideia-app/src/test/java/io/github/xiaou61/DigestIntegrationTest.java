@@ -48,7 +48,7 @@ class DigestIntegrationTest {
 
     private void insert(String fingerprint, LocalDate date, String group) {
         mapper.insert(date, group, "test-source", "测试源", "标题 " + fingerprint, "摘要",
-                "https://example.com/" + fingerprint, fingerprint, 10, null, null, null,
+                "https://example.com/" + fingerprint, fingerprint, 10, null, null, null, null,
                 1_800_000_000_000L, "ready", java.time.Instant.now());
     }
 
@@ -100,7 +100,7 @@ class DigestIntegrationTest {
     void githubStarsAreStored() {
         mapper.insert(TODAY, "github", "github-trending", "GitHub 热榜", "owner/repo", "摘要",
                 "https://github.com/owner/repo", "fp-stars", 250, 250, 850,
-                "Python · 12345★", 1_800_000_000_000L, "ready", java.time.Instant.now());
+                "12345★", "Python", 1_800_000_000_000L, "ready", java.time.Instant.now());
 
         DigestMapper.Row row = mapper.findByDate(TODAY).get(0);
         assertThat(row.heat()).isEqualTo(250);
@@ -144,11 +144,11 @@ class DigestIntegrationTest {
     @DisplayName("TASK-005：按日查询按 heat 降序，heat 为空的排后面")
     void findByDateOrdersByHeat() {
         mapper.insert(TODAY, "news", "s1", "源一", "无热度", "摘要", "https://example.com/n1",
-                "fp-noheat", null, null, null, null, 1_000L, "ready", java.time.Instant.now());
+                "fp-noheat", null, null, null, null, null, 1_000L, "ready", java.time.Instant.now());
         mapper.insert(TODAY, "news", "s2", "源二", "高热度", "摘要", "https://example.com/hi",
-                "fp-hi", 999, null, null, null, 2_000L, "ready", java.time.Instant.now());
+                "fp-hi", 999, null, null, null, null, 2_000L, "ready", java.time.Instant.now());
         mapper.insert(TODAY, "news", "s3", "源三", "低热度", "摘要", "https://example.com/lo",
-                "fp-lo", 1, null, null, null, 3_000L, "ready", java.time.Instant.now());
+                "fp-lo", 1, null, null, null, null, 3_000L, "ready", java.time.Instant.now());
 
         assertThat(mapper.findByDate(TODAY)).extracting(DigestMapper.Row::title)
                 .containsExactly("高热度", "低热度", "无热度");

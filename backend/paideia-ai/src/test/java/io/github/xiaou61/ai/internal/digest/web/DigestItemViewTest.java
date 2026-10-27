@@ -19,7 +19,7 @@ class DigestItemViewTest {
     void githubStarsAreSerialized() throws Exception {
         DigestController.ItemView view = new DigestController.ItemView(
                 1L, "github", "github-trending", "GitHub 热榜", "owner/repo", "摘要",
-                "https://github.com/owner/repo", 250, 250, 850, "Python · 12345★",
+                "https://github.com/owner/repo", 250, 250, 850, "12345★", "Python",
                 1_800_000_000_000L, "ready");
 
         String json = objectMapper.writeValueAsString(view);
@@ -32,7 +32,7 @@ class DigestItemViewTest {
     void nonGithubStarsAreNull() throws Exception {
         DigestController.ItemView view = new DigestController.ItemView(
                 2L, "news", "qbitai", "量子位", "标题", null, "https://example.com/a",
-                null, null, null, null, null, "degraded");
+                null, null, null, null, null, null, "degraded");
 
         String json = objectMapper.writeValueAsString(view);
 

@@ -17,7 +17,7 @@ public interface DigestMapper {
     /** 一条入库行。 */
     record Row(long id, LocalDate editionDate, String groupKey, String sourceKey, String sourceName,
                String title, String summary, String url, String fingerprint, Integer heat,
-               Integer starsDay, Integer starsWeek, String meta, Long publishedAt,
+               Integer starsDay, Integer starsWeek, String meta, String language, Long publishedAt,
                String summaryState, Instant createdAt) {
     }
 
@@ -55,10 +55,10 @@ public interface DigestMapper {
     @Insert("""
             INSERT INTO digest_items (edition_date, group_key, source_key, source_name, title,
                                       summary, url, fingerprint, heat, stars_day, stars_week,
-                                      meta, published_at, summary_state, created_at)
+                                      meta, language, published_at, summary_state, created_at)
             VALUES (#{editionDate}, #{groupKey}, #{sourceKey}, #{sourceName}, #{title},
                     #{summary}, #{url}, #{fingerprint}, #{heat}, #{starsDay}, #{starsWeek},
-                    #{meta}, #{publishedAt}, #{summaryState}, #{createdAt})
+                    #{meta}, #{language}, #{publishedAt}, #{summaryState}, #{createdAt})
             """)
     int insert(@Param("editionDate") LocalDate editionDate, @Param("groupKey") String groupKey,
                @Param("sourceKey") String sourceKey, @Param("sourceName") String sourceName,
@@ -66,6 +66,7 @@ public interface DigestMapper {
                @Param("url") String url, @Param("fingerprint") String fingerprint,
                @Param("heat") Integer heat, @Param("starsDay") Integer starsDay,
                @Param("starsWeek") Integer starsWeek, @Param("meta") String meta,
+               @Param("language") String language,
                @Param("publishedAt") Long publishedAt, @Param("summaryState") String summaryState,
                @Param("createdAt") Instant createdAt);
 
@@ -78,8 +79,8 @@ public interface DigestMapper {
      */
     @Select("""
             SELECT id, edition_date, group_key, source_key, source_name, title, summary, url,
-                   fingerprint, heat, stars_day, stars_week, meta, published_at, summary_state,
-                   created_at
+                   fingerprint, heat, stars_day, stars_week, meta, language, published_at,
+                   summary_state, created_at
             FROM digest_items
             WHERE edition_date = #{date}
             ORDER BY heat DESC, published_at DESC, id

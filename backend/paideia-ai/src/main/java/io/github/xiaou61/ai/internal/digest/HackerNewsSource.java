@@ -53,6 +53,7 @@ class HackerNewsSource {
                         points,
                         null,
                         comments > 0 ? comments + " 条评论" : null,
+                        null,
                         parseCreatedAt(hit, nowMillis),
                         "hackernews",
                         "Hacker News",

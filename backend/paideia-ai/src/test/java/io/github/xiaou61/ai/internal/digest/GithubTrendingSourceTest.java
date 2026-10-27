@@ -97,7 +97,9 @@ class GithubTrendingSourceTest {
         assertThat(item.title()).isEqualTo("trending-owner/hot-repo");
         assertThat(item.heat()).as("heat 来自 history 的 d1").isEqualTo(250);
         assertThat(item.starsWeek()).as("starsWeek 来自 history 的 d7").isEqualTo(850);
-        assertThat(item.meta()).isEqualTo("Python · 12345★");
+        // 语言已独立成列，meta 只留总 star——前端要按 language 分组
+        assertThat(item.meta()).isEqualTo("12345★");
+        assertThat(item.language()).isEqualTo("Python");
         assertThat(item.sourceName()).isEqualTo("GitHub 热榜");
         assertThat(http.requested).anyMatch(url -> url.contains("since=daily"));
         assertThat(http.requested).anyMatch(url -> url.contains("since=weekly"));

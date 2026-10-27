@@ -10,13 +10,15 @@ package io.github.xiaou61.ai.internal.digest;
  * @param heat        源自身的信号：HN 点数、GitHub 昨日新增 star；其它源为 {@code null}。
  *                    GitHub 的 `heat` 就是 `d1`，也是入库后的默认排序键。
  * @param starsWeek   GitHub 的近 7 日新增；其它源为 {@code null}。
- * @param meta        一条副信息（语言、作者、评论数），直接给人看
+ * @param meta        一条副信息（作者、评论数），直接给人看
+ * @param language    仓库主语言（GitHub 条目才有）。**独立字段而不是塞进 meta**：
+ *                    前端要按它分组，塞进文本就只剩装饰作用。
  * @param publishedAt 原文发布时间（epoch 毫秒）；源不提供时为抓取时刻
  * @param sourceKey   源标识，如 qbitai / github-trending
  * @param sourceName  源的显示名，如「量子位」；页面不可达时 GitHub 用「GitHub 新项目」
  * @param groupKey    news | github | community | hackernews，决定前端分组
  */
 public record FetchedItem(String title, String url, String summaryHint, Integer heat,
-                          Integer starsWeek, String meta, long publishedAt, String sourceKey,
-                          String sourceName, String groupKey) {
+                          Integer starsWeek, String meta, String language, long publishedAt,
+                          String sourceKey, String sourceName, String groupKey) {
 }

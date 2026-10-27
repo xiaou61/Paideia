@@ -30,6 +30,8 @@ export interface DigestItem {
   /** GitHub 的近 7 日新增 star；其它源为 null */
   starsWeek: number | null
   meta: string | null
+  /** 仓库主语言（只有 GitHub 条目有）。前端按它分组，不要从 meta 里解析。 */
+  language: string | null
   /** 原文发布时间（epoch 毫秒） */
   publishedAt: number | null
   /** ready | degraded。degraded 表示 AI 没能写摘要，界面显示原文标题 */

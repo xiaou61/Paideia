@@ -216,7 +216,7 @@ public class DigestCollectionService {
                         title, ready ? result.summary() : null,
                         item.url(), fingerprint, heat, starsDay,
                         github ? item.starsWeek() : null,
-                        item.meta(), item.publishedAt(),
+                        item.meta(), item.language(), item.publishedAt(),
                         ready ? STATE_READY : STATE_DEGRADED, now);
                 created++;
             } catch (RuntimeException exception) {

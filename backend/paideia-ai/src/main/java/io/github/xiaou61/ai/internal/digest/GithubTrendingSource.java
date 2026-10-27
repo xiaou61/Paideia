@@ -57,8 +57,14 @@ class GithubTrendingSource {
     private static final String SOURCE_PAGE = "GitHub 热榜";
     private static final String SOURCE_FALLBACK = "GitHub 新项目";
 
-    /** 日榜/周榜各取前 10，并集最多 20。 */
-    private static final int PAGE_LIMIT = 10;
+    /**
+     * 日榜/周榜各取前 15，并集最多 30。
+     *
+     * <p>原值是 10，实测线上只出 14 条（日榜 10 ∪ 周榜 10 去重后）——用户直接反馈
+     * 「一共就 14 个是不是太少了」。提到 15 之后并集上限 30，与 Search 兜底页的
+     * `per_page=30` 对齐，两条通路的产量一致。
+     */
+    private static final int PAGE_LIMIT = 15;
 
     /** history 并发度：25 个候选约 5 秒，远低于顺序的 40 秒。 */
     private static final int MAX_HISTORY_THREADS = 6;
@@ -265,7 +271,9 @@ class GithubTrendingSource {
                     candidate.description == null ? "" : candidate.description,
                     value(candidate.dayStars),
                     candidate.weekStars,
-                    meta(candidate.language, candidate.totalStars),
+                    // meta 只留总 star：语言已独立成列，前端要按它分组
+                    candidate.totalStars == null ? null : candidate.totalStars + "★",
+                    candidate.language,
                     nowMillis,
                     "github-trending",
                     sourceName,
@@ -347,21 +355,6 @@ class GithubTrendingSource {
             }
         }
         return null;
-    }
-
-    private static String meta(String language, Integer totalStars) {
-        StringBuilder builder = new StringBuilder();
-        if (language != null && !language.isBlank()) {
-            builder.append(language);
-        }
-        if (totalStars != null) {
-            if (builder.length() > 0) {
-                builder.append(" · ");
-            }
-            builder.append(totalStars).append('★');
-        }
-        String value = builder.toString();
-        return value.isBlank() ? null : value;
     }
 
     private static int value(Integer number) {
