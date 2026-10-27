@@ -157,7 +157,6 @@ export function InterviewPage() {
     <AppShell title="Paideia" actions={<LearnerHeader />}>
       <div className="mx-auto max-w-3xl space-y-6">
         <PageHeader
-          eyebrow="求职者"
           title="模拟面试"
           description="一次一个问题，答不上来就说不会。随时可以点「生成点评」拿一份结构化评分。"
         />

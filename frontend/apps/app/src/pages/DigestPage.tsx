@@ -87,7 +87,6 @@ export function DigestPage() {
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
       <PageHeader
-        eyebrow="每日速递"
         title="今天值得知道的事"
         description="每天一次，把前沿新闻、GitHub 热榜、社区热帖与 Hacker News 收在一屏。每条可一键存成笔记。"
       />
@@ -194,7 +193,7 @@ export function DigestPage() {
                 const midCut = Math.ceil(withHeat.length * 0.6)
                 return (
                   <section key={group.key} data-testid={`digest-group-${group.key}`}>
-                    <h2 className="mb-3 flex items-center gap-2 text-lg font-medium">
+                    <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
                       {group.title}
                       <Badge variant="secondary">{items.length}</Badge>
                       <span className="text-muted-foreground text-xs font-normal">

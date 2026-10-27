@@ -102,9 +102,18 @@ export function TrackMapPage() {
       {map.isSuccess ? (
         <>
           <PageHeader
-            eyebrow={`${map.data.mode === 'practice' ? '实战' : '理论'} · ${map.data.stageCount} 关 · 已通关 ${map.data.passedCount}`}
             title={map.data.name}
-            description={map.data.summary ?? '沿着下面的关卡一关一关往下走。'}
+            description={
+              // 进度数字是有用信息，但它属于"读到哪了"而不是"这一页叫什么"，
+              // 所以并进导语，不占标题上方那一行。
+              <>
+                <span className="text-foreground font-medium">
+                  {map.data.mode === 'practice' ? '实战' : '理论'} · {map.data.stageCount} 关 · 已通关{' '}
+                  {map.data.passedCount}
+                </span>
+                <span className="mt-1 block">{map.data.summary ?? '沿着下面的关卡一关一关往下走。'}</span>
+              </>
+            }
           />
 
           {/* 配对提示：实战轨道指向它假定的理论轨道。只是建议，不限制进入（WORK-038）。 */}
@@ -170,7 +179,11 @@ export function TrackMapPage() {
                     .filter((stage) => levelFilter === null || stage.level === levelFilter)
                     .map((stage) => (
                     <li key={stage.entryId}>
-                      <StageCell stage={stage} />
+                      <StageCell
+                        stage={stage}
+                        trackSlug={map.data.slug}
+                        trackName={map.data.name}
+                      />
                     </li>
                   ))}
                 </ol>
@@ -189,7 +202,15 @@ export function TrackMapPage() {
  * <p><b>没有锁定态</b>：任何一关都能直接点进去。顺序由格子的排列与编号表达，
  * 但不拦人——想跳着看某一关的人不该被挡住。
  */
-function StageCell({ stage }: { stage: TrackStage }) {
+function StageCell({
+  stage,
+  trackSlug,
+  trackName,
+}: {
+  stage: TrackStage
+  trackSlug: string
+  trackName: string
+}) {
   const done = stage.status === 'done'
 
   const icon = done ? <Check className="size-4" /> : <Play className="size-4" />
@@ -230,6 +251,8 @@ function StageCell({ stage }: { stage: TrackStage }) {
   return (
     <Link
       to={`/knowledge/entries/${stage.entryId}`}
+      // 带上来源：正文页据此把"返回知识库"换成"返回这条轨道的关卡地图"
+      state={{ fromTrackSlug: trackSlug, fromTrackName: trackName }}
       className="border-border bg-card hover:border-primary/40 flex items-center gap-3 rounded-lg border px-3 py-3 transition-colors"
       data-testid={`stage-${stage.seq}`}
       data-status={stage.status}

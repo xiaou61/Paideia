@@ -101,7 +101,6 @@ export function KnowledgeConceptsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="知识库"
         title="概念"
         description="概念是知识图谱的节点。把条目挂到概念上，学习者就能看到自己每个知识点掌握到什么程度。"
         actions={

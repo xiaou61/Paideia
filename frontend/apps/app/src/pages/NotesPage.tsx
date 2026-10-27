@@ -221,7 +221,6 @@ export function NotesPage() {
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
       <PageHeader
-        eyebrow="个人"
         title="我的笔记"
         description="随手记点什么，或让助手把答案存进来；也能生成只读链接发给别人。"
       />

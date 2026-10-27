@@ -221,9 +221,10 @@
   --radius-xl: calc(var(--radius) + 4px);
 
   /*
-   * 标题阶梯。Geist 的标题是 semibold + 负字距，且字距随字号收紧（32px 约 -0.04em）。
-   * 负字距是这种观感的关键：没有它，大字号在中英混排下会显得松散。
-   * 正文与标签继续用 Tailwind 的 xs/sm/base（12/14/16px），与 Geist 的 copy/label 一致。
+   * 标题阶梯。负字距随字号收紧，但**下限是 -0.04em**：再紧在中英混排里会开始粘连
+   * （实测 H1 是 40px，-0.05em 等于 -2px，"你好，e2e-learner" 的字快贴上了）。
+   * 32px 与 40px 都用 -0.04em，两者本来就不是能靠字距区分的档位，靠字号区分就够了。
+   * 正文与标签继续用 Tailwind 的 xs/sm/base（12/14/16px）。
    */
   --text-lg: 1.25rem;
   --text-lg--line-height: 1.4;
@@ -236,7 +237,7 @@
   --text-2xl--letter-spacing: -0.04em;
   --text-3xl: 2.5rem;
   --text-3xl--line-height: 1.1;
-  --text-3xl--letter-spacing: -0.05em;
+  --text-3xl--letter-spacing: -0.04em;
 
   /*
    * 界面只有中文，因此不引 webfont（Geist Sans 没有中文字形；CJK webfont 整包约 74MB，
@@ -269,14 +270,36 @@
   }
 }
 
-/* 系统设了"减少动态效果"就全部关掉——动效是可访问性里明确要求尊重的一档。 */
+/*
+ * 系统设了"减少动态效果"时，**位移与缩放关掉、颜色与透明度的状态变化保留**。
+ *
+ * 原来这里是一条 `*` 通配把 animation-duration 与 transition-duration 一起压成 0.01ms，
+ * 结果是连"悬停变个底色""按钮按下有反馈""加载中的转圈"全都没了——用户失去的是
+ * 界面在回应他的证据，而不只是晃动的画面。减少动效要减少的是**位移**，不是反馈。
+ *
+ * 具体做法：只对 transform / translate / scale 这类会引发前庭不适的属性限速，
+ * 并把所有动画压成"瞬时但保留终态"（0.01ms 的 duration 会让终态在下一帧就到位，
+ * 视觉上等于没有动画，但 opacity/color 的过渡仍然可读）。
+ */
 @media (prefers-reduced-motion: reduce) {
+  /* 位移类动画：直接去掉，元素停在终态 */
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* 过渡保留，但只留颜色/透明/阴影这类不引发前庭反应的属性；
+     位移与缩放立刻到位。写成 transition-property 白名单而不是 duration 归零，
+     是因为归零会把"悬停变底色"一起抹掉。 */
+  *,
+  *::before,
+  *::after {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke,
+      opacity, box-shadow !important;
+    transition-duration: 120ms !important;
   }
 }
 
@@ -320,17 +343,6 @@
   h3 {
     font-weight: 600;
     letter-spacing: -0.02em;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    *,
-    ::before,
-    ::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-      scroll-behavior: auto !important;
-    }
   }
 }
 

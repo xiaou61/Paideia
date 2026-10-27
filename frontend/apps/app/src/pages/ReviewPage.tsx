@@ -71,7 +71,6 @@ export function ReviewPage() {
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />}>
       <PageHeader
-        eyebrow="复习"
         title="今天该回头看的"
         description="按到期日排好。答错顺延到明天、档位不变；全对才前进一档。"
       />
@@ -92,7 +91,7 @@ export function ReviewPage() {
 
       {result !== null ? (
         <section className="mt-6 space-y-3" data-testid="review-result">
-          <h2 className="text-lg font-medium">这次的结果</h2>
+          <h2 className="text-lg font-semibold">这次的结果</h2>
           {result.results.map((item, i) => (
             <Card key={item.itemId} className={item.correct ? 'border-success/40' : 'border-destructive/40'}>
               <CardContent className="pt-5 text-sm">

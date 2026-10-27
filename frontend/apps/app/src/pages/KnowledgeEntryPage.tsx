@@ -20,7 +20,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAssistantContext } from '@paideia/assistant'
 import { ArrowLeft, ArrowRight, ChevronLeft, ListTree } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
@@ -44,6 +44,10 @@ export function KnowledgeEntryPage() {
   const valid = Number.isFinite(entryId)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const location = useLocation()
+  const fromTrack = location.state as
+    | { fromTrackSlug?: string; fromTrackName?: string }
+    | null
   const { setEntry, ask } = useAssistantContext()
 
   /**
@@ -169,12 +173,14 @@ export function KnowledgeEntryPage() {
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
       <Link
-        to="/knowledge"
+        to={fromTrack?.fromTrackSlug ? `/learn/${fromTrack.fromTrackSlug}` : '/knowledge'}
         className="text-muted-foreground hover:text-foreground mb-6 inline-flex items-center gap-1 text-sm transition-colors"
-        data-testid="back-to-categories"
+        data-testid={fromTrack?.fromTrackSlug ? 'back-to-track' : 'back-to-categories'}
       >
         <ChevronLeft className="size-4" />
-        返回知识库
+        {fromTrack?.fromTrackSlug
+          ? `返回「${fromTrack.fromTrackName ?? '学习轨道'}」关卡地图`
+          : '返回知识库'}
       </Link>
 
       {!valid ? (
@@ -207,10 +213,19 @@ export function KnowledgeEntryPage() {
       {entry.isSuccess && !serverProgress.isPending ? (
         <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_15rem]">
           <article className="min-w-0 lg:max-w-[46rem]">
-            <PageHeader
-              eyebrow={entry.data.categoryName === null ? '知识库' : entry.data.categoryName}
-              title={entry.data.title}
-            />
+            {/*
+              "我在哪个分类里"是真信息，但它该是可点的面包屑而不是标题上方的小标签：
+              标签只能看，面包屑能回去。
+            */}
+            {entry.data.categoryId === null || entry.data.categoryName === null ? null : (
+              <Link
+                to={`/knowledge/categories/${entry.data.categoryId}`}
+                className="text-muted-foreground hover:text-foreground mb-3 inline-block text-sm"
+              >
+                {entry.data.categoryName}
+              </Link>
+            )}
+            <PageHeader title={entry.data.title} />
 
             {/*
               来源链接（WORK-025）：抓来的面经帖标出原帖，让读者能回原处核对。

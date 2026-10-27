@@ -1,5 +1,5 @@
 import { type CategoryNode } from '@paideia/knowledge'
-import { Card, CardContent, CardHeader, CardTitle, Empty, EmptyDescription, EmptyHeader, EmptyTitle, PageHeader } from '@paideia/ui'
+import { Card, CardContent, CardHeader, CardTitle, PageHeader } from '@paideia/ui'
 import { ChevronRight, FileText, Flag, FolderTree, FilePen, Users } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
@@ -100,15 +100,6 @@ export function AdminHomePage() {
             </span>
             <ChevronRight className="text-muted-foreground group-hover:text-primary size-4 shrink-0 transition-colors" />
           </Link>
-
-          <Empty>
-            <EmptyHeader>
-              <EmptyTitle>其余管理功能还没有</EmptyTitle>
-              <EmptyDescription>
-                用户、课程与内容管理的入口会随对应需求加入，这里不提前摆假入口。
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
         </CardContent>
       </Card>
     </>

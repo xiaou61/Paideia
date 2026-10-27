@@ -7,7 +7,9 @@ import {
   AlertTitle,
   AppShell,
   Badge,
+  Button,
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -61,7 +63,6 @@ export function MyAssessmentsPage() {
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
       <PageHeader
-        eyebrow="我的"
         title="我标记过的内容"
         description="标记只是你自己的记录，用来挑出还需要再看一遍的内容。"
       />
@@ -123,6 +124,12 @@ export function MyAssessmentsPage() {
               打开一条内容，用「懂了 / 还不懂」标一下，之后就能在这里找到它。
             </EmptyDescription>
           </EmptyHeader>
+          {/* 空态必须给一个能立刻做的动作：只说"去标一下"而不给入口，等于让人自己找路 */}
+          <EmptyContent>
+            <Button render={<Link to="/knowledge" />} data-testid="my-assessment-empty-action">
+              去知识库挑一条
+            </Button>
+          </EmptyContent>
         </Empty>
       ) : null}
 

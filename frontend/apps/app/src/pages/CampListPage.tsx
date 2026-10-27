@@ -53,7 +53,6 @@ export function CampListPage() {
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
       <PageHeader
-        eyebrow="AI 训练营"
         title="用简历开一个训练营"
         description="先做一套诊断题，按薄弱点排每天学什么；走完后再测一次，两次并排看变化。"
       />

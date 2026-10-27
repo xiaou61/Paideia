@@ -56,7 +56,6 @@ export function GraphPage() {
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
       <PageHeader
-        eyebrow="我的知识图谱"
         title="你已经碰到什么、掌握到什么程度"
         description="节点是知识点，不是文章。颜色越深表示掌握得越牢；带标记的是到期该复习的。"
       />

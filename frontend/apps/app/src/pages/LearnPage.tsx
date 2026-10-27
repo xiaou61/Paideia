@@ -63,7 +63,6 @@ export function LearnPage() {
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
       <PageHeader
-        eyebrow="从零开始"
         title="挑一条轨道，一关一关往下走"
         description="理论读完能解释，实战做完能验收。顺序是建议的走法，想先看哪一关都可以，隔天提醒复习。"
       />
@@ -185,7 +184,7 @@ function TrackSection({
   return (
     <section className="mt-2 mb-8" data-testid={testId}>
       <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="text-lg font-medium">{title}</h2>
+        <h2 className="text-lg font-semibold">{title}</h2>
         <span className="text-muted-foreground text-sm" data-testid={`${testId}-count`}>
           {tracks.length} 条 · {stages} 关 · 已通关 {passed}
         </span>

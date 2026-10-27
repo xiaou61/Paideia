@@ -140,7 +140,7 @@ export function CampDetailPage() {
   if (camp.isError) {
     return (
       <AppShell title="Paideia" actions={<LearnerHeader />} wide>
-        <PageHeader eyebrow="AI 训练营" title="这个训练营看不到" />
+        <PageHeader title="这个训练营看不到" />
         <p className="text-muted-foreground text-sm">{(camp.error as Error).message}</p>
         <Button className="mt-4" onClick={() => navigate('/camp')}>
           回到列表
@@ -155,9 +155,8 @@ export function CampDetailPage() {
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
       <PageHeader
-        eyebrow={detail.days === 3 ? '3 天训练营' : '7 天训练营'}
         title={detail.resumeTitle}
-        description={`${detail.itemCount} 道诊断题。诊断、计划、复测都在这一页。`}
+        description={`${detail.days} 天训练营 · ${detail.itemCount} 道诊断题。诊断、计划、复测都在这一页。`}
       />
 
       <div className="mb-4 flex flex-wrap gap-2">

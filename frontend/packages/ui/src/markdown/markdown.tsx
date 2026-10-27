@@ -150,9 +150,11 @@ const documentComponents: Components = {
   p: ({ node, ...rest }) => <p className="my-4 leading-8" {...rest} />,
   ul: ({ node, ...rest }) => <ul className="my-4 list-disc space-y-1.5 pl-6" {...rest} />,
   ol: ({ node, ...rest }) => <ol className="my-4 list-decimal space-y-1.5 pl-6" {...rest} />,
+  // 引用块不用左侧色条：粗色边是 AI 生成界面最好认的标志（impeccable 检测器报 side-tab）。
+  // 用整块浅底 + 圆角表达"这是引文"，靠背景区分而不是靠一条竖线。
   blockquote: ({ node, ...rest }) => (
     <blockquote
-      className="border-info/50 bg-info/5 my-6 rounded-r-lg border-l-4 px-4 py-1 [&>p:first-child]:mt-3 [&>p:last-child]:mb-3"
+      className="bg-muted/60 text-muted-foreground my-6 rounded-lg px-5 py-1 [&>p:first-child]:mt-3 [&>p:last-child]:mb-3"
       {...rest}
     />
   ),

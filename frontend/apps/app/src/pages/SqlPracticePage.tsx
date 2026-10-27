@@ -254,7 +254,6 @@ export function SqlPracticePage() {
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
       <PageHeader
-        eyebrow="SQL 工作台"
         title="写一段 SQL，立刻看到结果"
         description="不计分、不进学习进度。每次都在干净的数据库里跑，随便改随便试。"
       />

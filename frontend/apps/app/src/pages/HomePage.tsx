@@ -6,7 +6,7 @@ import {
   type CategoryNode,
 } from '@paideia/knowledge'
 import { configFor, createIdentityApi } from '@paideia/identity'
-import { AppShell, Button, Card, CardContent, Input, Section, Spinner } from '@paideia/ui'
+import { AppShell, Button, Card, Input, Section, Spinner } from '@paideia/ui'
 import { useAuth } from '@paideia/auth'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, BookOpen, Database, Dumbbell, FileQuestion, GraduationCap, Layers, MessagesSquare, Network, Newspaper, NotebookPen, Search, Sparkles, Target } from 'lucide-react'
@@ -280,9 +280,6 @@ export function HomePage() {
           一屏之内既有行动也有去处，不会只剩一大片留白 */}
       <section className="border-border from-accent via-background to-background mb-8 grid gap-6 rounded-2xl border bg-gradient-to-br p-5 sm:gap-8 sm:p-8 lg:grid-cols-[1.1fr_1fr] lg:p-10">
         <div className="min-w-0">
-          <div className="text-primary mb-3 text-xs font-medium tracking-wide">
-            千人千面 · 个性化学习
-          </div>
           <h1 className="text-2xl sm:text-3xl">你好，{user?.username ?? ''}</h1>
           <p className="text-muted-foreground mt-3 max-w-xl text-base leading-7">
             右下角的「助手」会读当前内容、记得你说过的话，也能把答案存成笔记。
@@ -314,9 +311,31 @@ export function HomePage() {
             </Button>
           </div>
 
-          {/* hero 左栏的空白由"今天该做什么"填上：这里最容易变成一堵墙，
-              而三格小数字正好是"我进来该点哪"的答案。数据全部来自已有接口。 */}
-          <div className="mt-8 grid gap-3 sm:grid-cols-3 lg:mt-10" data-testid="home-hero-stats">
+          {/*
+            库存量放在搜索框下面一行小字里，**不再单独占一排大数字卡**。
+            原来这里还有一组「可读条目 / 分类 / 我标记过」，与上面那组
+            「待复习 / 学到一半 / 还不懂」是同一个模板重复两遍：前者答"我现在该做什么"，
+            后者只是把库存念了一遍，而"我标记过"又与"还不懂"是同一件事。
+          */}
+          <p className="text-muted-foreground mt-6 text-sm">
+            库里共{' '}
+            {/* testid 只挂在数字上：e2e 会把这个元素的非数字字符全去掉再与条目总数对照，
+                把"22 个分类"一起圈进来会拼成 24022（实测这一条红过）。 */}
+            <span className="text-foreground font-medium" data-testid="home-stat-entries">
+              {entries.data === undefined ? <Spinner className="inline size-3.5 align-[-2px]" /> : entries.data.total}
+            </span>{' '}
+            条内容
+            {categories.data === undefined ? null : <>, {categories.data.length} 个分类</>}
+            {' · '}
+            <Link to="/knowledge/entries" className="hover:text-foreground underline underline-offset-2">
+              全部条目
+            </Link>
+          </p>
+
+          {/* hero 左栏的空白由"今天该做什么"填上：三格数字直接可点，
+              它们回答的是"我进来该点哪"，而不是"这个站有多大"。
+              窄屏也保持三列（不堆成三行）：堆起来要占掉大半屏，而这三格本来就是一句话。 */}
+          <div className="mt-8 grid grid-cols-3 gap-2 sm:gap-3 lg:mt-10" data-testid="home-hero-stats">
             <HeroStat
               label="待复习"
               value={dueReview}
@@ -388,28 +407,6 @@ export function HomePage() {
           ) : null}
         </Card>
       </section>
-
-      {/* 三个数字：都来自接口 */}
-      <div className="mb-12 grid gap-4 sm:grid-cols-3" data-testid="home-stats">
-        <StatCard
-          testId="home-stat-entries"
-          label="可读条目"
-          value={entries.data?.total}
-          to="/knowledge/entries"
-        />
-        <StatCard
-          testId="home-stat-categories"
-          label="分类"
-          value={categories.data?.length}
-          to="/knowledge"
-        />
-        <StatCard
-          testId="home-stat-assessments"
-          label="我标记过"
-          value={assessments.data?.length}
-          to="/my-assessments"
-        />
-      </div>
 
       {/* 「继续学习」：服务端有记录就优先用它（跨设备一致），否则退回本地阅读痕迹。
           只有真读过才出现——空着一条"还没开始"只是噪音。 */}
@@ -519,49 +516,64 @@ export function HomePage() {
         ) : null}
       </Section>
 
-      <Section title="快捷入口">
-        <div className="grid gap-4 sm:grid-cols-3" data-testid="home-entries">
+      {/*
+        其余入口用**一行一条的索引**，不是 12 张同尺寸的卡片。
+        12 张一模一样的卡等于 12 个平等的选项，也就是没有推荐——眼睛只能从头扫到尾。
+        索引行按身份排好的顺序从上往下读，图标退到左侧做锚点，标题与说明挤在一行里。
+        所有 `data-testid` 与链接目标保持不变（e2e 与导航入口都依赖它们）。
+      */}
+      <Section
+        title="所有入口"
+        description={profile?.identity === undefined ? undefined : '按你的身份排过序。'}
+      >
+        <ul className="border-border divide-border divide-y overflow-hidden rounded-xl border" data-testid="home-entries">
           {quickLinks.map((item) => (
-            <Card key={item.to} className="hover:shadow-card transition-shadow">
-              <CardContent className="pt-6">
-                <span className="tile-surface border-border mb-3 flex size-10 items-center justify-center rounded-lg border">
-                  <item.icon className="text-primary size-5" />
+            <li key={item.to}>
+              <Link
+                to={item.to}
+                data-testid={item.testId}
+                className="hover:bg-accent/40 group flex items-center gap-3.5 px-4 py-3 transition-colors"
+              >
+                <span className="text-muted-foreground group-hover:text-primary flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors">
+                  <item.icon className="size-4" />
                 </span>
-                <Link
-                  to={item.to}
-                  data-testid={item.testId}
-                  className="block font-medium underline-offset-4 hover:underline"
-                >
-                  {item.title}
-                </Link>
-                <p className="text-muted-foreground mt-1.5 text-sm leading-6">{item.description}</p>
-              </CardContent>
-            </Card>
+                <span className="min-w-0 flex-1">
+                  <span className="group-hover:text-primary block text-sm font-medium transition-colors">
+                    {item.title}
+                  </span>
+                  <span className="text-muted-foreground mt-0.5 block truncate text-xs">{item.description}</span>
+                </span>
+                <ArrowRight className="text-muted-foreground group-hover:text-primary size-4 shrink-0 transition-colors" />
+              </Link>
+            </li>
           ))}
           {/*
             八股文专区（WORK-025 REQ-004）。它是知识库里的一个分类，不是独立页面，
             所以不进 `QUICK_LINKS`（那张表要求静态 `to`，而这里的 id 必须运行时解析）。
           */}
           {essayCategory === undefined ? null : (
-            <Card className="hover:shadow-card transition-shadow">
-              <CardContent className="pt-6">
-                <span className="tile-surface border-border mb-3 flex size-10 items-center justify-center rounded-lg border">
-                  <FileQuestion className="text-primary size-5" />
+            <li>
+              <Link
+                to={`/knowledge/categories/${essayCategory.id}`}
+                data-testid="home-entry-essay"
+                className="hover:bg-accent/40 group flex items-center gap-3.5 px-4 py-3 transition-colors"
+              >
+                <span className="text-muted-foreground group-hover:text-primary flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors">
+                  <FileQuestion className="size-4" />
                 </span>
-                <Link
-                  to={`/knowledge/categories/${essayCategory.id}`}
-                  data-testid="home-entry-essay"
-                  className="block font-medium underline-offset-4 hover:underline"
-                >
-                  八股文专区
-                </Link>
-                <p className="text-muted-foreground mt-1.5 text-sm leading-6">
-                  每天从面经里抽题，AI 逐题解析，面试前刷一遍。
-                </p>
-              </CardContent>
-            </Card>
+                <span className="min-w-0 flex-1">
+                  <span className="group-hover:text-primary block text-sm font-medium transition-colors">
+                    八股文专区
+                  </span>
+                  <span className="text-muted-foreground mt-0.5 block truncate text-xs">
+                    每天从面经里抽题，AI 逐题解析，面试前刷一遍。
+                  </span>
+                </span>
+                <ArrowRight className="text-muted-foreground group-hover:text-primary size-4 shrink-0 transition-colors" />
+              </Link>
+            </li>
           )}
-        </div>
+        </ul>
       </Section>
     </AppShell>
   )
@@ -585,35 +597,9 @@ function HeroStat({
       className="border-border/70 bg-background/70 hover:border-primary/40 group rounded-lg border p-3 transition-colors"
     >
       <span className="text-muted-foreground block text-xs">{label}</span>
-      <span className="mt-1 flex items-baseline gap-1.5">
+      <span className="mt-1 flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-1.5">
         <span className="text-xl font-semibold tracking-tight">{value}</span>
-        <span className="text-muted-foreground truncate text-xs">{hint}</span>
-      </span>
-    </Link>
-  )
-}
-
-/** 首页上的一个数字。数据还没回来时显示占位而不是 0——0 是一个有意义的数字，不能拿它顶替"不知道"。 */
-function StatCard({
-  label,
-  value,
-  to,
-  testId,
-}: {
-  label: string
-  value: number | undefined
-  to: string
-  testId: string
-}) {
-  return (
-    <Link
-      to={to}
-      data-testid={testId}
-      className="border-border bg-card hover:border-primary/40 hover:shadow-card flex items-baseline justify-between rounded-xl border p-5 transition-all hover:-translate-y-0.5"
-    >
-      <span className="text-muted-foreground text-sm">{label}</span>
-      <span className="text-2xl font-semibold tracking-tight">
-        {value === undefined ? <Spinner className="size-4" /> : value}
+        <span className="text-muted-foreground text-xs sm:truncate">{hint}</span>
       </span>
     </Link>
   )

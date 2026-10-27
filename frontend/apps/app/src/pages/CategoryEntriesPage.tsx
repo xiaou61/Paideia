@@ -16,7 +16,7 @@ import {
   Spinner,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, ChevronLeft, FileText, Search } from 'lucide-react'
+import { ArrowRight, BookOpenCheck, ChevronLeft, FileText, Search } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 
@@ -91,10 +91,32 @@ export function CategoryEntriesPage() {
       </Link>
 
       <PageHeader
-        eyebrow="知识库"
         title={title}
         description={scopedId === null ? '按更新时间排列。' : '这个分类下的条目。'}
       />
+
+      {/* 学习轨道的分类也能在知识库里翻，但"按关卡顺序走"只有 /learn 有；给一条明确的另一条路 */}
+      {current?.lineKind ? (
+        <Link
+          to={`/learn/${current.slug}`}
+          data-testid="category-track-link"
+          className="border-primary/30 bg-primary/[0.04] hover:border-primary/60 mb-6 flex items-center gap-3 rounded-xl border p-4 transition-colors"
+        >
+          <span className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg">
+            <BookOpenCheck className="size-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium">这是一条学习轨道</span>
+            <span className="text-muted-foreground mt-0.5 block text-xs">
+              同样的内容在「从零开始」里按关卡顺序排好了，带进度与复习。
+            </span>
+          </span>
+          <span className="text-primary flex shrink-0 items-center gap-1 text-sm">
+            打开关卡地图
+            <ArrowRight className="size-4" />
+          </span>
+        </Link>
+      ) : null}
 
       <form onSubmit={onSubmit} className="mb-6 flex items-center gap-2">
         <div className="relative max-w-md flex-1">

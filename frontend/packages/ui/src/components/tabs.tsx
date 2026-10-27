@@ -17,7 +17,10 @@ function Tabs({
       // 只写 data-orientation 会出现"看着是竖排、键盘却按横排走"的不一致。
       orientation={orientation}
       className={cn(
-        "group/tabs flex gap-2 data-[orientation=vertical]:flex-col",
+        // 横排是"标签在上、面板在下"，竖排才是标签在左。原来写反了（横排是 flex、竖排才
+        // flex-col），后果是横排 Tabs 的列表与面板永远并排：桌面端正文从标签右边开始，
+        // 窄屏把页面撑出横向滚动条（实测 /digest 390 宽下 scrollWidth 396）。
+        "group/tabs flex flex-col gap-2 data-[orientation=vertical]:flex-row",
         className
       )}
       {...props}

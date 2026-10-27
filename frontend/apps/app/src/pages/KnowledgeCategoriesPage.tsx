@@ -49,7 +49,6 @@ export function KnowledgeCategoriesPage() {
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
       <PageHeader
-        eyebrow="知识库"
         title="挑一个分类读起"
         description="分类是层级树；点进去是这个分类下的条目。不想挑分类就直奔全部条目。"
       />
@@ -107,8 +106,14 @@ export function KnowledgeCategoriesPage() {
               // 逐个淡入：一次性铺满的网格没有任何"进入"的感觉
               style={{ animationDelay: `${index * 40}ms` }}
             >
-              <span className="tile-surface border-border flex h-24 items-center justify-center border-b">
+              <span className="tile-surface border-border relative flex h-24 items-center justify-center border-b">
                 <FolderOpen className="text-primary/70 group-hover:text-primary size-8 transition-colors" />
+                {/* 学习轨道与普通分类混在一起，但前者有关卡顺序；标出来才知道去 /learn 有一条引导路线 */}
+                {category.lineKind ? (
+                  <Badge variant="secondary" className="absolute top-3 right-3">
+                    从零开始
+                  </Badge>
+                ) : null}
               </span>
               <span className="flex flex-1 flex-col p-5">
                 <span className="group-hover:text-primary text-lg transition-colors">{category.name}</span>

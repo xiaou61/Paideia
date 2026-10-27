@@ -78,7 +78,6 @@ export function NoteNewPage() {
       </button>
 
       <PageHeader
-        eyebrow="我的笔记"
         title="新建笔记"
         description="先写内容，再决定挂不挂到某条知识库条目上。正文支持 markdown，可以随时切到预览看效果。"
       />

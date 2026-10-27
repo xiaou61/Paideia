@@ -331,7 +331,15 @@ export function AssistantShell({
   if (!panel.open) {
     const firstTime = !hasSeenHint()
     return (
-      <div className="fixed right-6 bottom-6 z-40 flex flex-col items-end gap-2">
+      <div
+        className={`fixed z-40 flex flex-col items-end gap-2 ${
+          // 窄屏收紧到 16px 并让开 iPhone 手势条：`max()` 保证没有安全区的设备仍保留 1rem，
+          // 直接写 env() 会在那些设备上求值为 0、浮标贴死屏幕底边。
+          narrow
+            ? 'right-4 bottom-[max(1rem,env(safe-area-inset-bottom))]'
+            : 'right-6 bottom-6'
+        }`}
+      >
         {firstTime ? (
           <div
             className="border-border bg-card text-muted-foreground rounded-lg border px-3 py-1.5 text-xs shadow-lg"
@@ -346,7 +354,10 @@ export function AssistantShell({
           data-testid="assistant-launcher"
           aria-label="打开 AI 助手"
           title="打开 AI 助手（Ctrl/Cmd + J）"
-          className={`border-border bg-card hover:bg-accent flex items-center gap-2 rounded-full border px-4 py-3 text-sm font-medium shadow-xl ${
+          className={`border-border bg-card hover:bg-accent flex items-center gap-2 rounded-full border font-medium shadow-xl ${
+            // 窄屏小一档：46px 高的浮标在 390 宽上压掉的是一整行正文
+            narrow ? 'px-3 py-2.5 text-sm' : 'px-4 py-3 text-sm'
+          } ${
             // `motion-safe:` 让"减少动效"的用户拿到的是静止版本（无障碍要求，不是可选装饰）
             firstTime ? 'motion-safe:animate-pulse' : ''
           }`}

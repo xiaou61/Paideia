@@ -139,7 +139,6 @@ export function ProfilePage() {
     <AppShell title="Paideia" actions={<LearnerHeader />}>
       <div className="mx-auto max-w-2xl">
         <PageHeader
-          eyebrow="我的"
           title="身份与目标"
           description="身份只影响推荐顺序与助手的形态（比如求职者会多一个面试入口），不影响你能做什么——每个身份都能读全部内容、记笔记、用助手。"
         />

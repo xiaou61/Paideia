@@ -60,7 +60,17 @@ export function AppShell({
         </div>
       </header>
 
-      <main className={cn('mx-auto w-full flex-1 px-4 py-8 sm:px-6 sm:py-10', wide ? 'max-w-[86rem]' : 'max-w-3xl')}>
+      {/*
+        底部留白是给 AI 助手浮标让位的：它是 `fixed right-6 bottom-6` 的 46px 高浮层，
+        main 不留空间的话最后一行内容永远可能被它盖住（实测 /learn 压住 3 个轨道卡、
+        /resume 压住改名与删除按钮）。pb-24 在两种宽度下都够，且不影响正常滚动。
+      */}
+      <main
+        className={cn(
+          'mx-auto w-full flex-1 px-4 py-8 pb-24 sm:px-6 sm:py-10 sm:pb-24',
+          wide ? 'max-w-[86rem]' : 'max-w-3xl',
+        )}
+      >
         {children}
       </main>
 
@@ -81,25 +91,24 @@ export function AppShell({
  *
  * <p>字号用了阶梯里最大的一档（40px）——参考的文档站与学习产品在正文页都是这个量级，
  * 32px 在中英混排里撑不住"这是一篇文章"的第一印象。副标题从 14px 提到 16px 并放宽行高，
- * 它是**导语**不是标签。可选的 `eyebrow` 放所属分类这类"当前位置"信息。
+ * 它是**导语**不是标签。
+ *
+ * <p>**没有 eyebrow**：曾经有过一个标题上方的小标签属性，19 处调用写着"知识库""我的""复习"
+ * 这类与标题同义的话。它占掉一行却不提供任何信息，而标题自己就该扛住那一屏的第一眼。
+ * 真需要"当前位置"的页面，导航的选中态已经在说这件事了。
  */
 export function PageHeader({
   title,
   description,
-  eyebrow,
   actions,
 }: {
   title: string
   description?: ReactNode
-  eyebrow?: ReactNode
   actions?: ReactNode
 }) {
   return (
     <div className="mb-8 flex items-end justify-between gap-6">
       <div className="min-w-0">
-        {eyebrow === undefined ? null : (
-          <div className="text-primary mb-2 text-xs font-medium tracking-wide">{eyebrow}</div>
-        )}
         <h1 className="text-3xl">{title}</h1>
         {description === undefined ? null : (
           <p className="text-muted-foreground mt-3 max-w-2xl text-base leading-7">{description}</p>
@@ -128,7 +137,9 @@ export function Section({
     <section className={cn('mb-12', className)}>
       <div className="mb-5 flex items-end justify-between gap-4">
         <div>
-          <h2 className="text-lg">{title}</h2>
+          {/* 二级标题统一 20px/600（base 层的 h2 默认 600，这里显式写死字号，
+              免得各页面各用一档：同一页出现过 14px 与 20px 两种 h2） */}
+          <h2 className="text-lg font-semibold">{title}</h2>
           {description === undefined ? null : (
             <p className="text-muted-foreground mt-1 text-sm">{description}</p>
           )}

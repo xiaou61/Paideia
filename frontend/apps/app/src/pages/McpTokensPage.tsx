@@ -135,7 +135,6 @@ export function McpTokensPage() {
     <AppShell title="Paideia" actions={<LearnerHeader />}>
       <div className="mx-auto max-w-3xl space-y-6">
         <PageHeader
-          eyebrow="设置"
           title="MCP 接入"
           description="让 ZCode、Claude Desktop 这类外部助手直接读写你的知识库与笔记。每个凭据只显示一次明文，丢了就重新建一个。"
         />
