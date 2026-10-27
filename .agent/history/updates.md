@@ -6902,3 +6902,16 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 本地提交 `6a1cdcb`。未 push（需单独授权）。
 - **未验证**：hover/focus/disabled/loading 状态、键盘 Tab 顺序、真机触屏手势、
   管理端深色模式、性能（LCP/CLS）；约 10 个路由未进样本（含课程正文页 `/learn/:slug`）。
+
+### 2026-10-27 续：审计剩余项
+
+- 触控目标按 WCAG 2.5.8 补齐（digest 标题 / resume 名称 / 所有分类 / 全部→），
+  移动端四页 <24px 可点元素降为 0。
+- `/resume/new` 空态按钮归位 + 补 h1。
+- **实测发现服务器没开 gzip**：入口 chunk 942 KB 原样传输。开 `server.compression` 后
+  首页传输 1537 → 455 KB（-70%），FCP 544 → 408 ms。
+- 补 `PRODUCT.md` / `DESIGN.md`（impeccable init/document；PRODUCT.md 标注了推断项）。
+- 补审 9 个此前未进样本的路由；键盘 Tab 12 跳全部有焦点环；管理端深色模式 6 页 0 对比度失败。
+- 提交 `3b69632`。仍未 push。
+- **仍未做**：真机触屏手势、hover 状态逐元素截图核对、LCP（浏览器 API 取不到，
+  只测了 FCP/CLS）。
