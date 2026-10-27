@@ -2,7 +2,7 @@
 artifact: requirements
 work_id: WORK-045
 work: 数据大屏：全链路数据流转与运营视图
-status: draft
+status: approved
 mode: strict
 mode_reason: 跨管理端前端、paideia-app 新增只读聚合接口与迁移（如需快照）、Prometheus/Loki/Tempo/MySQL 四类数据源、公开仓库与权限边界；涉及现有 10+ 张表的聚合口径与「谁可以看到什么」，口径一旦定错会在界面上长期误导判断
 workflow: full
@@ -10,6 +10,9 @@ depends_on: []
 related_to: [WORK-028, WORK-036, WORK-042, WORK-043, WORK-032, WORK-035]
 created: 2026-10-27
 updated: 2026-10-27
+approved_by: xiaou61
+approved_at: 2026-10-27 17:02:21 +0800
+approver_role: CTO
 ---
 
 # 数据大屏需求
