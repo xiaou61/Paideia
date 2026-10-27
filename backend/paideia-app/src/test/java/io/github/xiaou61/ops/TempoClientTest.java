@@ -61,7 +61,7 @@ class TempoClientTest {
         assertThat(traces).hasSize(1);
         assertThat(traces.getFirst().traceId()).isEqualTo("t1");
         assertThat(traces.getFirst().durationMs()).isEqualTo(2400);
-        assertThat(traces.getFirst().start()).isEqualTo(Instant.parse("2025-10-26T00:00:00Z"));
+        assertThat(traces.getFirst().start()).isEqualTo(Instant.ofEpochSecond(1_761_432_000L));
     }
 
     @Test
