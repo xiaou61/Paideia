@@ -7103,3 +7103,14 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 未部署：**主树上有其他会话未提交的 `CategoryService.java` 改动（把学习轨道分类恢复进知识库）**，`release.ps1` 从工作区构建会把它一起打进生产包。那是别人的在飞工作、与本项无关，故本次不发版，等它落地或由用户指定用干净树发版。
 - 本地提交：30d25a2（merge），分支内 9313a8d 为功能最后一笔
 - 远端推送：未执行
+
+## 2026-10-27 17:40 +0800 · WORK-045 · 三项裁决落进需求
+
+- 类型：decision
+- 变更：用户对三个待确认问题作答，`requirements.md` 相应改写。① 受众**只给管理员**（不做学习者精简版）② **允许新增埋点**——原"未采集就显示未采集、不加表"的默认被推翻 ③ 刷新强度由 Agent 定，选 **60 秒轮询**。
+- 决策：埋点只补两项，不做通用框架。`digest_item_clicks(user_id,item_id,clicked_at)` 回答"535 条速递有没有人看"；`knowledge_search_log(user_id,keyword,result_count,searched_at)` 回答"用户在搜什么但搜不到"（零结果搜索词是最有价值的一类）。其它"未采集"项经核实要么已有数据只是没聚合（AI 记忆召回在 `ai_runs.attrs.memoryHits`、MCP 调用在 Micrometer、条目浏览在 `knowledge_entry_views`），要么成本远超价值（通用点击/停留/滚动埋点）。
+- 依据：用户本轮原话「1 只给管理员 2允许 3怎么都可以」；`EntryViewController` 已有"上报一次浏览"的成熟模式可照抄（POST + 归属取自令牌 + 路径不含用户标识）。
+- 验证：`validate` 对 WORK-045 只有"requirements 超 20KB"一条软警告，无错误。
+- 遗留（下一轮做）：proposal/design/tasks 三件仍不能起草——校验器要求需求先签署才允许下游工件。需要用户或 `approve` 命令签署 requirements.md。
+- 本地提交：本次文档提交
+- 远端推送：未执行
