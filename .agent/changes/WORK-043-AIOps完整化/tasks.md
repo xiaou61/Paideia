@@ -182,7 +182,7 @@ approver_role: CTO
 - 步骤：写两条查询 + 数学表达式 → 部署检查。
 - 验证：Grafana API 规则 health ok；空闲 10 分钟无告警。
 
-### TASK-012 | pending | OTel starter 与 trace id 统一
+### TASK-012 | done | OTel starter 与 trace id 统一
 
 - 对应：`REQ-013`、`REQ-015`、`AC-008`
 - 依赖：TASK-009（证据字段）
@@ -194,7 +194,7 @@ approver_role: CTO
   2. 改 filter 优先用 `Tracer.currentSpan().context().traceId()` → 测试绿。
 - 验证：`mvn -B -pl paideia-app -am -Dtest=TraceIdFilterTest ...`；启动后 `curl -i` 看 `X-Trace-Id` 与日志 traceId 一致。
 
-### TASK-013 | pending | Tempo 单机部署与数据源
+### TASK-013 | done | Tempo 单机部署与数据源
 
 - 对应：`REQ-014`、`AC-007`、`AC-016`
 - 依赖：无（可与 TASK-012 并行）
@@ -204,7 +204,7 @@ approver_role: CTO
 - 步骤：安装 → 起单元 → 数据源 → 查询一次 trace。
 - 验证：`curl 127.0.0.1:3200/ready` → ready；Grafana datasource health OK。
 
-### TASK-014 | pending | 日志 traceId 与 Grafana 关联
+### TASK-014 | done | 日志 traceId 与 Grafana 关联
 
 - 对应：`REQ-016`、`AC-008`
 - 依赖：TASK-012、TASK-013
@@ -214,7 +214,7 @@ approver_role: CTO
 - 步骤：改 pattern → 部署 → 人工点一次。
 - 验证：`journalctl`/Loki 查询行含 traceId；Grafana 跳转可用。
 
-### TASK-015 | pending | TempoClient 与 trace 证据
+### TASK-015 | done | TempoClient 与 trace 证据
 
 - 对应：`REQ-017`、`AC-009`
 - 依赖：TASK-013、TASK-009
@@ -224,7 +224,7 @@ approver_role: CTO
 - 步骤：先写解析/降级测试 → 实现 → 绿；把 trace 摘要接入证据。
 - 验证：`mvn -B -pl paideia-app -am -Dtest=TempoClientTest,OpsEvidenceCollectorTest ...`。
 
-### TASK-016 | pending | trace 属性白名单与脱敏
+### TASK-016 | done | trace 属性白名单与脱敏
 
 - 对应：`REQ-018`、`AC-016`
 - 依赖：TASK-015

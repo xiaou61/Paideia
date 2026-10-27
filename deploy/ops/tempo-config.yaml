@@ -27,9 +27,19 @@ storage:
     wal:
       path: /var/lib/tempo/wal
 
-compactor:
+# Tempo 3 的保留策略在 backend_worker（旧的顶层 compactor 已移除）。
+# 单机模式下 worker 连本机 scheduler 的 gRPC 端口。
+backend_worker:
+  backend_scheduler_addr: 127.0.0.1:9095
   compaction:
     block_retention: 720h
+
+# Tempo 3 的 live-store 默认往 /var/tempo 写 shutdown marker 与 WAL；
+# 本单元 ProtectSystem=strict，必须显式改到可写目录。
+live_store:
+  shutdown_marker_dir: /var/lib/tempo
+  wal:
+    path: /var/lib/tempo/wal
 
 usage_report:
   reporting_enabled: false

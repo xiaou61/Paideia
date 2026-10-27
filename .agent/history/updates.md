@@ -6966,3 +6966,68 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 未验证：基线样本需约 50 分钟到 100、7 天才完整；SLO 录制规则在 P3。
 - 本地提交：0b26b8e
 - 远端推送：未执行
+
+## 2026-10-27 15:20 +0800 · WORK-044 · 建项（MCP 网关补全调研）
+
+- 类型：research
+- 变更：新建 `WORK-044-MCP网关补全` 的 `requirements.md`（draft）与 `research.md`（draft）。未改任何源码。
+- 决策：**不照搬 Uber MCP Gateway 的四项扩展期特性**（AutoCrawler / 响应投影 / Code Mode / 第三方 server 代理），理由是前提在本项目均不成立；只收实测发现的五个缺口中的四个（外部无 find_tools 一项实测后判定**不是缺口**，因为 `/mcp/x/all` 全量 schema 仅约 13 KB / 7.2k tokens）。
+- 依据：用户提供 Uber Engineering 文章（公众号转载）；本机读码实测。
+- 调研方法：`ToolCatalog` / `McpViewRegistry` / `McpToolInvoker` / `PatService` / `McpViews` / `ToolQuery` 全文；工具按 `new ToolDescriptor(...)` 与 `GROUP` 常量统计（57 个 / 12 组）；`outputSchema` 与 `ToolResult.structured` 逐个查第 6 参数与第二参数。
+- 关键数字：57 个工具（ADMIN 41、学习者只读约 12、可写 4）；`outputSchema` 仅 2 个非 null；`structured` 生产调用点 2 处；凭据数量/配额/返回体上限三者**全无**；MCP **零 Micrometer 指标**；简历/面试/复习/记忆/训练营/图谱/速递/作答 **8 个域各 0 个工具**。
+- 排除的三处疑似缺陷（验证后不成立，已记入 research 防重复怀疑）：运维日志脱敏（`OpsLogRedactor` 有 5 条正则）、`/mcp/write` 只读凭据越权（`ToolQuery.view` 先滤 WRITE）、非管理员看到 admin 组（`McpViewRegistry` 抛 404 而非空清单）。
+- 已知不修：`McpViewRegistry.views` 缓存无淘汰、server 从不 close；触发修的条件写进 research。
+- 验证：`validate .` 对 WORK-044 **零错误零警告**；剩余两条错误属 WORK-041 历史遗留（`结构化测试证据不完整`、报告状态 partial），与本次无关。
+- 未验证：requirements 仍是 draft，**未批准**；五项待裁决（范围、优先级、Track C 是否做、配额单位、返回体上限数值）。
+- 本地提交：未提交
+- 远端推送：未执行
+
+## 2026-10-27 14:47:32 +0800 · WORK-044 · 签署 .agent/changes/WORK-044-MCP网关补全/requirements.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-044-MCP网关补全/requirements.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-044-MCP网关补全/requirements.md
+- 验证：回读 frontmatter：approved_by=xiaou61，1 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-27 14:50:38 +0800 · WORK-044 · 签署 .agent/changes/WORK-044-MCP网关补全/proposal.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-044-MCP网关补全/proposal.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-044-MCP网关补全/proposal.md
+- 验证：回读 frontmatter：approved_by=xiaou61，1 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-27 14:50:46 +0800 · WORK-044 · 签署 .agent/changes/WORK-044-MCP网关补全/design.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-044-MCP网关补全/design.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-044-MCP网关补全/design.md
+- 验证：回读 frontmatter：approved_by=xiaou61，1 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-27 14:50:54 +0800 · WORK-044 · 签署 .agent/changes/WORK-044-MCP网关补全/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-044-MCP网关补全/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-044-MCP网关补全/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，1 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-27 15:35 +0800 · WORK-043 P2 · 链路
+
+- 类型：implementation
+- 变更：Spring Boot OTel starter + 显式 tracing/export/OTLP endpoint；Tempo 3.1.1（backend_worker 保留、live_store 路径、只绑回环）；`TraceIdFilter` 优先 OTel trace id；Loki derived field；TempoClient + trace 证据与属性白名单。
+- 决策/修复：Boot 4 的 OTLP exporter 条件读 `management.opentelemetry.tracing.export.otlp.endpoint`（不是 `management.otlp.tracing.endpoint`）；Tempo 3 的 `compactor` 改为 `backend_worker.compaction`，live-store 默认 `/var/tempo` 必须改到可写目录；starter 的聚合 jar 已含 `OtlpHttpSpanExporter`，额外 `-http-trace` 构件并不存在。
+- 验证：P2 单测 15（app 10 + web 5）、集成 11、`TracingWiringTest` 1；生产 `X-Trace-Id` 按 id 查 Tempo 200，resource `service.name=paideia`；Grafana Tempo 数据源 health OK；日志 pattern 出现 `[traceId]`（debug 时观测）；`paideia_build_info=b526ecc`。
+- 未验证：没有制造 error/slow trace，所以诊断 trace 证据可能显示「无匹配 trace」；Loki 日志跳 Tempo 需人工在 Grafana 点一次。
+- 本地提交：6b4e6ea、18e68aa、38b9263、181bca5、056fdf7、b526ecc（38b9263 的错误依赖已在 181bca5 回退）
+- 远端推送：未执行
