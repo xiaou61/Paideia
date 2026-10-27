@@ -6954,5 +6954,15 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 依据：WORK-043 TASK-008..011；SLO 录制规则留到 TASK-018。
 - 验证：`promtool check rules` 21 条 SUCCESS、`promtool test rules` 3 个用例 SUCCESS；P1 切片 20 条 0 failed；生产 Prometheus `paideia-baseline` 组 21 条、`paideia:baseline_cpu:current` 可查（samples7d=1，冷启动）；Grafana 10 条规则 health ok、活动告警 0。
 - 未验证：P1 应用尚未发版；基线样本需约 50 分钟到 100、7 天才完整；生产报告还没引用基线。
-- 本地提交：待提交
+- 本地提交：0b26b8e
+- 远端推送：未执行
+
+## 2026-10-27 15:05 +0800 · WORK-043 P1 · 部署与生产验证
+
+- 类型：implementation
+- 变更：从工作树 `0b26b8e` 发版（仅后端，55.0 秒；复用 P0 的前端 dist）；Prometheus/Grafana 规则在生产已加载。
+- 验证：`paideia_build_info=0b26b8e`；合成告警 `work-043-p1-smoke` → 事件 #2 + 诊断 #6 DONE；报告明确写出「cpu/http_5xx/http_p95 均为基线不足（samples_7d=12）」并引用 `http_5xx=0.00%`、`p95=0.230s`、`cpu=29.7%`；Prometheus 21 条录制规则；Grafana 10 条规则 health ok、活动告警 0。
+- 新发现（未修，非 P1 范围）：报告从日志里抓到 `HttpMessageNotWritableException: No converter for [class ApiResponse] with preset Content-Type 'text/javascript'`——响应头被预设为 `text/javascript` 后异常处理器又写 `ApiResponse`，会掩盖原始异常。候选单开一个 lite 修复。
+- 未验证：基线样本需约 50 分钟到 100、7 天才完整；SLO 录制规则在 P3。
+- 本地提交：0b26b8e
 - 远端推送：未执行
