@@ -32,6 +32,7 @@ src/main/resources/db/migration/V20261026120000__add_track_mode.sql -1271398781
 src/main/resources/db/migration/V20261026160000__digest_github_signal.sql -1420678619
 src/main/resources/db/migration/V20261026180000__create_ops_diagnoses.sql 1792553255
 src/main/resources/db/migration/V20261027140000__create_ops_incidents.sql 636833428
+src/main/resources/db/migration/V20261027150000__digest_item_language.sql -1755945477
 src/main/resources/db/migration/V20__add_entry_read_indexes.sql -1148086735
 src/main/resources/db/migration/V21__create_ai_telemetry_tables.sql -891669932
 src/main/resources/db/migration/V22__create_learning_tracks.sql -976007377
