@@ -21,15 +21,15 @@ interface McpTokenMapper {
 
     @Insert("""
             INSERT INTO mcp_access_tokens (user_id, name, token_prefix, token_hash, scopes, toolsets,
-                                           expires_at, created_at)
+                                           daily_call_limit, expires_at, created_at)
             VALUES (#{userId}, #{name}, #{tokenPrefix}, #{tokenHash}, #{scopes}, #{toolsets},
-                    #{expiresAt}, #{createdAt})
+                    #{dailyCallLimit}, #{expiresAt}, #{createdAt})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(McpAccessToken token);
 
     @Select("""
-            SELECT id, user_id, name, token_prefix, token_hash, scopes, toolsets,
+            SELECT id, user_id, name, token_prefix, token_hash, scopes, toolsets, daily_call_limit,
                    expires_at, last_used_at, revoked_at, created_at
             FROM mcp_access_tokens
             WHERE token_hash = #{tokenHash}
@@ -37,13 +37,21 @@ interface McpTokenMapper {
     McpAccessToken findByHash(@Param("tokenHash") String tokenHash);
 
     @Select("""
-            SELECT id, user_id, name, token_prefix, token_hash, scopes, toolsets,
+            SELECT id, user_id, name, token_prefix, token_hash, scopes, toolsets, daily_call_limit,
                    expires_at, last_used_at, revoked_at, created_at
             FROM mcp_access_tokens
             WHERE user_id = #{userId}
             ORDER BY created_at DESC
             """)
     List<McpAccessToken> listByUser(@Param("userId") long userId);
+
+    /**
+     * 未吊销的凭据数量（WORK-044）。
+     *
+     * <p><b>只数未吊销的</b>：吊销过的凭据不该占名额，否则用户每次换设备都得先清理历史。
+     */
+    @Select("SELECT COUNT(*) FROM mcp_access_tokens WHERE user_id = #{userId} AND revoked_at IS NULL")
+    int countActiveByUser(@Param("userId") long userId);
 
     /** 吊销。返回 0 表示不存在或不是本人的——两种都当同一条 404。 */
     @Update("""

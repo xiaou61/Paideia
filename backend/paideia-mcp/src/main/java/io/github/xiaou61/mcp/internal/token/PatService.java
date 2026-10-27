@@ -44,6 +44,17 @@ public class PatService {
     /** 默认有效期：90 天（用户裁决 2026-10-18）；传 null 表示永不过期。 */
     public static final int DEFAULT_EXPIRES_IN_DAYS = 90;
 
+    /**
+     * 每用户凭据数量上限（WORK-044 REQ-010）。
+     *
+     * <p>单机个人项目里这是零成本护栏：没有它，一个写错的客户端可以无限建凭据，
+     * 而每条凭据都是一把能用的钥匙。
+     */
+    public static final int MAX_TOKENS_PER_USER = 20;
+
+    /** 每日调用上限的上界。防手滑写成 8 位数。 */
+    static final int MAX_DAILY_CALL_LIMIT = 100_000;
+
     /** 最后使用时间的写入节流：60 秒内同一 token 只写一次。 */
     private static final Duration TOUCH_INTERVAL = Duration.ofSeconds(60);
 
@@ -56,12 +67,12 @@ public class PatService {
 
     /** 创建结果。**明文只在这里出现一次**。 */
     public record CreatedToken(long id, String plaintext, String prefix, Set<ToolScope> scopes,
-                               Set<String> toolsets, Instant expiresAt) {
+                               Set<String> toolsets, Integer dailyCallLimit, Instant expiresAt) {
     }
 
     /** 列表项：不含 hash，也不含明文。`toolsets` 为空表示不限制工具组。 */
     public record TokenView(long id, String name, String prefix, Set<ToolScope> scopes,
-                            Set<String> toolsets,
+                            Set<String> toolsets, Integer dailyCallLimit,
                             Instant expiresAt, Instant lastUsedAt, Instant revokedAt, Instant createdAt) {
 
         public boolean active(Instant now) {
@@ -69,8 +80,9 @@ public class PatService {
         }
     }
 
-    /** 校验通过后的身份。**userId 只从这里来**。 */
-    public record PatPrincipal(long userId, long tokenId, Set<ToolScope> scopes, Set<String> toolsets) {
+    /** 校验通过后的身份。**userId 只从这里来**。`dailyCallLimit` 为 null 表示不限。 */
+    public record PatPrincipal(long userId, long tokenId, Set<ToolScope> scopes, Set<String> toolsets,
+                               Integer dailyCallLimit) {
 
         /**
          * 这张凭据是否允许某个工具组。
@@ -91,11 +103,13 @@ public class PatService {
     /**
      * 建一张凭据。
      *
-     * @param callerRole 建凭据的账号角色。管理能力是两把锁：凭据要带 admin scope，账号要是
-     *                   ADMIN 角色——这里拒绝非管理员申请 admin scope，不静默降级。
+     * @param dailyCallLimit 每日调用上限；null 或 0 表示不限
+     * @param callerRole     建凭据的账号角色。管理能力是两把锁：凭据要带 admin scope，账号要是
+     *                       ADMIN 角色——这里拒绝非管理员申请 admin scope，不静默降级。
      */
     public CreatedToken create(long userId, String name, Set<ToolScope> scopes,
-                               Set<String> toolsets, Integer expiresInDays, String callerRole) {
+                               Set<String> toolsets, Integer expiresInDays,
+                               Integer dailyCallLimit, String callerRole) {
         String trimmedName = name == null ? "" : name.trim();
         if (trimmedName.isEmpty()) {
             throw new BizException(ErrorCode.INVALID_ARGUMENT, "凭据名称不能为空");
@@ -108,6 +122,12 @@ public class PatService {
         }
         if (scopes.contains(ToolScope.ADMIN) && !"admin".equalsIgnoreCase(callerRole)) {
             throw new BizException(ErrorCode.INVALID_ARGUMENT, "只有管理员可以创建带 admin 权限的凭据");
+        }
+        Integer limit = normalizeDailyLimit(dailyCallLimit);
+        // 只数未吊销的：吊销过的凭据不该占名额，否则换设备时得先清理历史
+        if (tokens.countActiveByUser(userId) >= MAX_TOKENS_PER_USER) {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT,
+                    "最多只能有 " + MAX_TOKENS_PER_USER + " 个凭据；先吊销不用的再建新的。");
         }
 
         String plaintext = TOKEN_PREFIX + randomToken();
@@ -123,12 +143,33 @@ public class PatService {
         token.setTokenHash(hash(plaintext));
         token.setScopes(join(scopes));
         token.setToolsets(toolsets == null || toolsets.isEmpty() ? null : String.join(",", new java.util.TreeSet<>(toolsets)));
+        token.setDailyCallLimit(limit);
         token.setExpiresAt(expiresAt);
         token.setCreatedAt(now);
         tokens.insert(token);
 
         return new CreatedToken(token.getId(), plaintext, token.getTokenPrefix(), Set.copyOf(scopes),
-                parseToolsets(token.getToolsets()), expiresAt);
+                parseToolsets(token.getToolsets()), limit, expiresAt);
+    }
+
+    /**
+     * 归一每日上限：`null` 与 `0` 都表示不限。
+     *
+     * <p>**用 0 表达"不限"是接口约定**：请求体里字段缺失与显式传 null 在 JSON 里无法区分，
+     * 所以前端用 0 表示"我不设上限"（与 `expiresInDays` 同一条约定）。
+     */
+    private static Integer normalizeDailyLimit(Integer raw) {
+        if (raw == null || raw == 0) {
+            return null;
+        }
+        if (raw < 0) {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT, "每日调用上限不能是负数");
+        }
+        if (raw > MAX_DAILY_CALL_LIMIT) {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT,
+                    "每日调用上限不能超过 " + MAX_DAILY_CALL_LIMIT);
+        }
+        return raw;
     }
 
     /**
@@ -162,7 +203,7 @@ public class PatService {
             tokens.touchLastUsed(row.getId(), now);
         }
         return Optional.of(new PatPrincipal(row.getUserId(), row.getId(), parseScopes(row.getScopes()),
-                parseToolsets(row.getToolsets())));
+                parseToolsets(row.getToolsets()), row.getDailyCallLimit()));
     }
 
     public List<TokenView> list(long userId) {
@@ -183,7 +224,7 @@ public class PatService {
 
     private static TokenView toView(McpAccessToken token) {
         return new TokenView(token.getId(), token.getName(), token.getTokenPrefix(), parseScopes(token.getScopes()),
-                parseToolsets(token.getToolsets()),
+                parseToolsets(token.getToolsets()), token.getDailyCallLimit(),
                 token.getExpiresAt(), token.getLastUsedAt(), token.getRevokedAt(), token.getCreatedAt());
     }
 

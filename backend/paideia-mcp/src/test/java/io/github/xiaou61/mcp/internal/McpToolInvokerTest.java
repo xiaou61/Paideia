@@ -1,13 +1,25 @@
 package io.github.xiaou61.mcp.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import io.github.xiaou61.mcp.internal.usage.McpUsageRecorder;
 import io.github.xiaou61.platform.PaideiaTool;
 import io.github.xiaou61.platform.ToolCatalog;
 import io.github.xiaou61.platform.ToolContext;
 import io.github.xiaou61.platform.ToolDescriptor;
 import io.github.xiaou61.platform.ToolResult;
 import io.github.xiaou61.platform.ToolScope;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -15,19 +27,22 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 /**
- * 外部工具执行的三道闸：视图可见性、归属绑定、限流。
+ * 外部工具执行的几道闸：视图可见性、归属绑定、限流、每日配额、返回体截断。
  *
  * <p>每条都是"静默放行"式的失败——不测就只会在某个外泄事件里被发现。
  */
 class McpToolInvokerTest {
 
     private static final McpViewRegistry.PatCaller READER =
-            new McpViewRegistry.PatCaller(7L, 1L, "learner", Set.of(ToolScope.READ), Set.of());
+            new McpViewRegistry.PatCaller(7L, 1L, "learner", Set.of(ToolScope.READ), Set.of(), null);
     private static final McpViewRegistry.PatCaller WRITER =
-            new McpViewRegistry.PatCaller(7L, 1L, "learner", Set.of(ToolScope.READ, ToolScope.WRITE), Set.of());
+            new McpViewRegistry.PatCaller(7L, 1L, "learner", Set.of(ToolScope.READ, ToolScope.WRITE),
+                    Set.of(), null);
 
     private final AtomicReference<ToolContext> lastContext = new AtomicReference<>();
     private final AtomicReference<Map<String, Object>> lastArguments = new AtomicReference<>();
+    private final McpUsageRecorder usage = mock(McpUsageRecorder.class);
+    private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
 
     private PaideiaTool recording(String name, String toolset, boolean readOnly) {
         return recording(name, toolset, readOnly, readOnly ? ToolScope.READ : ToolScope.WRITE);
@@ -55,14 +70,14 @@ class McpToolInvokerTest {
         ToolCatalog catalog = new ToolCatalog(List.of(
                 recording("knowledge_search", "knowledge", true),
                 recording("note_create", "note", false)));
-        return new McpToolInvoker(catalog, new McpRateLimiter(perMinute));
+        return new McpToolInvoker(catalog, new McpRateLimiter(perMinute), usage, new McpMetrics(registry));
     }
 
     private McpToolInvoker invokerWithAdminTool() {
         ToolCatalog catalog = new ToolCatalog(List.of(
                 recording("knowledge_search", "knowledge", true),
                 recording("admin_users_list", "admin_users", true, ToolScope.ADMIN)));
-        return new McpToolInvoker(catalog, new McpRateLimiter(100));
+        return new McpToolInvoker(catalog, new McpRateLimiter(100), usage, new McpMetrics(registry));
     }
 
     @Test
@@ -135,7 +150,8 @@ class McpToolInvokerTest {
             }
         };
         ToolCatalog catalog = new ToolCatalog(List.of(exploding));
-        McpToolInvoker invoker = new McpToolInvoker(catalog, new McpRateLimiter(100));
+        McpToolInvoker invoker = new McpToolInvoker(catalog, new McpRateLimiter(100), usage,
+                new McpMetrics(registry));
 
         ToolResult result = invoker.invoke(READER, McpViews.parse("/x/knowledge").orElseThrow(),
                 "knowledge_boom", Map.of());
@@ -146,7 +162,7 @@ class McpToolInvokerTest {
     }
 
     /**
-     * 审计日志（REQ-020 / AC-010）：每次调用一行，七个字段齐全，**不含参数正文**。
+     * 审计日志（REQ-020 / AC-010）：每次调用一行，字段齐全，**不含参数正文**。
      *
      * <p>用 logback 的内存 appender 捕获：这是唯一能证明"字段真写出来了"的方式——
      * 读代码只能证明"我们打算写"。
@@ -171,7 +187,8 @@ class McpToolInvokerTest {
                     .contains("view=knowledge")
                     .contains("durationMs=")
                     .contains("isError=false")
-                    .contains("bytes=");
+                    .contains("bytes=")
+                    .contains("denied=");
             // 参数正文不得进日志
             assertThat(line).doesNotContain("不该出现在日志里的正文");
         } finally {
@@ -197,7 +214,7 @@ class McpToolInvokerTest {
     @Test
     void adminToolRequiresAdminRoleEvenWithAdminScope() {
         McpViewRegistry.PatCaller demoted = new McpViewRegistry.PatCaller(
-                7L, 1L, "learner", Set.of(ToolScope.READ, ToolScope.ADMIN), Set.of());
+                7L, 1L, "learner", Set.of(ToolScope.READ, ToolScope.ADMIN), Set.of(), null);
 
         ToolResult result = invokerWithAdminTool()
                 .invoke(demoted, McpViews.parse("/x/admin_users").orElseThrow(),
@@ -211,7 +228,7 @@ class McpToolInvokerTest {
     @Test
     void adminToolRunsForAdminRoleAndCarriesRoleIntoContext() {
         McpViewRegistry.PatCaller admin = new McpViewRegistry.PatCaller(
-                7L, 1L, "admin", Set.of(ToolScope.ADMIN), Set.of());
+                7L, 1L, "admin", Set.of(ToolScope.ADMIN), Set.of(), null);
 
         ToolResult result = invokerWithAdminTool()
                 .invoke(admin, McpViews.parse("/x/admin_users").orElseThrow(),
@@ -220,5 +237,100 @@ class McpToolInvokerTest {
         assertThat(result.error()).isFalse();
         assertThat(lastContext.get().admin()).isTrue();
         assertThat(lastContext.get().role()).isEqualTo("admin");
+    }
+
+    // ---------------------------------------------------------------- WORK-044
+
+    /** 配额用尽时工具不执行，且原因是 QUOTA 而不是 PERMISSION。 */
+    @Test
+    void quotaExhaustedStopsBeforeInvoking() {
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        when(usage.callsToday(1L, today)).thenReturn(5);
+        McpViewRegistry.PatCaller limited = new McpViewRegistry.PatCaller(
+                7L, 1L, "learner", Set.of(ToolScope.READ), Set.of(), 5);
+
+        ToolResult result = invoker(100).invoke(limited, McpViews.parse("/x/knowledge").orElseThrow(),
+                "knowledge_search", Map.of());
+
+        assertThat(result.error()).isTrue();
+        assertThat(result.text()).contains("每日上限");
+        assertThat(lastContext.get()).as("不该执行").isNull();
+        assertThat(registry.get("paideia.mcp.denied").tag("reason", "quota").counter().count())
+                .isEqualTo(1.0);
+    }
+
+    /** 上限为 null 时不查库——省掉一次无意义的 SELECT。 */
+    @Test
+    void nullLimitDoesNotQueryUsage() {
+        invoker(100).invoke(READER, McpViews.parse("/x/knowledge").orElseThrow(),
+                "knowledge_search", Map.of());
+
+        verify(usage, never()).callsToday(anyLong(), any());
+    }
+
+    /** 限流是内存判定，配额要查库；两者都触发时应当报限流（先过的那个）。 */
+    @Test
+    void rateLimitTakesPrecedenceOverQuota() {
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        when(usage.callsToday(1L, today)).thenReturn(99);
+        McpViewRegistry.PatCaller both = new McpViewRegistry.PatCaller(
+                7L, 1L, "learner", Set.of(ToolScope.READ), Set.of(), 1);
+        McpToolInvoker invoker = invoker(1);
+
+        invoker.invoke(both, McpViews.parse("/x/knowledge").orElseThrow(), "knowledge_search", Map.of());
+        ToolResult second = invoker.invoke(both, McpViews.parse("/x/knowledge").orElseThrow(),
+                "knowledge_search", Map.of());
+
+        assertThat(second.text()).contains("过于频繁");
+        assertThat(registry.get("paideia.mcp.denied").tag("reason", "rate_limit").counter().count())
+                .isEqualTo(1.0);
+    }
+
+    /** 每次调用都记一次用量，失败也记（errors 靠 errorDelta 区分）。 */
+    @Test
+    void everyCallIsRecorded() {
+        invoker(100).invoke(READER, McpViews.parse("/x/knowledge").orElseThrow(),
+                "knowledge_search", Map.of());
+
+        verify(usage).record(eq(1L), any(), anyBoolean());
+    }
+
+    @Test
+    void capLeavesShortTextAlone() {
+        ToolResult result = ToolResult.ok("短文本");
+
+        assertThat(McpToolInvoker.cap(result)).isSameAs(result);
+    }
+
+    @Test
+    void capTruncatesLongTextAndMarksIt() {
+        String longText = "字".repeat(McpToolInvoker.MAX_RESULT_CHARS + 1);
+
+        ToolResult capped = McpToolInvoker.cap(ToolResult.ok(longText));
+
+        assertThat(capped.text()).contains("[已截断");
+        assertThat(capped.text()).contains("原文 " + longText.length() + " 字符");
+        assertThat(capped.text().length()).isGreaterThan(McpToolInvoker.MAX_RESULT_CHARS);
+    }
+
+    /** 截断 JSON 会让客户端拿到非法结构——structured 必须原样保留。 */
+    @Test
+    void capKeepsStructuredIntact() {
+        Map<String, Object> structured = Map.of("noteId", 42L);
+        ToolResult longOne = ToolResult.ok("x".repeat(McpToolInvoker.MAX_RESULT_CHARS + 1), structured);
+
+        ToolResult capped = McpToolInvoker.cap(longOne);
+
+        assertThat(capped.structured()).isEqualTo(structured);
+    }
+
+    /** 指标标签里不许出现用户输入，否则时间序列会无限增长。 */
+    @Test
+    void labelsCarryNoUserInput() {
+        invoker(100).invoke(READER, McpViews.parse("/x/knowledge").orElseThrow(),
+                "knowledge_search", Map.of("keyword", "某个用户的搜索词"));
+
+        registry.getMeters().forEach(meter -> meter.getId().getTags().forEach(tag ->
+                assertThat(tag.getValue()).doesNotContain("某个用户的搜索词")));
     }
 }

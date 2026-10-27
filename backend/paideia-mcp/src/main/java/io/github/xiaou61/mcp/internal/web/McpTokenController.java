@@ -1,6 +1,7 @@
 package io.github.xiaou61.mcp.internal.web;
 
 import io.github.xiaou61.mcp.internal.token.PatService;
+import io.github.xiaou61.mcp.internal.usage.McpUsageRecorder;
 import io.github.xiaou61.platform.ApiAccess;
 import io.github.xiaou61.platform.ApiResponse;
 import io.github.xiaou61.platform.BizException;
@@ -8,6 +9,8 @@ import io.github.xiaou61.platform.ErrorCode;
 import io.github.xiaou61.platform.ToolScope;
 import io.github.xiaou61.security.CurrentUser;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -33,21 +36,26 @@ import org.springframework.web.bind.annotation.RestController;
 class McpTokenController {
 
     private final PatService tokens;
+    private final McpUsageRecorder usage;
 
-    McpTokenController(PatService tokens) {
+    McpTokenController(PatService tokens, McpUsageRecorder usage) {
         this.tokens = tokens;
+        this.usage = usage;
     }
 
-    record CreateRequest(String name, List<String> scopes, List<String> toolsets, Integer expiresInDays) {
+    record CreateRequest(String name, List<String> scopes, List<String> toolsets, Integer expiresInDays,
+                         Integer dailyCallLimit) {
     }
 
     /** 创建响应：**只此一次**带明文。`toolsets` 空表示不限制工具组。 */
     record CreatedView(long id, String token, String prefix, List<String> scopes, List<String> toolsets,
-                       Instant expiresAt) {
+                       Integer dailyCallLimit, Instant expiresAt) {
     }
 
     record TokenView(long id, String name, String prefix, List<String> scopes, List<String> toolsets,
-                     Instant expiresAt, Instant lastUsedAt, Instant revokedAt, Instant createdAt, boolean active) {
+                     Integer dailyCallLimit, long callsToday, long totalCalls, long totalErrors,
+                     Instant expiresAt, Instant lastUsedAt, Instant revokedAt, Instant createdAt,
+                     boolean active) {
     }
 
     @PostMapping
@@ -60,22 +68,31 @@ class McpTokenController {
         Integer effectiveDays = Integer.valueOf(0).equals(days) ? null
                 : (days == null ? PatService.DEFAULT_EXPIRES_IN_DAYS : days);
         Set<String> toolsets = parseToolsets(request == null ? null : request.toolsets());
+        // 每日上限同一条约定：0 表示"不限"
+        Integer dailyLimit = request == null ? null : request.dailyCallLimit();
         var created = tokens.create(userId, request == null ? null : request.name(), scopes,
-                toolsets, effectiveDays, CurrentUser.role());
+                toolsets, effectiveDays, dailyLimit, CurrentUser.role());
         return ApiResponse.ok(new CreatedView(created.id(), created.plaintext(), created.prefix(),
                 created.scopes().stream().map(ToolScope::key).sorted().toList(),
-                created.toolsets().stream().sorted().toList(), created.expiresAt()));
+                created.toolsets().stream().sorted().toList(), created.dailyCallLimit(),
+                created.expiresAt()));
     }
 
     @GetMapping
     ApiResponse<List<TokenView>> list() {
         Instant now = Instant.now();
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
         return ApiResponse.ok(tokens.list(requester()).stream()
-                .map(view -> new TokenView(view.id(), view.name(), view.prefix(),
-                        view.scopes().stream().map(ToolScope::key).sorted().toList(),
-                        view.toolsets().stream().sorted().toList(),
-                        view.expiresAt(), view.lastUsedAt(), view.revokedAt(), view.createdAt(),
-                        view.active(now)))
+                .map(view -> {
+                    McpUsageRecorder.Totals totals = usage.totals(view.id());
+                    return new TokenView(view.id(), view.name(), view.prefix(),
+                            view.scopes().stream().map(ToolScope::key).sorted().toList(),
+                            view.toolsets().stream().sorted().toList(),
+                            view.dailyCallLimit(), usage.callsToday(view.id(), today),
+                            totals.calls(), totals.errors(),
+                            view.expiresAt(), view.lastUsedAt(), view.revokedAt(), view.createdAt(),
+                            view.active(now));
+                })
                 .toList());
     }
 

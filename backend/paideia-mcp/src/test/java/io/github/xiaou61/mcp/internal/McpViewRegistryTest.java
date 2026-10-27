@@ -2,13 +2,16 @@ package io.github.xiaou61.mcp.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
+import io.github.xiaou61.mcp.internal.usage.McpUsageRecorder;
 import io.github.xiaou61.platform.PaideiaTool;
 import io.github.xiaou61.platform.ToolCatalog;
 import io.github.xiaou61.platform.ToolContext;
 import io.github.xiaou61.platform.ToolDescriptor;
 import io.github.xiaou61.platform.ToolResult;
 import io.github.xiaou61.platform.ToolScope;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -93,7 +96,8 @@ class McpViewRegistryTest {
     @Test
     void unknownAdminGroupIsNotFoundBeforeBuilding() {
         McpViewRegistry registry = new McpViewRegistry(catalog(),
-                new McpToolInvoker(catalog(), new McpRateLimiter(60)));
+                new McpToolInvoker(catalog(), new McpRateLimiter(60), mock(McpUsageRecorder.class),
+                        new McpMetrics(new SimpleMeterRegistry())));
 
         assertThatThrownBy(() -> registry.view("/x/admin_nope", Set.of(), "admin"))
                 .isInstanceOf(McpViewRegistry.ViewNotFoundException.class);
@@ -102,7 +106,8 @@ class McpViewRegistryTest {
     @Test
     void adminGroupIsNotFoundForLearner() {
         McpViewRegistry registry = new McpViewRegistry(catalog(),
-                new McpToolInvoker(catalog(), new McpRateLimiter(60)));
+                new McpToolInvoker(catalog(), new McpRateLimiter(60), mock(McpUsageRecorder.class),
+                        new McpMetrics(new SimpleMeterRegistry())));
 
         // 非管理员探测管理组得到 404，而不是"200 + 空清单"——后者等于确认组名存在
         assertThatThrownBy(() -> registry.view("/x/admin_users", Set.of(), "learner"))

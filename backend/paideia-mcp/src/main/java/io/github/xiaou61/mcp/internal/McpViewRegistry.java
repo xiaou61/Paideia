@@ -45,6 +45,7 @@ class McpViewRegistry {
     static final String ATTR_SCOPES = "pd.pat.scopes";
     static final String ATTR_TOOLSETS = "pd.pat.toolsets";
     static final String ATTR_ROLE = "pd.pat.role";
+    static final String ATTR_DAILY_CALL_LIMIT = "pd.pat.dailyCallLimit";
 
     private final ToolCatalog catalog;
     private final McpToolInvoker invoker;
@@ -114,13 +115,17 @@ class McpViewRegistry {
                 HttpServletStreamableServerTransportProvider.builder()
                         .mcpEndpoint(endpoint)
                         // 把请求里的身份搬进 McpTransportContext：工具处理函数只能从这里拿到"谁在调"
-                        .contextExtractor(request -> io.modelcontextprotocol.common.McpTransportContext.create(
-                                Map.of(
-                                        ATTR_USER_ID, request.getAttribute(ATTR_USER_ID),
-                                        ATTR_TOKEN_ID, request.getAttribute(ATTR_TOKEN_ID),
-                                        ATTR_SCOPES, request.getAttribute(ATTR_SCOPES),
-                                        ATTR_TOOLSETS, request.getAttribute(ATTR_TOOLSETS),
-                                        ATTR_ROLE, request.getAttribute(ATTR_ROLE))))
+                        // **用 HashMap 而不是 Map.of**：Map.of 不接受 null，而每日上限本来就是可空的
+                        .contextExtractor(request -> {
+                            var attributes = new java.util.HashMap<String, Object>();
+                            attributes.put(ATTR_USER_ID, request.getAttribute(ATTR_USER_ID));
+                            attributes.put(ATTR_TOKEN_ID, request.getAttribute(ATTR_TOKEN_ID));
+                            attributes.put(ATTR_SCOPES, request.getAttribute(ATTR_SCOPES));
+                            attributes.put(ATTR_TOOLSETS, request.getAttribute(ATTR_TOOLSETS));
+                            attributes.put(ATTR_ROLE, request.getAttribute(ATTR_ROLE));
+                            attributes.put(ATTR_DAILY_CALL_LIMIT, request.getAttribute(ATTR_DAILY_CALL_LIMIT));
+                            return io.modelcontextprotocol.common.McpTransportContext.create(attributes);
+                        })
                         .build();
 
         var specification = McpServer.sync(transport)
@@ -193,7 +198,10 @@ class McpViewRegistry {
                 ? (Set<String>) set
                 : Set.of();
         String role = context.get(ATTR_ROLE) instanceof String value ? value : "";
-        PatCaller caller = new PatCaller(userId, tokenId, role, scopes, toolsets);
+        Integer dailyCallLimit = context.get(ATTR_DAILY_CALL_LIMIT) instanceof Integer value
+                ? value
+                : null;
+        PatCaller caller = new PatCaller(userId, tokenId, role, scopes, toolsets, dailyCallLimit);
         ToolResult result = invoker.invoke(caller, view, toolName, arguments == null ? Map.of() : arguments);
         var builder = McpSchema.CallToolResult.builder().addTextContent(result.text());
         if (result.structured() != null) {
@@ -206,7 +214,8 @@ class McpViewRegistry {
     }
 
     /** 调用者身份（来自 PAT 解析结果）。`toolsets` 为空表示不限制工具组。 */
-    record PatCaller(long userId, long tokenId, String role, Set<ToolScope> scopes, Set<String> toolsets) {
+    record PatCaller(long userId, long tokenId, String role, Set<ToolScope> scopes, Set<String> toolsets,
+                     Integer dailyCallLimit) {
 
         boolean isAdmin() {
             return "admin".equalsIgnoreCase(role);

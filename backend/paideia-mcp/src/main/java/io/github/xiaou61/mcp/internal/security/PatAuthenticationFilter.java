@@ -39,6 +39,7 @@ class PatAuthenticationFilter extends OncePerRequestFilter {
     static final String ATTR_SCOPES = "pd.pat.scopes";
     static final String ATTR_TOOLSETS = "pd.pat.toolsets";
     static final String ATTR_ROLE = "pd.pat.role";
+    static final String ATTR_DAILY_CALL_LIMIT = "pd.pat.dailyCallLimit";
 
     private final PatService tokens;
     private final RoleLookup roles;
@@ -69,6 +70,7 @@ class PatAuthenticationFilter extends OncePerRequestFilter {
         request.setAttribute(ATTR_SCOPES, found.scopes());
         request.setAttribute(ATTR_TOOLSETS, found.toolsets());
         request.setAttribute(ATTR_ROLE, role);
+        request.setAttribute(ATTR_DAILY_CALL_LIMIT, found.dailyCallLimit());
 
         var authentication = new UsernamePasswordAuthenticationToken(
                 String.valueOf(found.userId()), null,

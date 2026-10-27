@@ -19,6 +19,8 @@ class McpAccessToken {
     private String scopes;
     /** 工具组白名单（逗号分隔）；**null = 不限制**，与本次改动前的语义一致。 */
     private String toolsets;
+    /** 每日调用上限；**null = 不限**（WORK-044）。 */
+    private Integer dailyCallLimit;
     private Instant expiresAt;
     private Instant lastUsedAt;
     private Instant revokedAt;
@@ -78,6 +80,14 @@ class McpAccessToken {
 
     void setToolsets(String toolsets) {
         this.toolsets = toolsets;
+    }
+
+    Integer getDailyCallLimit() {
+        return dailyCallLimit;
+    }
+
+    void setDailyCallLimit(Integer dailyCallLimit) {
+        this.dailyCallLimit = dailyCallLimit;
     }
 
     Instant getExpiresAt() {
