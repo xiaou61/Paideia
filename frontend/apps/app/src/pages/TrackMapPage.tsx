@@ -10,7 +10,7 @@ import {
   Spinner,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Check, Play } from 'lucide-react'
+import { ArrowLeft, Check, Milestone, Play } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 
@@ -42,15 +42,17 @@ function levelMeta(level: string): typeof BEGINNER {
 /**
  * 一条轨道的关卡地图（WORK-024）。
  *
- * <p><b>形态是关卡，不是列表</b>：每一关是一格，编号与排列表达先后；三种状态
- * 一眼可辨——已通关（实心 + 对勾）、当前可进（高亮 + 播放）、被前置锁住（灰 + 锁）。
- * 用户要的就是"闯关/图谱"这种感觉，而不是又一张文章列表。
+ * <p><b>形态是"路径"，不是列表</b>：一条贯穿全页的脊线，关卡节点落在脊线上，
+ * 章节名是脊线上的里程碑。原来每关是一张独立的横条卡，26 关就是 26 张一模一样的条，
+ * 看不出"这是一条路"。
  *
- * <p><b>格与格之间不画连线</b>：卡片是零间距排列的，之前那条 24px 的竖线没有空隙可落，
- * 压强在上一张卡片上、还偏在圆圈中心左侧，看起来像一条来路不明的断线（用户 2026-10-26 直接问
- * "这一条线是什么玩意"）。顺序由 0…N 的编号表达，够了。
+ * <p><b>为什么不做真 3D</b>（用户 2026-10-27 问能不能做 3D）：路径本身是线性的，
+ * 3D 不增加任何信息，只会让后面的关卡被前面的挡住；26 个元素在 3D 空间里扫描成本
+ * 反而上升；`transform: perspective` 会破坏焦点环与命中区（键盘与触屏都受影响）；
+ * 窄屏下更糟。所以这里做的是**纵深**而不是透视：节点落在脊线上、已通关的实心、
+ * 当前那关抬起来（阴影 + 描边），章节里程碑比关卡高一档。
  *
- * <p>章节按服务端给的分组显示；没有章节名的（空串）不显示标题。
+ * <p><b>没有锁定态</b>：任何一关都能直接点进去。顺序由脊线与编号表达，但不拦人。
  */
 export function TrackMapPage() {
   const { slug = '' } = useParams<{ slug: string }>()
@@ -166,11 +168,27 @@ export function TrackMapPage() {
             })}
           </div>
 
-          <div className="space-y-6" data-testid="track-map">
+          {/*
+            路径容器：`relative` 是脊线的定位基准。脊线是一条绝对定位的竖线，
+            节点用负 margin 压在它上面，于是"关卡在路上"这件事是画出来的，不是靠文案说的。
+            筛选后脊线仍然连续——它画在容器上，不画在每一格上。
+          */}
+          <div className="relative" data-testid="track-map">
+            {/*
+              脊线宽 2px 而不是 1px：1px 在浅灰底上几乎看不见，而节点带 4px 的背景色外圈
+              （用来"切断"脊线、让节点显得压在线上），1px 会被这圈完全吃掉——实测改前
+              节点之间是纯空白，根本看不出这是一条路。
+            */}
+            <span
+              aria-hidden
+              className="bg-border absolute top-3 bottom-3 left-[17px] w-0.5"
+            />
             {map.data.chapters.map((chapter, chapterIndex) => (
-              <section key={`${chapter.chapter}-${chapterIndex}`}>
+              <section key={`${chapter.chapter}-${chapterIndex}`} className="relative">
                 {chapter.chapter === '' ? null : (
-                  <h2 className="text-muted-foreground mb-3 text-xs font-medium tracking-wider uppercase">
+                  // 章节是脊线上的里程碑：带背景色把脊线"打断"，图标压在线上
+                  <h2 className="bg-background relative z-10 mb-1 flex items-center gap-2 py-1.5 text-sm font-semibold">
+                    <Milestone className="text-primary size-4 shrink-0" />
                     {chapter.chapter}
                   </h2>
                 )}
@@ -178,7 +196,7 @@ export function TrackMapPage() {
                   {chapter.stages
                     .filter((stage) => levelFilter === null || stage.level === levelFilter)
                     .map((stage) => (
-                    <li key={stage.entryId}>
+                    <li key={stage.entryId} className="relative">
                       <StageCell
                         stage={stage}
                         trackSlug={map.data.slug}
@@ -197,10 +215,11 @@ export function TrackMapPage() {
 }
 
 /**
- * 一格关卡。两种状态：已通关（实心 + 对勾）与可开始（高亮 + 播放）。
+ * 路径上的一个关卡节点。
  *
- * <p><b>没有锁定态</b>：任何一关都能直接点进去。顺序由格子的排列与编号表达，
- * 但不拦人——想跳着看某一关的人不该被挡住。
+ * <p>不是卡片：没有外框、没有独立背景，节点圆圈压在脊线上，标题写在右侧。
+ * 当前可进的那一关抬起来（白底 + 描边 + 阴影），已通关的实心绿——**纵深靠状态表达**，
+ * 这就是"地图"与"列表"的差别：一眼能看出走到哪了，以及下一步在哪。
  */
 function StageCell({
   stage,
@@ -212,52 +231,48 @@ function StageCell({
   trackName: string
 }) {
   const done = stage.status === 'done'
-
-  const icon = done ? <Check className="size-4" /> : <Play className="size-4" />
-
-  const circle = done
-    ? 'bg-success text-success-foreground'
-    : 'bg-primary text-primary-foreground'
-
-  const body = (
-    <>
-      <span
-        className={`flex size-10 shrink-0 items-center justify-center rounded-full ${circle}`}
-        data-testid={`stage-state-${stage.seq}`}
-      >
-        {icon}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium">
-            {stage.seq}. {stage.title}
-          </span>
-          {/* 难度就写在标题旁边：用户要的是"一眼看出哪些适合初学者" */}
-          <span
-            className={`rounded border px-1.5 py-0.5 text-[10px] leading-none ${levelMeta(stage.level).tone}`}
-            data-testid={`stage-level-${stage.seq}`}
-            title={levelMeta(stage.level).hint}
-          >
-            {levelMeta(stage.level).label}
-          </span>
-        </span>
-        <span className="text-muted-foreground mt-0.5 block text-xs">
-          {done ? '已通关' : '可以开始'}
-        </span>
-      </span>
-    </>
-  )
+  const level = levelMeta(stage.level)
 
   return (
     <Link
       to={`/knowledge/entries/${stage.entryId}`}
       // 带上来源：正文页据此把"返回知识库"换成"返回这条轨道的关卡地图"
       state={{ fromTrackSlug: trackSlug, fromTrackName: trackName }}
-      className="border-border bg-card hover:border-primary/40 flex items-center gap-3 rounded-lg border px-3 py-3 transition-colors"
+      className={`group relative flex items-center gap-3 py-2.5 transition-colors ${
+        done ? '' : 'hover:bg-accent/50 -mx-2 rounded-lg px-2'
+      }`}
       data-testid={`stage-${stage.seq}`}
       data-status={stage.status}
     >
-      {body}
+      {/* 节点：压在脊线上。ring 用背景色是为了"切断"脊线，让节点看起来在线上而不是被线穿过。
+          尺寸 36px（原 40px）：节点之间的空隙是脊线唯一露出来的地方，节点越大空隙越小——
+          实测 40px + py-1.5 时节点间只剩 2px，脊线完全看不见。 */}
+      <span
+        className={`relative z-10 flex size-9 shrink-0 items-center justify-center rounded-full ring-[3px] ring-background transition-transform group-hover:scale-105 ${
+          done
+            ? 'bg-success text-success-foreground'
+            : 'bg-primary text-primary-foreground shadow-md'
+        }`}
+        data-testid={`stage-state-${stage.seq}`}
+      >
+        {done ? <Check className="size-3.5" /> : <Play className="size-3.5" />}
+      </span>
+
+      <span className="min-w-0 flex-1 py-1.5">
+        <span className="flex flex-wrap items-center gap-2">
+          <span className={`text-sm ${done ? 'text-muted-foreground' : 'font-medium'}`}>
+            <span className="text-muted-foreground tabular-nums">{stage.seq}.</span> {stage.title}
+          </span>
+          <span
+            className={`rounded border px-1.5 py-0.5 text-[10px] leading-none ${level.tone}`}
+            data-testid={`stage-level-${stage.seq}`}
+            title={level.hint}
+          >
+            {level.label}
+          </span>
+          {done ? <span className="text-success text-[11px]">已通关</span> : null}
+        </span>
+      </span>
     </Link>
   )
 }
