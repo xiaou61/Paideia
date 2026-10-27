@@ -214,6 +214,10 @@ management:
   # 关闭 OTLP metrics 避免同一批指标走两套出口。
   tracing:
     enabled: true
+    export:
+      enabled: true
+      otlp:
+        enabled: true
     sampling:
       probability: ${PAIDEIA_TRACE_SAMPLE_PROBABILITY:1.0}
   otlp:
