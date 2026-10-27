@@ -7077,3 +7077,14 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 未验证：金集 live 模式、真实高流量快烧、生产 `paideia_ai_runs_total`（线上无人用 AI）。
 - 本地提交：c01f4c2、17fa00a + 本次文档提交
 - 远端推送：未执行
+
+## 2026-10-27 17:20 +0800 · WORK-045 · 建项与需求起草
+
+- 类型：decision
+- 变更：新建 `.agent/changes/WORK-045-数据大屏与数据流转/requirements.md`（draft，15 REQ + 10 AC + 3 待确认）。选题来自用户 2026-10-27 的原话（数据大屏/数据流转/要详细且有实用性），按用户指示排在 WORK-043 收口之后。
+- 事实核计（生产库实测，不是估算）：44 张业务表，量级极不均衡——`refresh_tokens` 4609 / `digest_items` 535 / `ai_runs` 55 / `knowledge_entry_views` 55 / `code_runs` 50 / `notes` 7，而 `users` 只有 2，`question_attempts` 与 `concept_mastery_state` 各 1，`camp_tasks`/`camp_attempts`/`ai_interview_evaluations`/`ai_run_payloads` 全为 0。最长数据跨度 8 天（10-19 ~ 10-27）。
+- 决策：大屏放管理端 `/analytics`（不给学习者）；单页五区块；六链泳道手写 CSS/SVG 不引图表库；一个聚合接口五区块一次返回（分开请求会让数字互相矛盾）；**不新增表、不新增埋点**，未采集的显示"未采集"；时间桶按北京自然日。
+- 未做：proposal/design/tasks 三件未起草——校验器要求需求先签署才允许有下游工件（`需求尚未形成，但已经存在下游工件`），已把起草好的 proposal 删掉。
+- 待用户拍板：① 受众只给管理员还是也要学习者精简版（推荐只给管理员）② 是否允许为此新增埋点（推荐不新增，先暴露空白）③ 刷新强度 60 秒还是 10 秒（后者需引入快照表，与"不新增表"冲突）。
+- 本地提交：本次文档提交
+- 远端推送：未执行
