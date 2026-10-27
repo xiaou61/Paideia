@@ -42,6 +42,10 @@ const TOOLSETS: ReadonlyArray<{ key: string; label: string; hint: string }> = [
   { key: 'account', label: '账号资料', hint: '身份与目标岗位' },
   { key: 'assistant', label: '平台助手', hint: '把问题交给平台 AI 回答' },
   { key: 'sql', label: 'SQL 数据集', hint: '看表结构与字段' },
+  { key: 'resume', label: '简历', hint: '列出与读取我的简历' },
+  { key: 'interview', label: '面试评估', hint: '历次模拟面试的评分与建议' },
+  { key: 'review', label: '复习', hint: '待复习条目与复习计划' },
+  { key: 'memory', label: '记忆', hint: '助手记住的关于我的事' },
   { key: 'admin_content', label: '内容管理', hint: '分类/条目/概念/关系的增改删' },
   { key: 'admin_users', label: '用户与积分', hint: '账号、角色、积分流水与调整' },
   { key: 'admin_ai', label: 'AI 观测', hint: '调用概览、趋势、明细与反馈' },
@@ -70,6 +74,8 @@ export function McpTokensPage() {
   const [write, setWrite] = useState(false)
   const [adminScope, setAdminScope] = useState(false)
   const [neverExpires, setNeverExpires] = useState(false)
+  /** 每日调用上限的输入值；空串 = 不限（WORK-044）。 */
+  const [dailyLimit, setDailyLimit] = useState('')
   /** 勾选了的工具组；**空集合 = 全部**（与改动前签发的凭据语义一致）。 */
   const [toolsets, setToolsets] = useState<string[]>([])
   const [created, setCreated] = useState<string | null>(null)
@@ -83,11 +89,14 @@ export function McpTokensPage() {
         scopes: ['read', ...(write ? ['write'] : []), ...(isAdmin && adminScope ? ['admin'] : [])],
         toolsets,
         expiresInDays: neverExpires ? 0 : 90,
+        // 空串与 0 都表示不限：服务端把 0 归一成 null
+        dailyCallLimit: dailyLimit.trim() === '' ? 0 : Number(dailyLimit),
       }),
     onSuccess: async (result) => {
       setCreated(result.token)
       setCopyState('idle')
       setName('')
+      setDailyLimit('')
       setCreateError(null)
       await queryClient.invalidateQueries({ queryKey: ['mcp-tokens'] })
     },
@@ -243,6 +252,22 @@ export function McpTokensPage() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="mcp-token-daily-limit">每日调用上限</Label>
+              <Input
+                id="mcp-token-daily-limit"
+                data-testid="mcp-token-daily-limit"
+                type="number"
+                min={0}
+                placeholder="不填 = 不限"
+                value={dailyLimit}
+                onChange={(event) => { setDailyLimit(event.target.value) }}
+              />
+              <p className="text-muted-foreground text-xs">
+                到上限后这个凭据当天不能再调，第二天自动恢复。按 UTC 日切。
+              </p>
+            </div>
+
+            <div className="space-y-2">
               <Button
                 data-testid="mcp-token-create"
                 disabled={createToken.isPending || nameMissing}
@@ -316,6 +341,14 @@ export function McpTokensPage() {
                       {token.expiresAt === null ? '永不过期' : `到期 ${formatDate(token.expiresAt)}`}
                       {' · '}
                       最近使用 {token.lastUsedAt === null ? '从未' : formatDate(token.lastUsedAt)}
+                    </p>
+                    <p className="text-muted-foreground text-xs" data-testid="mcp-token-usage">
+                      {token.dailyCallLimit === null
+                        ? `今日 ${token.callsToday} 次（不限）`
+                        : `今日 ${token.callsToday} / ${token.dailyCallLimit} 次`}
+                      {' · '}
+                      累计 {token.totalCalls} 次
+                      {token.totalErrors > 0 ? ` · 失败 ${token.totalErrors} 次` : ''}
                     </p>
                   </div>
                   {token.revokedAt === null ? (

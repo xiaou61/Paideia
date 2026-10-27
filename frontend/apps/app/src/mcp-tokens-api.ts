@@ -13,6 +13,13 @@ export interface McpToken {
   scopes: string[]
   /** 工具组白名单；空数组 = 不限制（与改动前的凭据一致）。 */
   toolsets: string[]
+  /** 每日调用上限；null = 不限（WORK-044）。 */
+  dailyCallLimit: number | null
+  /** 今日已调用次数（服务端按 UTC 算，与配额判定同一处）。 */
+  callsToday: number
+  /** 历史累计调用与失败次数。 */
+  totalCalls: number
+  totalErrors: number
   expiresAt: string | null
   lastUsedAt: string | null
   revokedAt: string | null
@@ -26,6 +33,7 @@ export interface CreatedMcpToken {
   prefix: string
   scopes: string[]
   toolsets: string[]
+  dailyCallLimit: number | null
   expiresAt: string | null
 }
 
@@ -36,6 +44,8 @@ export interface McpTokenInput {
   toolsets?: string[]
   /** 0 表示永不过期；不传走服务端默认（90 天）。 */
   expiresInDays?: number
+  /** 每日调用上限；0 或不传 = 不限。 */
+  dailyCallLimit?: number
 }
 
 export interface McpTokensApi {

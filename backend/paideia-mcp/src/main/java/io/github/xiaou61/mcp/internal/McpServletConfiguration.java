@@ -28,9 +28,11 @@ class McpServletConfiguration {
     static final class McpDispatcherServlet extends jakarta.servlet.http.HttpServlet {
 
         private final McpViewRegistry registry;
+        private final McpMetrics metrics;
 
-        McpDispatcherServlet(McpViewRegistry registry) {
+        McpDispatcherServlet(McpViewRegistry registry, McpMetrics metrics) {
             this.registry = registry;
+            this.metrics = metrics;
         }
 
         @Override
@@ -49,6 +51,8 @@ class McpServletConfiguration {
                         : "";
                 view = registry.view(request.getPathInfo(), toolsets, role);
             } catch (McpViewRegistry.ViewNotFoundException missing) {
+                // 视图不存在会在这里就返回，到不了 McpToolInvoker，所以指标只能在这里记
+                metrics.denied(Denial.VIEW_NOT_FOUND.key());
                 // 视图不存在与"端点不存在"给同一个响应，不告诉探测者哪些组存在
                 response.sendError(jakarta.servlet.http.HttpServletResponse.SC_NOT_FOUND);
                 return;
@@ -58,8 +62,8 @@ class McpServletConfiguration {
     }
 
     @Bean
-    ServletContextInitializer mcpServletRegistration(McpViewRegistry registry) {
-        McpDispatcherServlet dispatcher = new McpDispatcherServlet(registry);
+    ServletContextInitializer mcpServletRegistration(McpViewRegistry registry, McpMetrics metrics) {
+        McpDispatcherServlet dispatcher = new McpDispatcherServlet(registry, metrics);
         return servletContext -> {
             ServletRegistration.Dynamic registration = servletContext.addServlet("mcp", dispatcher);
             if (registration == null) {

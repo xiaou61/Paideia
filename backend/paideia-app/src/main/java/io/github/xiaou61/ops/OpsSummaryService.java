@@ -44,7 +44,34 @@ class OpsSummaryService {
         return new OpsSummary(
                 java.time.Instant.now().toString(),
                 reachable,
-                List.of(host, services, middleware, external, scheduled, switchesGroup(), backup));
+                List.of(host, services, middleware, external, scheduled, switchesGroup(), mcpGroup(), backup));
+    }
+
+    /**
+     * 外部 MCP 的调用量与被拒原因（WORK-044 REQ-015）。
+     *
+     * <p>指标名与 `McpMetrics` 一致；Prometheus 抓不到时各项显示"未知"而不是 0——
+     * 0 会被误读成"没人用"，而真相是"我们还不知道"。
+     */
+    private OpsSummary.Group mcpGroup() {
+        Double total = scalar("sum(paideia_mcp_tool_calls_total)");
+        Double denied = scalar("sum(paideia_mcp_denied_total)");
+        Double quota = scalar("sum(paideia_mcp_denied_total{reason=\"quota\"})");
+        return new OpsSummary.Group("mcp", "外部 MCP", OpsStatus.OK,
+                "累计调用 " + count(total) + "、被拒 " + count(denied) + "（其中配额 " + count(quota) + "）",
+                List.of(OpsSummary.Metric.text("tool_calls", count(total)),
+                        OpsSummary.Metric.text("denied", count(denied)),
+                        OpsSummary.Metric.text("denied_quota", count(quota))));
+    }
+
+    /** 聚合查询的结果只有一行、没有标签；查不到返回 null（区分"没人用"与"抓不到"）。 */
+    private Double scalar(String query) {
+        List<PrometheusClient.Sample> samples = prometheus.query(query);
+        return samples.isEmpty() ? null : samples.getFirst().value();
+    }
+
+    private static String count(Double value) {
+        return value == null ? "未知" : String.valueOf(value.longValue());
     }
 
     private OpsSummary.Group hostGroup(OpsProperties.Thresholds thresholds) {

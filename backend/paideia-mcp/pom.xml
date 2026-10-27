@@ -47,6 +47,12 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-validation</artifactId>
     </dependency>
+    <!-- 指标（WORK-044 TASK-005）：MeterRegistry 来自 actuator 的 micrometer-core。
+         只引 core 而不引 prometheus registry——registry 由 paideia-app 决定用哪一个。 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
 
     <!-- 与 AgentScope 传入的版本一致；不写版本号会随调解漂移 -->
     <dependency>

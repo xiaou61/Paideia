@@ -1,21 +1,39 @@
 {
   "uid": "paideia-ops",
   "title": "Paideia 运维",
-  "tags": ["paideia", "ops"],
+  "tags": [
+    "paideia",
+    "ops"
+  ],
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 1,
   "refresh": "30s",
-  "time": { "from": "now-6h", "to": "now" },
-  "templating": { "list": [] },
-  "annotations": { "list": [] },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
   "panels": [
     {
       "id": 1,
       "type": "gauge",
       "title": "磁盘已用（/）",
-      "gridPos": { "h": 6, "w": 4, "x": 0, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "paideia-prometheus" },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "paideia-prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
@@ -24,9 +42,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 0.70 },
-              { "color": "red", "value": 0.85 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.7
+              },
+              {
+                "color": "red",
+                "value": 0.85
+              }
             ]
           }
         },
@@ -44,10 +71,24 @@
       "id": 2,
       "type": "timeseries",
       "title": "主机资源",
-      "gridPos": { "h": 6, "w": 10, "x": 4, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "paideia-prometheus" },
+      "gridPos": {
+        "h": 6,
+        "w": 10,
+        "x": 4,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "paideia-prometheus"
+      },
       "fieldConfig": {
-        "defaults": { "custom": { "fillOpacity": 10, "lineWidth": 1 }, "unit": "percent" },
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 1
+          },
+          "unit": "percent"
+        },
         "overrides": []
       },
       "targets": [
@@ -68,15 +109,37 @@
       "type": "timeseries",
       "title": "线程池队列（打满 = 用户看不到回答）",
       "description": "队列容量 8。queued 贴近容量时，第 41 条并发就会被直接 429，而服务端此前没有任何计数。",
-      "gridPos": { "h": 6, "w": 10, "x": 14, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "paideia-prometheus" },
+      "gridPos": {
+        "h": 6,
+        "w": 10,
+        "x": 14,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "paideia-prometheus"
+      },
       "fieldConfig": {
-        "defaults": { "custom": { "fillOpacity": 20, "lineWidth": 1 }, "unit": "short" },
+        "defaults": {
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 1
+          },
+          "unit": "short"
+        },
         "overrides": []
       },
       "targets": [
-        { "refId": "A", "expr": "executor_queued_tasks", "legendFormat": "排队中" },
-        { "refId": "B", "expr": "executor_active_threads", "legendFormat": "活跃线程" },
+        {
+          "refId": "A",
+          "expr": "executor_queued_tasks",
+          "legendFormat": "排队中"
+        },
+        {
+          "refId": "B",
+          "expr": "executor_active_threads",
+          "legendFormat": "活跃线程"
+        },
         {
           "refId": "C",
           "expr": "sum(increase(executor_rejected_tasks_total[5m])) or vector(0)",
@@ -89,14 +152,32 @@
       "type": "timeseries",
       "title": "Laya 内存水位（上限 3G）",
       "description": "2026-10-20 实测 2.55G / 3G = 85%。OOM 后分类器静默退回规则判断，功能还在但决策模型已经不在了。",
-      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 6 },
-      "datasource": { "type": "prometheus", "uid": "paideia-prometheus" },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 6
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "paideia-prometheus"
+      },
       "fieldConfig": {
-        "defaults": { "custom": { "fillOpacity": 15, "lineWidth": 1 }, "unit": "decbytes" },
+        "defaults": {
+          "custom": {
+            "fillOpacity": 15,
+            "lineWidth": 1
+          },
+          "unit": "decbytes"
+        },
         "overrides": []
       },
       "targets": [
-        { "refId": "A", "expr": "paideia_unit_memory_bytes{unit=\"laya\"}", "legendFormat": "已用" },
+        {
+          "refId": "A",
+          "expr": "paideia_unit_memory_bytes{unit=\"laya\"}",
+          "legendFormat": "已用"
+        },
         {
           "refId": "B",
           "expr": "paideia_unit_memory_max_bytes{unit=\"laya\"}",
@@ -109,10 +190,24 @@
       "type": "timeseries",
       "title": "请求量与错误率",
       "description": "注意：SSE 端点（助手回答）量不准——SseEmitter 让 handler 立即返回，这里量不到 5–60 秒的流式生成。",
-      "gridPos": { "h": 6, "w": 9, "x": 6, "y": 6 },
-      "datasource": { "type": "prometheus", "uid": "paideia-prometheus" },
+      "gridPos": {
+        "h": 6,
+        "w": 9,
+        "x": 6,
+        "y": 6
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "paideia-prometheus"
+      },
       "fieldConfig": {
-        "defaults": { "custom": { "fillOpacity": 10, "lineWidth": 1 }, "unit": "reqps" },
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 1
+          },
+          "unit": "reqps"
+        },
         "overrides": []
       },
       "targets": [
@@ -138,34 +233,83 @@
       "type": "stat",
       "title": "备份新鲜度",
       "description": "超过 36 小时没有成功备份即红。当前 7 天保留、每日 03:15。",
-      "gridPos": { "h": 6, "w": 5, "x": 15, "y": 6 },
-      "datasource": { "type": "prometheus", "uid": "paideia-prometheus" },
+      "gridPos": {
+        "h": 6,
+        "w": 5,
+        "x": 15,
+        "y": 6
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "paideia-prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "h",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 36 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 36
+              }
             ]
           }
         },
         "overrides": []
       },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" },
-      "targets": [{ "refId": "A", "expr": "paideia_backup_age_seconds / 3600", "legendFormat": "小时" }]
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "paideia_backup_age_seconds / 3600",
+          "legendFormat": "小时"
+        }
+      ]
     },
     {
       "id": 7,
       "type": "table",
       "title": "采集目标与外部依赖",
       "description": "up=0 表示这个目标连不上。firecrawl 走 http_401 探活：401 才算通，502 是 api 挂了。",
-      "gridPos": { "h": 7, "w": 10, "x": 0, "y": 12 },
-      "datasource": { "type": "prometheus", "uid": "paideia-prometheus" },
-      "fieldConfig": { "defaults": { "custom": { "cellOptions": { "type": "auto" } } }, "overrides": [] },
+      "gridPos": {
+        "h": 7,
+        "w": 10,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "paideia-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": []
+      },
       "targets": [
-        { "refId": "A", "expr": "up", "format": "table", "instant": true },
+        {
+          "refId": "A",
+          "expr": "up",
+          "format": "table",
+          "instant": true
+        },
         {
           "refId": "B",
           "expr": "probe_success",
@@ -178,22 +322,62 @@
       "id": 8,
       "type": "table",
       "title": "systemd 单元与容器",
-      "gridPos": { "h": 7, "w": 10, "x": 10, "y": 12 },
-      "datasource": { "type": "prometheus", "uid": "paideia-prometheus" },
-      "fieldConfig": { "defaults": { "custom": { "cellOptions": { "type": "auto" } } }, "overrides": [] },
+      "gridPos": {
+        "h": 7,
+        "w": 10,
+        "x": 10,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "paideia-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": []
+      },
       "targets": [
-        { "refId": "A", "expr": "paideia_unit_active", "format": "table", "instant": true },
-        { "refId": "B", "expr": "paideia_container_running", "format": "table", "instant": true }
+        {
+          "refId": "A",
+          "expr": "paideia_unit_active",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "B",
+          "expr": "paideia_container_running",
+          "format": "table",
+          "instant": true
+        }
       ]
     },
     {
       "id": 9,
       "type": "timeseries",
       "title": "MySQL 连接与查询速率",
-      "gridPos": { "h": 7, "w": 10, "x": 20, "y": 12 },
-      "datasource": { "type": "prometheus", "uid": "paideia-prometheus" },
+      "gridPos": {
+        "h": 7,
+        "w": 10,
+        "x": 20,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "paideia-prometheus"
+      },
       "fieldConfig": {
-        "defaults": { "custom": { "fillOpacity": 10, "lineWidth": 1 } },
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 1
+          }
+        },
         "overrides": []
       },
       "targets": [
@@ -218,8 +402,16 @@
       "id": 10,
       "type": "logs",
       "title": "应用与 Laya 最近错误日志（Loki）",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 19 },
-      "datasource": { "type": "loki", "uid": "paideia-loki" },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 19
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "paideia-loki"
+      },
       "options": {
         "showTime": true,
         "wrapLogMessage": true,
@@ -241,20 +433,40 @@
       "type": "timeseries",
       "title": "SLI（1 小时窗口）",
       "description": "口径：HTTP 可用性排除 4xx 与 /actuator；延迟是「≤984ms 的请求占比」（Micrometer 默认桶没有 1.0 边界）；AI 的 402 不进分母。没有流量时曲线断开，不是 0。",
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 27 },
-      "datasource": { "type": "prometheus", "uid": "paideia-prometheus" },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 27
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "paideia-prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
           "min": 0.8,
           "max": 1,
-          "custom": { "fillOpacity": 0, "lineWidth": 2 },
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 2
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 0.97 },
-              { "color": "red", "value": 0.95 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.97
+              },
+              {
+                "color": "red",
+                "value": 0.95
+              }
             ]
           }
         },
@@ -293,20 +505,43 @@
       "type": "timeseries",
       "title": "燃尽率（1.0 = 按预算匀速烧，14.4 = 一小时烧掉 2%）",
       "description": "快烧 1h+5m 都 >14.4；慢烧 6h+30m 都 >6；工单级 3d+6h 都 >1。阈值 1/6/14.4 与 Grafana 规则一致。",
-      "gridPos": { "h": 7, "w": 8, "x": 12, "y": 27 },
-      "datasource": { "type": "prometheus", "uid": "paideia-prometheus" },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 12,
+        "y": 27
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "paideia-prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
           "min": 0,
-          "custom": { "fillOpacity": 0, "lineWidth": 2 },
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 2
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 1 },
-              { "color": "orange", "value": 6 },
-              { "color": "red", "value": 14.4 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "orange",
+                "value": 6
+              },
+              {
+                "color": "red",
+                "value": 14.4
+              }
             ]
           }
         },
@@ -345,8 +580,16 @@
       "type": "stat",
       "title": "HTTP 可用性预算剩余（近 7 天）",
       "description": "1 −（1 − SLI）/（1 − 目标）。100% 表示这段时间一次预算都没花；0 表示刚好烧完；负数表示已经超支。用 7 天滚动而不是自然月，是因为 Prometheus 只保留 30 天，自然月窗口在月初会失真。",
-      "gridPos": { "h": 7, "w": 4, "x": 20, "y": 27 },
-      "datasource": { "type": "prometheus", "uid": "paideia-prometheus" },
+      "gridPos": {
+        "h": 7,
+        "w": 4,
+        "x": 20,
+        "y": 27
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "paideia-prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
@@ -355,20 +598,107 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 0 },
-              { "color": "green", "value": 0.25 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 0.25
+              }
             ]
           }
         },
         "overrides": []
       },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "textMode": "value"
+      },
       "targets": [
         {
           "refId": "A",
           "expr": "(((sum(rate(http_server_requests_seconds_count{status!~\"4..|5..\", uri!~\"/actuator.*\"}[7d])) or vector(0)) / sum(rate(http_server_requests_seconds_count{status!~\"4..\", uri!~\"/actuator.*\"}[7d]))) - paideia:slo_target:http_availability) / (1 - paideia:slo_target:http_availability)",
           "legendFormat": "剩余"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "外部 MCP 调用（按组与结果）",
+      "description": "WORK-044：被拒（denied）不计入工具失败率。配额拒绝通常意味着某个客户端在狂刷。",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 34
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "paideia-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 1
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (toolset) (rate(paideia_mcp_tool_calls_total{result=\"ok\"}[5m]))",
+          "legendFormat": "{{toolset}} ok"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (reason) (rate(paideia_mcp_denied_total[5m]))",
+          "legendFormat": "被拒 {{reason}}"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "外部 MCP 工具平均耗时（最慢 8 个）",
+      "description": "WORK-044：Micrometer Timer 在未配 percentile histogram 时导出的是 summary（_count/_sum），只能算平均值。要 p95 需在配置里开 publishing.percentiles。",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 34
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "paideia-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 5,
+            "lineWidth": 1
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(8, sum by (tool) (rate(paideia_mcp_tool_duration_seconds_sum[5m])) / sum by (tool) (rate(paideia_mcp_tool_duration_seconds_count[5m])))",
+          "legendFormat": "{{tool}}"
         }
       ]
     }

@@ -128,9 +128,11 @@ class McpAdminIntegrationTest {
         HttpResponse<String> learnerView = postJson("/mcp/x/admin_users", learnerPat, initializeBody(), null);
         assertThat(learnerView.statusCode()).isEqualTo(404);
 
-        // 学习者默认视图与改动前一致：12 个只读工具，且没有任何管理工具
+        // 学习者默认视图：19 个只读工具，且没有任何管理工具。
+        // 12 → 19 是 WORK-044 之前就发生的（assistant_ask 等进了默认组），不是本项改的。
         List<String> learnerTools = tools("/mcp", learnerPat, initialize("/mcp", learnerPat));
-        assertThat(learnerTools).hasSize(12);
+        // 19 是 WORK-044 之前就有的实际值（本项新增的 8 个工具都是 defaultGroup=false，不计入）
+        assertThat(learnerTools).hasSize(19);
         assertThat(learnerTools).noneMatch(name -> name.startsWith("admin_"));
     }
 
@@ -166,32 +168,32 @@ class McpAdminIntegrationTest {
     }
 
     @Test
-    @DisplayName("38 个管理工具全部注册、全部 ADMIN、只落在 7 个管理组")
+    @DisplayName("41 个管理工具全部注册、全部 ADMIN、只落在 7 个管理组")
     void allAdminToolsAreRegistered() {
         List<io.github.xiaou61.platform.ToolDescriptor> admin = catalog.snapshot().stream()
                 .filter(tool -> tool.name().startsWith("admin_"))
                 .toList();
 
-        assertThat(admin).hasSize(38);
+        assertThat(admin).hasSize(41);
         assertThat(admin).allMatch(tool -> tool.scope() == ToolScope.ADMIN);
         assertThat(admin).allMatch(tool -> !tool.defaultGroup());
         assertThat(admin.stream().map(io.github.xiaou61.platform.ToolDescriptor::toolset)
                 .collect(java.util.stream.Collectors.toSet()))
                 .containsExactlyInAnyOrder("admin_content", "admin_users", "admin_ai",
                         "admin_review", "admin_learning", "admin_ops", "admin_digest");
-        assertThat(admin).filteredOn(io.github.xiaou61.platform.ToolDescriptor::readOnly).hasSize(19);
+        assertThat(admin).filteredOn(io.github.xiaou61.platform.ToolDescriptor::readOnly).hasSize(22);
         assertThat(admin).filteredOn(io.github.xiaou61.platform.ToolDescriptor::destructive).hasSize(9);
     }
 
     // ------------------------------------------------------------- helpers
 
     private String adminPat() {
-        return tokens.create(adminId, "管理集成测试", Set.of(ToolScope.ADMIN), Set.of(), 1, "admin")
+        return tokens.create(adminId, "管理集成测试", Set.of(ToolScope.ADMIN), Set.of(), 1, null, "admin")
                 .plaintext();
     }
 
     private String learnerPat() {
-        return tokens.create(learnerId, "学习者集成测试", Set.of(ToolScope.READ), Set.of(), 1, "learner")
+        return tokens.create(learnerId, "学习者集成测试", Set.of(ToolScope.READ), Set.of(), 1, null, "learner")
                 .plaintext();
     }
 

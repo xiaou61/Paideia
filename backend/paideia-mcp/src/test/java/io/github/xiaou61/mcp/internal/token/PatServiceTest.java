@@ -37,7 +37,7 @@ class PatServiceTest {
             return 1;
         });
 
-        PatService.CreatedToken created = service.create(7L, "笔记本", Set.of(ToolScope.READ), Set.of(), 90, "learner");
+        PatService.CreatedToken created = service.create(7L, "笔记本", Set.of(ToolScope.READ), Set.of(), 90, null, "learner");
 
         assertThat(created.plaintext()).startsWith(PatService.TOKEN_PREFIX);
         assertThat(created.plaintext().length()).isGreaterThan(PatService.TOKEN_PREFIX.length() + 30);
@@ -54,17 +54,17 @@ class PatServiceTest {
             return 1;
         });
 
-        assertThat(service.create(7L, "长期", Set.of(ToolScope.READ), Set.of(), null, "learner").expiresAt()).isNull();
+        assertThat(service.create(7L, "长期", Set.of(ToolScope.READ), Set.of(), null, null, "learner").expiresAt()).isNull();
     }
 
     @Test
     void rejectsBlankNameAndMissingScopes() {
-        assertThatThrownBy(() -> service.create(7L, "  ", Set.of(ToolScope.READ), Set.of(), 90, "learner"))
+        assertThatThrownBy(() -> service.create(7L, "  ", Set.of(ToolScope.READ), Set.of(), 90, null, "learner"))
                 .isInstanceOf(BizException.class).hasMessageContaining("名称");
-        assertThatThrownBy(() -> service.create(7L, "x", Set.of(), Set.of(), 90, "learner"))
+        assertThatThrownBy(() -> service.create(7L, "x", Set.of(), Set.of(), 90, null, "learner"))
                 .isInstanceOf(BizException.class).hasMessageContaining("权限范围");
         // 管理能力是两把锁：非管理员申请 admin scope 必须被拒，不能静默降级
-        assertThatThrownBy(() -> service.create(7L, "x", Set.of(ToolScope.ADMIN), Set.of(), 90, "learner"))
+        assertThatThrownBy(() -> service.create(7L, "x", Set.of(ToolScope.ADMIN), Set.of(), 90, null, "learner"))
                 .isInstanceOf(BizException.class).hasMessageContaining("管理员");
         verify(mapper, never()).insert(any());
     }
@@ -77,7 +77,7 @@ class PatServiceTest {
         });
 
         PatService.CreatedToken created = service.create(7L, "管理", Set.of(ToolScope.ADMIN),
-                Set.of("admin_users"), 90, "admin");
+                Set.of("admin_users"), 90, null, "admin");
 
         assertThat(created.scopes()).containsExactly(ToolScope.ADMIN);
         assertThat(created.toolsets()).containsExactly("admin_users");
@@ -153,8 +153,74 @@ class PatServiceTest {
         assertThat(view.toString()).doesNotContain("tokenHash").doesNotContain("0123456789");
     }
 
-    private static McpAccessToken row(String plaintext, Instant expiresAt, Instant revokedAt, Instant lastUsedAt) {
-        McpAccessToken token = new McpAccessToken();
+    // ---------------------------------------------------------------- WORK-044
+
+    /** 凭据数量上限：第 21 个被拒。 */
+    @Test
+    void rejectsTwentyFirstToken() {
+        when(mapper.countActiveByUser(7L)).thenReturn(PatService.MAX_TOKENS_PER_USER);
+
+        assertThatThrownBy(() -> service.create(7L, "多一个", Set.of(ToolScope.READ), Set.of(),
+                90, null, "learner"))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining(String.valueOf(PatService.MAX_TOKENS_PER_USER));
+        verify(mapper, never()).insert(any());
+    }
+
+    /** 吊销过的凭据不占名额——否则换设备时得先清理历史。 */
+    @Test
+    void revokedTokensDoNotCountTowardLimit() {
+        // countActiveByUser 只数 revoked_at IS NULL 的行，19 个活凭据可以再建一个
+        when(mapper.countActiveByUser(7L)).thenReturn(19);
+        when(mapper.insert(any())).thenAnswer(invocation -> {
+            ((McpAccessToken) invocation.getArgument(0)).setId(20L);
+            return 1;
+        });
+
+        PatService.CreatedToken created = service.create(7L, "第 20 个", Set.of(ToolScope.READ),
+                Set.of(), 90, null, "learner");
+
+        assertThat(created.id()).isEqualTo(20L);
+    }
+
+    /** 每日上限：0 与 null 都表示不限，负数与超上界被拒。 */
+    @Test
+    void normalizesDailyCallLimit() {
+        when(mapper.insert(any())).thenAnswer(invocation -> {
+            ((McpAccessToken) invocation.getArgument(0)).setId(1L);
+            return 1;
+        });
+
+        assertThat(service.create(7L, "零", Set.of(ToolScope.READ), Set.of(), 90, 0, "learner")
+                .dailyCallLimit()).isNull();
+        assertThat(service.create(7L, "空", Set.of(ToolScope.READ), Set.of(), 90, null, "learner")
+                .dailyCallLimit()).isNull();
+        assertThat(service.create(7L, "有", Set.of(ToolScope.READ), Set.of(), 90, 100, "learner")
+                .dailyCallLimit()).isEqualTo(100);
+
+        assertThatThrownBy(() -> service.create(7L, "负", Set.of(ToolScope.READ), Set.of(),
+                90, -1, "learner"))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("负数");
+        assertThatThrownBy(() -> service.create(7L, "大", Set.of(ToolScope.READ), Set.of(),
+                90, 100_001, "learner"))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("不能超过");
+    }
+
+    /** 上限随身份一起返回，供配额判定使用。 */
+    @Test
+    void authenticateCarriesDailyCallLimit() {
+        String token = PatService.TOKEN_PREFIX + "abcdefghijklmnopqrstuvwxyz0123456789";
+        McpAccessToken stored = row(token, Instant.now().plusSeconds(3600), null, null);
+        stored.setDailyCallLimit(50);
+        when(mapper.findByHash(any())).thenReturn(stored);
+
+        assertThat(service.authenticate(token)).isPresent()
+                .get().extracting(PatService.PatPrincipal::dailyCallLimit).isEqualTo(50);
+    }
+
+    private static McpAccessToken row(String plaintext, Instant expiresAt, Instant revokedAt, Instant lastUsedAt) {        McpAccessToken token = new McpAccessToken();
         token.setId(1L);
         token.setUserId(7L);
         token.setName("测试");
