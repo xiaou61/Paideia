@@ -72,6 +72,11 @@
       <artifactId>spring-boot-webmvc-test</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- WORK-043 P3：登录成功率指标（SLO 用）。 -->
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-core</artifactId>
+    </dependency>
   </dependencies>
 
   <build>

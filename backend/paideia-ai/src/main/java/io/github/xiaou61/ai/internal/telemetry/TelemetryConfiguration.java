@@ -1,6 +1,7 @@
 package io.github.xiaou61.ai.internal.telemetry;
 
 import io.github.xiaou61.ai.RunRecorder;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -22,11 +23,12 @@ class TelemetryConfiguration {
     private static final Logger log = LoggerFactory.getLogger(TelemetryConfiguration.class);
 
     @Bean
-    RunRecorder runRecorder(RunWriteQueue queue, TelemetryProperties properties) {
+    RunRecorder runRecorder(RunWriteQueue queue, TelemetryProperties properties,
+                            MeterRegistry meterRegistry) {
         if (!properties.isEnabled()) {
             log.warn("ai.telemetry.disabled：AI 调用统计已关闭，不产生任何记录（历史数据不受影响）");
             return new NoopRunRecorder();
         }
-        return new DefaultRunRecorder(queue, properties);
+        return new DefaultRunRecorder(queue, properties, meterRegistry);
     }
 }

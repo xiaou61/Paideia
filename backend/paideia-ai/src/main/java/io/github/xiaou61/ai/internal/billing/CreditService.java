@@ -4,6 +4,7 @@ import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.PageQuery;
 import io.github.xiaou61.platform.PageResult;
 import io.github.xiaou61.platform.ErrorCode;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
@@ -41,11 +42,14 @@ public class CreditService {
     private final CreditAccountMapper accounts;
     private final CreditLedgerMapper ledger;
     private final BillingProperties billing;
+    private final MeterRegistry metrics;
 
-    CreditService(CreditAccountMapper accounts, CreditLedgerMapper ledger, BillingProperties billing) {
+    CreditService(CreditAccountMapper accounts, CreditLedgerMapper ledger, BillingProperties billing,
+                  MeterRegistry metrics) {
         this.accounts = accounts;
         this.ledger = ledger;
         this.billing = billing;
+        this.metrics = metrics;
     }
 
     /** 对外的流水行。 */
@@ -216,6 +220,7 @@ public class CreditService {
                 deducted = actual;
             } else {
                 log.warn("ai.credit.settle_shortfall userId={} reserved={} actual={}", userId, reserved, actual);
+                metrics.counter("paideia.credit.settlement.shortfall").increment();
                 note = "余额不足以补扣差额 " + excess + " 分";
             }
         }

@@ -4,6 +4,7 @@ import io.github.xiaou61.ai.RunOutcome;
 import io.github.xiaou61.ai.RunRecorder;
 import io.github.xiaou61.ai.RunSpec;
 import io.github.xiaou61.ai.SpanSpec;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -43,10 +44,13 @@ final class DefaultRunRecorder implements RunRecorder {
 
     private final RunWriteQueue queue;
     private final TelemetryProperties properties;
+    private final MeterRegistry meterRegistry;
 
-    DefaultRunRecorder(RunWriteQueue queue, TelemetryProperties properties) {
+    DefaultRunRecorder(RunWriteQueue queue, TelemetryProperties properties,
+                       MeterRegistry meterRegistry) {
         this.queue = queue;
         this.properties = properties;
+        this.meterRegistry = meterRegistry;
     }
 
     @Override
@@ -57,7 +61,7 @@ final class DefaultRunRecorder implements RunRecorder {
     @Override
     public RunScope begin(RunSpec spec) {
         String traceId = newTraceId();
-        RunScopeImpl scope = new RunScopeImpl(traceId, spec, queue, properties);
+        RunScopeImpl scope = new RunScopeImpl(traceId, spec, queue, properties, meterRegistry);
         // **立刻投一条 running**：进程崩溃 / 线程卡死的那一轮必须留得下来，
         // 而那种行恰好是最该查的。只在结束时写的话，这三类故障一行都不会有。
         queue.offer(new RunPayload.RunBegin(scope.runningSnapshot()));
@@ -76,6 +80,7 @@ final class DefaultRunRecorder implements RunRecorder {
         private final RunSpec spec;
         private final RunWriteQueue queue;
         private final TelemetryProperties properties;
+        private final MeterRegistry meterRegistry;
         private final Instant startedAt = Instant.now();
         private final Map<String, Object> attrs = new LinkedHashMap<>();
         private final List<SpanRecord> spans = new ArrayList<>();
@@ -91,11 +96,13 @@ final class DefaultRunRecorder implements RunRecorder {
         private volatile Integer ttftMs;
         private volatile int credits;
 
-        RunScopeImpl(String traceId, RunSpec spec, RunWriteQueue queue, TelemetryProperties properties) {
+        RunScopeImpl(String traceId, RunSpec spec, RunWriteQueue queue, TelemetryProperties properties,
+                     MeterRegistry meterRegistry) {
             this.traceId = traceId;
             this.spec = spec;
             this.queue = queue;
             this.properties = properties;
+            this.meterRegistry = meterRegistry;
         }
 
         RunRecord runningSnapshot() {
@@ -195,7 +202,14 @@ final class DefaultRunRecorder implements RunRecorder {
             synchronized (payloads) {
                 payloadCopy = List.copyOf(payloads);
             }
-            queue.offer(new RunPayload.RunFinish(snapshot(outcome.key(), errorType), payloadCopy));
+            RunRecord record = snapshot(outcome.key(), errorType);
+            String kind = record.kind() == null || record.kind().isBlank() ? "unknown" : record.kind();
+            meterRegistry.counter("paideia.ai.runs", "kind", kind, "outcome", outcome.key()).increment();
+            if (record.durationMs() != null) {
+                meterRegistry.timer("paideia.ai.run.duration", "kind", kind)
+                        .record(Duration.ofMillis(record.durationMs()));
+            }
+            queue.offer(new RunPayload.RunFinish(record, payloadCopy));
         }
 
         /** 没 finish 就关：说明调用方走了异常路径。补一条 interrupted，绝不留 running 僵尸。 */

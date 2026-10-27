@@ -7,6 +7,7 @@ import io.github.xiaou61.ai.RunOutcome;
 import io.github.xiaou61.ai.RunRecorder;
 import io.github.xiaou61.ai.RunSpec;
 import io.github.xiaou61.ai.SpanSpec;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
@@ -63,7 +64,7 @@ class DefaultRunRecorderTest {
     @DisplayName("finish 与 close 都调用时只写一条终态")
     void finishAndCloseWriteOnce() {
         TestQueue queue = new TestQueue(properties());
-        RunRecorder recorder = new DefaultRunRecorder(queue, new TelemetryProperties());
+        RunRecorder recorder = new DefaultRunRecorder(queue, new TelemetryProperties(), new SimpleMeterRegistry());
         RunRecorder.RunScope run = recorder.begin(RunSpec.of(RunKind.CHAT, 7L));
         run.finish(RunOutcome.OK, null);
         run.close();
@@ -80,7 +81,7 @@ class DefaultRunRecorderTest {
     @DisplayName("只 close 不 finish 记为 interrupted")
     void closeWithoutFinishRecordsInterrupted() {
         TestQueue queue = new TestQueue(properties());
-        RunRecorder recorder = new DefaultRunRecorder(queue, new TelemetryProperties());
+        RunRecorder recorder = new DefaultRunRecorder(queue, new TelemetryProperties(), new SimpleMeterRegistry());
         recorder.begin(RunSpec.of(RunKind.CHAT, 7L)).close();
 
         RunPayload.RunFinish finish = (RunPayload.RunFinish) queue.accepted().stream()
@@ -93,7 +94,7 @@ class DefaultRunRecorderTest {
     @DisplayName("trace id 由服务端生成，与客户端传入的 httpTraceId 无关")
     void traceIdIsServerGenerated() {
         TestQueue queue = new TestQueue(properties());
-        RunRecorder recorder = new DefaultRunRecorder(queue, new TelemetryProperties());
+        RunRecorder recorder = new DefaultRunRecorder(queue, new TelemetryProperties(), new SimpleMeterRegistry());
         RunRecorder.RunScope run = recorder.begin(RunSpec.of(RunKind.CHAT, 7L));
         run.attribute("httpTraceId", "client-supplied");
         run.finish(RunOutcome.OK, null);
@@ -110,7 +111,7 @@ class DefaultRunRecorderTest {
     @DisplayName("未知 attrs 键被忽略（不许把提示词塞进来）")
     void unknownAttributeKeyIgnored() {
         TestQueue queue = new TestQueue(properties());
-        RunRecorder recorder = new DefaultRunRecorder(queue, new TelemetryProperties());
+        RunRecorder recorder = new DefaultRunRecorder(queue, new TelemetryProperties(), new SimpleMeterRegistry());
         RunRecorder.RunScope run = recorder.begin(RunSpec.of(RunKind.CHAT, 7L));
         run.attribute("prompt", "用户的完整提示词");
         run.attribute("historyMsgs", 3);
@@ -125,7 +126,7 @@ class DefaultRunRecorderTest {
     @DisplayName("逐轮 token 累加到轮次总量，步骤各自保留自己的用量")
     void perRoundTokensAccumulate() {
         TestQueue queue = new TestQueue(properties());
-        RunRecorder recorder = new DefaultRunRecorder(queue, new TelemetryProperties());
+        RunRecorder recorder = new DefaultRunRecorder(queue, new TelemetryProperties(), new SimpleMeterRegistry());
         RunRecorder.RunScope run = recorder.begin(RunSpec.of(RunKind.CHAT, 7L));
         try (RunRecorder.StepScope step = run.step(SpanSpec.llm(1))) {
             step.tokens(10, 5, 0);
@@ -152,7 +153,7 @@ class DefaultRunRecorderTest {
     @DisplayName("失败的工具步骤记为 failed，不冒充成功")
     void failedToolStepIsMarkedFailed() {
         TestQueue queue = new TestQueue(properties());
-        RunRecorder recorder = new DefaultRunRecorder(queue, new TelemetryProperties());
+        RunRecorder recorder = new DefaultRunRecorder(queue, new TelemetryProperties(), new SimpleMeterRegistry());
         RunRecorder.RunScope run = recorder.begin(RunSpec.of(RunKind.CHAT, 7L));
         try (RunRecorder.StepScope step = run.step(SpanSpec.tool("knowledge_search"))) {
             step.failed("tool_error");
@@ -171,7 +172,7 @@ class DefaultRunRecorderTest {
     void fullQueueDropsWithoutBlocking() {
         TestQueue queue = new TestQueue(properties());
         queue.setFull(true);
-        RunRecorder recorder = new DefaultRunRecorder(queue, new TelemetryProperties());
+        RunRecorder recorder = new DefaultRunRecorder(queue, new TelemetryProperties(), new SimpleMeterRegistry());
 
         long started = System.nanoTime();
         RunRecorder.RunScope run = recorder.begin(RunSpec.of(RunKind.CHAT, 7L));
@@ -212,5 +213,22 @@ class DefaultRunRecorderTest {
         }
         assertThat(calls.get()).isGreaterThanOrEqualTo(2);
         assertThat(queue.writeFailures()).isGreaterThanOrEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("轮次结束发 AI 运行计数与耗时指标")
+    void emitsRunMetrics() {
+        SimpleMeterRegistry metrics = new SimpleMeterRegistry();
+        TestQueue queue = new TestQueue(properties());
+        RunRecorder recorder = new DefaultRunRecorder(queue, properties(), metrics);
+
+        try (RunRecorder.RunScope run = recorder.begin(RunSpec.of(RunKind.CHAT, 7L))) {
+            run.finish(RunOutcome.OK, null);
+        }
+
+        assertThat(metrics.get("paideia.ai.runs")
+                .tag("kind", RunKind.CHAT).tag("outcome", "ok").counter().count()).isEqualTo(1);
+        assertThat(metrics.get("paideia.ai.run.duration")
+                .tag("kind", RunKind.CHAT).timer().count()).isEqualTo(1);
     }
 }

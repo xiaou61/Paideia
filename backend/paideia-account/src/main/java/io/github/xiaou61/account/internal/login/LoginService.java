@@ -8,6 +8,7 @@ import io.github.xiaou61.account.internal.user.PasswordHasher;
 import io.github.xiaou61.account.internal.user.User;
 import io.github.xiaou61.account.internal.user.UserMapper;
 import io.github.xiaou61.security.AuthPort;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Optional;
@@ -41,18 +42,36 @@ public class LoginService {
     private final PasswordHasher passwordHasher;
     private final TokenService tokenService;
     private final RateLimiter rateLimiter;
+    private final MeterRegistry metrics;
 
     LoginService(UserMapper userMapper,
                  PasswordHasher passwordHasher,
                  TokenService tokenService,
-                 RateLimiter rateLimiter) {
+                 RateLimiter rateLimiter,
+                 MeterRegistry metrics) {
         this.userMapper = userMapper;
         this.passwordHasher = passwordHasher;
         this.tokenService = tokenService;
         this.rateLimiter = rateLimiter;
+        this.metrics = metrics;
     }
 
+    /**
+     * 登录成功/失败各记一次（WORK-043 SLO）。只区分 success/failure：
+     * 失败原因已在日志里，不把错误码做成标签以免基数随错误码增长。
+     */
     public AuthTokens login(String identifier, String rawPassword, String sourceAddress) {
+        try {
+            AuthTokens tokens = doLogin(identifier, rawPassword, sourceAddress);
+            metrics.counter("paideia.login.attempts", "outcome", "success").increment();
+            return tokens;
+        } catch (RuntimeException failure) {
+            metrics.counter("paideia.login.attempts", "outcome", "failure").increment();
+            throw failure;
+        }
+    }
+
+    private AuthTokens doLogin(String identifier, String rawPassword, String sourceAddress) {
         String trimmed = identifier.trim();
         String identifierKey = "login-id:" + Digest.sha256Hex(trimmed.toLowerCase(Locale.ROOT));
         String sourceKey = "login-source:" + Digest.sha256Hex(sourceAddress);

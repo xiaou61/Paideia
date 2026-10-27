@@ -1,5 +1,6 @@
 package io.github.xiaou61.account.internal.login;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -13,6 +14,7 @@ import io.github.xiaou61.account.internal.token.TokenService;
 import io.github.xiaou61.account.internal.user.PasswordHasher;
 import io.github.xiaou61.account.internal.user.User;
 import io.github.xiaou61.account.internal.user.UserMapper;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -31,8 +33,9 @@ class LoginServiceTest {
     private final PasswordHasher passwordHasher = mock(PasswordHasher.class);
     private final TokenService tokenService = mock(TokenService.class);
     private final RateLimiter rateLimiter = new RateLimiter(1_000, Clock.systemUTC());
+    private final SimpleMeterRegistry metrics = new SimpleMeterRegistry();
     private final LoginService loginService =
-            new LoginService(userMapper, passwordHasher, tokenService, rateLimiter);
+            new LoginService(userMapper, passwordHasher, tokenService, rateLimiter, metrics);
 
     @Test
     @DisplayName("无密码账号也要付出一次假校验的代价，否则响应耗时可枚举第三方账号")
@@ -48,6 +51,8 @@ class LoginServiceTest {
         assertThatThrownBy(() -> loginService.login("oauth-only", "whatever", "10.0.0.1"))
                 .isInstanceOf(io.github.xiaou61.platform.BizException.class)
                 .hasMessageContaining("用户名或密码不正确");
+        assertThat(metrics.get("paideia.login.attempts").tag("outcome", "failure").counter().count())
+                .isGreaterThanOrEqualTo(1);
 
         verify(passwordHasher).wasteTimeLikeAMatch();
         // 没有摘要可比，就不该拿 null 去比——那条路径不跑 BCrypt，会快出一个可观测的差
