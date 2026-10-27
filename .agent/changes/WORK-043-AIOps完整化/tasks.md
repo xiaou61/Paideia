@@ -136,7 +136,9 @@ approver_role: CTO
 - 步骤：改 group_by → 部署检查；抑制逻辑与 TASK-003 同一实现。
 - 验证：Grafana API 读取 policy 的 `group_by`；集成测试绿。
 
-### TASK-008 | pending | 基线/SLO 录制规则与 promtool 测试
+### TASK-008 | in_progress | 基线/SLO 录制规则与 promtool 测试
+
+- 进度：基线录制规则（CPU/5xx/P95）与 promtool 用例已完成；SLO 录制规则在 TASK-018 收口。
 
 - 对应：`REQ-008`、`REQ-025`、`AC-004`、`AC-012`、`AC-013`
 - 依赖：TASK-001（无代码依赖，可并行）
@@ -148,7 +150,7 @@ approver_role: CTO
   2. 写正常/尖峰/样本不足三个用例 → `promtool test rules` 绿。
 - 验证：`promtool check rules deploy/ops/prometheus-rules.yml && promtool test rules deploy/ops/prometheus-rules.test.yml`。
 
-### TASK-009 | pending | 证据 v2：基线字段与优先级截断
+### TASK-009 | done | 证据 v2：基线字段与优先级截断
 
 - 对应：`REQ-008`、`REQ-011`、`AC-004`
 - 依赖：TASK-008
@@ -160,7 +162,7 @@ approver_role: CTO
   2. 写总字符上限/优先级截断测试 → 实现 → 绿。
 - 验证：`mvn -B -pl paideia-ai ...` + `scripts/test-db.sh mvn ... -Dtest=OpsEvidenceCollectorTest ...`。
 
-### TASK-010 | pending | 指标基线告警（CPU/5xx/P95）
+### TASK-010 | done | 指标基线告警（CPU/5xx/P95）
 
 - 对应：`REQ-009`、`REQ-011`、`AC-005`
 - 依赖：TASK-008
@@ -170,7 +172,7 @@ approver_role: CTO
 - 步骤：加规则 → 部署检查 health/state。
 - 验证：Grafana API 6+3 条规则、health ok、无活动误报。
 
-### TASK-011 | pending | ERROR 日志量基线告警
+### TASK-011 | done | ERROR 日志量基线告警
 
 - 对应：`REQ-010`、`REQ-011`、`AC-006`
 - 依赖：TASK-008、TASK-010

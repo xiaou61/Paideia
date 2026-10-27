@@ -2,6 +2,7 @@ package io.github.xiaou61.ops;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -30,16 +31,19 @@ class LokiClientTest {
     @BeforeEach
     void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/loki/api/v1/query_range", exchange -> {
-            byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().add("Content-Type", "application/json");
-            exchange.sendResponseHeaders(status, bytes.length);
-            try (OutputStream out = exchange.getResponseBody()) {
-                out.write(bytes);
-            }
-        });
+        server.createContext("/loki/api/v1/query_range", this::respond);
+        server.createContext("/loki/api/v1/query", this::respond);
         server.start();
         baseUrl = "http://127.0.0.1:" + server.getAddress().getPort();
+    }
+
+    private void respond(HttpExchange exchange) throws IOException {
+        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().add("Content-Type", "application/json");
+        exchange.sendResponseHeaders(status, bytes.length);
+        try (OutputStream out = exchange.getResponseBody()) {
+            out.write(bytes);
+        }
     }
 
     @AfterEach
@@ -78,6 +82,18 @@ class LokiClientTest {
 
         assertThat(client().queryRange("{}", Instant.now().minusSeconds(60), Instant.now(), 10))
                 .isEmpty();
+    }
+
+    @Test
+    @DisplayName("即时指标查询解析 vector 的第一个 value")
+    void scalarParsesVector() {
+        body = """
+                {"status":"success","data":{"resultType":"vector","result":[
+                  {"metric":{},"value":[1761432000,"42"]}
+                ]}}""";
+
+        assertThat(client().scalar("sum(count_over_time({unit=\"x\"}[5m]))", Instant.now()))
+                .isEqualTo(42.0);
     }
 
     @Test

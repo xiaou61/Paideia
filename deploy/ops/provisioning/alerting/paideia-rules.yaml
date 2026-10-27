@@ -189,3 +189,118 @@ groups:
         annotations:
           summary: 近 5 分钟应用 ERROR 类日志超过 20 条
           description: 打开运维页的日志面板与 AI 诊断区；诊断证据会带最近日志摘录。
+
+      # 动态基线（WORK-043）：当前值显著高于上周同时段，且有绝对下限与样本门禁。
+      # 读取 Prometheus 录制规则（deploy/ops/prometheus-rules.yml）；NoData=OK，
+      # 录制规则尚未生效或样本不足时不误报。
+      - uid: paideia-baseline-cpu
+        title: CPU 相对 7 天基线异常
+        condition: A
+        for: 10m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: paideia-prometheus
+            model:
+              refId: A
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 1
+              expr: >-
+                (paideia:baseline_cpu:current > bool 70)
+                * (paideia:baseline_cpu:ratio > bool 2)
+                * (paideia:baseline_cpu:samples7d > bool 100)
+        noDataState: OK
+        execErrState: Error
+        notification_settings:
+          receiver: paideia-ops
+        annotations:
+          summary: CPU 高于 70% 且超过 7 天同时段基线 2 倍
+          description: 打开运维页的 AI 诊断；诊断证据会带当前值、1h/24h/7d 基线与样本数。
+
+      - uid: paideia-baseline-5xx
+        title: 5xx 相对 7 天基线异常
+        condition: A
+        for: 10m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: paideia-prometheus
+            model:
+              refId: A
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 1
+              expr: >-
+                (paideia:baseline_5xx:current > bool 1)
+                * (paideia:baseline_5xx:ratio > bool 3)
+                * (paideia:baseline_5xx:samples7d > bool 100)
+        noDataState: OK
+        execErrState: Error
+        notification_settings:
+          receiver: paideia-ops
+        annotations:
+          summary: 5xx 高于 1% 且超过 7 天同时段基线 3 倍
+          description: 先用运维页 AI 诊断确认是否与最近发版有关；基线样本不足时不会触发。
+
+      - uid: paideia-baseline-p95
+        title: P95 相对 7 天基线异常
+        condition: A
+        for: 10m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: paideia-prometheus
+            model:
+              refId: A
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 1
+              expr: >-
+                (paideia:baseline_p95:current > bool 1)
+                * (paideia:baseline_p95:ratio > bool 2)
+                * (paideia:baseline_p95:samples7d > bool 100)
+        noDataState: OK
+        execErrState: Error
+        notification_settings:
+          receiver: paideia-ops
+        annotations:
+          summary: P95 高于 1 秒且超过 7 天同时段基线 2 倍
+          description: 打开运维页 AI 诊断；有链路后报告会带最慢 span。
+
+      # 日志量基线：当前 5 分钟 ERROR 数 vs 上周同时段。B 无数据时 NoData=OK，
+      # 不把「上周没有日志」当成异常；固定阈值规则（20 条/5m）仍然兜底。
+      - uid: paideia-log-errors-baseline
+        title: ERROR 日志相对上周同时段异常
+        condition: C
+        for: 10m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: paideia-loki
+            model:
+              refId: A
+              queryType: instant
+              expr: >-
+                sum(count_over_time({unit="paideia.service"} |~ "(?i)(error|exception|failed)" [5m]))
+          - refId: B
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: paideia-loki
+            model:
+              refId: B
+              queryType: instant
+              expr: >-
+                sum(count_over_time({unit="paideia.service"} |~ "(?i)(error|exception|failed)" [5m] offset 1w))
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: math
+              expression: "$A > 3 * $B && $A > 10"
+        noDataState: OK
+        execErrState: Error
+        notification_settings:
+          receiver: paideia-ops
+        annotations:
+          summary: ERROR 日志超过上周同时段 3 倍且超过 10 条
+          description: 上周同时段没有日志或 Loki 不可达时不触发；看运维页日志面板与 AI 诊断。

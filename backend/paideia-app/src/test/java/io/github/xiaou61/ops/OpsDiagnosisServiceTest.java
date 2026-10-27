@@ -60,7 +60,8 @@ class OpsDiagnosisServiceTest {
             return 1;
         }).when(mapper).insert(any());
         when(evidence.collect(anyString(), any(), any())).thenReturn(new OpsDiagnoser.Evidence(
-                "manual", null, null, "summary", "metrics", "alerts", "logs", "deploys"));
+                "manual", null, null, "summary", "metrics", "baselines",
+                "alerts", "logs", null, "deploys"));
         when(diagnoser.diagnose(anyLong(), any())).thenReturn(new OpsDiagnoser.Diagnosis(
                 "report", new TokenUsage(1, 2, 3), "deepseek-flash"));
     }

@@ -6945,3 +6945,14 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 未验证：生产管理端事件页未用管理员 JWT 实际打开（本地 e2e 1 passed）；P1–P4 尚未实施。
 - 本地提交：01e8bdb
 - 远端推送：未执行
+
+## 2026-10-27 14:50 +0800 · WORK-043 P1 · 基线
+
+- 类型：implementation
+- 变更：Prometheus 录制规则（CPU/5xx/P95 的 current/1h/24h/7d/回退 baseline/ratio/samples7d）；证据 v2 增加 `baselines`/`traces` 段；Grafana 三条指标动态基线 + ERROR 日志量基线；`promtool` 正常/尖峰/样本不足用例。
+- 决策：7d 缺失时回退 24h/1h；`samples7d < 100` 写「基线不足」；动态基线告警 `NoData=OK`，样本不足不误报。
+- 依据：WORK-043 TASK-008..011；SLO 录制规则留到 TASK-018。
+- 验证：`promtool check rules` 21 条 SUCCESS、`promtool test rules` 3 个用例 SUCCESS；P1 切片 20 条 0 failed；生产 Prometheus `paideia-baseline` 组 21 条、`paideia:baseline_cpu:current` 可查（samples7d=1，冷启动）；Grafana 10 条规则 health ok、活动告警 0。
+- 未验证：P1 应用尚未发版；基线样本需约 50 分钟到 100、7 天才完整；生产报告还没引用基线。
+- 本地提交：待提交
+- 远端推送：未执行

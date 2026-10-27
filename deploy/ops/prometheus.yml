@@ -10,6 +10,10 @@ global:
   scrape_interval: 15s
   evaluation_interval: 30s
 
+# 基线录制规则（WORK-043）：当前/1h/24h/7d 同时段/样本数，Grafana 告警只读结果。
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
 scrape_configs:
   # 应用自身（Micrometer → Prometheus 文本格式）。
   # 与管理端点同端口，由 SecurityConfiguration 的「仅本机来源」规则保护。

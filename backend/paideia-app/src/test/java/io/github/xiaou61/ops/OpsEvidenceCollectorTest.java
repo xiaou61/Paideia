@@ -59,6 +59,27 @@ class OpsEvidenceCollectorTest {
     }
 
     @Test
+    @DisplayName("基线行包含 1h/24h/7d 与 ratio；样本不足写基线不足")
+    void baselineFormatting() {
+        when(prometheus.scalar("paideia:baseline_cpu:current")).thenReturn(25.0);
+        when(prometheus.scalar("paideia:baseline_cpu:1h")).thenReturn(20.0);
+        when(prometheus.scalar("paideia:baseline_cpu:24h")).thenReturn(18.0);
+        when(prometheus.scalar("paideia:baseline_cpu:7d")).thenReturn(20.0);
+        when(prometheus.scalar("paideia:baseline_cpu:baseline")).thenReturn(20.0);
+        when(prometheus.scalar("paideia:baseline_cpu:ratio")).thenReturn(1.25);
+        when(prometheus.scalar("paideia:baseline_cpu:samples7d")).thenReturn(20160.0);
+        when(loki.scalar(anyString(), any())).thenReturn(2.0);
+
+        String baselines = collector.collect("manual", null, null).baselines();
+
+        assertThat(baselines)
+                .contains("cpu current=25.00%", "1h=20.00%", "24h=18.00%",
+                        "7d_same_hour=20.00%", "baseline=20.00%", "ratio=1.25x", "samples_7d=20160")
+                .contains("http_5xx_percent = 基线不足")
+                .contains("log_errors current=2 7d_same_hour=2 ratio=1.00x");
+    }
+
+    @Test
     @DisplayName("Loki 不可达时写明确占位，不抛异常")
     void lokiDownIsExplicit() {
         when(loki.queryRange(anyString(), any(), any(), anyInt())).thenReturn(List.of());

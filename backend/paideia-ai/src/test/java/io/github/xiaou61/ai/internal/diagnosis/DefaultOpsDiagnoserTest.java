@@ -131,7 +131,7 @@ class DefaultOpsDiagnoserTest {
     private static OpsDiagnoser.Evidence evidence() {
         return new OpsDiagnoser.Evidence(
                 "manual", null, "现在为什么慢",
-                "服务状态：OK", "p95 = 1.2s", "无 firing 告警",
-                "2026-10-26T10:00:00Z WARN slow", "deploy 10:00");
+                "服务状态：OK", "p95 = 1.2s", "p95 ratio=1.0x",
+                "无 firing 告警", "2026-10-26T10:00:00Z WARN slow", null, "deploy 10:00");
     }
 }

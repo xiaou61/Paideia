@@ -58,6 +58,10 @@ say "脚本与配置"
 install -m 0755 "$HERE/paideia-backup.sh" "$OPS_DIR/paideia-backup.sh"
 install -m 0755 "$HERE/ops-textfile.sh"   "$OPS_DIR/ops-textfile.sh"
 install -m 0644 "$HERE/prometheus.yml"    /etc/prometheus/prometheus.yml
+mkdir -p /etc/prometheus/rules
+install -m 0644 "$HERE/prometheus-rules.yml" /etc/prometheus/rules/paideia-baseline.yml
+# 规则语法错会让 Prometheus 起不来；安装时就检查，而不是等重启失败。
+promtool check rules /etc/prometheus/rules/*.yml
 install -m 0644 "$HERE/blackbox.yml"      /etc/blackbox/blackbox.yml
 install -m 0644 "$HERE/loki-config.yaml"  /etc/loki/loki-config.yaml
 install -m 0644 "$HERE/alloy-config.alloy" /etc/alloy/config.alloy

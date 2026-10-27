@@ -1,0 +1,53 @@
+# 基线录制规则的 promtool 用例（WORK-043）。
+#
+# 只测 CPU 这一组：它不依赖直方图/日志，能用合成 counter 精确覆盖
+# 「正常 / 尖峰 / 样本不足」三种输入；5xx/P95 的表达式由 promtool check rules 保证语法，
+# 运行时行为由 Grafana 规则 health 与生产查询确认。
+#
+# 间隔取 3 分钟：7 天窗口约 3360 个样本，低于 promtool 的单查询样本上限。
+rule_files:
+  - prometheus-rules.yml
+
+evaluation_interval: 3m
+
+tests:
+  - name: cpu 正常，比值为 1
+    interval: 3m
+    input_series:
+      - series: 'node_cpu_seconds_total{mode="idle",instance="test"}'
+        values: '0+180x4'
+    promql_expr_test:
+      - expr: paideia:baseline_cpu:current
+        eval_time: 12m
+        exp_samples:
+          - labels: '{__name__="paideia:baseline_cpu:current"}'
+            value: 0
+
+  - name: cpu 尖峰，当前 50%，上周同时段 0%，比值 50
+    interval: 3m
+    input_series:
+      - series: 'node_cpu_seconds_total{mode="idle",instance="test"}'
+        values: '0+180x3370 606600+90x10'
+    promql_expr_test:
+      - expr: paideia:baseline_cpu:current
+        eval_time: 10140m
+        exp_samples:
+          - labels: '{__name__="paideia:baseline_cpu:current"}'
+            value: 50
+      - expr: paideia:baseline_cpu:ratio > bool 10
+        eval_time: 10140m
+        exp_samples:
+          - labels: '{}'
+            value: 1
+
+  - name: 样本不足时 samples7d 小于 100
+    interval: 3m
+    input_series:
+      - series: 'node_cpu_seconds_total{mode="idle",instance="test"}'
+        values: '0+180x10'
+    promql_expr_test:
+      - expr: paideia:baseline_cpu:samples7d
+        eval_time: 30m
+        exp_samples:
+          - labels: '{__name__="paideia:baseline_cpu:samples7d"}'
+            value: 10

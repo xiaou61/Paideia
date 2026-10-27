@@ -36,8 +36,7 @@ class LokiClient {
         this.http = HttpClient.newBuilder().connectTimeout(timeout).build();
     }
 
-    List<LogLine> queryRange(String query, Instant from, Instant to, int limit) {
-        String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
+    List<LogLine> queryRange(String query, Instant from, Instant to, int limit) {        String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
         String url = baseUrl + "/loki/api/v1/query_range?query=" + encoded
                 + "&start=" + from.getEpochSecond() + "000000000"
                 + "&end=" + to.getEpochSecond() + "000000000"
@@ -78,5 +77,40 @@ class LokiClient {
     }
 
     record LogLine(Instant at, String line) {
+    }
+
+    /**
+     * 即时指标查询（WORK-043）：用于“当前 5 分钟 ERROR 数 vs 上周同时段”。
+     * 失败返回 null，调用方写“基线不足/无数据”，不把缺失当成 0。
+     */
+    Double scalar(String query, Instant at) {
+        String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
+        String url = baseUrl + "/loki/api/v1/query?query=" + encoded
+                + "&time=" + at.getEpochSecond() + "000000000";
+        HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+                .timeout(timeout)
+                .GET()
+                .build();
+        try {
+            HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                return null;
+            }
+            JsonNode root = JSON.readTree(response.body());
+            if (!"success".equals(root.path("status").asText())) {
+                return null;
+            }
+            JsonNode result = root.path("data").path("result");
+            if (!result.isArray() || result.isEmpty()) {
+                return null;
+            }
+            String raw = result.get(0).path("value").path(1).asText();
+            return raw.isBlank() ? null : Double.valueOf(raw);
+        } catch (IOException | InterruptedException | RuntimeException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            return null;
+        }
     }
 }

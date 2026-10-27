@@ -24,6 +24,8 @@ import org.springframework.stereotype.Service;
 class OpsEvidenceCollector {
 
     private static final DateTimeFormatter LOG_TIME = DateTimeFormatter.ISO_INSTANT;
+    private static final String LOG_ERROR_QUERY =
+            "sum(count_over_time({unit=\"paideia.service\"} |~ \"(?i)(error|exception|failed)\" [5m]))";
 
     /** 固定指标目录：名字 → 查询、精度、单位。 */
     private static final List<Metric> METRICS = List.of(
@@ -75,16 +77,20 @@ class OpsEvidenceCollector {
 
         String summaryText = formatSummary(summary.summary());
         String metricsText = formatMetrics();
+        String baselinesText = formatBaselines();
         String alertsText = firingAlerts();
         String deploysText = formatDeploy();
+        // P2 接 Tempo 后填入；现在留空，提示词会写“不可达或无数据”。
+        String tracesText = "";
 
-        int nonLogChars = summaryText.length() + metricsText.length() + alertsText.length() + deploysText.length();
+        int nonLogChars = summaryText.length() + metricsText.length() + baselinesText.length()
+                + alertsText.length() + tracesText.length() + deploysText.length();
         int logBudget = Math.max(0, config.getMaxEvidenceChars() - nonLogChars);
         String logsText = formatDiagnosisLogs(config.getMaxLogLines(), logBudget);
 
         return new OpsDiagnoser.Evidence(
                 trigger, alertName, question,
-                summaryText, metricsText, alertsText, logsText, deploysText);
+                summaryText, metricsText, baselinesText, alertsText, logsText, tracesText, deploysText);
     }
 
     /** 工具用的固定指标名清单；名字即白名单。 */
@@ -199,6 +205,65 @@ class OpsEvidenceCollector {
         if (value != null && !value.isBlank()) {
             out.append(' ').append(key).append('=').append(value);
         }
+    }
+
+    /**
+     * 基线：当前值 vs 1h/24h/7d 同时段。样本不足写“基线不足”，不把缺失当成 0。
+     * 录制规则在 deploy/ops/prometheus-rules.yml；这里只读结果。
+     */
+    private String formatBaselines() {
+        StringBuilder out = new StringBuilder();
+        metricBaseline(out, "cpu", "paideia:baseline_cpu", "%");
+        metricBaseline(out, "http_5xx_percent", "paideia:baseline_5xx", "%");
+        metricBaseline(out, "http_p95_seconds", "paideia:baseline_p95", "s");
+        logBaseline(out);
+        return out.toString();
+    }
+
+    private void metricBaseline(StringBuilder out, String name, String prefix, String unit) {
+        Double current = prometheus.scalar(prefix + ":current");
+        Double samples = prometheus.scalar(prefix + ":samples7d");
+        Double baseline = prometheus.scalar(prefix + ":baseline");
+        if (current == null || samples == null || samples < 100 || baseline == null) {
+            out.append(name).append(" = 基线不足（samples_7d=")
+                    .append(samples == null ? "无数据" : trimmed(samples, 0))
+                    .append("）\n");
+            return;
+        }
+        Double oneHour = prometheus.scalar(prefix + ":1h");
+        Double day = prometheus.scalar(prefix + ":24h");
+        Double sevenDay = prometheus.scalar(prefix + ":7d");
+        Double ratio = prometheus.scalar(prefix + ":ratio");
+        out.append(name).append(" current=").append(trimmed(current, 2)).append(unit)
+                .append(" 1h=").append(valueOrDash(oneHour, unit))
+                .append(" 24h=").append(valueOrDash(day, unit))
+                .append(" 7d_same_hour=")
+                .append(sevenDay == null ? "—（回退）" : trimmed(sevenDay, 2) + unit)
+                .append(" baseline=").append(trimmed(baseline, 2)).append(unit)
+                .append(" ratio=").append(ratio == null ? "—" : trimmed(ratio, 2) + "x")
+                .append(" samples_7d=").append(trimmed(samples, 0))
+                .append('\n');
+    }
+
+    private void logBaseline(StringBuilder out) {
+        Instant now = Instant.now();
+        Double current = loki.scalar(LOG_ERROR_QUERY, now);
+        Double week = loki.scalar(LOG_ERROR_QUERY + " offset 1w", now);
+        if (current == null) {
+            out.append("log_errors = 无数据\n");
+            return;
+        }
+        out.append("log_errors current=").append(trimmed(current, 0));
+        if (week == null || week <= 0) {
+            out.append(" 7d_same_hour=基线不足\n");
+        } else {
+            out.append(" 7d_same_hour=").append(trimmed(week, 0))
+                    .append(" ratio=").append(trimmed(current / week, 2)).append("x\n");
+        }
+    }
+
+    private static String valueOrDash(Double value, String unit) {
+        return value == null || !Double.isFinite(value) ? "—" : trimmed(value, 2) + unit;
     }
 
     private String formatDiagnosisLogs(int maxLines, int maxChars) {

@@ -22,13 +22,15 @@ public interface OpsDiagnoser {
      * @param question  管理员填写的关注点；没有为 null
      * @param summary   运维摘要（七组状态）
      * @param metrics   关键指标（已格式化）
+     * @param baselines 关键指标与上周同时段基线（WORK-043）
      * @param alerts    当前 firing 的告警（已格式化）
      * @param logs      最近日志摘录（已脱敏）
+     * @param traces    错误/慢 trace 摘要（WORK-043；P2 起有值）
      * @param deploys   最近发版信息
      */
     record Evidence(String trigger, String alertName, String question,
-                    String summary, String metrics, String alerts,
-                    String logs, String deploys) {
+                    String summary, String metrics, String baselines,
+                    String alerts, String logs, String traces, String deploys) {
     }
 
     /** @param usage 上游没有返回用量时为 null（此时结算会全额退回预留） */
