@@ -7030,4 +7030,19 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：P2 单测 15（app 10 + web 5）、集成 11、`TracingWiringTest` 1；生产 `X-Trace-Id` 按 id 查 Tempo 200，resource `service.name=paideia`；Grafana Tempo 数据源 health OK；日志 pattern 出现 `[traceId]`（debug 时观测）；`paideia_build_info=b526ecc`。
 - 未验证：没有制造 error/slow trace，所以诊断 trace 证据可能显示「无匹配 trace」；Loki 日志跳 Tempo 需人工在 Grafana 点一次。
 - 本地提交：6b4e6ea、18e68aa、38b9263、181bca5、056fdf7、b526ecc（38b9263 的错误依赖已在 181bca5 回退）
+
+## 2026-10-27 16:15 +0800 · WORK-044 · 实施完成
+
+- 类型：implementation
+- 变更：四笔提交在 `work-044-mcp-completion`（未合并、未推送）。P1 凭据每日配额/用量统计/返回体截断/指标；P2 简历·面试·复习·记忆四域 8 个工具；P3 凭据页用量与上限输入 + e2e；另加配额真实链路集成测试与验收报告。
+- 决策：按用户 2026-10-27 五项裁决执行——四域全做、Track B/D 本期做、Track C 不做、配额按每日调用次数。实现层面的取舍记在 `requirements.md` 的「实现选择」（8 个而非 12 个工具、不做计费类工具、记忆用 rememberText、计数按天分行、截断放 invoker 且只裁 text）。
+- 依据：WORK-044 requirements/proposal/design/tasks（四件已由用户签署）；`research.md` 的实测缺口。
+- 验证：`paideia-mcp` 34→54 条 0 失败；后端全量（除 app）1384 条 0 失败 28 跳过；app 关键 7 类 23 条 0 失败；配额集成测试 2 条 0 失败；e2e 9 条通过；前端 typecheck 退出码 0。**三条反向验证**：默认视图（改 defaultGroup 让两条测试红）、配额拦截（加 `false &&` 让集成测试红）、截断保留 structured（改成 null 让测试红），均改回后绿。**端到端**：真实 jar 启动后 `/actuator/prometheus` 出现三指标，`dailyCallLimit=1` 的 PAT 第 2 次调用被拒。
+- 过程中修掉：自己写的截断计数 bug（`shown++` 判断时已自增）；`Map.of` 不接受可空的每日上限（改 HashMap）；`McpUsageRecorder` 跨子包需 public。
+- **发现两条早就过期、在本次之前就红的断言**（非本项引入）：`McpAdminIntegrationTest` 写死管理工具 38 个（WORK-042 后实际 41）、默认视图 12 个（实际 19）、只读管理工具 19（实际 22）。已按实测值修正并在提交信息里注明。
+- 未验证：REQ-015 只做到"进 Prometheus 抓取"，**没加 Grafana 面板或 admin_ops_summary 位置**；`VIEW_NOT_FOUND` 在 `McpViewRegistry` 抛出、不进 invoker，该原因指标不产生；并发超额（判定与计数非原子）已知但未测；UTC 日切未测跨天。
+- 环境记录：`paideia_test` 已被并发会话污染（残留迁移 `900` 导致 Flyway 校验失败），端到端验证改用派生独占库 `paideia_run_1027160520_1998`，验完已删。
+- 本地提交：db28ef6（P1 `324317f`、P2 `54cd443`、P3 `ac45c13`）
+
+- 远端推送：未执行
 - 远端推送：未执行
