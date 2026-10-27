@@ -101,14 +101,6 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-opentelemetry</artifactId>
     </dependency>
-    <!-- starter 的 opentelemetry-exporter-otlp 是 gRPC 版；HTTP trace 自动配置
-         （OtlpTracingAutoConfiguration）的条件类 OtlpHttpSpanExporter 在另一个构件里。
-         不补这一条时 span 会生成但不导出，Tempo 永远为空（2026-10-27 实测）。 -->
-    <dependency>
-      <groupId>io.opentelemetry</groupId>
-      <artifactId>opentelemetry-exporter-otlp-http-trace</artifactId>
-      <version>1.62.0</version>
-    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>
