@@ -673,7 +673,7 @@
       "id": 15,
       "type": "timeseries",
       "title": "外部 MCP 工具平均耗时（最慢 8 个）",
-      "description": "WORK-044：Micrometer Timer 在未配 percentile histogram 时导出的是 summary（_count/_sum），只能算平均值。要 p95 需在配置里开 publishing.percentiles。",
+      "description": "WORK-044：Micrometer Timer 未配 percentile histogram 时导出的是 summary（_count/_sum），只能算平均值。分母为 0（窗口内无调用）时不画，避免 NaN 断线。要 p95 需先开 publishing.percentiles。",
       "gridPos": {
         "h": 6,
         "w": 12,
@@ -697,7 +697,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "topk(8, sum by (tool) (rate(paideia_mcp_tool_duration_seconds_sum[5m])) / sum by (tool) (rate(paideia_mcp_tool_duration_seconds_count[5m])))",
+          "expr": "(sum by (tool) (rate(paideia_mcp_tool_duration_seconds_sum[5m])) / (sum by (tool) (rate(paideia_mcp_tool_duration_seconds_count[5m])) > 0))",
           "legendFormat": "{{tool}}"
         }
       ]
