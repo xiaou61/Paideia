@@ -77,14 +77,21 @@ function parseArgs(argv) {
     dir: path.join(ROOT, 'content', 'courses'),
     baseUrl: process.env.PAIDEIA_BASE_URL ?? 'http://127.0.0.1:8081',
     dryRun: false,
+    // 简讲（WORK-040）：只建分类与条目，不登记学习轨道。
+    // 简讲的用途是查阅，没有通关概念；建了轨道它就会以"一条线"的身份出现在 /learn。
+    track: true,
   }
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index]
     if (arg === '--dry-run') options.dryRun = true
+    else if (arg === '--no-track') options.track = false
     else if (arg === '--dir') options.dir = path.resolve(ROOT, argv[++index])
     else if (arg === '--base-url') options.baseUrl = argv[++index]
     else if (arg === '--help' || arg === '-h') {
-      console.log('用法：node scripts/import-course.mjs [--dry-run] [--dir <目录>] [--base-url <地址>]')
+      console.log(
+        '用法：node scripts/import-course.mjs [--dry-run] [--no-track] [--dir <目录>] [--base-url <地址>]',
+      )
+      console.log('  --no-track  只建分类与条目，不登记学习轨道（简讲用）')
       process.exit(0)
     } else {
       console.error(`不认识的参数：${arg}`)
@@ -216,7 +223,10 @@ async function ensureCategory(client, language, lessons, options) {
     return existing
   }
   if (options.dryRun) {
-    console.log(`  [dry-run] 将创建分类 ${spec.name}（${spec.slug}, ${spec.kind}）`)
+    console.log(
+      `  [dry-run] 将创建分类 ${spec.name}（${spec.slug}, ` +
+        `${options.track === false ? '无 line_kind' : spec.kind}）`,
+    )
     return { id: -1, slug: spec.slug, name: spec.name, children: [] }
   }
   const id = await client.post('/api/v1/knowledge/admin/categories', {
@@ -224,15 +234,30 @@ async function ensureCategory(client, language, lessons, options) {
     name: spec.name,
     slug: spec.slug,
     sortOrder: spec.sortOrder,
-    lineKind: spec.kind,
+    // 简讲（--no-track）**不打 line_kind**：带 lineKind 的分类会被当成一条学习线出现在 /learn，
+    // 而简讲只有查阅用途、没有通关概念（WORK-040 REQ-003）。
+    lineKind: options.track === false ? null : spec.kind,
   })
   console.log(`  + 分类 ${spec.name}（id=${id}）`)
   return { id, slug: spec.slug, name: spec.name, children: [] }
 }
 
+/**
+ * 管理端条目列表要翻页取全。
+ *
+ * <p>服务端把 size 收敛到 200，只取第一页时条目超过 200 后较老的内容会"看不见"，
+ * 导入脚本就会把已存在的标题当新条目再建一遍（2026-10-26 加篇时库里已 222 条）。
+ */
 async function existingEntries(client) {
-  const page = await client.get('/api/v1/knowledge/admin/entries?size=200')
-  return page?.items ?? []
+  const items = []
+  for (let page = 1; ; page++) {
+    const result = await client.get(`/api/v1/knowledge/admin/entries?size=200&page=${page}`)
+    const batch = result?.items ?? []
+    items.push(...batch)
+    if (batch.length === 0 || items.length >= (result?.total ?? 0)) {
+      return items
+    }
+  }
 }
 
 async function importLanguage(client, language, lessons, options, allEntries) {

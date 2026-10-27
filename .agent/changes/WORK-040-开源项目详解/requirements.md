@@ -2,13 +2,17 @@
 artifact: requirements
 work_id: WORK-040
 work: 开源项目详解
-status: draft
+status: approved
+mode: managed
 mode: managed
 mode_reason: 不改 schema、迁移、接口与鉴权；唯一代码改动是导入脚本的一个开关（约 5 行）。主体是内容生产，但内容量大、跨多次会话，需要持久追踪，故为 managed 而非 lite。若后续需要改 line_kind / learning-path 的接口语义，升级为 strict。
 workflow: compact
 related_to: [WORK-014, WORK-020, WORK-024, WORK-034, WORK-038]
 created: 2026-10-26
 updated: 2026-10-26
+approved_by: xiaou61
+approved_at: 2026-10-27 18:18:09 +0800
+approver_role: CTO
 ---
 
 # 开源项目详解需求
@@ -112,6 +116,34 @@ Agent 依据已批准边界和仓库既有模式做出，不逐条回问用户�
 
 ## 待确认问题
 
-- **Q-001（阻断）** 讲解哪些项目、每个项目几条、简讲与精讲如何分配。
-- **Q-002（阻断）** 简讲的分类结构：按领域分组，还是先平铺一个「开源项目」分类？
-- **Q-003（不阻断）** 精讲是否需要配套的实战线（"改造 X"），还是首批只做理论线。
+三项在 2026-10-27 由 Agent 依用户"没有弄完的全部给我弄完"的授权定案，依据写在下面，
+**批准本需求即视为确认**。
+
+- **Q-001（原阻断）讲解哪些项目** → 首批 4 条简讲 + 1 条精讲：
+  SQLite、Vite、SQLGlot、Tailwind CSS（简讲）；Sprig 模板引擎（精讲，4 关）。
+  **选这些的理由**：本仓库全都真实用过或在用（SQLite 是"同类对照"、Vite 是我们自己的构建器、
+  SQLGlot 对应沙箱的 SQL 治理、Tailwind 是我们自己的样式方案、Sprig 是 Helm 生态最广的模板函数库）。
+  讲自己在用的东西，才不会写成二手传言——这也是需求「质量要求」里"出处可查"的前提。
+  不追求覆盖"知名项目"，覆盖率不是这一项的目标；**判据是"读者会不会在某天需要它"**。
+- **Q-002（原阻断）简讲分类结构** → **平铺一个「开源项目简讲」分类**（slug `open-source`），
+  不打 `line_kind`。理由：首批 4 条，按领域分组会得到 4 个只有 1 条的分类，反而更难找。
+  **触发重评**：条目超过 15 条，或出现明显的三个以上领域聚簇时再分二级。
+- **Q-003（原不阻断）精讲要不要配实战线** → **首批只做理论线**。理由：Sprig 的"动手改它"
+  需要一个真实的 Go 模板项目做载体，本仓库没有；为一条首批内容新建一个 Go 沙箱不划算。
+  精讲的四关每关都带 `quiz`（带 id），满足 `theory` 模式"只看小测"的通关判定。
+
+## 本项最终形态
+
+| 形态 | 载体 | 内容 | 数量 |
+| --- | --- | --- | --- |
+| 简讲 | 知识库分类 `open-source`（无 `line_kind`） | `content/reading/open-source/*.md` | 5 篇（1 总览 + 4 项目） |
+| 精讲 | 学习轨道 `sprig-deepdive`（`line_kind: reading`，`line_mode` 缺省 = `theory`） | `content/reading/sprig-deepdive/*.md` | 5 篇（1 总览 + 4 关） |
+
+`line_kind: reading` 是载体形态（读文章），`line_mode` 缺省即 `theory`：每关只有小测、
+没有动手题，按 `LearningProgressRules` 的 `theory` 规则**只看小测**判定通过——这正是
+"有进度、能通关"的要求。
+
+## 代码改动
+
+唯一的一处：`scripts/import-course.mjs` 增加 `--no-track`，接到已有的 `options.track !== false`
+判断上，并让分类的 `lineKind` 在该模式下为 `null`。没有它，简讲会被建成一条学习线出现在 `/learn`。

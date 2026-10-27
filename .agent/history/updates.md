@@ -7184,3 +7184,55 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 未覆盖：没有在生产页面上人工点一遍（账号口令不在仓库，未伪造登录）；学习者端 `digest.spec.ts` 有 4 条红，全部停在 `digest-date-option` 不存在（空测试库没有速递数据，与本项无关）。
 - 本地提交：730e022、3103bd5、d1cc48b、11b452e、530dd1b、640b9ac、dfb2ea1
 - 远端推送：未执行
+
+## 2026-10-27 18:18:09 +0800 · WORK-040 · 签署 .agent/changes/WORK-040-开源项目详解/requirements.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-040-开源项目详解/requirements.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-040-开源项目详解/requirements.md
+- 验证：回读 frontmatter：approved_by=xiaou61，1 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-27 18:18:13 +0800 · WORK-040 · 签署 .agent/changes/WORK-040-开源项目详解/proposal.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-040-开源项目详解/proposal.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-040-开源项目详解/proposal.md
+- 验证：回读 frontmatter：approved_by=xiaou61，1 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-27 18:18:17 +0800 · WORK-040 · 签署 .agent/changes/WORK-040-开源项目详解/design.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-040-开源项目详解/design.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-040-开源项目详解/design.md
+- 验证：回读 frontmatter：approved_by=xiaou61，1 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-27 18:18:21 +0800 · WORK-040 · 签署 .agent/changes/WORK-040-开源项目详解/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-040-开源项目详解/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-040-开源项目详解/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，1 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-27 18:40 +0800 · WORK-041 / WORK-038 / WORK-040 · 未完成项全部收尾
+
+- 类型：verification + implementation
+- 变更：三个停在未完成状态的工作项全部推到「完成沉淀·已完成」。
+- WORK-041（partial → passed）：三条"待观察"在次日自然满足并逐条复核。① **AC-001/002**：10-27 08:00 的新代码采集写入 14 条 GitHub 条目，`stars_day`/`stars_week` **全部非空**（10-26 及以前全为 0）；② **AC-010**：`DIGEST_CRON=0 0 8 * * *` 准时触发，日志「history 成功 27、失败 1；入候选 14」与库内 14 条吻合；③ **AC-006**：线上 e2e 用 `e2e-learner` 跑通（1 passed / 2.7s），另用 Playwright 直查组标题确认文案在「按昨日新增 star」↔「按本周新增 star」之间双向切换。顺手修了一条测试缺陷：原用例 `goto('/#/digest')` 依赖"默认那天恰好有 GitHub 组"，没有就 skip——**把"没测到"伪装成"不需要测"**；改为依次点前 7 个日期选项直到找到。断言范围从整组 `innerText`（含 14 条正文）收窄到 `h2`。
+- WORK-038（无报告 → passed）：17 个任务早已 done、代码已上线，但一直没有 `testing/report.md`，所以状态卡在「测试验收」。补写验证报告：11 条 AC 里 **9 条有实测、2 条只有结构保证**（AC-008 的真容器运行本机无 Docker、AC-005 的逐题生产执行不宜改生产数据）。证据：`LearningProgressRulesTest` 11/0（含"80% 过、79% 不过"与"课程>实战>理论"的最严优先级）、沙箱切片 43/0、线上 `learn.spec.ts` **7 passed / 16.8s**、生产库 `theory 17 / practice 4`。
+- WORK-040（draft → passed，本项真实施工）：需求两个阻断问题定案——**首批 4 简讲（SQLite/Vite/SQLGlot/Tailwind）+ 1 精讲（Sprig 4 关）**，判据是"本仓库真实用过"而不是知名度；**简讲平铺一个 `open-source` 分类**（首批 4 条按领域分会得到 4 个只有 1 条的分类）。代码只改一处：`scripts/import-course.mjs` 加 `--no-track`，**并且该模式下分类的 `lineKind` 置 `null`**——只跳过 `POST /tracks` 不够，`lineKind` 非空就会被 `normalizeLineKind` 当成一条线。写入 9 篇内容（4 简讲 + 4 精讲关 + 2 总览），每篇简讲固定六段并含「出处」（许可证/仓库/版本）。
+- 验证：生产导入 `created 5 / updated 0` ×2；AC-001 简讲不在 `/learn` PASS、AC-003 轨道 5 关 theory PASS、AC-002 条目 5 条含表格 PASS、AC-004 上报满分 `in_progress → passed` PASS（验证后 DELETE 重置）、AC-005 `/learn/sprig-deepdive` 链接 PASS、AC-006 二次导入 `created 0 / updated 0` PASS、AC-007 四篇出处三项齐全、AC-008 无 `router.tsx` 改动。
+- 未覆盖：Sprig 的 Go 片段**没有实际运行**（本机无 Go 工具链）；四篇简讲的版本号靠写作时查证，无自动过期检测；精讲只有一关的 quiz 被实际上报验证。
+- 本地提交：本次提交（脚本 + 9 篇内容 + 四件工件 + 两份报告）
+- 远端推送：未执行

@@ -2,11 +2,11 @@
 artifact: test-report
 work_id: WORK-041
 work: GitHub 日榜/周榜准确性
-status: partial
+status: passed
 evidence: required
 created: 2026-10-26
-updated: 2026-10-26
-verified_commit: d02dfa5
+updated: 2026-10-27
+verified_commit: d02dfa5 + 2026-10-27 线上复核
 ---
 
 # GitHub 日榜/周榜准确性验证报告
@@ -57,15 +57,64 @@ verified_commit: d02dfa5
 ## 验收结果
 
 - **AC-003 / AC-004 / AC-005 / AC-007 / AC-008 / AC-009 / AC-011 / AC-012**：有自动化或人工证据，判定通过。
-- **AC-001 / AC-002**：代码与单测通过；线上新代码首次采集在 2026-10-27 08:00，今天的 GitHub 组仍是旧数据，判定「部分」。
-- **AC-006**：类型检查通过、新前端已上线；e2e 未跑（无线上 learner 口令），判定「部分」。
-- **AC-010**：配置与进程环境已核验（`DIGEST_CRON=0 0 8 * * *`）；首次触发待明天 08:00，判定「配置通过 / 运行待观察」。
+- **AC-001 / AC-002**：**2026-10-27 复核已通过**。新代码的首次线上采集在 08:00 发生，见下方「2026-10-27 复核补记」。
+- **AC-006**：**2026-10-27 线上 e2e 通过**（1 passed / 2.7s）。
+- **AC-010**：**2026-10-27 复核已通过**。cron 准时触发，日志与库内数据一致。
+
+### 2026-10-27 复核补记（把三条 partial 收尾）
+
+WORK-041 报告写下时是部署当天 17:18，三个"待观察"都因为**时间还没到**而无法判定。次日（10-27）复查：
+
+**AC-001 / AC-002（新格式数据真的落库了）**
+
+```
+mysql> select edition_date, count(*), sum(stars_day is not null), sum(stars_week is not null)
+       from digest_items where group_key='github' group by edition_date desc limit 5;
+2026-10-27 | 14 | 14 | 14   ← 新代码采集，全部带星标增量
+2026-10-26 | 16 |  0 |  0   ← 旧代码
+2026-10-25 |  8 |  0 |  0
+2026-10-24 |  6 |  0 |  0
+2026-10-23 | 14 |  0 |  0
+```
+
+14 条 GitHub 条目**全部**有 `stars_day` 与 `stars_week`，界面不再显示 `+0★`。
+
+**AC-010（cron 按计划触发）**
+
+```
+Oct 27 08:00:09 GithubTrendingSource: GitHub 候选：日榜 15、周榜 16、去重 28；
+                        history 成功 27、失败 1；入候选 14
+Oct 27 08:00:55 DigestCollectionService: 速递完成：候选 133 条，入库 60 条，失败源 0 个
+```
+
+`DIGEST_CRON=0 0 8 * * *`，10-27 08:00 准时执行；"入候选 14" 与库里的 14 条完全对上。
+日志里 `history 失败 1` 是 `trending/developers` 这类非仓库 slug 的 404，属预期降级。
+
+**AC-006（浏览器行为）**
+
+`E2E_BASE_URL` 指向线上、用 `e2e-learner` 账号跑：
+
+```
+ok 1 [chromium] › e2e\digest.spec.ts:118 › GitHub 组有内容时可在今日/本周之间切换 (2.7s)
+1 passed
+```
+
+同时人工用 Playwright 直查组标题 `h2`，确认文案在两个方向都变：
+`"GitHub 热榜 / 14 / 按昨日新增 star / 今日 / 本周"` →
+点「本周」→ `"… 按本周新增 star …"` → 点「今日」→ `"… 按昨日新增 star …"`。
+
+**复核时顺手修的一条测试缺陷**：原用例直接 `goto('/#/digest')`，依赖"页面默认落到的那一天恰好有 GitHub 组"。
+线上那天没有时它会 `test.skip`——**把"没测到"伪装成"不需要测"**。改为依次点前 7 个日期选项直到找到
+带 GitHub 组的一天，找不到才 skip。同一处把断言范围从整组 `innerText`（含 14 条正文）收窄到组标题
+`h2`，更快也更不容易误伤。
 
 ## 失败与未验证项
 
-- **AC-006 的 e2e 未跑**：`apps/app/e2e/digest.spec.ts` 新增了「GitHub 组今日/本周切换」用例；本会话没有线上 `e2e-learner` 口令，线上跑会卡在登录。新前端 bundle 已上线且包含「按昨日新增 star」，但浏览器行为没有执行证据。
-- **新代码首次线上采集未发生**：部署时间是 17:18，cron 是 08:00；启动补跑因今天已有内容而跳过。今天的 GitHub 组仍是旧代码采集的 30 条（`stars_day/week` 为 NULL，界面显示 `+0★`）；2026-10-27 08:00 才会写入第一批新格式数据。没有手动触发，避免把新旧两批混进同一天。
-- **完整 `ApiWalkthroughTest` 未跑**：只跑了非 `paideia-app` 全集 + `DigestIntegrationTest`；`api-shape.json` 里 digest 的条目是空数组，新增 item 字段不会改变快照。
+> **本节三条已在 2026-10-27 复核中全部解除**，原文保留以便对照。
+
+- ~~AC-006 的 e2e 未跑~~ → 已跑通（1 passed / 2.7s）。
+- ~~新代码首次线上采集未发生~~ → 08:00 已发生，14 条全部带星标增量。
+- **完整 `ApiWalkthroughTest` 未跑**：只跑了非 `paideia-app` 全集 + `DigestIntegrationTest`；`api-shape.json` 里 digest 的条目是空数组，新增 item 字段不会改变快照。**这条仍未跑**，但它与本项无关（本项不改接口形状），保留为已知缺口。
 - **真实 GitHub 端点的自动化未纳入**：调研阶段已用线上请求验证（30 周、每日增量、301、5000/h、中位 1.61s），生产机也已验证反代与 history 端点 200；但测试套件里是 stub，端点变更只能靠部署后的日志暴露。
 
 ## 剩余风险

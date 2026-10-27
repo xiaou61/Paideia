@@ -119,15 +119,28 @@ test.describe('每日速递', () => {
     await page.goto('/#/digest')
     await expect(page.getByTestId('digest-date-option').first()).toBeVisible({ timeout: 15_000 })
 
+    // 页面默认落到**最近有内容**的一天，但那天不一定有 GitHub 组（抓取可能只成功了一半）。
+    // 依次点日期选项直到找到带 GitHub 组的一天：这样"有内容却没测到"不会伪装成 skip。
+    const options = page.getByTestId('digest-date-option')
     const github = page.getByTestId('digest-group-github')
-    if ((await github.count()) === 0) {
-      test.skip(true, '这一天没有 GitHub 组内容，切换无从验证')
+    let found = (await github.count()) > 0
+    for (let i = 0; !found && i < Math.min(await options.count(), 7); i++) {
+      await options.nth(i).click()
+      // 等这一天的内容渲染完再判断，否则永远读不到组
+      await page.waitForTimeout(600)
+      found = (await github.count()) > 0
+    }
+    if (!found) {
+      test.skip(true, '最近 7 天都没有 GitHub 组内容，切换无从验证')
       return
     }
+    // 断言范围收到组标题行：整组 innerText 含 14 条条目的正文，匹配起来又慢又容易误伤
+    const header = github.locator('h2')
     await expect(page.getByTestId('digest-github-window')).toBeVisible()
+    await expect(header).toContainText('按昨日新增 star')
     await page.getByTestId('digest-github-window-week').click()
-    await expect(github).toContainText('按本周新增 star')
+    await expect(header).toContainText('按本周新增 star')
     await page.getByTestId('digest-github-window-day').click()
-    await expect(github).toContainText('按昨日新增 star')
+    await expect(header).toContainText('按昨日新增 star')
   })
 })
