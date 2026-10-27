@@ -192,7 +192,13 @@ export function DigestPage() {
                 const highCut = Math.ceil(withHeat.length * 0.25)
                 const midCut = Math.ceil(withHeat.length * 0.6)
                 return (
-                  <section key={group.key} data-testid={`digest-group-${group.key}`}>
+                  <section
+                    key={group.key}
+                    id={`digest-${group.key}`}
+                    data-testid={`digest-group-${group.key}`}
+                    // scroll-mt 让锚点跳转后标题不被 sticky 页头盖住
+                    className="scroll-mt-20"
+                  >
                     <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
                       {group.title}
                       <Badge variant="secondary">{items.length}</Badge>
@@ -227,11 +233,19 @@ export function DigestPage() {
                         </div>
                       ) : null}
                     </h2>
-                    <div className="grid gap-3 md:grid-cols-2">
+                    {/*
+                      热榜用**排名行**，不是 60 张同尺寸卡片。
+                      原来每条都是一张 205px 高的卡、3 个药丸标签加一个常驻按钮，
+                      60 条要滚 6800px，而且卡片里最该被读的数字（热度）只是个装饰。
+                      排名行把「第几」放到最左边，标题一行、摘要一行，元信息压到底部一行。
+                      两列是因为单列拉满 1326px 时一行太长，眼睛要从头扫到尾才读完标题。
+                    */}
+                    <ol className="border-border grid overflow-hidden rounded-xl border md:grid-cols-2">
                       {items.map((item, index) => (
-                        <DigestCard
+                        <DigestRow
                           key={item.id}
                           item={item}
+                          rank={index + 1}
                           githubWindow={isGithub ? githubWindow : undefined}
                           tier={
                             item.heat === null
@@ -244,7 +258,7 @@ export function DigestPage() {
                           }
                         />
                       ))}
-                    </div>
+                    </ol>
                   </section>
                 )
               })}
@@ -286,15 +300,31 @@ export function DigestPage() {
  * <p>整卡可点（原文链接铺满卡片），「存成笔记」压在右下角并阻止冒泡——原来只有标题那行
  * 是链接，点卡片别处没反应。内容做三行截断，卡片高度才齐。
  */
-function DigestCard({
+/**
+ * 一条热榜行。
+ *
+ * <p>形态是**排名 + 标题 + 摘要 + 一行元信息**，不是卡片。理由：
+ * <ul>
+ *   <li>热榜的第一信息是「第几」，卡片形态把它丢了，读者只能自己数。</li>
+ *   <li>60 条 × 205px 的卡片要滚 6800px；同样的内容用行只需要约一半，而且能一眼扫完。</li>
+ *   <li>元信息（来源、热度、档位、时间）从标题上方挪到下方一行，标题不再被三四个药丸挤在中间。</li>
+ * </ul>
+ *
+ * <p>「存成笔记」不再常驻：60 个按钮在页面上是 60 个噪声。改成悬停/聚焦时才出现，
+ * 触屏没有悬停，所以 `focus-within` 也让它出现——键盘与触屏都够得到。
+ */
+function DigestRow({
   item,
+  rank,
   tier,
   githubWindow,
 }: {
   item: DigestItem
+  /** 组内排名，从 1 开始。热榜没有排名等于没有热榜。 */
+  rank: number
   /** 组内热度档位：前 25% 高、40% 较高、其余不标。null = 这条没有热度信号。 */
   tier: 'high' | 'mid' | 'low' | null
-  /** 只对 GitHub 组有值：决定卡片显示昨日还是本周的数字。 */
+  /** 只对 GitHub 组有值：决定显示昨日还是本周的数字。 */
   githubWindow?: 'day' | 'week'
 }) {
   const degraded = item.summaryState === 'degraded'
@@ -307,67 +337,91 @@ function DigestCard({
   )}`
 
   return (
-    <Card
+    <li
       data-testid="digest-item"
-      className="group hover:border-primary/40 hover:shadow-card flex flex-col transition-all"
+      data-rank={rank}
+      // 网格里用 border 而不是 divide：divide-y 在双列下会把"每一行"的线画在单个格子上，
+      // 左右两列的线会错开。border-b + 右列 border-l 才是双列下唯一稳定的画法。
+      className="border-border group/row hover:bg-accent/40 focus-within:bg-accent/40 relative flex gap-3 border-b px-3 py-3 transition-colors sm:gap-4 sm:px-4 md:[&:nth-child(2n)]:border-l md:[&:nth-last-child(-n+2)]:border-b-0"
     >
-      <CardContent className="flex flex-1 flex-col gap-2.5 pt-5">
-        <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
-          <Badge variant="outline">{item.sourceName}</Badge>
-          {github ? (
-            <span className="flex items-center gap-1" data-testid="digest-github-stars">
-              <Star className="size-3.5" />
-              {githubWindow === 'week'
-                ? `本周 +${formatStars(stars)}★`
-                : `+${formatStars(stars)}★ 昨日`}
-            </span>
-          ) : item.heat === null ? null : (
-            <span className="flex items-center gap-1" data-testid="digest-heat">
-              <Flame className="size-3.5" />
-              {item.heat}
-            </span>
-          )}
-          {github && githubWindow !== 'week' && item.starsWeek !== null ? (
-            <span className="text-muted-foreground">本周 +{formatStars(item.starsWeek)}★</span>
-          ) : null}
-          {tierLabel === null ? null : (
-            <Badge
-              variant={tier === 'high' ? 'default' : 'secondary'}
-              data-testid="digest-heat-tier"
-            >
-              {tierLabel}
-            </Badge>
-          )}
-          {item.meta === null ? null : <span>{item.meta}</span>}
-        </div>
+      {/* 排名：前三是热的，其余退成灰号 */}
+      <span
+        className={`mt-0.5 w-5 shrink-0 text-right text-sm font-semibold tabular-nums ${
+          rank <= 3 ? 'text-primary' : 'text-muted-foreground/60'
+        }`}
+        aria-label={`第 ${rank} 名`}
+      >
+        {rank}
+      </span>
+
+      <div className="min-w-0 flex-1">
         <a
           href={item.url}
           target="_blank"
           rel="noreferrer"
-          // py-1 把命中区从 19px 抬到 27px（WCAG 2.5.8 要 24px）；-my-1 抵掉多出来的上下间距，视觉位置不变。
-          className="group-hover:text-primary -my-1 line-clamp-2 py-1 font-medium leading-snug transition-colors hover:underline"
+          // py-0.5 把命中区抬到 24px 以上（WCAG 2.5.8），视觉上仍是紧凑的一行标题
+          className="group-hover/row:text-primary block py-0.5 font-medium leading-snug transition-colors hover:underline"
           data-testid="digest-title"
         >
           {item.title}
-          <ExternalLink className="ml-1 inline size-3 align-baseline opacity-50" />
+          <ExternalLink className="ml-1 inline size-3 align-baseline opacity-40" />
         </a>
+
         {degraded ? (
-          <p className="text-muted-foreground text-sm" data-testid="digest-degraded">
+          <p className="text-muted-foreground mt-1 text-sm" data-testid="digest-degraded">
             这条还没写好摘要
           </p>
-        ) : (
-          <p className="text-muted-foreground line-clamp-3 text-sm leading-relaxed" data-testid="digest-summary">
+        ) : item.summary === null ? null : (
+          <p
+            // 两列布局下每列约 660px，两行摘要够用；单列时也只两行，保持行高一致
+            className="text-muted-foreground mt-1 line-clamp-2 text-sm leading-relaxed"
+            data-testid="digest-summary"
+          >
             {item.summary}
           </p>
         )}
-        <div className="mt-auto flex justify-end pt-1">
-          <Button variant="ghost" size="sm" render={<Link to={noteLink} data-testid="digest-to-note" />}>
-            <NotebookPen className="mr-1 size-4" />
-            存成笔记
-          </Button>
+
+        <div className="text-muted-foreground mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs">
+          <span>{item.sourceName}</span>
+          {github ? (
+            <span className="flex items-center gap-0.5" data-testid="digest-github-stars">
+              <Star className="size-3" />
+              {githubWindow === 'week'
+                ? `本周 +${formatStars(stars)}`
+                : `+${formatStars(stars)} 昨日`}
+            </span>
+          ) : item.heat === null ? null : (
+            <span className="flex items-center gap-0.5" data-testid="digest-heat">
+              <Flame className="size-3" />
+              {item.heat}
+            </span>
+          )}
+          {tierLabel === null ? null : (
+            <span
+              className={tier === 'high' ? 'text-primary font-medium' : ''}
+              data-testid="digest-heat-tier"
+            >
+              {tierLabel}
+            </span>
+          )}
+          {item.meta === null ? null : <span>{item.meta}</span>}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      {/* 常驻按钮改成悬停/聚焦才出现：60 个常驻按钮是 60 个噪声。
+          触屏没有悬停，所以 `max-sm:` 下保持 60% 可见。
+          **opacity-0 的元素仍在 Tab 顺序里**，所以 focus-visible 必须能把它拉回 100%，
+          否则键盘用户会停在一个完全看不见的按钮上。 */}
+      <Link
+        to={noteLink}
+        data-testid="digest-to-note"
+        title="存成笔记"
+        aria-label={`把「${item.title}」存成笔记`}
+        className="text-muted-foreground hover:text-primary focus-visible:text-primary flex size-8 shrink-0 items-center justify-center rounded-md opacity-0 transition-all group-hover/row:opacity-100 group-focus-within/row:opacity-100 focus-visible:opacity-100 max-sm:opacity-60"
+      >
+        <NotebookPen className="size-4" />
+      </Link>
+    </li>
   )
 }
 
