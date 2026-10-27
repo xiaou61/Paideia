@@ -26,6 +26,15 @@ export function createDigestApi(client: ApiClient) {
       client.requestEnvelope<DigestWeekly | null>(
         `/api/v1/digest/weekly${week === undefined ? '' : `?week=${encodeURIComponent(week)}`}`,
       ),
+
+    /**
+     * 记一次条目点击（WORK-045）。
+     *
+     * <p>服务端恒返回 200（条目不存在、写库失败都算成功），所以调用方**必须**自己 catch
+     * 掉网络中断——它不该影响任何跳转。
+     */
+    click: (itemId: number) =>
+      client.requestEnvelope<null>(`/api/v1/digest/items/${itemId}/click`, { method: 'POST' }),
   }
 }
 

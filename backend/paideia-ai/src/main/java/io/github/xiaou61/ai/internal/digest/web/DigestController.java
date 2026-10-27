@@ -1,5 +1,6 @@
 package io.github.xiaou61.ai.internal.digest.web;
 
+import io.github.xiaou61.ai.internal.digest.DigestClickMapper;
 import io.github.xiaou61.ai.internal.digest.DigestCollectionService;
 import io.github.xiaou61.ai.internal.digest.DigestMapper;
 import io.github.xiaou61.ai.internal.digest.DigestProperties;
@@ -8,11 +9,17 @@ import io.github.xiaou61.platform.ApiAccess;
 import io.github.xiaou61.platform.ApiResponse;
 import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
+import io.github.xiaou61.security.CurrentUser;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,14 +35,19 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/digest")
 class DigestController {
 
+    private static final Logger log = LoggerFactory.getLogger(DigestController.class);
+
     private final DigestCollectionService collection;
     private final DigestMapper mapper;
     private final DigestProperties properties;
+    private final DigestClickMapper clicks;
 
-    DigestController(DigestCollectionService collection, DigestMapper mapper, DigestProperties properties) {
+    DigestController(DigestCollectionService collection, DigestMapper mapper, DigestProperties properties,
+                     DigestClickMapper clicks) {
         this.collection = collection;
         this.mapper = mapper;
         this.properties = properties;
+        this.clicks = clicks;
     }
 
     /** 一条速递给前端的样子。 */
@@ -77,6 +89,26 @@ class DigestController {
     }
 
     record WeeklyView(LocalDate weekStart, String body, int itemCount) {
+    }
+
+    /**
+     * 记一次速递点击（WORK-045）。
+     *
+     * <p><b>恒返回 200</b>，即使条目不存在或写库失败。理由：用户点的是外链，前端拿到任何
+     * 非 2xx 都不该影响跳转，而这条埋点对用户本身没有价值——报错只是噪音。
+     * 失败在服务端记 WARN，供排查"为什么点击数是 0"。
+     *
+     * <p>归属取自令牌，路径里没有用户标识（与浏览上报同一纪律）。
+     */
+    @PostMapping("/items/{id}/click")
+    ApiResponse<Void> recordClick(@PathVariable("id") long id) {
+        try {
+            long userId = Long.parseLong(CurrentUser.subjectId());
+            clicks.insert(userId, id, Instant.now());
+        } catch (RuntimeException failure) {
+            log.warn("digest.click.record-failed itemId={} cause={}", id, failure.toString());
+        }
+        return ApiResponse.ok(null);
     }
 
     private LocalDate parseDate(String raw) {

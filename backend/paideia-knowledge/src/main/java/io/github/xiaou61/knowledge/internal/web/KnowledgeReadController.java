@@ -3,6 +3,7 @@ package io.github.xiaou61.knowledge.internal.web;
 import io.github.xiaou61.knowledge.internal.category.CategoryService;
 import io.github.xiaou61.knowledge.internal.category.CategoryTree;
 import io.github.xiaou61.knowledge.internal.entry.EntryService;
+import io.github.xiaou61.knowledge.internal.entry.SearchLogService;
 import io.github.xiaou61.platform.ApiAccess;
 import io.github.xiaou61.platform.ApiResponse;
 import io.github.xiaou61.platform.PageQuery;
@@ -32,10 +33,13 @@ class KnowledgeReadController {
 
     private final CategoryService categoryService;
     private final EntryService entryService;
+    private final SearchLogService searchLog;
 
-    KnowledgeReadController(CategoryService categoryService, EntryService entryService) {
+    KnowledgeReadController(CategoryService categoryService, EntryService entryService,
+                            SearchLogService searchLog) {
         this.categoryService = categoryService;
         this.entryService = entryService;
+        this.searchLog = searchLog;
     }
 
     /**
@@ -61,7 +65,14 @@ class KnowledgeReadController {
             @RequestParam(name = "q", required = false) String q,
             @RequestParam(name = "page", defaultValue = "1") int page,
             @RequestParam(name = "size", defaultValue = "20") int size) {
-        return ApiResponse.ok(entryService.listPublished(categoryId, q, PageQuery.of(page, size, null)));
+        PageResult<EntryService.EntrySummary> result =
+                entryService.listPublished(categoryId, q, PageQuery.of(page, size, null));
+        // 只有带 q 的请求才是"搜索"；记一条供数据大屏算内容缺口（WORK-045）。
+        // 失败不影响返回（服务里吞异常），也不额外查一次库——total 就是命中数。
+        if (q != null && !q.isBlank()) {
+            searchLog.record(CurrentUserId.orNull(), q, result.total());
+        }
+        return ApiResponse.ok(result);
     }
 
     /** 条目详情：正文、分类、同分类内的上一篇／下一篇、反向链接、以及**自己的**自评标记。 */
