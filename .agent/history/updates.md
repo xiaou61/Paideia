@@ -7031,3 +7031,34 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 未验证：没有制造 error/slow trace，所以诊断 trace 证据可能显示「无匹配 trace」；Loki 日志跳 Tempo 需人工在 Grafana 点一次。
 - 本地提交：6b4e6ea、18e68aa、38b9263、181bca5、056fdf7、b526ecc（38b9263 的错误依赖已在 181bca5 回退）
 - 远端推送：未执行
+
+## 2026-10-27 16:45 +0800 · WORK-043 P3 · SLO
+
+- 类型：implementation
+- 变更：`DefaultRunRecorder` 发 `paideia.ai.runs{kind,outcome}` 与 `paideia.ai.run.duration{kind}`；`LoginService` 计 success/failure；`CreditService` 计结算缺口。`prometheus-rules.yml` 新增 `paideia-slo` 组 35 条（5 目标 + 13 SLI + 17 燃尽率）；`paideia-rules.yaml` 新增 7 条 SLO 告警（全部 `NoData=OK`）；`paideia-ops.json` 加 3 个 panel（SLI/燃尽率/预算剩余）；证据增加 `slo_*` 行，提示词升 `ops-diagnosis-v3`。
+- 决策：SLO 告警用 7 条而非原计划的 4–6 条——多出的两条（3d+6h 工单级、定时任务直判）各自覆盖别的规则抓不到的场景，为凑数删掉反而损失。
+- 验证：`promtool check rules` 56 rules SUCCESS、`promtool test rules` 7 用例 SUCCESS；生产 `paideia-baseline` 21 + `paideia-slo` 35 全在求值；Grafana 17 条规则 `health=ok`、无 firing；panel 数 13；错口令登录 → `outcome="failure"` → 35 秒后 `sli_login_success:ratio1h=1`。
+- 演练：合成 SLO webhook 两次 → 事件 #4/#5、诊断 #8/#9；报告引用 `sli_1h=100.000% burn_1h=0.00x` 并据此判断告警与 SLI 自相矛盾。
+- 本地提交：fb807e5、aaafe82
+- 远端推送：未执行
+
+## 2026-10-27 16:50 +0800 · WORK-043 P4 · 反馈与评测
+
+- 类型：implementation
+- 变更：`POST /api/v1/ops/admin/diagnoses/{id}/feedback`（rating ∈ {-1,0,1}，只接受 DONE，重评覆盖）；`GET .../stats` 返回 `{rated,good,partial,bad,helpfulRate}`（无评分时 rate 为 null）；运维页报告下方三档按钮 + 备注、卡片描述行显示好评率。金集 12 条 + `OpsDiagnosisGoldenSetTest`（prompt 模式进 CI，live 模式 `PAIDEIA_OPS_EVAL=1` 手动）。
+- 决策：金集放 `paideia-ai` 而不是原计划的 `paideia-app`——被测的 `OpsDiagnosisPrompt` 在 ai 模块，跨模块引内部包会被 `ModularityTest` 拦。
+- 验证：`OpsFeedbackIntegrationTest` 5/0；金集 prompt 模式 14 跑 / 0 失败 / 1 跳过；管理端 typecheck 与 build 通过；生产 `GET /stats` 无令牌 401。
+- 未验证：live 模式未执行（需真实 key 与 12 次调用）；评分区 e2e 只在库里有已完成诊断时才点。
+- 本地提交：f242689、3253a7b
+- 远端推送：未执行
+
+## 2026-10-27 17:05 +0800 · WORK-043 P5 · 收口
+
+- 类型：fix + verification
+- 变更：修两处生产演练暴露的缺陷——`sloSummary` 把 `NaN` 也当"无流量"（原来只判 null，证据里出现 `sli_1h=NaN%`，模型当真实数值推理）；`TempoClient` 缺 `status` 字段时给 `unset`（proto3 JSON 省略零值，原来给空串，证据里出现 `status=`）。`install-ops.sh` 增加 `grafana-server.service` 检测与停用。写 `testing/report.md`（16 条 AC 全有命令+退出码+证据）；tasks.md 26 个任务全部 done。
+- 依据：生产诊断 #9 报告原文（`slo_ai_success sli_1h=NaN%`、`status=` 为空）；`journalctl` 显示 `grafana-server` 在 `Restart=on-failure` 循环 66 次而 `grafana.service` 一直在跑。
+- 验证：非 app 模块全量 330/0/14（78 秒）；守卫 9/0；`Ops*Test` 全绿；两条反向验证（去掉 NaN 判定 → `nanSliIsNotANumber` 红；`asText("unset")` 改回空串 → `missingStatusReadsAsUnset` 红）恢复后各 8/0 与 4/0；从干净工作树 `release.ps1 -WithWeb` 112.3 秒部署；生产 ss 确认监控端口全在回环。
+- 修复的非本项问题：另一会话的 `a25333a` 漏登记 `V20261027150000` 校验和导致 `MigrationChecksumTest` 对所有人变红，单独提交 `17fa00a` 补登记。
+- 未验证：金集 live 模式、真实高流量快烧、生产 `paideia_ai_runs_total`（线上无人用 AI）。
+- 本地提交：c01f4c2、17fa00a + 本次文档提交
+- 远端推送：未执行

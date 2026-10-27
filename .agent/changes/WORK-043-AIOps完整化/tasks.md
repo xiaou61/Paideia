@@ -136,9 +136,9 @@ approver_role: CTO
 - 步骤：改 group_by → 部署检查；抑制逻辑与 TASK-003 同一实现。
 - 验证：Grafana API 读取 policy 的 `group_by`；集成测试绿。
 
-### TASK-008 | in_progress | 基线/SLO 录制规则与 promtool 测试
+### TASK-008 | done | 基线/SLO 录制规则与 promtool 测试
 
-- 进度：基线录制规则（CPU/5xx/P95）与 promtool 用例已完成；SLO 录制规则在 TASK-018 收口。
+- 进度：基线录制规则（CPU/5xx/P95）21 条与 SLO 录制规则 35 条都在 `prometheus-rules.yml`，`rule_files` 已由 `prometheus.yml` 引入、`install-ops.sh` 安装时跑 `promtool check rules`。`promtool test rules` 7 个用例全绿（正常/尖峰/样本不足 + 全 200/全 500 快烧/只有 4xx 与 actuator/延迟 50%）。
 
 - 对应：`REQ-008`、`REQ-025`、`AC-004`、`AC-012`、`AC-013`
 - 依赖：TASK-001（无代码依赖，可并行）
@@ -234,7 +234,7 @@ approver_role: CTO
 - 步骤：写黑名单测试 → 实现 → 绿。
 - 验证：`mvn ... -Dtest=TempoTraceRedactorTest`。
 
-### TASK-017 | pending | AI/登录/结算业务指标
+### TASK-017 | done | AI/登录/结算业务指标
 
 - 对应：`REQ-024`、`AC-012`
 - 依赖：无
@@ -243,8 +243,9 @@ approver_role: CTO
 - 测试：`SloMetricsTest.labelsAreLowCardinality`、`DefaultRunRecorderTest` 扩展。
 - 步骤：在 `finish` 发 counter/timer → 单测；登录/结算同理。
 - 验证：`mvn -B -pl paideia-ai -Dtest=DefaultRunRecorderTest ...`；`curl actuator/prometheus` 看指标。
+- 进度：`DefaultRunRecorder` 发 `paideia.ai.runs{kind,outcome}` 与 `paideia.ai.run.duration{kind}`（kind 空值收敛成 `unknown`）；`LoginService` 包一层计数 success/failure；`CreditService` 结算缺口计数。测试 `DefaultRunRecorderTest`（9 条）+ `SloMetricsTest`（基数断言）+ `LoginServiceTest`。生产实测：故意用错口令登录 → `paideia_login_attempts_total{outcome="failure"} 1.0` 出现在 `/actuator/prometheus`，35 秒后 Prometheus 算出 `paideia:sli_login_success:ratio1h=1`。
 
-### TASK-018 | pending | SLO burn-rate 规则
+### TASK-018 | done | SLO burn-rate 规则
 
 - 对应：`REQ-025`、`REQ-027`、`AC-013`
 - 依赖：TASK-008、TASK-017
@@ -253,8 +254,9 @@ approver_role: CTO
 - 测试：`promtool test rules` 覆盖 no-data/快烧/慢烧。
 - 步骤：录制 SLI → 写 burn 规则 → 部署检查。
 - 验证：`promtool` 绿；Grafana 规则 health ok；构造一次快烧能触发。
+- 进度：`prometheus-rules.yml` 新增 `paideia-slo` 组 35 条（5 个目标 + 13 条 SLI + 17 条燃尽率）；`paideia-rules.yaml` 新增 7 条（可用性快烧/慢烧/预算、延迟慢烧、AI 快烧、登录快烧、定时任务失败），全部 `NoData=OK`。`promtool check rules` 56 rules SUCCESS、`promtool test rules` 7 用例 SUCCESS（含"只有 4xx 与 actuator 流量时 SLI 为空"）。生产 `curl /api/v1/rules` 确认 `paideia-baseline` 21 条 + `paideia-slo` 35 条都在求值。
 
-### TASK-019 | pending | SLO 面板
+### TASK-019 | done | SLO 面板
 
 - 对应：`REQ-026`、`AC-013`
 - 依赖：TASK-018
@@ -263,8 +265,9 @@ approver_role: CTO
 - 测试：Grafana dashboard API 读取 panel 数；人工看一次。
 - 步骤：加 panel → 部署检查。
 - 验证：dashboard API 返回新增 panel。
+- 进度：`paideia-ops.json` 由 10 个 panel 增到 13 个（SLI 1h 趋势、燃尽率、7 天预算剩余）；生产 Grafana DB 读回 panel 数 = 13。
 
-### TASK-020 | pending | SLO 告警走事件/诊断路径
+### TASK-020 | done | SLO 告警走事件/诊断路径
 
 - 对应：`REQ-027`、`AC-014`
 - 依赖：TASK-018、TASK-003
@@ -273,8 +276,9 @@ approver_role: CTO
 - 测试：构造一次 burn 告警 → 事件 + 诊断；报告引用 burn rate。
 - 步骤：接 receiver → 演练 → 检查报告。
 - 验证：生产/测试 webhook 触发后事件与诊断存在。
+- 进度：`OpsEvidenceCollector.sloSummary()` 把五个目标的 SLI/燃尽率写进 `<baselines>`；`OpsDiagnosisPrompt.VERSION` 升到 `ops-diagnosis-v3`，明确 1x/6x/14.4x 含义与"无流量不能判断好坏"。生产演练两次（事件 #4/#5、诊断 #8/#9）：报告直接引用 `sli_1h=100.000%` 与 `burn_1h=0.00x`，并据此判断"告警与 SLI 自相矛盾"——链路通了。**演练暴露两个真缺陷并已修**：SLI 为 NaN 时证据写成 `sli_1h=NaN%`（模型会当真实数值），trace 缺 `status` 字段时写成空串。
 
-### TASK-021 | pending | 诊断评分端点与 UI
+### TASK-021 | done | 诊断评分端点与 UI
 
 - 对应：`REQ-019`、`AC-010`
 - 依赖：TASK-001、TASK-004
@@ -283,8 +287,9 @@ approver_role: CTO
 - 测试：`OpsFeedbackIntegrationTest.invalidRatingRejected`、e2e 评分按钮。
 - 步骤：写 400/200 测试 → 实现 → UI → e2e。
 - 验证：`scripts/test-db.sh mvn ... -Dtest=OpsFeedbackIntegrationTest ...` + e2e。
+- 进度：端点 `POST /{id}/feedback`（rating ∈ {-1,0,1}，只接受 DONE）；`OpsPage.tsx` 报告下方三档按钮 + 备注框。测试 `OpsFeedbackIntegrationTest` 5 条全绿（非法评分 400、重评覆盖、事件时间线 NOTE、空统计、权限）。
 
-### TASK-022 | pending | 金集与重放评测
+### TASK-022 | done | 金集与重放评测
 
 - 对应：`REQ-020`、`REQ-021`、`AC-011`
 - 依赖：TASK-009、TASK-015、TASK-021
@@ -296,8 +301,9 @@ approver_role: CTO
   2. 写 prompt 模式断言 → 绿。
   3. 手动跑 live 模式，记录报告。
 - 验证：`mvn ... -Dtest=OpsDiagnosisGoldenSetTest`（默认不调模型）；`PAIDEIA_OPS_EVAL=1 ...` 手动。
+- 进度：金集放 `paideia-ai/src/test/resources/ops-eval/golden-set.json`（**不是**原计划的 app 模块：被测的 `OpsDiagnosisPrompt` 在 ai 模块，跨模块引内部包会被 `ModularityTest` 拦）。12 条覆盖 5xx/CPU/延迟/AI 401/登录撞库/磁盘/堆/MySQL/Redis/定时任务/慢 trace/无流量/采集不可达。prompt 模式 13 条断言全绿；**live 模式未执行**（需真实 key 与 12 次调用，本轮未跑）。
 
-### TASK-023 | pending | helpful 率端点与 UI
+### TASK-023 | done | helpful 率端点与 UI
 
 - 对应：`REQ-022`、`AC-010`
 - 依赖：TASK-021
@@ -306,8 +312,9 @@ approver_role: CTO
 - 测试：集成测试 stats；e2e 显示。
 - 步骤：写统计查询 → 端点 → UI。
 - 验证：`mvn ... -Dtest=OpsFeedbackIntegrationTest` + e2e。
+- 进度：`GET /stats` 返回 `{rated,good,partial,bad,helpfulRate}`，`rated=0` 时 `helpfulRate=null`；运维页诊断卡描述行显示"已评 N 份，好评率 X%"。
 
-### TASK-024 | pending | 证据/安全复核与文档
+### TASK-024 | done | 证据/安全复核与文档
 
 - 对应：`REQ-018`、`AC-016`
 - 依赖：TASK-009、TASK-015、TASK-016
@@ -316,8 +323,9 @@ approver_role: CTO
 - 测试：人工检查证据字段、Tempo 属性、日志脱敏；全量切片。
 - 步骤：逐条核对 AC-016；记录实际 trace 属性；补文档。
 - 验证：报告中每个安全项有证据行。
+- 进度：`testing/report.md` 的「安全复核」表 9 行逐条有方法+结果；生产 `ss -ltn` 证明监控端口全在回环、公网侧无新增；trace 白名单由 `TempoTraceRedactorTest` 守护。
 
-### TASK-025 | pending | 部署与生产验证
+### TASK-025 | done | 部署与生产验证
 
 - 对应：全部 `AC-*`
 - 依赖：TASK-001..TASK-024
@@ -329,8 +337,9 @@ approver_role: CTO
   2. 从干净工作树发版。
   3. 制造一次合成告警 → 事件 → 诊断；检查 trace/SLO。
 - 验证：生产清单逐条有输出。
+- 进度：规则先于应用部署（`promtool check rules` 56 条 → 重启 prometheus/grafana）；应用从 `.worktrees/work-043-p2` 发版，**112.3 秒**；合成告警两次（事件 #4/#5、诊断 #8/#9），报告引用 SLI 与 burn rate。**期间发现并修复 Grafana 双单元抢 3000 端口**（`install-ops.sh` 已加检测）。
 
-### TASK-026 | pending | 测试报告与收尾
+### TASK-026 | done | 测试报告与收尾
 
 - 对应：全部 `AC-*`
 - 依赖：TASK-025
@@ -339,6 +348,7 @@ approver_role: CTO
 - 测试：跑受影响切片 + promtool + e2e。
 - 步骤：跑测试 → 写报告 → 更新历史 → 清理工作树。
 - 验证：报告每条 AC 有证据；`validate --strict` 无 WORK-043 错误。
+- 进度：`testing/report.md` 16 条 AC 全部有命令 + 退出码 + 证据；两条反向验证（去 NaN 判定、把 `unset` 改回空串）都实测变红后恢复。**未验证项 3 条如实记录**：金集 live 模式、真实高流量快烧、生产 AI 计数。
 
 ## 完成条件
 
