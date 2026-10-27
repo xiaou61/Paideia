@@ -110,3 +110,47 @@ test('MCP 凭据：非管理员看不到管理工具组与管理范围', async (
   await expect(page.getByTestId('mcp-toolset-admin_users')).toHaveCount(0)
   await expect(page.getByTestId('mcp-token-admin')).toHaveCount(0)
 })
+
+/**
+ * WORK-044：每日调用上限与用量。
+ *
+ * <p>两条都是"用户能观察到"的：不填上限时显示"不限"，填了之后显示 `今日 N / M 次`。
+ * 真正的配额拦截由后端单测钉（`McpToolInvokerTest.quotaExhaustedStopsBeforeInvoking`），
+ * 这里只验界面把服务端的数字显示出来了。
+ */
+test('MCP 凭据：填了每日上限时列表显示 今日/上限', async ({ page }) => {
+  await signIn(page)
+  await page.goto('/#/settings/mcp')
+
+  const name = `limit-${String(Date.now())}`
+  await page.getByTestId('mcp-token-name').fill(name)
+  await page.getByTestId('mcp-token-daily-limit').fill('100')
+  await page.getByTestId('mcp-token-create').click()
+  await expect(page.getByTestId('mcp-token-plaintext')).toBeVisible()
+
+  const row = page.getByTestId('mcp-token-row').filter({ hasText: name })
+  await expect(row.getByTestId('mcp-token-usage')).toContainText('今日 0 / 100 次')
+})
+
+test('MCP 凭据：不填上限时显示不限', async ({ page }) => {
+  await signIn(page)
+  await page.goto('/#/settings/mcp')
+
+  const name = `nolimit-${String(Date.now())}`
+  await page.getByTestId('mcp-token-name').fill(name)
+  await page.getByTestId('mcp-token-create').click()
+  await expect(page.getByTestId('mcp-token-plaintext')).toBeVisible()
+
+  const row = page.getByTestId('mcp-token-row').filter({ hasText: name })
+  await expect(row.getByTestId('mcp-token-usage')).toContainText('今日 0 次（不限）')
+})
+
+/** 四个新域的工具组要能在界面上勾到——勾不到等于没上线。 */
+test('MCP 凭据：四个新域的工具组可选', async ({ page }) => {
+  await signIn(page)
+  await page.goto('/#/settings/mcp')
+
+  for (const key of ['resume', 'interview', 'review', 'memory']) {
+    await expect(page.getByTestId(`mcp-toolset-${key}`)).toBeVisible()
+  }
+})
