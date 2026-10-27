@@ -7088,3 +7088,18 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 待用户拍板：① 受众只给管理员还是也要学习者精简版（推荐只给管理员）② 是否允许为此新增埋点（推荐不新增，先暴露空白）③ 刷新强度 60 秒还是 10 秒（后者需引入快照表，与"不新增表"冲突）。
 - 本地提交：本次文档提交
 - 远端推送：未执行
+
+## 2026-10-27 17:05 +0800 · WORK-044 · 合并 master 与 REQ-015/016 补齐
+
+- 类型：implementation
+- 变更：先把分支 rebase 到最新 master（吸收了 WORK-041/043 的 11 笔提交，只有 `updates.md` 一处文本冲突，按时间序合并）；补做上一轮写成"未完成"的两条；再 `--no-ff` 合并回 master。
+- 补做（REQ-015）：`admin_ops_summary` 新增 `mcp` 分组（累计调用/被拒/其中配额，Prometheus 不可达时显示"未知"而不是 0）；`paideia-ops.json` 加两个面板（按组与结果的速率、平均耗时）。
+- 补做（REQ-016）：`VIEW_NOT_FOUND` 原先在分派 servlet 就返回 404、到不了 `McpToolInvoker`，所以 `reason="view_not_found"` 永远不会产生。改在 servlet 的 catch 里记。新增 `McpDispatcherServletTest` 2 条。
+- 纠正：耗时面板原写 `histogram_quantile(_bucket)`，但 Micrometer Timer 未配 percentile histogram 时导出的是 summary（无 `_bucket`），查询会永远为空。改成平均耗时，并在面板描述里写明要 p95 需先开 `publishing.percentiles`。
+- 验证：合并后在 master 上重跑——`paideia-mcp` 56 条 0 失败；后端全量（除 app）**1424 条 0 失败 30 跳过**；app 关键 8 类 25 条 0 失败；e2e 9 条通过。视图探测实测 `paideia_mcp_denied_total{reason="view_not_found"} 1.0`；`admin_ops_summary` 实测 8 组含 mcp。
+- 反向验证（第四条）：去掉 servlet 里那行 `metrics.denied`，新增的 2 条测试都红；恢复后绿。
+- 合并时处理：主树里有一份未跟踪的旧版工件副本（建项时直接在主树写的），与分支版本 diff 后确认分支更新，删副本再合并；`migration-checksums.txt` 双方都登记了新迁移，手工取并集。
+- 工作树已清理（`git worktree remove` + `git branch -d`）。
+- 未部署：**主树上有其他会话未提交的 `CategoryService.java` 改动（把学习轨道分类恢复进知识库）**，`release.ps1` 从工作区构建会把它一起打进生产包。那是别人的在飞工作、与本项无关，故本次不发版，等它落地或由用户指定用干净树发版。
+- 本地提交：30d25a2（merge），分支内 9313a8d 为功能最后一笔
+- 远端推送：未执行
