@@ -51,3 +51,84 @@ tests:
         exp_samples:
           - labels: '{__name__="paideia:baseline_cpu:samples7d"}'
             value: 10
+
+  # ── SLO 录制规则（WORK-043 TASK-018）────────────────────────────────────
+  # 只覆盖 HTTP 可用性/延迟这两组最容易算错的：4xx 排除、actuator 排除、无流量不算失败。
+  # AI/登录的算式与可用性同构（good/total），由 promtool check rules 与生产查询确认。
+
+  - name: 全部 200 时可用性为 1，燃尽率为 0
+    interval: 3m
+    input_series:
+      - series: 'http_server_requests_seconds_count{status="200",uri="/api/v1/knowledge"}'
+        values: '0+180x10'
+    promql_expr_test:
+      - expr: paideia:sli_http_availability:ratio5m > bool 0.999
+        eval_time: 12m
+        exp_samples:
+          - labels: '{}'
+            value: 1
+      - expr: paideia:slo_burn_rate:http_availability_1h < bool 0.001
+        eval_time: 12m
+        exp_samples:
+          - labels: '{}'
+            value: 1
+
+  - name: 全部 500 时可用性为 0，1h 与 5m 同时快烧
+    interval: 3m
+    input_series:
+      - series: 'http_server_requests_seconds_count{status="500",uri="/api/v1/knowledge"}'
+        values: '0+180x10'
+    promql_expr_test:
+      - expr: paideia:sli_http_availability:ratio5m < bool 0.001
+        eval_time: 27m
+        exp_samples:
+          - labels: '{}'
+            value: 1
+      - expr: paideia:slo_burn_rate:http_availability_1h > bool 14.4
+        eval_time: 27m
+        exp_samples:
+          - labels: '{}'
+            value: 1
+      - expr: paideia:slo_burn_rate:http_availability_5m > bool 14.4
+        eval_time: 27m
+        exp_samples:
+          - labels: '{}'
+            value: 1
+
+  - name: 只有 4xx 与 actuator 流量时 SLI 为空，不会算成 0
+    interval: 3m
+    input_series:
+      - series: 'http_server_requests_seconds_count{status="404",uri="/api/v1/missing"}'
+        values: '0+180x10'
+      - series: 'http_server_requests_seconds_count{status="200",uri="/actuator/prometheus"}'
+        values: '0+180x10'
+    promql_expr_test:
+      - expr: absent(paideia:sli_http_availability:ratio5m)
+        eval_time: 12m
+        exp_samples:
+          - labels: '{}'
+            value: 1
+      - expr: absent(paideia:slo_burn_rate:http_availability_5m)
+        eval_time: 12m
+        exp_samples:
+          - labels: '{}'
+            value: 1
+
+  - name: 一半请求超过 984ms 时延迟 SLI 为 0.5
+    interval: 3m
+    input_series:
+      - series: 'http_server_requests_seconds_bucket{le="0.984263336",status="200",uri="/api/v1/knowledge"}'
+        values: '0+180x10'
+      - series: 'http_server_requests_seconds_count{status="200",uri="/api/v1/knowledge"}'
+        values: '0+360x10'
+    promql_expr_test:
+      - expr: paideia:sli_http_latency:ratio5m > bool 0.4
+        eval_time: 12m
+        exp_samples:
+          - labels: '{}'
+            value: 1
+      - expr: paideia:sli_http_latency:ratio5m < bool 0.6
+        eval_time: 12m
+        exp_samples:
+          - labels: '{}'
+            value: 1

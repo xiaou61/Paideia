@@ -304,3 +304,195 @@ groups:
         annotations:
           summary: ERROR 日志超过上周同时段 3 倍且超过 10 条
           description: 上周同时段没有日志或 Loki 不可达时不触发；看运维页日志面板与 AI 诊断。
+
+      # ── SLO 燃尽率（WORK-043 TASK-019）────────────────────────────────────
+      #
+      # 读 Prometheus 的 `paideia:slo_burn_rate:*`（prometheus-rules.yml）。
+      # 多窗口同时超阈值才算触发，这是 Google SRE 的做法：长窗口保证"不是一次抖动"，
+      # 短窗口保证"现在还没停"，两者都成立才叫快烧。
+      #
+      # **NoData=OK**：录制规则缺席（刚部署、没流量、没 AI 调用）时不能报警。
+      # `*` 而不是 `and`：两侧各是 0/1，相乘即为"同时成立"。
+      #
+      # severity 只影响事件页的分类与 critical 抑制 warning 的行为，不影响谁收到邮件。
+      - uid: paideia-slo-availability-fast
+        title: SLO 快烧：HTTP 可用性
+        condition: A
+        for: 2m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: paideia-prometheus
+            model:
+              refId: A
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 1
+              expr: >-
+                (paideia:slo_burn_rate:http_availability_1h > bool 14.4)
+                * (paideia:slo_burn_rate:http_availability_5m > bool 14.4)
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        notification_settings:
+          receiver: paideia-ops
+        annotations:
+          summary: HTTP 可用性正在以 14.4 倍速消耗月度预算
+          description: 1 小时与 5 分钟同时快烧；1 小时内烧掉 2% 月度预算。看运维页事件与 AI 诊断，先查最近的 5xx、ERROR 日志与最慢/报错 trace。
+
+      - uid: paideia-slo-availability-slow
+        title: SLO 慢烧：HTTP 可用性
+        condition: A
+        for: 15m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: paideia-prometheus
+            model:
+              refId: A
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 1
+              expr: >-
+                (paideia:slo_burn_rate:http_availability_6h > bool 6)
+                * (paideia:slo_burn_rate:http_availability_30m > bool 6)
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        notification_settings:
+          receiver: paideia-ops
+        annotations:
+          summary: HTTP 可用性持续以 6 倍速消耗预算
+          description: 6 小时与 30 分钟同时慢烧；照这个速度一周左右烧完一个月的预算。不是急停级别，但今天该看一眼 5xx 的分布。
+
+      - uid: paideia-slo-availability-budget
+        title: SLO 预算告急：HTTP 可用性
+        condition: A
+        for: 1h
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: paideia-prometheus
+            model:
+              refId: A
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 1
+              expr: >-
+                (paideia:slo_burn_rate:http_availability_3d > bool 1)
+                * (paideia:slo_burn_rate:http_availability_6h > bool 1)
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        notification_settings:
+          receiver: paideia-ops
+        annotations:
+          summary: HTTP 可用性按 3 天速度会烧完月度预算
+          description: 工单级告警：3 天与 6 小时燃尽率都大于 1。要么定一个可靠性改进项，要么把 99.5% 的目标按实际使用情况重新评估。
+
+      - uid: paideia-slo-latency-slow
+        title: SLO 慢烧：HTTP 延迟
+        condition: A
+        for: 15m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: paideia-prometheus
+            model:
+              refId: A
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 1
+              expr: >-
+                (paideia:slo_burn_rate:http_latency_6h > bool 6)
+                * (paideia:slo_burn_rate:http_latency_30m > bool 6)
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        notification_settings:
+          receiver: paideia-ops
+        annotations:
+          summary: "HTTP 延迟（<984ms 占比 95%）持续慢烧"
+          description: 看运维页 AI 诊断：证据里有 P95、7 天基线与最慢 span；先分清是应用变慢还是数据库/上游变慢。
+
+      - uid: paideia-slo-ai-fast
+        title: SLO 快烧：AI 成功率
+        condition: A
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: paideia-prometheus
+            model:
+              refId: A
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 1
+              expr: >-
+                (paideia:slo_burn_rate:ai_success_1h > bool 14.4)
+                * (paideia:slo_burn_rate:ai_success_5m > bool 14.4)
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        notification_settings:
+          receiver: paideia-ops
+        annotations:
+          summary: AI 调用成功率正在快速下降
+          description: 先看是不是上游凭据/额度/网络问题（诊断证据里的模型与错误类型），再看是不是本机积分或限流把请求挡在调上游之前。
+
+      - uid: paideia-slo-login-fast
+        title: SLO 快烧：登录成功率
+        condition: A
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: paideia-prometheus
+            model:
+              refId: A
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 1
+              expr: >-
+                (paideia:slo_burn_rate:login_success_1h > bool 14.4)
+                * (paideia:slo_burn_rate:login_success_5m > bool 14.4)
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        notification_settings:
+          receiver: paideia-ops
+        annotations:
+          summary: 登录成功率正在快速下降
+          description: 先区分是"密码错/限流"（4xx，用户侧）还是"服务异常"（5xx）；诊断证据里的 5xx 与 ERROR 日志能分开这两类。
+
+      # 定时任务不是 burn rate：它每天只跑一两次，用"最近一次是否成功"更直接。
+      # 从未运行按成功算（ScheduledTaskMetrics 的约定），这里只抓"跑过且失败"。
+      - uid: paideia-slo-scheduled-failing
+        title: 定时任务最近一次失败
+        condition: A
+        for: 30m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: paideia-prometheus
+            model:
+              refId: A
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 1
+              expr: paideia:sli_scheduled_success:ratio5m < bool 1
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        notification_settings:
+          receiver: paideia-ops
+        annotations:
+          summary: 有定时任务上次执行失败（连续 30 分钟未恢复）
+          description: 看运维页「定时任务」表定位是哪一个；再按手势清理/遥测保留/每日速递分别查日志。

@@ -235,6 +235,142 @@
           "editorMode": "code"
         }
       ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "SLI（1 小时窗口）",
+      "description": "口径：HTTP 可用性排除 4xx 与 /actuator；延迟是「≤984ms 的请求占比」（Micrometer 默认桶没有 1.0 边界）；AI 的 402 不进分母。没有流量时曲线断开，不是 0。",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 27 },
+      "datasource": { "type": "prometheus", "uid": "paideia-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0.8,
+          "max": 1,
+          "custom": { "fillOpacity": 0, "lineWidth": 2 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.97 },
+              { "color": "red", "value": 0.95 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "paideia:sli_http_availability:ratio1h",
+          "legendFormat": "HTTP 可用性（目标 99.5%）"
+        },
+        {
+          "refId": "B",
+          "expr": "paideia:sli_http_latency:ratio1h",
+          "legendFormat": "HTTP 延迟（目标 95%）"
+        },
+        {
+          "refId": "C",
+          "expr": "paideia:sli_ai_success:ratio1h",
+          "legendFormat": "AI 成功率（目标 99%）"
+        },
+        {
+          "refId": "D",
+          "expr": "paideia:sli_login_success:ratio1h",
+          "legendFormat": "登录成功率（目标 99%）"
+        },
+        {
+          "refId": "E",
+          "expr": "paideia:sli_scheduled_success:ratio5m",
+          "legendFormat": "定时任务（目标 99%）"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "燃尽率（1.0 = 按预算匀速烧，14.4 = 一小时烧掉 2%）",
+      "description": "快烧 1h+5m 都 >14.4；慢烧 6h+30m 都 >6；工单级 3d+6h 都 >1。阈值 1/6/14.4 与 Grafana 规则一致。",
+      "gridPos": { "h": 7, "w": 8, "x": 12, "y": 27 },
+      "datasource": { "type": "prometheus", "uid": "paideia-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": { "fillOpacity": 0, "lineWidth": 2 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "orange", "value": 6 },
+              { "color": "red", "value": 14.4 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "paideia:slo_burn_rate:http_availability_1h",
+          "legendFormat": "可用性 1h"
+        },
+        {
+          "refId": "B",
+          "expr": "paideia:slo_burn_rate:http_availability_6h",
+          "legendFormat": "可用性 6h"
+        },
+        {
+          "refId": "C",
+          "expr": "paideia:slo_burn_rate:http_latency_6h",
+          "legendFormat": "延迟 6h"
+        },
+        {
+          "refId": "D",
+          "expr": "paideia:slo_burn_rate:ai_success_1h",
+          "legendFormat": "AI 1h"
+        },
+        {
+          "refId": "E",
+          "expr": "paideia:slo_burn_rate:login_success_1h",
+          "legendFormat": "登录 1h"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "HTTP 可用性预算剩余（近 7 天）",
+      "description": "1 −（1 − SLI）/（1 − 目标）。100% 表示这段时间一次预算都没花；0 表示刚好烧完；负数表示已经超支。用 7 天滚动而不是自然月，是因为 Prometheus 只保留 30 天，自然月窗口在月初会失真。",
+      "gridPos": { "h": 7, "w": 4, "x": 20, "y": 27 },
+      "datasource": { "type": "prometheus", "uid": "paideia-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": -1,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0 },
+              { "color": "green", "value": 0.25 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(((sum(rate(http_server_requests_seconds_count{status!~\"4..|5..\", uri!~\"/actuator.*\"}[7d])) or vector(0)) / sum(rate(http_server_requests_seconds_count{status!~\"4..\", uri!~\"/actuator.*\"}[7d]))) - paideia:slo_target:http_availability) / (1 - paideia:slo_target:http_availability)",
+          "legendFormat": "剩余"
+        }
+      ]
     }
   ]
 }

@@ -149,7 +149,10 @@ class OpsEvidenceCollector {
     String firingAlerts() {
         List<PrometheusClient.Sample> samples = prometheus.query("ALERTS{alertstate=\"firing\"}");
         if (samples.isEmpty()) {
-            return "无 firing 告警（或 Prometheus 不可达）";
+            // 我们的告警都由 Grafana 求值，不进 Prometheus 的 ALERTS——这里查不到不等于没告警。
+            return "（Prometheus 侧无 firing 记录；本项目的告警由 Grafana 求值，"
+                    + "触发告警名见上，Grafana 的实况以运维页的告警列表为准）\n"
+                    + "无 firing 告警（或 Prometheus 不可达）\n";
         }
         StringBuilder out = new StringBuilder();
         int count = 0;
@@ -225,7 +228,41 @@ class OpsEvidenceCollector {
         metricBaseline(out, "http_5xx_percent", "paideia:baseline_5xx", "%");
         metricBaseline(out, "http_p95_seconds", "paideia:baseline_p95", "s");
         logBaseline(out);
+        sloSummary(out);
         return out.toString();
+    }
+
+    /**
+     * SLO 燃尽率（WORK-043 TASK-020）。
+     *
+     * <p>为什么放在证据里：SLO 告警的 alertname 只说"快烧/慢烧"，模型看不到具体倍数就只能猜。
+     * 这里把五个目标的当前 SLI 与燃尽率一起给它，报告才能直接引用数字。
+     * 录制规则在 `deploy/ops/prometheus-rules.yml` 的 `paideia-slo` 组。
+     */
+    private void sloSummary(StringBuilder out) {
+        // 目标名 → (SLI 序列, 燃尽率序列, 单位)。只放 1h/6h 两个窗口：快烧看 1h、慢烧看 6h。
+        String[][] specs = {
+                {"http_availability", "paideia:sli_http_availability:ratio1h", "paideia:slo_burn_rate:http_availability_1h"},
+                {"http_latency", "paideia:sli_http_latency:ratio1h", "paideia:slo_burn_rate:http_latency_1h"},
+                {"ai_success", "paideia:sli_ai_success:ratio1h", "paideia:slo_burn_rate:ai_success_1h"},
+                {"login_success", "paideia:sli_login_success:ratio1h", "paideia:slo_burn_rate:login_success_1h"},
+        };
+        for (String[] spec : specs) {
+            Double sli = prometheus.scalar(spec[1]);
+            Double burn = prometheus.scalar(spec[2]);
+            out.append("slo_").append(spec[0]).append(' ');
+            if (sli == null) {
+                out.append("= 无流量（SLI 不可计算）\n");
+                continue;
+            }
+            out.append("sli_1h=").append(trimmed(sli * 100, 3)).append('%')
+                    .append(" burn_1h=").append(burn == null ? "—" : trimmed(burn, 2) + "x")
+                    .append('\n');
+        }
+        Double scheduled = prometheus.scalar("paideia:sli_scheduled_success:ratio5m");
+        out.append("slo_scheduled_success sli=")
+                .append(scheduled == null ? "无数据" : trimmed(scheduled * 100, 1) + "%")
+                .append('\n');
     }
 
     private void metricBaseline(StringBuilder out, String name, String prefix, String unit) {

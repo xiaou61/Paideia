@@ -85,6 +85,22 @@ class OpsEvidenceCollectorTest {
     }
 
     @Test
+    @DisplayName("SLO 的 SLI 与燃尽率进入基线证据，无流量写无流量")
+    void sloEvidence() {
+        // 默认桩：所有标量都是 1.0 → 四条 SLI 都是 100%、燃尽率 1.0
+        when(prometheus.scalar("paideia:sli_ai_success:ratio1h")).thenReturn(null);
+
+        String baselines = collector.collect("alert", "SLO 快烧：HTTP 可用性", null).baselines();
+
+        assertThat(baselines)
+                .contains("slo_http_availability sli_1h=100.000% burn_1h=1.00x")
+                .contains("slo_http_latency sli_1h=100.000%")
+                .contains("slo_login_success sli_1h=100.000%")
+                .contains("slo_ai_success = 无流量（SLI 不可计算）")
+                .contains("slo_scheduled_success sli=100.0%");
+    }
+
+    @Test
     @DisplayName("trace 摘要只带最慢 span 与白名单属性")
     void traceEvidence() {
         when(tempo.search(any(), any(), anyInt())).thenReturn(List.of(

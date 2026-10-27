@@ -59,3 +59,127 @@ groups:
         expr: count_over_time(paideia:baseline_p95:current[7d])
       - record: paideia:baseline_p95:ratio
         expr: paideia:baseline_p95:current / clamp_min(paideia:baseline_p95:baseline, 0.001)
+
+  # ── SLO 的 SLI 与燃尽率（WORK-043 TASK-018）──────────────────────────────
+  #
+  # 五个目标集中写成录制序列：改目标只改这五行，burn rate 全部引用它们。
+  # 没有流量时 SLI 是 NaN / 空集，告警的比较运算不成立——**"没流量"不能算失败**。
+  #
+  # 口径：
+  #   - HTTP 可用性：排除 4xx（客户端错，不是服务不可用）与 /actuator（运维端点）；
+  #   - HTTP 延迟：同上过滤，用 `<= 984ms` 的桶。Micrometer 默认桶没有 1.0 这一个边界
+  #     （实测最近的上下界是 0.984263336 与 1.073741824），取更严的那个；
+  #   - AI：`paideia.ai.runs` 的 ok 占比；402（积分不足）不会进 run，不计入分母；
+  #   - 登录：成功占比；失败原因不进标签，只有 success/failure；
+  #   - 定时任务：最近一次是否成功（1/0）的均值；从未运行按成功算（见 ScheduledTaskMetrics）。
+  #
+  # 燃尽率 =（1 − SLI）/（1 − 目标）。14.4 / 6 / 1 是 Google SRE 的 2%/5%/10% 预算消耗速度。
+  - name: paideia-slo
+    interval: 30s
+    rules:
+      - record: paideia:slo_target:http_availability
+        expr: vector(0.995)
+      - record: paideia:slo_target:http_latency
+        expr: vector(0.95)
+      - record: paideia:slo_target:ai_success
+        expr: vector(0.99)
+      - record: paideia:slo_target:login_success
+        expr: vector(0.99)
+      - record: paideia:slo_target:scheduled_success
+        expr: vector(0.99)
+
+      # ── HTTP 可用性 ──────────────────────────────────────────────────────
+      - record: paideia:sli_http_availability:ratio5m
+        expr: >-
+          (sum(rate(http_server_requests_seconds_count{status!~"4..|5..", uri!~"/actuator.*"}[5m])) or vector(0))
+          / sum(rate(http_server_requests_seconds_count{status!~"4..", uri!~"/actuator.*"}[5m]))
+      - record: paideia:sli_http_availability:ratio30m
+        expr: >-
+          (sum(rate(http_server_requests_seconds_count{status!~"4..|5..", uri!~"/actuator.*"}[30m])) or vector(0))
+          / sum(rate(http_server_requests_seconds_count{status!~"4..", uri!~"/actuator.*"}[30m]))
+      - record: paideia:sli_http_availability:ratio1h
+        expr: >-
+          (sum(rate(http_server_requests_seconds_count{status!~"4..|5..", uri!~"/actuator.*"}[1h])) or vector(0))
+          / sum(rate(http_server_requests_seconds_count{status!~"4..", uri!~"/actuator.*"}[1h]))
+      - record: paideia:sli_http_availability:ratio6h
+        expr: >-
+          (sum(rate(http_server_requests_seconds_count{status!~"4..|5..", uri!~"/actuator.*"}[6h])) or vector(0))
+          / sum(rate(http_server_requests_seconds_count{status!~"4..", uri!~"/actuator.*"}[6h]))
+      - record: paideia:sli_http_availability:ratio3d
+        expr: >-
+          (sum(rate(http_server_requests_seconds_count{status!~"4..|5..", uri!~"/actuator.*"}[3d])) or vector(0))
+          / sum(rate(http_server_requests_seconds_count{status!~"4..", uri!~"/actuator.*"}[3d]))
+
+      # ── HTTP 延迟（≤984ms 占比）────────────────────────────────────────
+      - record: paideia:sli_http_latency:ratio5m
+        expr: >-
+          (sum(rate(http_server_requests_seconds_bucket{le="0.984263336", status!~"4..|5..", uri!~"/actuator.*"}[5m])) or vector(0))
+          / sum(rate(http_server_requests_seconds_count{status!~"4..|5..", uri!~"/actuator.*"}[5m]))
+      - record: paideia:sli_http_latency:ratio30m
+        expr: >-
+          (sum(rate(http_server_requests_seconds_bucket{le="0.984263336", status!~"4..|5..", uri!~"/actuator.*"}[30m])) or vector(0))
+          / sum(rate(http_server_requests_seconds_count{status!~"4..|5..", uri!~"/actuator.*"}[30m]))
+      - record: paideia:sli_http_latency:ratio1h
+        expr: >-
+          (sum(rate(http_server_requests_seconds_bucket{le="0.984263336", status!~"4..|5..", uri!~"/actuator.*"}[1h])) or vector(0))
+          / sum(rate(http_server_requests_seconds_count{status!~"4..|5..", uri!~"/actuator.*"}[1h]))
+      - record: paideia:sli_http_latency:ratio6h
+        expr: >-
+          (sum(rate(http_server_requests_seconds_bucket{le="0.984263336", status!~"4..|5..", uri!~"/actuator.*"}[6h])) or vector(0))
+          / sum(rate(http_server_requests_seconds_count{status!~"4..|5..", uri!~"/actuator.*"}[6h]))
+      - record: paideia:sli_http_latency:ratio3d
+        expr: >-
+          (sum(rate(http_server_requests_seconds_bucket{le="0.984263336", status!~"4..|5..", uri!~"/actuator.*"}[3d])) or vector(0))
+          / sum(rate(http_server_requests_seconds_count{status!~"4..|5..", uri!~"/actuator.*"}[3d]))
+
+      # ── AI / 登录 / 定时任务 ─────────────────────────────────────────────
+      - record: paideia:sli_ai_success:ratio5m
+        expr: >-
+          (sum(rate(paideia_ai_runs_total{outcome="ok"}[5m])) or vector(0))
+          / sum(rate(paideia_ai_runs_total[5m]))
+      - record: paideia:sli_ai_success:ratio1h
+        expr: >-
+          (sum(rate(paideia_ai_runs_total{outcome="ok"}[1h])) or vector(0))
+          / sum(rate(paideia_ai_runs_total[1h]))
+      - record: paideia:sli_login_success:ratio5m
+        expr: >-
+          (sum(rate(paideia_login_attempts_total{outcome="success"}[5m])) or vector(0))
+          / sum(rate(paideia_login_attempts_total[5m]))
+      - record: paideia:sli_login_success:ratio1h
+        expr: >-
+          (sum(rate(paideia_login_attempts_total{outcome="success"}[1h])) or vector(0))
+          / sum(rate(paideia_login_attempts_total[1h]))
+      - record: paideia:sli_scheduled_success:ratio5m
+        expr: avg(paideia_scheduled_last_success)
+
+      # ── 燃尽率 ───────────────────────────────────────────────────────────
+      - record: paideia:slo_burn_rate:http_availability_5m
+        expr: (1 - paideia:sli_http_availability:ratio5m) / (1 - paideia:slo_target:http_availability)
+      - record: paideia:slo_burn_rate:http_availability_30m
+        expr: (1 - paideia:sli_http_availability:ratio30m) / (1 - paideia:slo_target:http_availability)
+      - record: paideia:slo_burn_rate:http_availability_1h
+        expr: (1 - paideia:sli_http_availability:ratio1h) / (1 - paideia:slo_target:http_availability)
+      - record: paideia:slo_burn_rate:http_availability_6h
+        expr: (1 - paideia:sli_http_availability:ratio6h) / (1 - paideia:slo_target:http_availability)
+      - record: paideia:slo_burn_rate:http_availability_3d
+        expr: (1 - paideia:sli_http_availability:ratio3d) / (1 - paideia:slo_target:http_availability)
+      - record: paideia:slo_burn_rate:http_latency_5m
+        expr: (1 - paideia:sli_http_latency:ratio5m) / (1 - paideia:slo_target:http_latency)
+      - record: paideia:slo_burn_rate:http_latency_30m
+        expr: (1 - paideia:sli_http_latency:ratio30m) / (1 - paideia:slo_target:http_latency)
+      - record: paideia:slo_burn_rate:http_latency_1h
+        expr: (1 - paideia:sli_http_latency:ratio1h) / (1 - paideia:slo_target:http_latency)
+      - record: paideia:slo_burn_rate:http_latency_6h
+        expr: (1 - paideia:sli_http_latency:ratio6h) / (1 - paideia:slo_target:http_latency)
+      - record: paideia:slo_burn_rate:http_latency_3d
+        expr: (1 - paideia:sli_http_latency:ratio3d) / (1 - paideia:slo_target:http_latency)
+      - record: paideia:slo_burn_rate:ai_success_5m
+        expr: (1 - paideia:sli_ai_success:ratio5m) / (1 - paideia:slo_target:ai_success)
+      - record: paideia:slo_burn_rate:ai_success_1h
+        expr: (1 - paideia:sli_ai_success:ratio1h) / (1 - paideia:slo_target:ai_success)
+      - record: paideia:slo_burn_rate:login_success_5m
+        expr: (1 - paideia:sli_login_success:ratio5m) / (1 - paideia:slo_target:login_success)
+      - record: paideia:slo_burn_rate:login_success_1h
+        expr: (1 - paideia:sli_login_success:ratio1h) / (1 - paideia:slo_target:login_success)
+      - record: paideia:slo_burn_rate:scheduled_success_5m
+        expr: (1 - paideia:sli_scheduled_success:ratio5m) / (1 - paideia:slo_target:scheduled_success)
