@@ -86,6 +86,17 @@ interface AnalyticsQueries {
     @Select("SELECT COUNT(*) FROM users")
     long accounts();
 
+    // 训练营与面试评估：都是"上线了但可能没人用"的候选。**必须真查**——
+    // 硬编码 0 会在有人用过之后继续显示"表为空"，那正是这一页最该避免的误导。
+    @Select("SELECT COUNT(*) FROM camp_tasks")
+    long campTasks();
+
+    @Select("SELECT COUNT(*) FROM camp_attempts")
+    long campAttempts();
+
+    @Select("SELECT COUNT(*) FROM ai_interview_evaluations")
+    long interviewEvaluations();
+
     // ── 各表近 N 天增量 ───────────────────────────────────────────────────────
 
     @Select("SELECT COUNT(*) FROM ai_runs WHERE started_at >= #{from}")

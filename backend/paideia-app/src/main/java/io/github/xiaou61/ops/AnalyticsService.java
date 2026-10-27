@@ -275,9 +275,11 @@ class AnalyticsService {
                 feature("简历", c.resumeDocuments, "份"),
                 feature("SQL 运行", c.codeRuns, "次"),
                 feature("笔记", c.notes, "篇"),
-                // 这三项是"已采集但为 0"的典型：表建好了，功能上线了，没人用
-                new AnalyticsView.Feature("训练营", AnalyticsView.State.ZERO, "0 条（表为空）"),
-                new AnalyticsView.Feature("模拟面试评估", AnalyticsView.State.ZERO, "0 条（表为空）"));
+                // 训练营与面试评估**真查库**：2026-10-27 上线时是 0，但面试评估已经有 1 条。
+                // 硬编码 0 会在有人用过之后继续说"表为空"——那是这一页最该避免的误导。
+                feature("训练营试卷", c.campTasks, "份"),
+                feature("训练营作答", c.campAttempts, "次"),
+                feature("模拟面试评估", c.interviewEvaluations, "份"));
         return new AnalyticsView.Usage(c.accounts, features);
     }
 
@@ -374,5 +376,8 @@ class AnalyticsService {
         final long searches = queries.searchLogs();
         final long notes = queries.notes();
         final long accounts = queries.accounts();
+        final long campTasks = queries.campTasks();
+        final long campAttempts = queries.campAttempts();
+        final long interviewEvaluations = queries.interviewEvaluations();
     }
 }

@@ -117,18 +117,25 @@ class AnalyticsIntegrationTest {
     }
 
     @Test
-    @DisplayName("训练营与面试评估显示「已采集但为 0」，不是「没采集」")
-    void emptyFeaturesAreZeroNotMissing() throws Exception {
+    @DisplayName("训练营/面试评估真查库：有数据是 ok、为 0 是 zero，都不是「没采集」")
+    void featuresReflectRealCounts() throws Exception {
         AnalyticsView view = overview();
 
-        AnalyticsView.Feature camp = view.usage().features().stream()
-                .filter(feature -> feature.name().equals("训练营")).findFirst().orElseThrow();
-        assertThat(camp.state()).isEqualTo(AnalyticsView.State.ZERO);
+        // 这三项曾经硬编码成"0 条（表为空）"——2026-10-27 上线后发现面试评估已有 1 条，
+        // 硬编码会让界面在有人用过之后继续说"空"。现在改为真查库，状态跟着数据走。
+        for (String name : new String[] {"训练营试卷", "训练营作答", "模拟面试评估"}) {
+            AnalyticsView.Feature feature = view.usage().features().stream()
+                    .filter(candidate -> candidate.name().equals(name)).findFirst().orElseThrow();
+            assertThat(feature.state())
+                    .as("%s 的状态必须是 ok 或 zero", name)
+                    .isIn(AnalyticsView.State.OK, AnalyticsView.State.ZERO);
+            assertThat(feature.detail()).doesNotContain("表为空");
+        }
 
         // 新增的两项埋点：表存在就说明"有数据源"，哪怕当前是 0
-        AnalyticsView.Feature cliCk = view.usage().features().stream()
+        AnalyticsView.Feature clicks = view.usage().features().stream()
                 .filter(feature -> feature.name().equals("速递点击")).findFirst().orElseThrow();
-        assertThat(cliCk.state()).isIn(AnalyticsView.State.OK, AnalyticsView.State.ZERO);
+        assertThat(clicks.state()).isIn(AnalyticsView.State.OK, AnalyticsView.State.ZERO);
     }
 
     private AnalyticsView overview() throws Exception {
