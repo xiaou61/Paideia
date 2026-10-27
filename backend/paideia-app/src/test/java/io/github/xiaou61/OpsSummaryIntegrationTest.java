@@ -52,11 +52,11 @@ class OpsSummaryIntegrationTest {
     }
 
     @Test
-    @DisplayName("管理员能读到七个分组")
+    @DisplayName("管理员能读到八个分组")
     void adminSeesAllGroups() {
         assertThat(mvc.get().uri("/api/v1/ops/admin/summary").header("Authorization", tokenFor("admin")))
                 .hasStatusOk()
-                .matches(jsonPath("$.data.groups").value(org.hamcrest.Matchers.hasSize(7)));
+                .matches(jsonPath("$.data.groups").value(org.hamcrest.Matchers.hasSize(8)));
     }
 
     @Test
@@ -66,7 +66,8 @@ class OpsSummaryIntegrationTest {
                 .hasStatusOk()
                 .matches(jsonPath("$.data.prometheusReachable").value(false))
                 // 配置开关直接读 Environment，本就不依赖 Prometheus，因此它是 OK 而不是 UNKNOWN。
-                // 其余六个分组全部来自 Prometheus，必须如实显示"未知"——不能画成 0 或正常。
+                // 其余七个分组全部来自 Prometheus（含 WORK-044 的 mcp），必须如实显示"未知"——
+                // 不能画成 0 或正常。
                 .matches(jsonPath("$.data.groups[?(@.key!='switches')].status").value(
                         org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.is("UNKNOWN"))))
                 .matches(jsonPath("$.data.groups[?(@.key=='switches')].status").value(

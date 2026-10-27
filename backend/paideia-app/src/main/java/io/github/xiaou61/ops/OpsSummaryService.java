@@ -57,7 +57,11 @@ class OpsSummaryService {
         Double total = scalar("sum(paideia_mcp_tool_calls_total)");
         Double denied = scalar("sum(paideia_mcp_denied_total)");
         Double quota = scalar("sum(paideia_mcp_denied_total{reason=\"quota\"})");
-        return new OpsSummary.Group("mcp", "外部 MCP", OpsStatus.OK,
+        // 三个都查不到 = Prometheus 不可达。这时**不能报 OK**：绿色的"累计调用 未知"
+        // 正是本页最忌讳的那种误导（WORK-045 回归时发现，原实现硬编码 OK）。
+        OpsStatus status = total == null && denied == null && quota == null
+                ? OpsStatus.UNKNOWN : OpsStatus.OK;
+        return new OpsSummary.Group("mcp", "外部 MCP", status,
                 "累计调用 " + count(total) + "、被拒 " + count(denied) + "（其中配额 " + count(quota) + "）",
                 List.of(OpsSummary.Metric.text("tool_calls", count(total)),
                         OpsSummary.Metric.text("denied", count(denied)),
