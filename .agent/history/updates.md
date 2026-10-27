@@ -6886,3 +6886,19 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 未验证：生产管理端手动按钮未用管理员 JWT 实测（集成与 e2e 覆盖）；Grafana→应用的真实告警投递未制造；生产 MCP 管理员 PAT 未实调；报告质量无金集评测。
 - 本地提交：e6f2657、84ba364；报告/任务状态另有一笔待落。
 - 远端推送：未执行
+
+## 2026-10-27 全站页面优化（impeccable 审计后落地）
+
+- 装了 impeccable 4.7.1 到 `~/.agents/skills/impeccable`（引擎 0.1.17，sha256 已核；
+  GitHub release 直连会截断，实际经 `ghfast.top` 镜像取完整文件）。
+- 用 Playwright 登录线上实例，41 页（学习者端 15 × 桌面/移动 + 管理端 11）全部截图
+  并抓渲染后几何事实。审计报告在 `docs/design/page-audit-2026-10-27.md`（该目录被忽略）。
+- 落地：3 个 P0（Tabs 方向写反、助手浮标遮挡、管理端首页假话）+ 设计层五项
+  （删 eyebrow ×19、字距收到 -0.04em、二级标题统一、首页去模板化、空态补动作）
+  + reduced-motion 与引用块侧边色条。
+- 顺带修 TelemetrySummaryMapper 的 5 个普通 `@Select` 误用 `&lt;`（管理端 AI 调用概览
+  整页 500，首现 09:05 早于本次部署）；`check_mapper_script_xml.py` 补反向检查并已反向验证。
+- 验证：学习者端 e2e 91/0、管理端 31/0、后端 314/0、前端单测全绿。
+- 本地提交 `6a1cdcb`。未 push（需单独授权）。
+- **未验证**：hover/focus/disabled/loading 状态、键盘 Tab 顺序、真机触屏手势、
+  管理端深色模式、性能（LCP/CLS）；约 10 个路由未进样本（含课程正文页 `/learn/:slug`）。
