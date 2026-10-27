@@ -107,7 +107,9 @@ class TempoClient {
                     spans.add(new Span(
                             span.path("name").asText("unknown"),
                             Math.max(0, (end - start) / 1_000_000),
-                            span.path("status").path("code").asText(""),
+                            // OTLP 的 proto3 JSON **省略零值**：status.code=UNSET(0) 时整个字段不出现，
+                            // 读成空串会让证据里出现 "status=" 这种没法解读的片段（生产演练时见过）。
+                            span.path("status").path("code").asText("unset"),
                             attributes(span.path("attributes"))));
                 }
             }

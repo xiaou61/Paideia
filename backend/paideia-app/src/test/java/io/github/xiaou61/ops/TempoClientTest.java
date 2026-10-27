@@ -88,6 +88,23 @@ class TempoClientTest {
     }
 
     @Test
+    @DisplayName("缺 status 字段时给 unset，而不是空串")
+    void missingStatusReadsAsUnset() {
+        // proto3 JSON 省略零值：正常 span（status=UNSET）根本没有 status 字段
+        traceBody = """
+                {"batches":[{"scopeSpans":[{"spans":[
+                  {"name":"GET /api/v1/me","startTimeUnixNano":"1761432000000000000",
+                   "endTimeUnixNano":"1761432000320000000",
+                   "attributes":[]}
+                ]}]}]}""";
+
+        Optional<TempoClient.TraceDetail> detail = client().trace("t1");
+
+        assertThat(detail).isPresent();
+        assertThat(detail.get().slowest().status()).isEqualTo("unset");
+    }
+
+    @Test
     @DisplayName("Tempo 非 200 时返回空")
     void non200ReturnsEmpty() {
         status = 503;

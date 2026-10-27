@@ -101,6 +101,20 @@ class OpsEvidenceCollectorTest {
     }
 
     @Test
+    @DisplayName("SLI 为 NaN 时也写无流量，不能把 NaN 当数值交给模型")
+    void nanSliIsNotANumber() {
+        // 分子分母都没有样本时 Prometheus 给 NaN（生产演练报告里曾出现 "sli_1h=NaN%"）
+        when(prometheus.scalar("paideia:sli_http_latency:ratio1h")).thenReturn(Double.NaN);
+        when(prometheus.scalar("paideia:slo_burn_rate:http_latency_1h")).thenReturn(Double.NaN);
+
+        String baselines = collector.collect("alert", "SLO 慢烧：HTTP 延迟", null).baselines();
+
+        assertThat(baselines)
+                .contains("slo_http_latency = 无流量（SLI 不可计算）")
+                .doesNotContain("NaN");
+    }
+
+    @Test
     @DisplayName("trace 摘要只带最慢 span 与白名单属性")
     void traceEvidence() {
         when(tempo.search(any(), any(), anyInt())).thenReturn(List.of(

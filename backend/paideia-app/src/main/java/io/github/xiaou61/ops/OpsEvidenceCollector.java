@@ -251,12 +251,16 @@ class OpsEvidenceCollector {
             Double sli = prometheus.scalar(spec[1]);
             Double burn = prometheus.scalar(spec[2]);
             out.append("slo_").append(spec[0]).append(' ');
-            if (sli == null) {
+            // **NaN 也是"不可计算"**：分子分母都没有样本时 Prometheus 给的是 NaN 而不是空，
+            // 只判 null 会把 NaN 写成 "sli_1h=NaN%"——模型会当成一个真实数值去推理
+            // （2026-10-27 生产演练的报告里就出现过 "slo_ai_success sli_1h=NaN%"）。
+            if (sli == null || sli.isNaN() || sli.isInfinite()) {
                 out.append("= 无流量（SLI 不可计算）\n");
                 continue;
             }
             out.append("sli_1h=").append(trimmed(sli * 100, 3)).append('%')
-                    .append(" burn_1h=").append(burn == null ? "—" : trimmed(burn, 2) + "x")
+                    .append(" burn_1h=").append(burn == null || burn.isNaN() || burn.isInfinite()
+                            ? "—" : trimmed(burn, 2) + "x")
                     .append('\n');
         }
         Double scheduled = prometheus.scalar("paideia:sli_scheduled_success:ratio5m");
