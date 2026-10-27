@@ -175,7 +175,8 @@ export function ResumeListPage() {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      className="truncate text-left font-medium hover:underline"
+                      // py-1 把命中区从 20px 抬到 28px（WCAG 2.5.8 要 24px）；-my-1 抵掉视觉位移。
+                      className="-my-1 truncate py-1 text-left font-medium hover:underline"
                       onClick={() => navigate(`/resume/${item.id}`)}
                       data-testid={`resume-open-${item.id}`}
                     >

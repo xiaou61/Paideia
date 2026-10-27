@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
@@ -86,15 +87,17 @@ export function ResumeImportReviewPage() {
   if (draft === null) {
     return (
       <AppShell title="Paideia" actions={<LearnerHeader />} wide>
+        <PageHeader title="导入简历" />
         <Empty>
           <EmptyHeader>
             <EmptyTitle>没有待确认的简历</EmptyTitle>
             <EmptyDescription>草稿在刷新后会丢失。请回到「我的简历」重新上传。</EmptyDescription>
           </EmptyHeader>
+          {/* 动作放进 EmptyContent：原来它挂在 Empty 外面，于是文案居中、按钮偏左 */}
+          <EmptyContent>
+            <Button onClick={() => navigate('/resume')}>回到我的简历</Button>
+          </EmptyContent>
         </Empty>
-        <div className="mt-4">
-          <Button onClick={() => navigate('/resume')}>回到我的简历</Button>
-        </div>
       </AppShell>
     )
   }

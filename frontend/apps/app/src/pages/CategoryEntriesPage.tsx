@@ -83,7 +83,8 @@ export function CategoryEntriesPage() {
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
       <Link
         to="/knowledge"
-        className="text-muted-foreground hover:text-foreground mb-5 inline-flex items-center gap-1 text-sm transition-colors"
+        // py-1 把命中区从 20px 抬到 28px（WCAG 2.5.8 要 24px）；-my-1 与 mb-4 一起保持原视觉间距。
+        className="text-muted-foreground hover:text-foreground -my-1 mb-4 inline-flex items-center gap-1 py-1 text-sm transition-colors"
         data-testid="back-to-categories"
       >
         <ChevronLeft className="size-4" />

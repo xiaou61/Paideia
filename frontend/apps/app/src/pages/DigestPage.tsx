@@ -344,7 +344,8 @@ function DigestCard({
           href={item.url}
           target="_blank"
           rel="noreferrer"
-          className="group-hover:text-primary line-clamp-2 font-medium leading-snug transition-colors hover:underline"
+          // py-1 把命中区从 19px 抬到 27px（WCAG 2.5.8 要 24px）；-my-1 抵掉多出来的上下间距，视觉位置不变。
+          className="group-hover:text-primary -my-1 line-clamp-2 py-1 font-medium leading-snug transition-colors hover:underline"
           data-testid="digest-title"
         >
           {item.title}

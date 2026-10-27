@@ -1,3 +1,20 @@
+server:
+  compression:
+    # 前端产物实测：入口 chunk 942 KB、CSS 18 KB，服务器原来**一个字节都不压**（实测
+    # Content-Encoding 缺失，Content-Length 就是原文件大小）。开着它同一份文件变 283 KB。
+    # 只压超过 1 KB 的、且只压文本类——图片与字体已经是压缩格式，再压是白烧 CPU。
+    enabled: true
+    min-response-size: 1024
+    mime-types:
+      - application/javascript
+      - text/javascript
+      - text/css
+      - text/html
+      - text/plain
+      - application/json
+      - application/xml
+      - image/svg+xml
+
 spring:
   application:
     name: paideia

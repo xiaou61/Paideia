@@ -362,7 +362,8 @@ export function HomePage() {
             <h2 className="text-sm font-medium">最近更新</h2>
             <Link
               to="/knowledge/entries"
-              className="text-muted-foreground hover:text-foreground text-xs"
+              // py-1 把命中区从 16px 抬到 24px（WCAG 2.5.8 下限）；-my-1 保持视觉位置。
+              className="text-muted-foreground hover:text-foreground -my-1 py-1 text-xs"
             >
               全部 →
             </Link>
