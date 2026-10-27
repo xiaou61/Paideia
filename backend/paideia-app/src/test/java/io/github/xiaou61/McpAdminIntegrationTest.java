@@ -186,12 +186,12 @@ class McpAdminIntegrationTest {
     // ------------------------------------------------------------- helpers
 
     private String adminPat() {
-        return tokens.create(adminId, "管理集成测试", Set.of(ToolScope.ADMIN), Set.of(), 1, "admin")
+        return tokens.create(adminId, "管理集成测试", Set.of(ToolScope.ADMIN), Set.of(), 1, null, "admin")
                 .plaintext();
     }
 
     private String learnerPat() {
-        return tokens.create(learnerId, "学习者集成测试", Set.of(ToolScope.READ), Set.of(), 1, "learner")
+        return tokens.create(learnerId, "学习者集成测试", Set.of(ToolScope.READ), Set.of(), 1, null, "learner")
                 .plaintext();
     }
 

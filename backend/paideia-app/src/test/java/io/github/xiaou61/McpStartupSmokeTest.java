@@ -49,7 +49,7 @@ class McpStartupSmokeTest {
     @Test
     @DisplayName("initialize + tools/list：默认视图能回包，且清单里只有只读默认组工具")
     void streamableHttpRoundTrip() throws Exception {
-        PatService.CreatedToken created = tokens.create(7L, "冒烟", Set.of(ToolScope.READ), Set.of(), 1, "learner");
+        PatService.CreatedToken created = tokens.create(7L, "冒烟", Set.of(ToolScope.READ), Set.of(), 1, null, "learner");
 
         String sessionId = initialize("/mcp", created.plaintext());
         List<String> names = tools(("/mcp"), created.plaintext(), sessionId);
@@ -62,7 +62,7 @@ class McpStartupSmokeTest {
     @Test
     @DisplayName("子视图路由：/mcp/x/knowledge 只给知识组")
     void subViewRoutesToSingleToolset() throws Exception {
-        PatService.CreatedToken created = tokens.create(7L, "冒烟-知识", Set.of(ToolScope.READ), Set.of(), 1, "learner");
+        PatService.CreatedToken created = tokens.create(7L, "冒烟-知识", Set.of(ToolScope.READ), Set.of(), 1, null, "learner");
 
         String sessionId = initialize("/mcp/x/knowledge", created.plaintext());
         List<String> names = tools("/mcp/x/knowledge", created.plaintext(), sessionId);
@@ -81,9 +81,9 @@ class McpStartupSmokeTest {
     @DisplayName("只授权 knowledge 的凭据看不到别的组的工具（清单按凭据分）")
     void toolsetsLimitVisibleTools() throws Exception {
         PatService.CreatedToken scoped = tokens.create(7L, "冒烟-限组",
-                Set.of(ToolScope.READ), Set.of("knowledge"), 1, "learner");
+                Set.of(ToolScope.READ), Set.of("knowledge"), 1, null, "learner");
         PatService.CreatedToken open = tokens.create(7L, "冒烟-不限组",
-                Set.of(ToolScope.READ), Set.of(), 1, "learner");
+                Set.of(ToolScope.READ), Set.of(), 1, null, "learner");
 
         List<String> scopedNames = tools("/mcp", scoped.plaintext(),
                 initialize("/mcp", scoped.plaintext()));
@@ -113,7 +113,7 @@ class McpStartupSmokeTest {
     @Test
     @DisplayName("未知视图 404，而不是 400——不告诉探测者哪些组存在")
     void unknownViewIsNotFound() throws Exception {
-        PatService.CreatedToken created = tokens.create(7L, "冒烟-路由", Set.of(ToolScope.READ), Set.of(), 1, "learner");
+        PatService.CreatedToken created = tokens.create(7L, "冒烟-路由", Set.of(ToolScope.READ), Set.of(), 1, null, "learner");
 
         HttpResponse<String> response = http.send(HttpRequest.newBuilder()
                 .uri(URI.create("http://127.0.0.1:" + port + "/mcp/x/nope"))
