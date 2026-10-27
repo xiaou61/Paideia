@@ -4,7 +4,7 @@ work_id: WORK-044
 work: MCP 网关补全：跨域能力、凭据治理与可观测
 status: passed
 evidence: required
-verified_commit: 9313a8d
+verified_commit: 30d25a2
 verified_at: 2026-10-27
 created: 2026-10-27
 updated: 2026-10-27
