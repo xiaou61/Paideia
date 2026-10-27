@@ -22,7 +22,7 @@ approver_role: CTO
 
 ## 任务
 
-### TASK-001 | pending | 两张埋点表与校验和
+### TASK-001 | done | 两张埋点表与校验和
 
 - 对应：`REQ-016`、`REQ-017`
 - 依赖：无
@@ -34,7 +34,7 @@ approver_role: CTO
   2. `-Dmigration.checksums.update=true` 登记，复核 diff 只有新增一行。
 - 验证：三条守卫测试 0 failed。
 
-### TASK-002 | pending | 速递点击上报
+### TASK-002 | done | 速递点击上报
 
 - 对应：`REQ-016`、`REQ-018`、`AC-004b`
 - 依赖：TASK-001
@@ -46,7 +46,7 @@ approver_role: CTO
   2. 前端在 `<a>` 的 `onClick` 里 `void api.post(...).catch(() => {})` —— **必须吞掉**，且不能 `preventDefault`。
 - 验证：`-Dtest=DigestClickRecorderTest`；手动点一次确认表里多一行且页面照常跳转。
 
-### TASK-003 | pending | 搜索词上报
+### TASK-003 | done | 搜索词上报
 
 - 对应：`REQ-017`、`REQ-018`、`AC-004b`
 - 依赖：TASK-001
@@ -58,7 +58,7 @@ approver_role: CTO
   2. 在 `entries(...)` 拿到结果后记一条；**只在该请求是用户主动搜索时**（`q` 非空）。
 - 验证：`-Dtest=SearchLogRecorderTest`；手动搜一次确认表里多一行且结果页正常。
 
-### TASK-004 | pending | 聚合查询（只读 SQL）
+### TASK-004 | done | 聚合查询（只读 SQL）
 
 - 对应：`REQ-001`~`REQ-015`
 - 依赖：TASK-001、TASK-003（搜索数据可用）
@@ -70,7 +70,7 @@ approver_role: CTO
   2. 逐条实现 SQL，`GROUP BY DATE(CONVERT_TZ(...))` 用**数字偏移**（`+08:00`），不用时区名——生产 `mysql.time_zone_name` 查不到，实测 `CONVERT_TZ(...,'+00:00','+08:00')` 可用。
 - 验证：`-Dtest=AnalyticsQueriesTest`。
 
-### TASK-005 | pending | 服务编排与断点判定
+### TASK-005 | done | 服务编排与断点判定
 
 - 对应：`REQ-001`~`REQ-015`、`AC-002`、`AC-003`、`AC-006`
 - 依赖：TASK-004
@@ -83,7 +83,7 @@ approver_role: CTO
   3. 三态：有数据 `active`、采集到但为 0 `zero`、无数据源 `not-collected`。
 - 验证：`-Dtest=AnalyticsServiceTest`。
 
-### TASK-006 | pending | 端点与权限
+### TASK-006 | done | 端点与权限
 
 - 对应：`REQ-015`、`AC-001`
 - 依赖：TASK-005
@@ -93,7 +93,7 @@ approver_role: CTO
 - 步骤：`@ApiAccess(ApiAccess.Access.ADMIN)` + 一条 GET，直接返回 service 结果。
 - 验证：`-Dtest=AnalyticsIntegrationTest`。
 
-### TASK-007 | pending | 大屏页面：泳道与四个区块
+### TASK-007 | done | 大屏页面：泳道与四个区块
 
 - 对应：`REQ-001`~`REQ-015`、`AC-003`、`AC-004`、`AC-005`
 - 依赖：TASK-006
@@ -107,7 +107,7 @@ approver_role: CTO
   4. 每区块下钻链接。
 - 验证：typecheck 通过；本地起后端实看一遍。
 
-### TASK-008 | pending | 响应式与视觉细节
+### TASK-008 | done | 响应式与视觉细节
 
 - 对应：`AC-008`
 - 依赖：TASK-007
@@ -116,7 +116,7 @@ approver_role: CTO
 - 步骤：≥1536 三列 / 1280–1535 两列 / <1024 单列；数字 `tabular-nums`。
 - 验证：`AC-008` 的 e2e 断言无横向滚动。
 
-### TASK-009 | pending | e2e：入口、五区块、断点、响应式
+### TASK-009 | done | e2e：入口、五区块、断点、响应式
 
 - 对应：`AC-003`、`AC-008`、`AC-009`
 - 依赖：TASK-007、TASK-008
@@ -125,7 +125,7 @@ approver_role: CTO
 - 步骤：按现有 `incidents.spec.ts` 的写法（signIn → 点导航 → 断言）。
 - 验证：`../scripts/test-db.sh pnpm --filter @paideia/admin exec playwright test e2e/analytics.spec.ts`
 
-### TASK-010 | pending | 性能实测与索引盘点
+### TASK-010 | done | 性能实测与索引盘点
 
 - 对应：`AC-007`
 - 依赖：TASK-006
@@ -136,7 +136,7 @@ approver_role: CTO
   2. 若 > 800ms，先看慢查询（`EXPLAIN`），补索引；仍超则改分区块懒加载。
 - 验证：P95 数字写进报告。
 
-### TASK-011 | pending | 收口：文档、部署、生产实看
+### TASK-011 | done | 收口：文档、部署、生产实看
 
 - 对应：全部 `AC-*`
 - 依赖：TASK-001..TASK-010

@@ -1,5 +1,6 @@
 import { ThemeToggle } from '@paideia/ui'
 import {
+  BarChart3,
   Boxes,
   Bell,
   ChevronDown,
@@ -90,6 +91,9 @@ const MENU: MenuItem[] = [
   { to: '/ops/panel', label: '运维', icon: Cpu },
   // 事件（WORK-043）：告警的生命周期与时间线，与运维诊断分开一页。
   { to: '/ops/incidents', label: '事件', icon: Bell },
+  // 数据大屏（WORK-045）：横向视角——数据从哪来、经过哪几步、在哪一步掉了。
+  // 放在运维两页之后：它回答的是"平台整体在怎么运转"，不是"现在有没有故障"。
+  { to: '/analytics', label: '数据大屏', icon: BarChart3 },
 ]
 
 /** 面包屑：按菜单层级写死的路径（首页固定在最前，不再逐级可点）。 */
@@ -108,6 +112,7 @@ const CRUMBS: Record<string, string[]> = {
   '/ai-runs/feedback': ['AI 调用', '回答反馈'],
   '/ops/panel': ['运维'],
   '/ops/incidents': ['事件'],
+  '/analytics': ['数据大屏'],
 }
 
 /**

@@ -457,6 +457,11 @@ function DigestRow({
           href={item.url}
           target="_blank"
           rel="noreferrer"
+          // 记一次点击（WORK-045）。**必须吞掉失败**：这是外链，埋点挂了也得让用户跳走。
+          // 不 preventDefault、不 await——加 await 会让部分浏览器把这次跳转算成"非用户触发"。
+          onClick={() => {
+            void digest.click(item.id).catch(() => undefined)
+          }}
           // py-0.5 把命中区抬到 24px 以上（WCAG 2.5.8），视觉上仍是紧凑的一行标题
           className="group-hover/row:text-primary block py-0.5 font-medium leading-snug transition-colors hover:underline"
           data-testid="digest-title"

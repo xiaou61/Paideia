@@ -1,6 +1,7 @@
 import { Navigate, createHashRouter } from 'react-router'
 
 import { AdminHomePage } from './pages/AdminHomePage'
+import { AnalyticsPage } from './pages/AnalyticsPage'
 import { AiCreditsAuditPage } from './pages/AiCreditsAuditPage'
 import { AiRunsListPage } from './pages/AiRunsListPage'
 import { AiFeedbackPage } from './pages/AiFeedbackPage'
@@ -142,6 +143,16 @@ export const router = createHashRouter([
     element: (
       <RequireAdmin>
         <IncidentsPage />
+      </RequireAdmin>
+    ),
+  },
+  // 数据大屏（WORK-045）：横向视角——数据从哪来、经过哪几步、在哪一步掉了。
+  // 与运维页（看"现在怎么样"）互补，所以单开一页而不是塞进 /ops。
+  {
+    path: '/analytics',
+    element: (
+      <RequireAdmin>
+        <AnalyticsPage />
       </RequireAdmin>
     ),
   },

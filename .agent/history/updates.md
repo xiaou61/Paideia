@@ -7172,4 +7172,15 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 发版后修掉一个面板缺陷：耗时面板在 5 分钟窗口无调用时 `sum(_sum)/sum(_count)` 是 0/0 → Prometheus 返回 NaN → 面板断线。改成 `... / (... > 0)` 过滤分母为 0，实测查询从 `NaN` 变成空结果（预期）。提交 `82ae774`。
 - **发现一个既有问题（非本项引入）**：生产 `mcp_access_tokens` 里有 **69 条** `e2e-*`/`scoped-*`/`revoke-*` 凭据，最早 2026-10-22，是历来 e2e 打到生产库累积的（`E2E_BASE_URL` 指向线上时每个用例都建一条）。本项 e2e 又加了 3 条。**未清理**——它们都是已吊销或测试用，但该由用户决定是否清。
 - 本地提交：82ae774（面板修复）；发版内容 = master `c70ad44`
+
+## 2026-10-27 18:00 +0800 · WORK-045 · 数据大屏实施完成
+
+- 类型：implementation
+- 变更：新建 `io.github.xiaou61.ops` 的 `AnalyticsController/Service/Queries/View`，一个只读端点 `GET /api/v1/ops/admin/analytics/overview` 返回五区块（flows/volume/usage/ai/search/monitoring）；管理端新增 `/analytics` 页面（六链泳道 + 四区块 + 监控摘要）、导航「数据大屏」与面包屑；新增两张埋点表 `digest_item_clicks`、`knowledge_search_log` 与两个上报路径（`POST /api/v1/digest/items/{id}/click`、`GET /knowledge/entries?q=` 服务端记录）；学习者端速递标题点开时上报。
+- 决策：`AnalyticsQueries` 放进 `ops` 包而不是独立 `analytics` 包——`PrometheusClient` 是包级私有，独立包访问不到，而复制一份 HTTP 客户端是新造通路。聚合直接用只读 SQL（`ModularityTest` 禁止跨模块引 internal 包）。断点规则（本节点 0 且上游 > 0）抽成静态纯函数以便单测。时序按北京自然日切桶，用 `CONVERT_TZ(...,'+00:00','+08:00')` 数字偏移（生产账号读不到 `mysql.time_zone_name`，时区名会返回 NULL，已实测）。
+- 验证：非 app 模块 **352/0/14**；app 侧 ops+analytics+守卫 **91/0**；管理端 e2e **5 passed/58.1s**（五区块、六链、SQL 未采集、监控降级、三档视口无横向溢出）；性能 20 次采样 **P50 50ms / P95 59ms / max 63ms**（预算 800ms）；反向验证去掉断点规则的 `index > 0` 守卫 → `firstNodeIsNeverBroken` 越界，恢复后 5/0。
+- 生产：迁移 `V20261027170000` 执行成功、两张表已建；全量发版 141.6 秒，修 campTasks 那次 59.7 秒；`paideia_build_info=dfb2ea1`，六个监控单元全部 active；端点无令牌 401；直接对生产库跑同一批聚合 SQL 核对了 22 个数字（答题 1、账号 2、面试评估 1…）。
+- 生产实测修掉三处：① `mcpGroup` 在 Prometheus 不可达时报 OK（WORK-044 遗留，绿色卡片配"未知"）② 时序只输出有数据的点，空库直接返回空数组 ③ **训练营/面试评估硬编码"0 条（表为空）"，而面试评估实际已有 1 条**——大屏上任何不查库的数字都会在数据变化后变成谎话。
+- 未覆盖：没有在生产页面上人工点一遍（账号口令不在仓库，未伪造登录）；学习者端 `digest.spec.ts` 有 4 条红，全部停在 `digest-date-option` 不存在（空测试库没有速递数据，与本项无关）。
+- 本地提交：730e022、3103bd5、d1cc48b、11b452e、530dd1b、640b9ac、dfb2ea1
 - 远端推送：未执行
