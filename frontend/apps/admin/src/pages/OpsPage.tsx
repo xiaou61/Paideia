@@ -74,9 +74,27 @@ interface Diagnosis {
   outputTokens: number | null
   reportMd: string | null
   errorMessage: string | null
+  rating: number | null
+  feedbackNote: string | null
   createdAt: string
   finishedAt: string | null
 }
+
+/** 好评率（WORK-043）。rated = 0 时 helpfulRate 为 null：还没人评不等于全都不准。 */
+interface DiagnosisStats {
+  rated: number
+  good: number
+  partial: number
+  bad: number
+  helpfulRate: number | null
+}
+
+/** 三档评分的显示文案；值与后端约定的 -1/0/1 一一对应。 */
+const RATINGS: { value: number; label: string }[] = [
+  { value: 1, label: '准' },
+  { value: 0, label: '部分准' },
+  { value: -1, label: '不准' },
+]
 
 const DIAGNOSIS_STATUS: Record<
   DiagnosisStatus,
@@ -268,6 +286,12 @@ function DiagnosisSection() {
     },
   })
 
+  // 好评率只随评分变化，跟着列表一起刷就够了（不额外加定时器）
+  const stats = useQuery({
+    queryKey: ['admin-ops-diagnosis-stats'],
+    queryFn: () => api.requestEnvelope<DiagnosisStats>('/api/v1/ops/admin/diagnoses/stats'),
+  })
+
   return (
     <Card className="mb-6" data-testid="ops-diagnosis-card">
       <CardHeader>
@@ -279,6 +303,17 @@ function DiagnosisSection() {
         </CardTitle>
         <CardDescription>
           采集当前指标、告警、最近错误日志与发版时间，交给模型写一份根因假设。只读，不会自动修复。
+          {/* 好评率不驱动任何自动化——它只用来回答"这套诊断值不值得继续用" */}
+          {stats.data && stats.data.rated > 0 ? (
+            <span data-testid="ops-helpful-rate">
+              {' '}
+              已评 {stats.data.rated} 份，好评率{' '}
+              {stats.data.helpfulRate === null
+                ? '—'
+                : `${Math.round(stats.data.helpfulRate * 100)}%`}
+              （准 {stats.data.good} / 部分准 {stats.data.partial} / 不准 {stats.data.bad}）
+            </span>
+          ) : null}
         </CardDescription>
         <CardAction>
           <Button
@@ -346,11 +381,30 @@ function DiagnosisItem({
   onToggle: () => void
 }) {
   const style = DIAGNOSIS_STATUS[item.status]
+  const queryClient = useQueryClient()
+  const [note, setNote] = useState('')
   const detail = useQuery({
     queryKey: ['admin-ops-diagnosis', item.id],
     queryFn: () => api.requestEnvelope<Diagnosis>(`/api/v1/ops/admin/diagnoses/${item.id}`),
     enabled: open && item.status === 'DONE',
   })
+
+  // 评分是覆盖式更新：改判要能改，且统计里只算一次（后端按行更新，不追加）
+  const rate = useMutation({
+    mutationFn: (rating: number) =>
+      api.requestEnvelope<Diagnosis>(`/api/v1/ops/admin/diagnoses/${item.id}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rating, note: note.trim() === '' ? undefined : note.trim() }),
+      }),
+    onSuccess: () => {
+      setNote('')
+      void queryClient.invalidateQueries({ queryKey: ['admin-ops-diagnoses'] })
+      void queryClient.invalidateQueries({ queryKey: ['admin-ops-diagnosis-stats'] })
+      void queryClient.invalidateQueries({ queryKey: ['admin-ops-diagnosis', item.id] })
+    },
+  })
+
   const label = item.triggerType === 'alert' ? `告警：${item.alertName ?? '未知'}` : '手动诊断'
 
   return (
@@ -399,6 +453,46 @@ function DiagnosisItem({
           ) : detail.data?.reportMd ? (
             <div className="mt-3">
               <Markdown markdown={detail.data.reportMd} className="text-sm" />
+              {/*
+                评分（WORK-043）：只对已完成的报告出现。三档而不是五颗星——
+                要回答的是"能不能照着做"，星级会把这个问题拆成没法汇总的东西。
+              */}
+              <div
+                className="border-border mt-4 flex flex-wrap items-center gap-2 border-t pt-3"
+                data-testid={`ops-feedback-${item.id}`}
+              >
+                <span className="text-muted-foreground text-xs">这份诊断准不准？</span>
+                {RATINGS.map((option) => (
+                  <Button
+                    key={option.value}
+                    size="sm"
+                    variant={item.rating === option.value ? 'default' : 'outline'}
+                    onClick={() => rate.mutate(option.value)}
+                    disabled={rate.isPending}
+                    data-testid={`ops-rate-${option.value}`}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+                <Input
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                  maxLength={500}
+                  placeholder="可选：一句备注（会写进事件时间线）"
+                  aria-label="评分备注"
+                  className="max-w-xs"
+                />
+                {item.rating !== null ? (
+                  <span className="text-muted-foreground text-xs">
+                    已评：{RATINGS.find((option) => option.value === item.rating)?.label ?? item.rating}
+                  </span>
+                ) : null}
+              </div>
+              {rate.isError ? (
+                <p className="text-destructive mt-2 text-xs" role="alert">
+                  评分失败：{errorMessage(rate.error)}
+                </p>
+              ) : null}
             </div>
           ) : (
             <p className="text-muted-foreground mt-2 text-sm">没有报告内容。</p>

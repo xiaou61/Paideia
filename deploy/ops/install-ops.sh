@@ -177,6 +177,15 @@ for unit in prometheus node-exporter mysqld-exporter redis-exporter blackbox-exp
 done
 systemctl daemon-reload
 
+# **包自带的 grafana-server.service 必须停用**（2026-10-27 实测踩过）：apt 装的 grafana 会
+# enable 它自己的单元，而本脚本用的是自写的 grafana.service。两个单元抢 127.0.0.1:3000，
+# 后启动的那个 bind 失败并进入 `Restart=on-failure` 重启循环（半小时内 66 次），
+# 而先启动的那个只是"看着正常"——`systemctl restart grafana-server` 更是完全改不了真正在跑的那个。
+if systemctl list-unit-files grafana-server.service >/dev/null 2>&1; then
+    systemctl disable --now grafana-server.service 2>/dev/null || true
+    systemctl reset-failed grafana-server.service 2>/dev/null || true
+fi
+
 say "启动"
 for unit in prometheus loki alloy tempo node-exporter mysqld-exporter redis-exporter blackbox-exporter grafana; do
     systemctl enable --now "$unit" || echo "⚠ $unit 启动失败，见 journalctl -u $unit"

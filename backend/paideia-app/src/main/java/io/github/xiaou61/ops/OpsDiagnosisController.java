@@ -49,9 +49,31 @@ class OpsDiagnosisController {
         return ApiResponse.ok(service.get(id));
     }
 
+    /**
+     * 评分（WORK-043 TASK-021）。`rating` 只接受 -1 / 0 / 1，越界返回 400；
+     * 备注可选、最多 500 字。评分人取令牌里的当前用户，不接受请求体指定。
+     */
+    @PostMapping("/{id}/feedback")
+    ApiResponse<OpsDiagnosisService.View> feedback(@PathVariable("id") long id,
+                                                   @RequestBody(required = false) FeedbackRequest request) {
+        long userId = Long.parseLong(CurrentUser.subjectId());
+        Integer rating = request == null ? null : request.rating();
+        String note = request == null ? null : request.note();
+        return ApiResponse.ok(service.feedback(id, rating, note, userId));
+    }
+
+    /** 好评率（WORK-043 TASK-023）。没有任何评分时 `helpfulRate` 为 null。 */
+    @GetMapping("/stats")
+    ApiResponse<OpsDiagnosisService.Stats> stats() {
+        return ApiResponse.ok(service.stats());
+    }
+
     record CreateRequest(String question) {
     }
 
     record Created(long id) {
+    }
+
+    record FeedbackRequest(Integer rating, String note) {
     }
 }

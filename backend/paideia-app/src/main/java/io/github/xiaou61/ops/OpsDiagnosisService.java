@@ -139,6 +139,57 @@ class OpsDiagnosisService {
                 .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "诊断记录不存在"));
     }
 
+    /**
+     * 给一份已完成的诊断评分（WORK-043 REQ-019）。
+     *
+     * <p>三条约束：
+     * <ol>
+     *   <li>**只接受 -1/0/1**：不开放"五颗星"，要回答的只是"这份报告能不能照着做"；</li>
+     *   <li>**只给 DONE 评分**：失败或进行中的报告没有可评的内容，评了只会污染 helpful 率；</li>
+     *   <li>**重评是覆盖**：同一人改主意不该在统计里算两次。</li>
+     * </ol>
+     * 有 incident 时追加一条 NOTE 到时间线，事后能对上"这次事件里报告有没有用"。
+     */
+    View feedback(long id, Integer rating, String note, long actorUserId) {
+        if (rating == null || rating < -1 || rating > 1) {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT, "评分只能是 -1、0 或 1");
+        }
+        OpsDiagnosisRow row = mapper.findById(id)
+                .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "诊断记录不存在"));
+        if (!OpsDiagnosisRow.STATUS_DONE.equals(row.getStatus())) {
+            throw new BizException(ErrorCode.CONFLICT, "只能给已完成的诊断评分");
+        }
+        String trimmed = trim(note, 500);
+        if (mapper.updateFeedback(id, rating, trimmed, Instant.now()) != 1) {
+            // 状态在"读出来"与"写回去"之间变了（并发重跑）；如实报冲突，不静默吞掉
+            throw new BizException(ErrorCode.CONFLICT, "诊断状态已变化，请刷新后重试");
+        }
+        if (row.getIncidentId() != null) {
+            incidents.appendEvent(row.getIncidentId(), OpsIncidentEvent.KIND_NOTE,
+                    "诊断 #" + id + " 评分：" + RATING_LABELS.get(rating)
+                            + (trimmed == null ? "" : "；" + trimmed),
+                    actorUserId);
+        }
+        return get(id);
+    }
+
+    /** helpful 率（WORK-043 REQ-022）：分母为 0 时给 null，"还没人评"不等于"全都不准"。 */
+    Stats stats() {
+        OpsDiagnosisMapper.FeedbackStats raw = mapper.stats();
+        long rated = raw == null ? 0 : raw.rated();
+        long good = raw == null ? 0 : raw.good();
+        long partial = raw == null ? 0 : raw.partial();
+        long bad = raw == null ? 0 : raw.bad();
+        Double helpfulRate = rated == 0 ? null : (double) good / rated;
+        return new Stats(rated, good, partial, bad, helpfulRate);
+    }
+
+    private static final Map<Integer, String> RATING_LABELS =
+            Map.of(1, "准", 0, "部分准", -1, "不准");
+
+    record Stats(long rated, long good, long partial, long bad, Double helpfulRate) {
+    }
+
     /** 应用启动时把上次进程留下的 PENDING/RUNNING 收掉，避免页面永远显示"诊断中"。 */
     @EventListener(ApplicationReadyEvent.class)
     void cleanupStale() {

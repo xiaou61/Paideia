@@ -99,4 +99,35 @@ interface OpsDiagnosisMapper {
             """)
     List<OpsDiagnosisRow> listByIncident(@Param("incidentId") long incidentId,
                                          @Param("limit") int limit);
+
+    /** 评分覆盖（WORK-043）：同一人重评只保留最后一次，不追加历史。只对已完成的诊断开放。 */
+    @Update("""
+            UPDATE ops_diagnoses
+            SET rating = #{rating}, feedback_note = #{note}, feedback_at = #{at}
+            WHERE id = #{id} AND status = 'DONE'
+            """)
+    int updateFeedback(@Param("id") long id,
+                       @Param("rating") int rating,
+                       @Param("note") String note,
+                       @Param("at") Instant at);
+
+    /**
+     * 好评率（WORK-043 TASK-023）。
+     *
+     * <p>`rated` 是分母（有评分的条数），`good/partial/bad` 对应 1/0/-1。
+     * 好评率在服务层算：分母为 0 时给 null 而不是 0——"还没人评"与"全都不准"不是一回事。
+     */
+    @Select("""
+            SELECT COUNT(*) AS rated,
+                   COALESCE(SUM(rating = 1), 0)  AS good,
+                   COALESCE(SUM(rating = 0), 0)  AS partial,
+                   COALESCE(SUM(rating = -1), 0) AS bad
+            FROM ops_diagnoses
+            WHERE rating IS NOT NULL AND status = 'DONE'
+            """)
+    FeedbackStats stats();
+
+    /** 统计行。与 AiUsageMapper 的用法一致：编译器开了 -parameters，MyBatis 能按名回填。 */
+    record FeedbackStats(long rated, long good, long partial, long bad) {
+    }
 }
