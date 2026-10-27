@@ -6936,3 +6936,12 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 未验证：P1–P4 尚未实施；P0 尚未部署到生产。
 - 本地提交：待提交
 - 远端推送：未执行
+
+## 2026-10-27 14:20 +0800 · WORK-043 P0 · 部署与生产验证
+
+- 类型：implementation
+- 变更：从干净工作树 `01e8bdb` 发版（含前端，214.7 秒）；生产库执行 `V20261027140000`；Grafana 通知策略在服务器上改为 `group_by: ['alertname','severity']` 并重启。
+- 验证：`flyway_schema_history` 最新为 `20261027140000`；`ops_incidents`/`ops_incident_events` 已建；回环 webhook 合成告警 `work-043-smoke` → 事件 #1 OPEN + 诊断 #5 DONE（4449 字符）+ 时间线 FIRED/DIAGNOSIS_STARTED/DIAGNOSIS_DONE；Grafana health 200、policy `['alertname','severity']`/`paideia-ops`；管理端 bundle 含 `incidents-list`。
+- 未验证：生产管理端事件页未用管理员 JWT 实际打开（本地 e2e 1 passed）；P1–P4 尚未实施。
+- 本地提交：01e8bdb
+- 远端推送：未执行
