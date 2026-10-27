@@ -97,14 +97,14 @@ updated: 2026-10-27
 
 ## 未验证项
 
-1. **Grafana 面板**：REQ-015 允许"在 `admin_ops_summary` **或** Grafana 有位置"。
-   本次只做到"指标已进 Prometheus 抓取"（见下），**没有在 Grafana 加面板**，
-   也没有加进 `admin_ops_summary`。**这一条按需求原文仍未完成**——指标可抓，但还没有人看它。
-2. **并发超额**：两个请求同时通过配额判定时，实际可能多放一次（判定与计数非原子）。
+1. **并发超额**：两个请求同时通过配额判定时，实际可能多放一次（判定与计数非原子）。
    design 第六节已记为已知限制；未做并发测试。
-3. **UTC 日切**：配额按 UTC 日切，北京时间用户早上 8 点"跨天"。
+2. **UTC 日切**：配额按 UTC 日切，北京时间用户早上 8 点"跨天"。
    e2e 与集成测试都在同一天内跑，**没有测跨天的行为**。
-4. **未部署**：三个提交都在 `work-044-mcp-completion` 分支，**未合并 master、未部署、未推送**。
+3. **Grafana 面板的渲染**：两个 MCP 面板已写进 `paideia-ops.json`（JSON 合法、面板 id 不重复），
+   但**没有在真实 Grafana 里看过它们画出线来**——本机 Prometheus 不可达，
+   面板要有数据才验证得了。
+4. **未部署**：全部提交都在 `work-044-mcp-completion` 分支，**未合并 master、未部署、未推送**。
 
 ## 端到端补充验证（2026-10-27 16:08，应用真实启动）
 
@@ -125,15 +125,15 @@ updated: 2026-10-27
 - **指标按原因分类**：`paideia_mcp_denied_total{reason="quota"} 2.0`、
   `paideia_mcp_tool_calls_total{result="denied",toolset="note"} 2.0` —— 被拒不计入工具失败率。
 
-REQ-015 的**前半句已满足**（进 Prometheus 抓取），后半句（有可见位置）仍未做。
+REQ-015 的**两句都已满足**：指标进 Prometheus 抓取（实测）+ 有可见位置（`admin_ops_summary` 的 mcp 分组实测返回、Grafana 两个面板已写入）。
 
 ## 与需求的偏差
 
 | REQ | 状态 |
 | --- | --- |
 | REQ-007 新增工具上限 12 个 | 实际 8 个（每域 2 个），在限内 |
-| REQ-015 指标在 `admin_ops_summary` 或 Grafana 有位置 | **一半**：已进 Prometheus 抓取（实测），但没加面板或摘要 |
-| REQ-016 被拒按原因分类 | 5 类可产生指标（`reason=quota` 实测）；`VIEW_NOT_FOUND` 在 `McpViewRegistry` 抛出、不进 invoker，**该原因的指标不会产生** |
+| REQ-015 指标在 `admin_ops_summary` 或 Grafana 有位置 | **已做**：`admin_ops_summary` 新增 `mcp` 分组（实测返回 8 组，第 7 组是 mcp）；`paideia-ops.json` 加两个 MCP 面板 |
+| REQ-016 被拒按原因分类 | 6 类全部可产生指标。`VIEW_NOT_FOUND` 原先漏了（在 servlet 层返回、到不了 invoker），**已改成在分派 servlet 里记**，实测 `reason="view_not_found"` 产生 1 |
 | REQ-020 前端不新增概念 | 只加了一个输入框与一行文字，未新增页面或术语 |
 
 ## 结论
@@ -142,5 +142,11 @@ Track A（四个域全覆盖）、Track B（配额/计数/截断/数量上限）
 Track D 的**指标注册部分**已完成。AC-001..AC-014 全部有实测证据，其中 AC-005 / AC-008 / AC-010
 做了反向验证。
 
-**仍有两处没做到，如实记录**：REQ-015 的"指标有可见位置"（面板或摘要）未做；
-`VIEW_NOT_FOUND` 的指标不会产生。这两条不影响功能，但按需求原文不算通过。
+Track D 的两处补齐（2026-10-27 16:44）：
+- **REQ-015**：`admin_ops_summary` 新增 `mcp` 分组（实测 8 组，含 mcp；Prometheus 不可达时显示"未知"而不是 0，
+  因为 0 会被误读成"没人用"）；`paideia-ops.json` 加两个 MCP 面板。
+- **REQ-016**：`VIEW_NOT_FOUND` 原先在分派 servlet 就返回、到不了 `McpToolInvoker`，所以那一类指标永远不产生。
+  已改成在 servlet 的 catch 里记，新增 `McpDispatcherServletTest` 两条钉住，**反向验证过**（去掉那行两条都红），
+  并实测 `paideia_mcp_denied_total{reason="view_not_found"} 1.0`。
+
+至此 AC-001..AC-014 全部有实测证据，无遗留缺口。
