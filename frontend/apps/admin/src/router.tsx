@@ -13,6 +13,7 @@ import { NoteReportsPage } from './pages/NoteReportsPage'
 import { SqlDatasetReportsPage } from './pages/SqlDatasetReportsPage'
 import { SqlDatasetsPage } from './pages/SqlDatasetsPage'
 import { OpsPage } from './pages/OpsPage'
+import { IncidentsPage } from './pages/IncidentsPage'
 import { RequireAdmin } from './require-admin'
 
 /**
@@ -133,6 +134,14 @@ export const router = createHashRouter([
     element: (
       <RequireAdmin>
         <OpsPage />
+      </RequireAdmin>
+    ),
+  },
+  {
+    path: '/ops/incidents',
+    element: (
+      <RequireAdmin>
+        <IncidentsPage />
       </RequireAdmin>
     ),
   },

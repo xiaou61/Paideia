@@ -40,6 +40,7 @@ class OpsDiagnosisService {
     private final OpsDiagnosisMapper mapper;
     private final OpsEvidenceCollector evidence;
     private final OpsDiagnoser diagnoser;
+    private final OpsIncidentService incidents;
     private final OpsProperties properties;
     private final TaskExecutor executor;
     private final AtomicBoolean running = new AtomicBoolean();
@@ -48,11 +49,13 @@ class OpsDiagnosisService {
     OpsDiagnosisService(OpsDiagnosisMapper mapper,
                         OpsEvidenceCollector evidence,
                         OpsDiagnoser diagnoser,
+                        OpsIncidentService incidents,
                         OpsProperties properties,
                         @Qualifier("applicationTaskExecutor") TaskExecutor executor) {
         this.mapper = mapper;
         this.evidence = evidence;
         this.diagnoser = diagnoser;
+        this.incidents = incidents;
         this.properties = properties;
         this.executor = executor;
     }
@@ -63,7 +66,7 @@ class OpsDiagnosisService {
      * @return 诊断 id；告警因冷却或忙碌被跳过时返回 {@code -1}
      * @throws BizException 诊断关闭（409）、手动重复提交（429）
      */
-    long start(String trigger, String alertName, String question, long requestedBy) {
+    long start(String trigger, Long incidentId, String alertName, String question, long requestedBy) {
         OpsProperties.Diagnosis config = properties.getDiagnosis();
         if (!config.isEnabled()) {
             throw new BizException(ErrorCode.CONFLICT, "运维诊断已关闭");
@@ -71,13 +74,6 @@ class OpsDiagnosisService {
 
         boolean alert = "alert".equals(trigger) && alertName != null && !alertName.isBlank();
         Instant now = Instant.now();
-        if (alert) {
-            Instant previous = alertCooldowns.get(alertName);
-            if (previous != null && previous.plusSeconds(config.getCooldownSeconds()).isAfter(now)) {
-                log.debug("ops.diagnosis.skipped alert={} reason=cooldown", alertName);
-                return -1;
-            }
-        }
 
         if (!running.compareAndSet(false, true)) {
             if (alert) {
@@ -88,20 +84,43 @@ class OpsDiagnosisService {
         }
 
         try {
+            if (incidentId != null) {
+                // 事件级冷却：同一 OPEN 事件在窗口内不重复花钱。先查后写，单飞保证没有并发 claim。
+                if (!incidents.canDiagnose(incidentId, now, config.getCooldownSeconds())) {
+                    log.debug("ops.diagnosis.skipped incidentId={} reason=cooldown-or-closed", incidentId);
+                    running.set(false);
+                    return -1;
+                }
+            } else if (alert) {
+                Instant previous = alertCooldowns.get(alertName);
+                if (previous != null && previous.plusSeconds(config.getCooldownSeconds()).isAfter(now)) {
+                    log.debug("ops.diagnosis.skipped alert={} reason=cooldown", alertName);
+                    running.set(false);
+                    return -1;
+                }
+            }
+
             OpsDiagnosisRow row = new OpsDiagnosisRow();
             row.setTriggerType(trigger);
+            row.setIncidentId(incidentId);
             row.setAlertName(alert ? alertName : null);
             row.setQuestion(trim(question, 2000));
             row.setStatus(OpsDiagnosisRow.STATUS_PENDING);
             row.setRequestedBy(requestedBy);
             row.setCreatedAt(now);
             mapper.insert(row);
-            if (alert) {
+            if (incidentId != null) {
+                incidents.markDiagnosed(incidentId, now);
+            } else if (alert) {
                 alertCooldowns.put(alertName, now);
                 purgeCooldowns(now);
             }
             long id = row.getId();
-            executor.execute(() -> run(id, requestedBy, trigger, row.getAlertName(), row.getQuestion()));
+            if (incidentId != null) {
+                incidents.markStarted(incidentId, id);
+            }
+            executor.execute(() -> run(id, requestedBy, trigger, incidentId,
+                    row.getAlertName(), row.getQuestion()));
             return id;
         } catch (RuntimeException failure) {
             running.set(false);
@@ -131,7 +150,8 @@ class OpsDiagnosisService {
         }
     }
 
-    private void run(long id, long userId, String trigger, String alertName, String question) {
+    private void run(long id, long userId, String trigger, Long incidentId,
+                     String alertName, String question) {
         try {
             mapper.markRunning(id);
             OpsDiagnoser.Evidence collected = evidence.collect(trigger, alertName, question);
@@ -141,6 +161,9 @@ class OpsDiagnosisService {
                     usage == null ? null : usage.inputTokens(),
                     usage == null ? null : usage.outputTokens(),
                     diagnosis.report(), Instant.now());
+            if (incidentId != null) {
+                incidents.markDone(incidentId, id, diagnosis.model());
+            }
             log.info("ops.diagnosis.done id={} trigger={} model={}", id, trigger, diagnosis.model());
         } catch (RuntimeException failure) {
             String message = messageOf(failure);
@@ -148,6 +171,14 @@ class OpsDiagnosisService {
                 mapper.markFailed(id, message, Instant.now());
             } catch (RuntimeException persistFailure) {
                 log.error("ops.diagnosis.persist-failed id={} error={}", id, messageOf(persistFailure));
+            }
+            if (incidentId != null) {
+                try {
+                    incidents.markFailed(incidentId, id, message);
+                } catch (RuntimeException timelineFailure) {
+                    log.warn("ops.diagnosis.timeline-failed id={} error={}",
+                            id, messageOf(timelineFailure));
+                }
             }
             log.warn("ops.diagnosis.failed id={} trigger={} error={}", id, trigger, message);
         } finally {
@@ -181,15 +212,17 @@ class OpsDiagnosisService {
     }
 
     /** 列表不带报告全文（一次 20 条全文会把响应撑大）；详情才带。 */
-    record View(long id, String triggerType, String alertName, String question, String status,
-                String model, Integer inputTokens, Integer outputTokens, String reportMd,
-                String errorMessage, Instant createdAt, Instant finishedAt) {
+    record View(long id, Long incidentId, String triggerType, String alertName, String question,
+                String status, String model, Integer inputTokens, Integer outputTokens,
+                String reportMd, String errorMessage, Integer rating, String feedbackNote,
+                Instant createdAt, Instant finishedAt) {
 
         static View of(OpsDiagnosisRow row, boolean includeReport) {
-            return new View(row.getId(), row.getTriggerType(), row.getAlertName(), row.getQuestion(),
-                    row.getStatus(), row.getModel(), row.getInputTokens(), row.getOutputTokens(),
-                    includeReport ? row.getReportMd() : null,
-                    row.getErrorMessage(), row.getCreatedAt(), row.getFinishedAt());
+            return new View(row.getId(), row.getIncidentId(), row.getTriggerType(), row.getAlertName(),
+                    row.getQuestion(), row.getStatus(), row.getModel(), row.getInputTokens(),
+                    row.getOutputTokens(), includeReport ? row.getReportMd() : null,
+                    row.getErrorMessage(), row.getRating(), row.getFeedbackNote(),
+                    row.getCreatedAt(), row.getFinishedAt());
         }
     }
 }

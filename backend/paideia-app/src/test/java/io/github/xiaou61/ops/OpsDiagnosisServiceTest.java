@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -35,6 +36,7 @@ class OpsDiagnosisServiceTest {
     private OpsDiagnosisMapper mapper;
     private OpsEvidenceCollector evidence;
     private OpsDiagnoser diagnoser;
+    private OpsIncidentService incidents;
     private OpsProperties properties;
     private AtomicReference<Runnable> pending;
     private TaskExecutor executor;
@@ -45,11 +47,12 @@ class OpsDiagnosisServiceTest {
         mapper = mock(OpsDiagnosisMapper.class);
         evidence = mock(OpsEvidenceCollector.class);
         diagnoser = mock(OpsDiagnoser.class);
+        incidents = mock(OpsIncidentService.class);
         properties = new OpsProperties();
         properties.getDiagnosis().setCooldownSeconds(600);
         pending = new AtomicReference<>();
         executor = pending::set;
-        service = new OpsDiagnosisService(mapper, evidence, diagnoser, properties, executor);
+        service = new OpsDiagnosisService(mapper, evidence, diagnoser, incidents, properties, executor);
 
         org.mockito.Mockito.doAnswer(invocation -> {
             OpsDiagnosisRow row = invocation.getArgument(0);
@@ -67,7 +70,7 @@ class OpsDiagnosisServiceTest {
     void disabledRejects() {
         properties.getDiagnosis().setEnabled(false);
 
-        assertThatThrownBy(() -> service.start("manual", null, null, USER))
+        assertThatThrownBy(() -> service.start("manual", null, null, null, USER))
                 .isInstanceOf(BizException.class)
                 .extracting(e -> ((BizException) e).errorCode())
                 .isEqualTo(ErrorCode.CONFLICT);
@@ -78,36 +81,57 @@ class OpsDiagnosisServiceTest {
     @Test
     @DisplayName("同一告警在冷却窗口内只建一行，第二次返回 -1")
     void cooldownSkipsSecondAlert() {
-        assertThat(service.start("alert", "disk-low", null, USER)).isEqualTo(99L);
+        assertThat(service.start("alert", null, "disk-low", null, USER)).isEqualTo(99L);
         pending.get().run();
 
-        assertThat(service.start("alert", "disk-low", null, USER)).isEqualTo(-1L);
+        assertThat(service.start("alert", null, "disk-low", null, USER)).isEqualTo(-1L);
         verify(mapper, times(1)).insert(any());
     }
 
     @Test
     @DisplayName("手动触发不受冷却限制")
     void manualIsNotCooledDown() {
-        assertThat(service.start("manual", null, null, USER)).isEqualTo(99L);
+        assertThat(service.start("manual", null, null, null, USER)).isEqualTo(99L);
         pending.get().run();
 
-        assertThat(service.start("manual", null, null, USER)).isEqualTo(99L);
+        assertThat(service.start("manual", null, null, null, USER)).isEqualTo(99L);
         verify(mapper, times(2)).insert(any());
     }
 
     @Test
     @DisplayName("已有诊断在跑时，手动第二次提交返回 429")
     void concurrentManualIsRejected() {
-        service.start("manual", null, null, USER);
+        service.start("manual", null, null, null, USER);
         // 任务尚未执行（executor 只是收下 Runnable），单飞标志仍为 true
-        assertThatThrownBy(() -> service.start("manual", null, null, USER))
+        assertThatThrownBy(() -> service.start("manual", null, null, null, USER))
                 .isInstanceOf(BizException.class)
                 .extracting(e -> ((BizException) e).errorCode())
                 .isEqualTo(ErrorCode.TOO_MANY_REQUESTS);
 
         pending.get().run();
         // 跑完后可以再次提交
-        assertThat(service.start("manual", null, null, USER)).isEqualTo(99L);
+        assertThat(service.start("manual", null, null, null, USER)).isEqualTo(99L);
+    }
+
+    @Test
+    @DisplayName("事件级冷却：canDiagnose=false 时不建行")
+    void incidentCooldownSkips() {
+        when(incidents.canDiagnose(eq(5L), any(), anyLong())).thenReturn(false);
+
+        assertThat(service.start("alert", 5L, "disk-low", null, USER)).isEqualTo(-1L);
+
+        verify(mapper, never()).insert(any());
+    }
+
+    @Test
+    @DisplayName("事件诊断：写回冷却时间并追加时间线")
+    void incidentDiagnosisMarksTimeline() {
+        when(incidents.canDiagnose(eq(5L), any(), anyLong())).thenReturn(true);
+
+        assertThat(service.start("alert", 5L, "disk-low", null, USER)).isEqualTo(99L);
+
+        verify(incidents).markDiagnosed(eq(5L), any());
+        verify(incidents).markStarted(5L, 99L);
     }
 
     @Test

@@ -28,6 +28,10 @@ class OpsDiagnosisRow {
     private Long requestedBy;
     private Instant createdAt;
     private Instant finishedAt;
+    private Long incidentId;
+    private Integer rating;
+    private String feedbackNote;
+    private Instant feedbackAt;
 
     Long getId() {
         return id;
@@ -131,5 +135,37 @@ class OpsDiagnosisRow {
 
     void setFinishedAt(Instant finishedAt) {
         this.finishedAt = finishedAt;
+    }
+
+    Long getIncidentId() {
+        return incidentId;
+    }
+
+    void setIncidentId(Long incidentId) {
+        this.incidentId = incidentId;
+    }
+
+    Integer getRating() {
+        return rating;
+    }
+
+    void setRating(Integer rating) {
+        this.rating = rating;
+    }
+
+    String getFeedbackNote() {
+        return feedbackNote;
+    }
+
+    void setFeedbackNote(String feedbackNote) {
+        this.feedbackNote = feedbackNote;
+    }
+
+    Instant getFeedbackAt() {
+        return feedbackAt;
+    }
+
+    void setFeedbackAt(Instant feedbackAt) {
+        this.feedbackAt = feedbackAt;
     }
 }

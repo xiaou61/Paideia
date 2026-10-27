@@ -1,6 +1,7 @@
 import { ThemeToggle } from '@paideia/ui'
 import {
   Boxes,
+  Bell,
   ChevronDown,
   ChevronRight,
   Coins,
@@ -87,6 +88,8 @@ const MENU: MenuItem[] = [
   },
   // 运维（WORK-028）：只有一页（摘要卡片 + 完整面板），所以是叶子菜单项而不是父项分组。
   { to: '/ops/panel', label: '运维', icon: Cpu },
+  // 事件（WORK-043）：告警的生命周期与时间线，与运维诊断分开一页。
+  { to: '/ops/incidents', label: '事件', icon: Bell },
 ]
 
 /** 面包屑：按菜单层级写死的路径（首页固定在最前，不再逐级可点）。 */
@@ -104,6 +107,7 @@ const CRUMBS: Record<string, string[]> = {
   '/ai-runs/list': ['AI 调用', '调用明细'],
   '/ai-runs/feedback': ['AI 调用', '回答反馈'],
   '/ops/panel': ['运维'],
+  '/ops/incidents': ['事件'],
 }
 
 /**

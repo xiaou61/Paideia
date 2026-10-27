@@ -6915,3 +6915,24 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 提交 `3b69632`。仍未 push。
 - **仍未做**：真机触屏手势、hover 状态逐元素截图核对、LCP（浏览器 API 取不到，
   只测了 FCP/CLS）。
+
+## 2026-10-27 13:52:33 +0800 · WORK-043 · 签署 .agent/changes/WORK-043-AIOps完整化/requirements.md、.agent/changes/WORK-043-AIOps完整化/proposal.md、.agent/changes/WORK-043-AIOps完整化/design.md、.agent/changes/WORK-043-AIOps完整化/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-043-AIOps完整化/requirements.md、.agent/changes/WORK-043-AIOps完整化/proposal.md、.agent/changes/WORK-043-AIOps完整化/design.md、.agent/changes/WORK-043-AIOps完整化/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-043-AIOps完整化/requirements.md、.agent/changes/WORK-043-AIOps完整化/proposal.md、.agent/changes/WORK-043-AIOps完整化/design.md、.agent/changes/WORK-043-AIOps完整化/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-27 14:20 +0800 · WORK-043 P0 · 事件地基
+
+- 类型：implementation
+- 变更：新增 `ops_incidents`/`ops_incident_events` 与 `ops_diagnoses` 增量列；指纹/状态机/时间线；webhook 扩为 upsert/resolve + critical 抑制 warning；诊断挂事件并按事件冷却；事件列表/详情/备注端点；管理端「事件」页与导航；Grafana 通知 `group_by` 改为 `alertname + severity`。
+- 决策：指纹只取稳定标签（alertname/severity/instance/job）；`dedupe_key` OPEN=fingerprint、RESOLVED=NULL；同一通知至多触发一次诊断；被抑制的 warning 只记 NOTE。
+- 依据：WORK-043 TASK-001..007；用户四项裁决。
+- 验证：P0 后端 27 条（`OpsIncidentFingerprintTest`/`OpsIncidentMapperTest`/`OpsIncidentIntegrationTest`/`OpsDiagnosisServiceTest`/`OpsDiagnosisIntegrationTest`/`OpsHookIntegrationTest`）0 failed；迁移校验和已登记；管理端 `incidents.spec.ts` 1 passed；`pnpm typecheck` 通过。
+- 未验证：P1–P4 尚未实施；P0 尚未部署到生产。
+- 本地提交：待提交
+- 远端推送：未执行

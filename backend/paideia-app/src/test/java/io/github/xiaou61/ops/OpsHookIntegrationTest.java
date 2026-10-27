@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.xiaou61.ai.OpsDiagnoser;
 import io.github.xiaou61.ai.TokenUsage;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -57,6 +58,9 @@ class OpsHookIntegrationTest {
 
     @Autowired
     OpsDiagnosisMapper mapper;
+
+    @Autowired
+    OpsIncidentMapper incidentMapper;
 
     @MockitoBean
     OpsDiagnoser diagnoser;
@@ -159,6 +163,113 @@ class OpsHookIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.accepted").value(false))
                 .andExpect(jsonPath("$.data.skipped").exists());
+
+        assertThat(incidentsFor(alert)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("重复 firing 只有一个事件；连续两次通知不重复建")
+    void duplicateFiringCreatesOneIncident() throws Exception {
+        String alert = "alert-" + UUID.randomUUID();
+        String payload = PAYLOAD.formatted(alert);
+
+        String first = mockMvc.perform(loopback(post("/api/v1/ops/hooks/grafana"))
+                        .header("X-Paideia-Ops-Token", "test-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accepted").value(true))
+                .andReturn().getResponse().getContentAsString();
+        awaitFinished(json.readTree(first).path("data").path("id").asLong());
+
+        mockMvc.perform(loopback(post("/api/v1/ops/hooks/grafana"))
+                        .header("X-Paideia-Ops-Token", "test-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accepted").value(false));
+
+        assertThat(incidentsFor(alert)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("resolved 后再次 firing 是新事件")
+    void reopenCreatesNewIncident() throws Exception {
+        String alert = "alert-" + UUID.randomUUID();
+        String firing = PAYLOAD.formatted(alert);
+        String resolved = """
+                {"status":"resolved","alerts":[{"status":"resolved",
+                 "labels":{"alertname":"%s","severity":"warning"}}]}
+                """.formatted(alert);
+
+        String first = mockMvc.perform(loopback(post("/api/v1/ops/hooks/grafana"))
+                        .header("X-Paideia-Ops-Token", "test-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(firing))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accepted").value(true))
+                .andReturn().getResponse().getContentAsString();
+        awaitFinished(json.readTree(first).path("data").path("id").asLong());
+
+        mockMvc.perform(loopback(post("/api/v1/ops/hooks/grafana"))
+                        .header("X-Paideia-Ops-Token", "test-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(resolved))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accepted").value(false));
+
+        String second = mockMvc.perform(loopback(post("/api/v1/ops/hooks/grafana"))
+                        .header("X-Paideia-Ops-Token", "test-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(firing))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accepted").value(true))
+                .andReturn().getResponse().getContentAsString();
+        awaitFinished(json.readTree(second).path("data").path("id").asLong());
+
+        List<OpsIncident> matching = incidentsFor(alert);
+        assertThat(matching).hasSize(2);
+        assertThat(matching).filteredOn(row -> OpsIncident.STATUS_OPEN.equals(row.getStatus()))
+                .hasSize(1);
+        assertThat(matching).filteredOn(row -> OpsIncident.STATUS_RESOLVED.equals(row.getStatus()))
+                .hasSize(1);
+    }
+
+    @Test
+    @DisplayName("critical 存在时只诊断 critical，warning 只记时间线")
+    void criticalSuppressesOnlyWarnings() throws Exception {
+        String critical = "critical-" + UUID.randomUUID();
+        String warning = "warning-" + UUID.randomUUID();
+        String payload = """
+                {"status":"firing","alerts":[
+                 {"status":"firing","labels":{"alertname":"%s","severity":"critical"}},
+                 {"status":"firing","labels":{"alertname":"%s","severity":"warning"}}]}
+                """.formatted(critical, warning);
+
+        String body = mockMvc.perform(loopback(post("/api/v1/ops/hooks/grafana"))
+                        .header("X-Paideia-Ops-Token", "test-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accepted").value(true))
+                .andReturn().getResponse().getContentAsString();
+
+        OpsDiagnosisRow diagnosis = awaitFinished(json.readTree(body).path("data").path("id").asLong());
+        long criticalId = incidentsFor(critical).getFirst().getId();
+        long warningId = incidentsFor(warning).getFirst().getId();
+
+        assertThat(diagnosis.getIncidentId()).isEqualTo(criticalId);
+        assertThat(mapper.listByIncident(criticalId, 10)).isNotEmpty();
+        assertThat(mapper.listByIncident(warningId, 10)).isEmpty();
+        assertThat(incidentMapper.listEvents(warningId, 20))
+                .anyMatch(event -> OpsIncidentEvent.KIND_NOTE.equals(event.getKind())
+                        && event.getMessage().contains("抑制"));
+    }
+
+    private List<OpsIncident> incidentsFor(String alert) {
+        return incidentMapper.listRecent(null, 200).stream()
+                .filter(row -> alert.equals(row.getAlertName()))
+                .toList();
     }
 
     /** MockMvc 默认不保证 remoteAddr 是回环；安全规则按它判定，测试必须显式给。 */

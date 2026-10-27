@@ -40,7 +40,9 @@ contactPoints:
 policies:
   - orgId: 1
     receiver: paideia-ops
-    group_by: []
+    # WORK-043：同 alertname + severity 合并成一条通知；不同告警仍分开（处置动作不同）。
+    # 跨告警抑制（critical 抑制同通知的 warning）在事件层做，见 OpsHookController。
+    group_by: ['alertname', 'severity']
     group_wait: 30s
     group_interval: 5m
     repeat_interval: 12h

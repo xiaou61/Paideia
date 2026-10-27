@@ -22,9 +22,9 @@ interface OpsDiagnosisMapper {
 
     @Insert("""
             INSERT INTO ops_diagnoses
-                (trigger_type, alert_name, question, status, requested_by, created_at)
+                (trigger_type, alert_name, question, status, requested_by, created_at, incident_id)
             VALUES
-                (#{triggerType}, #{alertName}, #{question}, #{status}, #{requestedBy}, #{createdAt})
+                (#{triggerType}, #{alertName}, #{question}, #{status}, #{requestedBy}, #{createdAt}, #{incidentId})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(OpsDiagnosisRow row);
@@ -72,7 +72,7 @@ interface OpsDiagnosisMapper {
     @Select("""
             SELECT id, trigger_type, alert_name, question, status, model,
                    input_tokens, output_tokens, report_md, error_message,
-                   requested_by, created_at, finished_at
+                   requested_by, created_at, finished_at, incident_id, rating, feedback_note, feedback_at
             FROM ops_diagnoses
             WHERE id = #{id}
             """)
@@ -81,10 +81,22 @@ interface OpsDiagnosisMapper {
     @Select("""
             SELECT id, trigger_type, alert_name, question, status, model,
                    input_tokens, output_tokens, report_md, error_message,
-                   requested_by, created_at, finished_at
+                   requested_by, created_at, finished_at, incident_id, rating, feedback_note, feedback_at
             FROM ops_diagnoses
             ORDER BY created_at DESC, id DESC
             LIMIT #{limit}
             """)
     List<OpsDiagnosisRow> listRecent(@Param("limit") int limit);
+
+    @Select("""
+            SELECT id, trigger_type, alert_name, question, status, model,
+                   input_tokens, output_tokens, report_md, error_message,
+                   requested_by, created_at, finished_at, incident_id, rating, feedback_note, feedback_at
+            FROM ops_diagnoses
+            WHERE incident_id = #{incidentId}
+            ORDER BY created_at DESC, id DESC
+            LIMIT #{limit}
+            """)
+    List<OpsDiagnosisRow> listByIncident(@Param("incidentId") long incidentId,
+                                         @Param("limit") int limit);
 }

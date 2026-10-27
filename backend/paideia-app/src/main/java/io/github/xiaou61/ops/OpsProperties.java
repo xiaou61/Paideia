@@ -33,6 +33,8 @@ public class OpsProperties {
 
     private final Diagnosis diagnosis = new Diagnosis();
 
+    private final Incidents incidents = new Incidents();
+
     public String getPrometheusUrl() {
         return prometheusUrl;
     }
@@ -75,6 +77,10 @@ public class OpsProperties {
 
     public Diagnosis getDiagnosis() {
         return diagnosis;
+    }
+
+    public Incidents getIncidents() {
+        return incidents;
     }
 
     public Thresholds getThresholds() {
@@ -207,6 +213,32 @@ public class OpsProperties {
 
         public void setListLimit(int listLimit) {
             this.listLimit = listLimit;
+        }
+    }
+
+    /** 告警事件（WORK-043）。 */
+    public static class Incidents {
+
+        /** 一条 webhook 最多处理几个 alert，防止异常载荷放大写入。 */
+        private int maxAlertsPerNotification = 5;
+
+        /** critical 事件存在时，同通知的 warning 只记时间线、不触发诊断。 */
+        private boolean suppressWarningWhenCritical = true;
+
+        public int getMaxAlertsPerNotification() {
+            return maxAlertsPerNotification;
+        }
+
+        public void setMaxAlertsPerNotification(int maxAlertsPerNotification) {
+            this.maxAlertsPerNotification = maxAlertsPerNotification;
+        }
+
+        public boolean isSuppressWarningWhenCritical() {
+            return suppressWarningWhenCritical;
+        }
+
+        public void setSuppressWarningWhenCritical(boolean suppressWarningWhenCritical) {
+            this.suppressWarningWhenCritical = suppressWarningWhenCritical;
         }
     }
 }

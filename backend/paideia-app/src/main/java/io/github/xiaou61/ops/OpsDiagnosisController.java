@@ -35,7 +35,7 @@ class OpsDiagnosisController {
     ResponseEntity<ApiResponse<Created>> create(@RequestBody(required = false) CreateRequest request) {
         long userId = Long.parseLong(CurrentUser.subjectId());
         String question = request == null ? null : request.question();
-        long id = service.start("manual", null, question, userId);
+        long id = service.start("manual", null, null, question, userId);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.ok(new Created(id)));
     }
 
