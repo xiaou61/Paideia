@@ -220,6 +220,13 @@ management:
         enabled: true
     sampling:
       probability: ${PAIDEIA_TRACE_SAMPLE_PROBABILITY:1.0}
+  # Boot 4 的 OTLP exporter 条件读新命名空间；只写 management.otlp.tracing 时
+  # ConnectionDetails 不会创建，span 生成但不导出（2026-10-27 实测）。
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${PAIDEIA_OTLP_TRACES_ENDPOINT:http://127.0.0.1:4318/v1/traces}
   otlp:
     tracing:
       export:

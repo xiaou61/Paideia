@@ -26,6 +26,7 @@ import org.springframework.test.context.TestPropertySource;
         "management.tracing.enabled=true",
         "management.tracing.export.enabled=true",
         "management.tracing.export.otlp.enabled=true",
+        "management.opentelemetry.tracing.export.otlp.endpoint=http://127.0.0.1:1/v1/traces",
         "management.otlp.tracing.export.enabled=true",
         "management.otlp.tracing.endpoint=http://127.0.0.1:1/v1/traces"
 })
