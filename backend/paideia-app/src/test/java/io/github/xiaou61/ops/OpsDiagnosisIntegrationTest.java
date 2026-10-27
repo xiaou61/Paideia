@@ -41,6 +41,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @TestPropertySource(properties = {
         "paideia.ops.prometheus-url=http://127.0.0.1:1",
         "paideia.ops.loki-url=http://127.0.0.1:1",
+        "paideia.ops.tempo-url=http://127.0.0.1:1",
         "paideia.ops.query-timeout-ms=100"
 })
 @EnabledIfEnvironmentVariable(named = "PAIDEIA_TEST_DB_PASSWORD", matches = ".+")

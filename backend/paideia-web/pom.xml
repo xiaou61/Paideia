@@ -28,6 +28,11 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-validation</artifactId>
     </dependency>
+    <!-- TraceIdFilter 读取当前 OTel span 的 trace id；只依赖 API，不依赖具体 bridge。 -->
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-tracing</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>

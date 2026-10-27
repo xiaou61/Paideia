@@ -1,0 +1,35 @@
+# Tempo 单机配置（WORK-043 P2）。
+#
+# 只绑回环：应用通过 OTLP HTTP 4318 发 span，Grafana 通过 3200 查询。
+# 文件系统存储 + 30 天保留，与 Prometheus/Loki 对齐；不启用 metrics-generator
+# （SLO 用 Prometheus 现有指标，避免多一套聚合链路）。
+server:
+  http_listen_address: 127.0.0.1
+  http_listen_port: 3200
+  grpc_listen_address: 127.0.0.1
+  grpc_listen_port: 9095
+  log_level: warn
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        http:
+          endpoint: 127.0.0.1:4318
+        grpc:
+          endpoint: 127.0.0.1:4317
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /var/lib/tempo/blocks
+    wal:
+      path: /var/lib/tempo/wal
+
+compactor:
+  compaction:
+    block_retention: 720h
+
+usage_report:
+  reporting_enabled: false

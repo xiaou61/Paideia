@@ -43,6 +43,11 @@ scrape_configs:
     static_configs:
       - targets: ['127.0.0.1:12345']
 
+  # 链路自身（WORK-043）：Tempo 挂了 trace 证据会静默缺失，up 要能看到。
+  - job_name: tempo
+    static_configs:
+      - targets: ['127.0.0.1:3200']
+
   # ── 外部依赖探活 ─────────────────────────────────────────────────────────
   # 三个 job 共用一个 blackbox 实例；instance 标签被钉成短名（laya/rustfs/firecrawl），
   # 摘要接口按它取值。**不要**把 instance 改成目标 URL，那会让摘要里的名字变成一串地址。

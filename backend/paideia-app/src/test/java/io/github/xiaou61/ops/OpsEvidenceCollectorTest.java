@@ -10,6 +10,8 @@ import static org.mockito.Mockito.when;
 import io.github.xiaou61.ai.OpsDiagnoser;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,6 +28,7 @@ class OpsEvidenceCollectorTest {
     private OpsSummaryService summary;
     private PrometheusClient prometheus;
     private LokiClient loki;
+    private TempoClient tempo;
     private OpsEvidenceCollector collector;
 
     @BeforeEach
@@ -33,7 +36,9 @@ class OpsEvidenceCollectorTest {
         summary = mock(OpsSummaryService.class);
         prometheus = mock(PrometheusClient.class);
         loki = mock(LokiClient.class);
-        collector = new OpsEvidenceCollector(properties, summary, prometheus, loki);
+        tempo = mock(TempoClient.class);
+        collector = new OpsEvidenceCollector(properties, summary, prometheus, loki, tempo);
+        when(tempo.search(any(), any(), anyInt())).thenReturn(List.of());
 
         when(summary.summary()).thenReturn(new OpsSummary("2026-10-26T10:00:00Z", true, List.of(
                 new OpsSummary.Group("host", "主机", OpsStatus.OK, "磁盘正常",
@@ -77,6 +82,23 @@ class OpsEvidenceCollectorTest {
                         "7d_same_hour=20.00%", "baseline=20.00%", "ratio=1.25x", "samples_7d=20160")
                 .contains("http_5xx_percent = 基线不足")
                 .contains("log_errors current=2 7d_same_hour=2 ratio=1.00x");
+    }
+
+    @Test
+    @DisplayName("trace 摘要只带最慢 span 与白名单属性")
+    void traceEvidence() {
+        when(tempo.search(any(), any(), anyInt())).thenReturn(List.of(
+                new TempoClient.TraceSummary("trace-1", "POST /api/v1/ai/chat", 2400, true, Instant.now())));
+        when(tempo.trace("trace-1")).thenReturn(Optional.of(new TempoClient.TraceDetail("trace-1",
+                List.of(new TempoClient.Span("SELECT users", 1800, "STATUS_CODE_ERROR",
+                        Map.of("db.system", "mysql", "db.statement", "select * from users"))))));
+
+        String traces = collector.collect("manual", null, null).traces();
+
+        assertThat(traces)
+                .contains("trace=trace-1", "root=POST", "2400ms", "error=true",
+                        "slowest=SELECT users", "1800ms", "db.system=mysql")
+                .doesNotContain("db.statement", "select * from users");
     }
 
     @Test

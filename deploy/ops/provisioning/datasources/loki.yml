@@ -11,3 +11,9 @@ datasources:
     editable: false
     jsonData:
       maxLines: 1000
+      # 日志行里的 [traceId] 跳到 Tempo；trace id 由 TraceIdFilter 统一为 OTel 的值。
+      derivedFields:
+        - name: traceId
+          matcherRegex: '\[([a-f0-9]{32})\]'
+          datasourceUid: paideia-tempo
+          url: '$${__value.raw}'

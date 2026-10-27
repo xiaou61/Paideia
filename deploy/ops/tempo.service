@@ -1,0 +1,22 @@
+# Tempo（Paideia 链路，WORK-043 P2）。
+# 与其它监控单元同一套纪律：只绑回环、独立 Restart、MemoryMax 兜底。
+[Unit]
+Description=Tempo（Paideia 链路）
+After=network-online.target
+
+[Service]
+Type=simple
+User=tempo
+Group=tempo
+ExecStart=/usr/local/bin/tempo -config.file=/etc/tempo/tempo-config.yaml
+Restart=on-failure
+RestartSec=5
+MemoryMax=512M
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/tempo
+
+[Install]
+WantedBy=multi-user.target

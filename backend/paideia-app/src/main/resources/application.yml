@@ -210,3 +210,19 @@ management:
     distribution:
       percentiles-histogram:
         http.server.requests: true
+  # WORK-043 P2：trace 走 OTLP HTTP 到本机 Tempo；指标仍由 Prometheus 抓取，
+  # 关闭 OTLP metrics 避免同一批指标走两套出口。
+  tracing:
+    sampling:
+      probability: ${PAIDEIA_TRACE_SAMPLE_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${PAIDEIA_OTLP_TRACES_ENDPOINT:http://127.0.0.1:4318/v1/traces}
+    metrics:
+      export:
+        enabled: false
+
+logging:
+  pattern:
+    # 日志里带 trace id，Grafana 的 Loki derived field 才能跳到 Tempo。
+    correlation: "[%X{traceId:-}] "

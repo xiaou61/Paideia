@@ -1,0 +1,22 @@
+# Grafana 数据源：Tempo（WORK-043 P2）。
+# 与 Loki 双向关联：日志里的 traceId 跳 trace，trace 里的 service.name 跳日志。
+apiVersion: 1
+
+datasources:
+  - name: Tempo
+    uid: paideia-tempo
+    type: tempo
+    access: proxy
+    url: http://127.0.0.1:3200
+    editable: false
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: paideia-loki
+        spanStartTimeShift: '-1h'
+        spanEndTimeShift: '1h'
+        filterByTraceID: true
+        tags:
+          - key: 'service.name'
+            value: 'service_name'
+      lokiSearch:
+        datasourceUid: paideia-loki

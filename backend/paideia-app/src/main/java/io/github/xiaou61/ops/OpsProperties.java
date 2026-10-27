@@ -23,6 +23,9 @@ public class OpsProperties {
     /** Loki 查询地址（WORK-042）。只应指向回环。 */
     private String lokiUrl = "http://127.0.0.1:3100";
 
+    /** Tempo 查询地址（WORK-043）。只应指向回环。 */
+    private String tempoUrl = "http://127.0.0.1:3200";
+
     /**
      * Grafana webhook 的共享令牌（WORK-042）。为空时 webhook 一律拒绝，手动诊断不受影响。
      * 真实值来自服务器 600 文件，经 systemd 环境变量注入；仓库里只有占位。
@@ -65,6 +68,14 @@ public class OpsProperties {
 
     public void setLokiUrl(String lokiUrl) {
         this.lokiUrl = lokiUrl;
+    }
+
+    public String getTempoUrl() {
+        return tempoUrl;
+    }
+
+    public void setTempoUrl(String tempoUrl) {
+        this.tempoUrl = tempoUrl;
     }
 
     public String getHookToken() {

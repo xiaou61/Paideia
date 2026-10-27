@@ -55,21 +55,30 @@ class OpsEvidenceCollector {
     private final OpsSummaryService summary;
     private final PrometheusClient prometheus;
     private final LokiClient loki;
+    private final TempoClient tempo;
 
-    /** 生产构造器；另一个带客户端的构造器只给测试用（两个构造器必须标出这一个）。 */
+    /** 生产构造器；其余带客户端的构造器只给测试用。 */
     @Autowired
     OpsEvidenceCollector(OpsProperties properties, OpsSummaryService summary) {
         this(properties, summary,
                 new PrometheusClient(properties.getPrometheusUrl(), properties.getQueryTimeoutMs()),
-                new LokiClient(properties.getLokiUrl(), properties.getQueryTimeoutMs()));
+                new LokiClient(properties.getLokiUrl(), properties.getQueryTimeoutMs()),
+                new TempoClient(properties.getTempoUrl(), properties.getQueryTimeoutMs()));
     }
 
     OpsEvidenceCollector(OpsProperties properties, OpsSummaryService summary,
                          PrometheusClient prometheus, LokiClient loki) {
+        this(properties, summary, prometheus, loki,
+                new TempoClient(properties.getTempoUrl(), properties.getQueryTimeoutMs()));
+    }
+
+    OpsEvidenceCollector(OpsProperties properties, OpsSummaryService summary,
+                         PrometheusClient prometheus, LokiClient loki, TempoClient tempo) {
         this.properties = properties;
         this.summary = summary;
         this.prometheus = prometheus;
         this.loki = loki;
+        this.tempo = tempo;
     }
 
     OpsDiagnoser.Evidence collect(String trigger, String alertName, String question) {
@@ -80,8 +89,7 @@ class OpsEvidenceCollector {
         String baselinesText = formatBaselines();
         String alertsText = firingAlerts();
         String deploysText = formatDeploy();
-        // P2 接 Tempo 后填入；现在留空，提示词会写“不可达或无数据”。
-        String tracesText = "";
+        String tracesText = formatTraces();
 
         int nonLogChars = summaryText.length() + metricsText.length() + baselinesText.length()
                 + alertsText.length() + tracesText.length() + deploysText.length();
@@ -264,6 +272,44 @@ class OpsEvidenceCollector {
 
     private static String valueOrDash(Double value, String unit) {
         return value == null || !Double.isFinite(value) ? "—" : trimmed(value, 2) + unit;
+    }
+
+    /** 最近 1 小时的错误/慢 trace；最多 3 条，每条只带最慢 span 与白名单属性。 */
+    private String formatTraces() {
+        Instant to = Instant.now();
+        Instant from = to.minus(Duration.ofHours(1));
+        List<TempoClient.TraceSummary> traces = tempo.search(from, to, 3);
+        if (traces.isEmpty()) {
+            return "无匹配 trace（或 Tempo 不可达）";
+        }
+        StringBuilder out = new StringBuilder();
+        int count = 0;
+        for (TempoClient.TraceSummary trace : traces) {
+            if (count++ >= 3) {
+                break;
+            }
+            out.append("trace=").append(trace.traceId())
+                    .append(" root=").append(trace.rootName())
+                    .append(" duration=").append(trace.durationMs()).append("ms");
+            if (trace.error()) {
+                out.append(" error=true");
+            }
+            out.append('\n');
+            tempo.trace(trace.traceId()).ifPresent(detail -> {
+                TempoClient.Span slowest = detail.slowest();
+                if (slowest != null) {
+                    out.append("  slowest=").append(slowest.name())
+                            .append(" ").append(slowest.durationMs()).append("ms")
+                            .append(" status=").append(slowest.status());
+                    Map<String, String> attrs = TempoTraceRedactor.filter(slowest.attributes());
+                    if (!attrs.isEmpty()) {
+                        out.append(" attrs=").append(attrs);
+                    }
+                    out.append('\n');
+                }
+            });
+        }
+        return out.toString();
     }
 
     private String formatDiagnosisLogs(int maxLines, int maxChars) {

@@ -24,14 +24,15 @@ REDIS_EXPORTER_VERSION=1.67.0
 BLACKBOX_EXPORTER_VERSION=0.25.0
 LOKI_VERSION=3.7.9
 ALLOY_VERSION=1.21.2
+TEMPO_VERSION=3.1.1
 
 say() { printf '\n=== %s ===\n' "$1"; }
 
 say "目录与服务账号"
 mkdir -p "$OPS_DIR" "$BACKUP_DIR" /etc/paideia-backup "$TEXTFILE_DIR" /etc/prometheus /etc/blackbox
 mkdir -p /etc/grafana/provisioning/datasources /etc/grafana/provisioning/dashboards /etc/grafana/provisioning/alerting
-mkdir -p /var/lib/loki /var/lib/alloy /etc/loki /etc/alloy /etc/paideia-ops
-for account in prometheus node_exporter mysqld_exporter redis_exporter blackbox_exporter loki alloy; do
+mkdir -p /var/lib/loki /var/lib/alloy /var/lib/tempo /etc/loki /etc/alloy /etc/tempo /etc/paideia-ops
+for account in prometheus node_exporter mysqld_exporter redis_exporter blackbox_exporter loki alloy tempo; do
     id "$account" >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin "$account"
 done
 # Alloy 读 journald 必须在这两个组里；缺了不会报错，只是**一条日志都采不到**。
@@ -65,6 +66,7 @@ promtool check rules /etc/prometheus/rules/*.yml
 install -m 0644 "$HERE/blackbox.yml"      /etc/blackbox/blackbox.yml
 install -m 0644 "$HERE/loki-config.yaml"  /etc/loki/loki-config.yaml
 install -m 0644 "$HERE/alloy-config.alloy" /etc/alloy/config.alloy
+install -m 0644 "$HERE/tempo-config.yaml" /etc/tempo/tempo-config.yaml
 install -m 0644 "$HERE/grafana.ini"       /etc/grafana/grafana.ini
 cp -r "$HERE/provisioning/." /etc/grafana/provisioning/
 chown -R grafana:grafana /etc/grafana/provisioning 2>/dev/null || true
@@ -160,21 +162,23 @@ install_release prometheus/blackbox_exporter "$BLACKBOX_EXPORTER_VERSION" blackb
 install_release oliver006/redis_exporter "$REDIS_EXPORTER_VERSION" redis_exporter "redis_exporter-v${REDIS_EXPORTER_VERSION}.linux-amd64"
 install_release_zip grafana/loki "$LOKI_VERSION" loki "loki-linux-amd64"
 install_release_zip grafana/alloy "$ALLOY_VERSION" alloy "alloy-linux-amd64"
+install_release grafana/tempo "$TEMPO_VERSION" tempo "tempo_${TEMPO_VERSION}_linux_amd64"
 
 mkdir -p /var/lib/prometheus
 chown -R prometheus:prometheus /var/lib/prometheus
 chown -R loki:loki /var/lib/loki
 chown -R alloy:alloy /var/lib/alloy
+chown -R tempo:tempo /var/lib/tempo
 
 say "安装 systemd 单元"
-for unit in prometheus node-exporter mysqld-exporter redis-exporter blackbox-exporter loki alloy ops-textfile grafana paideia-backup; do
+for unit in prometheus node-exporter mysqld-exporter redis-exporter blackbox-exporter loki alloy tempo ops-textfile grafana paideia-backup; do
     [ -f "$HERE/$unit.service" ] && install -m 0644 "$HERE/$unit.service" "/etc/systemd/system/$unit.service"
     [ -f "$HERE/$unit.timer" ] && install -m 0644 "$HERE/$unit.timer" "/etc/systemd/system/$unit.timer"
 done
 systemctl daemon-reload
 
 say "启动"
-for unit in prometheus loki alloy node-exporter mysqld-exporter redis-exporter blackbox-exporter grafana; do
+for unit in prometheus loki alloy tempo node-exporter mysqld-exporter redis-exporter blackbox-exporter grafana; do
     systemctl enable --now "$unit" || echo "⚠ $unit 启动失败，见 journalctl -u $unit"
 done
 systemctl enable --now ops-textfile.timer paideia-backup.timer
@@ -183,14 +187,14 @@ systemctl start ops-textfile.service || true
 
 # 配置改动不热加载：Grafana 的 provisioning、Prometheus 的抓取配置、Loki/Alloy 的配置文件
 # 都要重启才生效。这里不是 release.ps1，装监控配置本来就该重启这几个单元。
-systemctl restart prometheus grafana loki alloy || echo "⚠ 重启监控单元失败，见 journalctl"
+systemctl restart prometheus grafana loki alloy tempo || echo "⚠ 重启监控单元失败，见 journalctl"
 
 say "结果"
-for unit in prometheus grafana loki alloy node-exporter mysqld-exporter redis-exporter blackbox-exporter ops-textfile.timer paideia-backup.timer; do
+for unit in prometheus grafana loki alloy tempo node-exporter mysqld-exporter redis-exporter blackbox-exporter ops-textfile.timer paideia-backup.timer; do
     printf '%-22s %s\n' "$unit" "$(systemctl is-active "$unit" 2>/dev/null || true)"
 done
 echo '--- 监听端口（应全部是 127.0.0.1）---'
-ss -ltn | grep -E ':(9090|9100|9104|9121|9115|3000|3100|12345)\s' || echo "（没有监控端口监听——异常）"
+ss -ltn | grep -E ':(9090|9100|9104|9121|9115|3000|3100|3200|4317|4318|12345)\s' || echo "（没有监控端口监听——异常）"
 
 # **每条告警规则必须显式指定收件人**（实测踩过）：Grafana 13 的 provisioned 规则
 # 不指定 notification_settings 时，`__grafana_receiver__` 落到 `empty` 收件人——
