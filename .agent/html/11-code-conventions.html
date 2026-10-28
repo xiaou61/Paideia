@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>11 · 代码规范 — Paideia 架构导读</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="nav.js"></script>
+
+<main>
+  <p class="kicker">11 / 工程规范</p>
+  <h1>写代码时的硬规矩</h1>
+  <p class="question"><strong>这页回答：</strong>我要加一个接口，哪些写法会在构建期被挡住？哪些不会报错、但半年后才咬人？</p>
+
+  <h2>先看一个具体场景</h2>
+  <p>你要加一个「批量导出学习记录」的接口。大概三十行代码：控制器一个方法、服务里查两张表、返回一个 CSV。</p>
+  <p>但在这三十行里，有五件事不是「风格偏好」，而是<b>写错了不会立刻报错</b>的：SQL 写在哪儿、时间用什么时区、跨模块怎么取别人家的数据、异常怎么抛、这个接口该挂哪个前缀。下面按「多久之后才会发现」排序。</p>
+
+  <h2>按「多久被发现」排序的规矩</h2>
+  <table>
+    <thead><tr><th>规矩</th><th>为什么</th><th>违反了多久被发现</th></tr></thead>
+    <tbody>
+      <tr><td><b>时间只存 UTC，由应用写</b></td><td>MySQL 会话时区是 <code>SYSTEM</code>（+08:00）；<code>DEFAULT CURRENT_TIMESTAMP</code> 也按会话时区算</td><td><b>8 小时后</b>，而且没人会觉得是时区问题</td></tr>
+      <tr><td><b>SQL 只写在 mapper 里</b></td><td>拼串就是把注入面写进代码；也让「这条 SQL 谁在用」无法检索</td><td>注入要等出事；其它情况 code review 当天</td></tr>
+      <tr><td><b>跨模块只许用公开契约</b></td><td>直接用别人的 <code>internal</code> 包，等于把两个模块焊死，改一个实现波及全仓</td><td><code>ModularityTest</code> 构建期就红</td></tr>
+      <tr><td><b>管理端接口挂 <code>&lt;模块&gt;/admin/**</code></b></td><td>只有这个形状能排在任何宽规则之前；换个写法会落到兜底，等于谁都能调</td><td><b>永远不会</b>，直到有人真去越权</td></tr>
+      <tr><td><b>前端每个页面必须有导航入口</b></td><td>有 URL 没入口 = 没上线；首页快捷卡不算，那排要往下滚</td><td><b>永远不会</b>，只会表现为「内容少了一大半」</td></tr>
+    </tbody>
+  </table>
+
+  <h3>一、数据库：三条不能商量的</h3>
+  <div class="rules">
+    <div class="rule rule--key">
+      <span class="n">1</span>
+      <span class="r">所有 SQL 只在 mapper 里</span>
+      <span class="r-why">Java 里不拼 SQL，也不把 mapper 的语句挪到 Service。<b>外键很少（见 07），所以「这张表谁在写」只能靠检索 mapper 来回答</b>；语句一旦散落在 Java 里，这个问题就答不了了。</span>
+    </div>
+    <div class="rule rule--key">
+      <span class="n">2</span>
+      <span class="r">时间一律应用写 UTC，不用 <code>NOW()</code> / <code>DEFAULT CURRENT_TIMESTAMP</code></span>
+      <span class="r-why">JDBC 连接串必须<b>同时</b>写 <code>connectionTimeZone=UTC</code> 与 <code>forceConnectionTimeZoneToSession=true</code>。少了后者就是「驱动按 UTC 解释、会话按本地时间写」，所有时间静默快 8 小时。</span>
+    </div>
+    <div class="rule rule--key">
+      <span class="n">3</span>
+      <span class="r">标识符小写 snake_case，主键自增</span>
+      <span class="r-why">避开保留字；自增主键是既定选型，MyBatis 用 <code>useGeneratedKeys</code> 取值，不自己生成 id。</span>
+    </div>
+  </div>
+
+  <h3>二、模块边界：构建期就挡住</h3>
+  <p>模块之间只许通过<b>公开契约接口</b>说话（<code>KnowledgeApi</code>、<code>AccountApi</code> 这类）。实现类放在 <code>internal</code> 子包里，跨模块引用会被 <code>ModularityTest</code> 判红。</p>
+  <p>这条规矩的真实收益是<b>改名不改调用方</b>：把 <code>EntryService</code> 拆成两个，只要契约没变，别的模块一行都不用动。代价是多一层接口——但只有一层。</p>
+
+  <div class="warn">
+    <b>它挡不住的情况：</b>你在同一个模块内部乱来，或者把契约接口写得跟实现一样宽（一个接口塞二十个方法）。边界靠构建守，<b>接口的粒度靠 review 守</b>。
+  </div>
+
+  <h3>三、错误与响应：HTTP 一个维度，业务码另一个维度</h3>
+  <figure>
+    <div class="d">
+      <div class="steps">
+        <span class="from">Service</span><span class="arrow">→</span><span class="to">异常</span><span class="what">抛 <code>BizException(ErrorCode.…)</code>，不抛裸 <code>RuntimeException</code></span>
+        <span class="from">异常</span><span class="arrow">→</span><span class="to">映射</span><span class="what"><code>GlobalExceptionHandler</code>：业务码 → HTTP 状态<small>映射必须穷尽；掉 <code>default</code> 会让 40200 变成 500</small></span>
+        <span class="from">映射</span><span class="arrow">→</span><span class="to">外壳</span><span class="what"><code>ApiResponseBodyAdvice</code> 统一包 <code>{code, data, message, traceId}</code></span>
+        <span class="from">路由</span><span class="arrow">→</span><span class="to">404</span><span class="what">未知路径必须显式 404<small>否则被 <code>Exception.class</code> 兜成 500，「路径写错」看起来像「服务端崩了」</small></span>
+      </div>
+    </div>
+    <figcaption><b>两个维度。</b>前端只认 <code>code</code>；运维只认 HTTP 状态码。两者都要对。</figcaption>
+  </figure>
+
+  <h3>四、技术选型带来的硬约束</h3>
+  <p>下面这几条不是偏好，是已经裁决过的选型，改它等于改架构：</p>
+  <ul>
+    <li><b>手写 MyBatis，禁止 MyBatis-Plus。</b>要用它的便利，就等于把「SQL 只在 mapper」这条一起放弃。</li>
+    <li><b>只用 MySQL，完全放开。</b>可以用 upsert、JSON 算子、<code>SKIP LOCKED</code>、全文检索。<b>代价是换库等于重写数据访问层</b>——这是明知并接受的。</li>
+    <li><b>不用 JDK 预览特性。</b>结构化并发在 JDK 25 仍是预览；构建开了 <code>--release</code> 就会红。</li>
+    <li><b>启动器名字变了。</b>Boot 4 里是 <code>spring-boot-starter-webmvc</code>，<code>@MockBean</code>/<code>@SpyBean</code> 已移除——照旧写法抄示例会编译不过。</li>
+    <li><b>AI 只走 AgentScope，不叠加 Spring AI。</b>且框架类型（<code>Msg</code>、<code>ChatUsage</code>）不得渗进业务代码，必须收在 <code>ai</code> 模块的端口之后。</li>
+  </ul>
+
+  <h3>五、前端：三条跟「别让用户找不到 / 别让样式分叉」有关</h3>
+  <ul>
+    <li><b>每条用户可见路由都要有导航入口</b>（导航栏或账号菜单），并同步给 <code>@paideia/identity</code> 的 <code>preferredNav</code> 补 key——那是联合字面量，不加会编译不过。这是唯一一处「让编译期帮你记住产品完整性」的地方。</li>
+    <li><b>主题令牌只有一份</b>，在 <code>@paideia/ui</code>。管理端与学习者端共用，否则两套颜色迟早分叉。</li>
+    <li><b>Tailwind 的 <code>@source</code> 要指向全部包</b>。指错目录不会报错，只会静默缺样式——页面能开、类名没生效。</li>
+  </ul>
+
+  <h2>写注释的唯一判据</h2>
+  <p>只写代码本身表达不出来的东西：<b>为什么这么写</b>、约束是什么、踩过什么坑。不要写「这里在做什么」——下一行代码已经说了。</p>
+  <p>反面例子在 <code>SecurityConfiguration</code> 里有一堆正面对照：每条 <code>/admin/**</code> 规则上面都写着「必须排在谁之前，写反会怎样」。那种注释是资产，因为它记录了一个不出现在类型系统里的约束。</p>
+
+  <h2>自查清单（提交前三十秒）</h2>
+  <div class="notes">
+    <ul>
+      <li>新表 / 新列 → 迁移是 14 位时间戳？只建结构？种子数据进 <code>devdata</code>？</li>
+      <li>新端点 → 挂对了前缀？管理端是 <code>&lt;模块&gt;/admin/**</code>？</li>
+      <li>新页面 → 导航里有入口？<code>preferredNav</code> 补了 key？</li>
+      <li>新 SQL → 在 mapper 里？没有字符串拼接？</li>
+      <li>新时间字段 → 应用写、UTC、两个 JDBC 参数都在？</li>
+      <li>跨模块调用 → 走的是公开契约，不是 <code>internal</code>？</li>
+      <li>改了模块边界 / 表 / 部署 → <code>docs/architecture/</code> 的图在同一个提交里改了吗？</li>
+    </ul>
+  </div>
+
+  <div class="notes">
+    <h2>权威清单在哪</h2>
+    <ul class="paths">
+      <li><code>AGENTS.md</code> — 协作节奏、提交、测试、迁移、部署、保密</li>
+      <li><code>.agent/rules/always.md</code> — 常驻 MUST、技术选型（D-01…D-14）与它们的理由</li>
+      <li><code>.agent/notes/dev-workflow.md</code> — 实测数字、踩过的坑、每条的来历</li>
+      <li><code>docs/architecture/README.md</code> — 架构图的两类约定与已知限制</li>
+    </ul>
+  </div>
+
+  <div class="warn">
+    <b>这页是导读，不是清单本身。</b>规则的权威副本在上面的文件里；这页只解释它们为什么存在。两者冲突时以文件为准，并回头修这页。
+  </div>
+</main>
+
+</body>
+</html>

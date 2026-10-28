@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>14 · 文档与决策纪律 — Paideia 架构导读</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="nav.js"></script>
+
+<main>
+  <p class="kicker">14 / 工程规范</p>
+  <h1>文档与决策纪律</h1>
+  <p class="question"><strong>这页回答：</strong>什么改动要建工作项？被推翻的决定记在哪？为什么文档一定会过期，怎么让它过期得能被发现？</p>
+
+  <h2>先看一个具体场景</h2>
+  <p>你想把「记忆」拆成按身份分开的两份。</p>
+  <p>这不是一个改文件的事：它改的是数据归属、影响注销语义、还可能推翻半年前的一条裁决。这类改动如果只在提交信息里说一句，半年后没人知道为什么变成了这样，也不知道当时否掉了什么方案。</p>
+  <p>所以这个仓库把「想清楚」这一步也变成有产出的东西——工作项与决策记录。</p>
+
+  <h2>三种规模的改动，三种处理</h2>
+  <table>
+    <thead><tr><th>改动的规模</th><th>做什么</th><th>产出物</th></tr></thead>
+    <tbody>
+      <tr><td><b>低风险、边界清楚的单文件</b></td><td>确认目标 → 改 → 窄验证</td><td>不建工作项</td></tr>
+      <tr><td><b>需要持久追踪、多人协作或有明显风险</b></td><td>建 <code>WORK-*</code>，走四件工件与签署</td><td><code>.agent/changes/WORK-编号-中文名/</code></td></tr>
+      <tr><td><b>影响长期做法的规则</b></td><td>更新 <code>.agent/rules/always.md</code></td><td>规则文件本身；<b>不是</b>只写进某个工作项</td></tr>
+    </tbody>
+  </table>
+
+  <p><b>第三行是最容易被忽略的。</b>一条规则如果只写在工作项里，那个工作项完成之后就没人再读它了。<b>与本节同等长期有效的规则变更，必须更新规则文件</b>——这是写在 <code>always.md</code> 末尾的元规则。</p>
+
+  <h3>工作项解决的是什么问题</h3>
+  <p>不是「留个记录」，而是<b>在动手之前把不确定的东西问出来</b>：需求边界、接口形状、数据影响、验证方式。四件工件（需求 / 方案 / 设计 / 任务）各自回答一段，签署之后才算数。</p>
+  <p>它的另一面是硬依赖：<b>没完成的前置项会真的挡住实现与验收</b>。范围、接口、数据、安全、部署、架构发生重大变化时，要回到最早受影响的那件工件重来——而不是在任务列表里加一行。</p>
+
+  <div class="warn">
+    <b>一个真实的反面教材：</b>工作项被「批准」之后又追加了六项范围，结果四件工件全部退回草稿。批准不是终点，<b>范围变了就回到签字那一步</b>。
+  </div>
+
+  <h2>决策记录：写「不做什么」比写「做什么」更重要</h2>
+  <p>技术选型编号到 D-14，每条都写在 <code>always.md</code> 里，带理由与代价。读这套东西时最有价值的部分往往不是选了什么，而是<b>否掉了什么、为什么否</b>：</p>
+
+  <div class="d">
+    <div class="rules">
+      <div class="rule"><span class="n">→</span><span class="r">Tauri → Electron</span><span class="r-why">Tauri 要 Rust + MSVC，开发机两者都没有；换 Electron 后立刻能构建。代价：安装包与内存显著变大，明知并接受。</span></div>
+      <div class="rule"><span class="n">→</span><span class="r">纯 BYOK → 平台凭据 + 积分</span><span class="r-why">BYOK 把「注册 → 能用」变成四步，还要自己做密钥管理；改成平台出钱后注册即可用，代价是自己做配额、计价、欠费防护。</span></div>
+      <div class="rule"><span class="n">→</span><span class="r">自研流式渲染 → 现成方案</span><span class="r-why">自研要维护逐前缀等价的语料与测试；现成方案把公式、mermaid 块、按钮块都当一等公民。代价是体积与升级节奏。</span></div>
+      <div class="rule"><span class="n">→</span><span class="r">记忆按身份切 → 一份全属于用户</span><span class="r-why">按身份切就表达不出「跨身份生效」，也会在切换时丢失上下文。<b>撤销的裁决也要记，否则会被人再提一次。</b></span></div>
+    </div>
+  </div>
+
+  <h2>图与文档：能生成就别手写</h2>
+  <p>这是唯一一条「防止文档腐烂」的机制，判据只有一个：<b>这个答案能不能从代码里抽出来？</b></p>
+  <ul>
+    <li><b>能</b>（模块依赖、前端包、表清单、端点清单）→ <b>脚本生成</b>，不许手画。模型凭印象复述一定会漏会错，而且错得很像真的。</li>
+    <li><b>不能</b>（请求链路、时序、状态机、部署拓扑）→ 手写，但要在同一个提交里跟着代码改。</li>
+    <li><b>两类都不能的</b>（对外演示的漂亮图）→ 用画布工具，<b>但不放进这份存档</b>——它没有 diff，一年后必然过期且没人敢碰。</li>
+  </ul>
+  <p>生成的那几张图有两条自检：<code>node scripts/gen-arch-diagram.mjs --check</code> 比对声明与事实，<code>node scripts/check-diagrams.mjs</code> 校验语法。手写的那几张没有工具能守，<b>只有「同一个提交里改图」这一条管得住</b>。</p>
+
+  <div class="notes">
+    <ul>
+      <li><b>标了「由脚本生成」的文件不要手改。</b>手改会让 <code>--check</code> 失败，那是刻意的：那张图必须等于事实。</li>
+      <li><b>改了模块边界、外部依赖、表结构或部署拓扑</b>，在同一个提交里改对应的图。</li>
+      <li><b>图里不写地址、端口映射到主机、凭据。</b>公开仓库，图也会被检索到。</li>
+      <li><b>本页这种导读是第二手材料。</b>数字来自生成脚本，和代码不一致时以代码为准，然后回来改这页。</li>
+    </ul>
+  </div>
+
+  <h2>文档为什么会过期，以及怎么让它过期得能被发现</h2>
+  <p>规律很简单：<b>写进文档的「事实」一定会漂移，「判断」不会。</b></p>
+  <table>
+    <thead><tr><th>写什么</th><th>会不会漂</th><th>对策</th></tr></thead>
+    <tbody>
+      <tr><td>模块数、包数、表数、端点数</td><td><b>会</b>，加一个迁移就变</td><td>脚本生成 + <code>--check</code>；手写页面里注明「以代码为准」</td></tr>
+      <tr><td>接好的库、端口、部署形态</td><td><b>会</b>，改一次配置就变</td><td>写进 <code>always.md</code> 并标注日期；实测数字放 <code>dev-workflow.md</code></td></tr>
+      <tr><td>为什么这么设计、代价是什么</td><td><b>不会</b></td><td>这才是文档真正的价值，值得写具体</td></tr>
+      <tr><td>踩过的坑</td><td>不会</td><td>连同「当时怎么发现的」一起写，否则下次还会踩</td></tr>
+    </tbody>
+  </table>
+
+  <h2>这套东西的成本，写在明面上</h2>
+  <ul>
+    <li><b>建工作项有摩擦。</b>所以低风险单文件改动不建；判断标准是「要不要有人批准、会不会影响数据或接口」。</li>
+    <li><b>四件工件对很小的改动是过重的。</b>接受这个过度，是因为省下来的「想清楚」往往会在实现到一半时加倍收回来。</li>
+    <li><b>规则文件会变长。</b>长到没人读的时候，唯一的解法是让它更短、更具体，而不是再加一节。</li>
+  </ul>
+
+  <h2>自查清单</h2>
+  <div class="notes">
+    <ul>
+      <li>这次改动会不会影响别人？需要签字的就建工作项，别硬上。</li>
+      <li>这是一条长期规则吗？→ 更新 <code>always.md</code>，不是只写在任务里。</li>
+      <li>推翻了旧决定吗？→ 把「撤销」也写下来，否则会被人再提一次。</li>
+      <li>动了边界 / 表 / 部署？→ 图在同一个提交里吗？<code>--check</code> 跑了吗？</li>
+      <li>文档里写的是数字还是判断？数字给了来源吗？</li>
+    </ul>
+  </div>
+
+  <div class="notes">
+    <h2>权威清单在哪</h2>
+    <ul class="paths">
+      <li><code>.agent/rules/always.md</code> — 常驻 MUST 与 D-01…D-14</li>
+      <li><code>.agent/changes/</code> — 全部工作项与它们的四件工件</li>
+      <li><code>.agent/INDEX.md</code> — 按模块导航：代码在哪、依据在哪、验证在哪</li>
+      <li><code>.agent/history/updates.md</code> — 每次实际修改的变更 / 决策 / 依据 / 验证</li>
+      <li><code>docs/architecture/README.md</code> — 两类图的约定与已知限制</li>
+    </ul>
+  </div>
+</main>
+
+</body>
+</html>

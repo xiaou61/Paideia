@@ -77,6 +77,11 @@ body {
 .sidebar a.on { background: var(--card); color: var(--fg); font-weight: 600; box-shadow: inset 2px 0 0 var(--accent); }
 .sidebar a .num { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 1.4em; }
 .sidebar a.on .num { color: var(--accent); }
+.sidebar .nav-group {
+  margin: 16px 10px 4px;
+  font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--muted); font-weight: 600;
+}
 
 /* ── 正文 ───────────────────────────────────────────── */
 main { max-width: 1040px; padding: 44px 36px 140px; }
@@ -164,12 +169,12 @@ figcaption b { color: var(--fg); font-weight: 600; }
 .layer-body { display: flex; gap: 10px; flex-wrap: wrap; }
 
 /* 判定阶梯（时序 / 规则顺序） */
-.steps { display: grid; grid-template-columns: 92px 20px 108px minmax(0, 1fr); align-items: stretch; }
+.steps { display: grid; grid-template-columns: 112px 18px 104px minmax(0, 1fr); align-items: stretch; }
 .steps > span { padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; line-height: 1.5; }
 .steps > span:nth-last-child(-n + 4) { border-bottom: 0; }
-.steps .from { color: var(--muted); text-align: right; padding-right: 6px; }
+.steps .from { color: var(--muted); text-align: right; padding-right: 6px; overflow-wrap: anywhere; }
 .steps .arrow { color: var(--accent); text-align: center; }
-.steps .to { font-weight: 600; }
+.steps .to { font-weight: 600; overflow-wrap: anywhere; }
 .steps .what { padding-left: 8px; }
 .steps .what small { display: block; color: var(--muted); font-size: 12.5px; }
 .steps .fail .what, .steps > .what.fail { color: #b45309; }
@@ -225,7 +230,7 @@ figcaption b { color: var(--fg); font-weight: 600; }
 
 /* ── 表格 ───────────────────────────────────────────── */
 table { width: 100%; border-collapse: collapse; margin: 18px 0 26px; font-size: 14.5px; }
-th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
 th { font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
 tbody tr:hover { background: var(--card); }
 

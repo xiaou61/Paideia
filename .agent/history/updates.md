@@ -7348,3 +7348,19 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：`node .agent/html/render-check.mjs` → 11 页 × 两个宽度 / 0 失败；`rg mermaid .agent/html` 仅剩产品渲染器的一句描述
 - 本地提交：本轮单独提交
 - 远端推送：未执行
+
+## 2026-10-28 11:55:00 +0800 · 架构导读新增工程规范四页（11–14）
+
+- 类型：docs
+- 变更：
+  - 新增 `.agent/html/11-code-conventions.html`：按「违反了多久被发现」排序的硬规矩（时间只存 UTC/两个 JDBC 参数、SQL 只在 mapper、跨模块只走公开契约、管理端前缀、前端必须有导航入口），附技术选型带来的硬约束与提交前自查清单
+  - 新增 `12-testing.html`：三环的实测预算、四条「证据」定义（独占测试库 / 看 Skipped 列 / 不用 H2 / 反向验证）、四道守卫、接口自查的两个必做动作与五个坑
+  - 新增 `13-commit-review-release.html`：提交/推送/部署三种授权、worktree 与磁盘占用、提交前扫暂存区（公开仓库与并发会话的真实事故）、评审三条口径、增量发版全流程
+  - 新增 `14-docs-and-decisions.html`：三种改动规模、工作项与「撤销的裁决」、两类图的判据、文档漂移的规律与对策
+  - `nav.js` 加分组标题「工程规范」与四条入口（15 页）；`index.html` 拆成「系统怎么跑 / 代码怎么写」两段；`render-check.mjs` 导航数 11 → 15
+  - `style.css` 修两处溢出：`.steps` 长名（如 `MigrationVersionFormatTest`）溢出列宽、表格长 code 不换行
+- 决策：规范页不照抄清单，每页按「规则 → 为什么 → 违反了多久被发现」写，并指向 `AGENTS.md` / `.agent/rules/always.md` / `dev-workflow.md` 作权威副本——避免第二份会漂移的规范
+- 依据：`AGENTS.md`、`.agent/rules/always.md`、`.agent/notes/dev-workflow.md`、`.agent/notes/api-testing-standard.md` 的实际内容
+- 验证：`node .agent/html/render-check.mjs --shots` → 15 页 × 1440/1280 / 0 失败（无 console 错、无图溢出、侧栏 15 条、除 nav.js 无外部脚本）
+- 本地提交：本轮单独提交
+- 远端推送：未执行

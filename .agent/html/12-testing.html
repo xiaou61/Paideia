@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>12 · 测试规范 — Paideia 架构导读</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="nav.js"></script>
+
+<main>
+  <p class="kicker">12 / 工程规范</p>
+  <h1>什么才算「跑过了」</h1>
+  <p class="question"><strong>这页回答：</strong>改完一处，跑哪几条测试就够？为什么绿色的构建不能当证据？</p>
+
+  <h2>先看一个具体场景</h2>
+  <p>你修了一个「过期令牌没有返回 401」的 bug。跑了一遍测试，全绿，提交了。</p>
+  <p>问题是：<b>这遍绿说明了什么？</b>如果本来就没有一条测试覆盖那个分支，绿只能说明「原来的测试还认识这个代码」。所以这个仓库对「跑过了」有明确要求——不是「跑了一遍」，是<b>「改坏的时候它必须变红」</b>。</p>
+
+  <h2>三环：按固定开销，不按用例数量</h2>
+  <p><b>贵的不是用例，是每次运行的固定开销。</b>后端集成测试要连数据库、起上下文；纯函数测试跑完是 0.1 秒。所以内环的设计目标是「不启上下文、不进网络」。</p>
+
+  <table>
+    <thead><tr><th>环</th><th>什么时候跑</th><th>跑什么</th><th>预算（实测）</th></tr></thead>
+    <tbody>
+      <tr><td><b>内环</b></td><td>每改完一处</td><td><code>mvn -pl &lt;模块&gt; -am test -Dtest=&lt;类&gt;</code>；前端 <code>pnpm --filter &lt;包&gt; test</code></td><td>&lt; 30 秒</td></tr>
+      <tr><td><b>外环</b></td><td>一个切片收口（= 提交前）</td><td>非 app 全模块（88 秒 / 410 条）+ 四个守卫类（46 秒 / 9 条）+ 前端 typecheck/test + <b>改动那一端</b>的 e2e</td><td>&lt; 4 分钟</td></tr>
+      <tr><td><b>全量</b></td><td>交接 / 改跨模块契约 / 改 schema / 发版带 <code>-WithTests</code></td><td>后端全量 <code>-T 1C</code> + 对应端 e2e</td><td>&lt; 5 分钟</td></tr>
+    </tbody>
+  </table>
+
+  <div class="warn">
+    <b>没有「发布前」这一档。</b>这个项目上线就是随手跑一次部署脚本，不存在「攒批次、一次跑全量」的节点。所以不要把任何检查挂在一个虚构的阶段上——那只会变成永远不跑。
+  </div>
+
+  <h3>e2e：先选文件，别默认全量</h3>
+  <p>学习者端全量是 <b>61 条 / 2 分 36 秒</b>，但<b>单条边际成本只有约 2.4 秒</b>、固定启动约 20 秒——所以跑一个文件是 <b>13–54 秒</b>，全量是 156 秒。三种选法：</p>
+  <ul>
+    <li><code>playwright test e2e/&lt;名字&gt;.spec.ts</code> —— 改哪个页面就跑对应文件</li>
+    <li><code>playwright test --grep "&lt;片段&gt;"</code> —— 只验一条路径，实测 13 秒</li>
+    <li><code>playwright test --last-failed</code> —— 修完失败只重跑失败的</li>
+  </ul>
+  <p>三端全量只在<b>动了共享包</b>（<code>@paideia/ui</code> / <code>core</code> / <code>auth</code> / <code>knowledge</code>）或发版前跑。</p>
+
+  <h2>四条「证据」的定义</h2>
+  <div class="rules">
+    <div class="rule rule--key">
+      <span class="n">1</span>
+      <span class="r">必须用独占的测试库，共用库跑出来的红不是缺陷</span>
+      <span class="r-why">任何碰数据库的验证都走 <code>scripts/test-db.sh</code>。它给这一轮分配 <code>paideia_run_&lt;时间&gt;_&lt;pid&gt;</code>，成功自动删、失败保留库名并打印。同机可能有别的会话在跑，共用库会互相删数据——造出「单类全绿、全量报红」那种红，<b>它既不是产品缺陷，也不能当证据</b>。</span>
+    </div>
+    <div class="rule rule--key">
+      <span class="n">2</span>
+      <span class="r">看结果先看 Skipped 列</span>
+      <span class="r-why">没配数据库口令时，集成测试是<b>跳过而不是失败</b>，<code>BUILD SUCCESS</code> 照样成立——曾经有一次「115 条测试全绿」其实是 115 条一条没跑。这个坑在这个项目里被记过两次。</span>
+    </div>
+    <div class="rule rule--key">
+      <span class="n">3</span>
+      <span class="r">不用 H2 替代 MySQL</span>
+      <span class="r-why">项目完全放开 MySQL 专有特性：upsert、JSON 列与算子、<code>SKIP LOCKED</code>、全文检索。这些在 H2 上要么没有、要么行为不同——用 H2 跑绿了，等于证明了一份不存在的兼容性。</span>
+    </div>
+    <div class="rule rule--key">
+      <span class="n">4</span>
+      <span class="r">修 bug 要做反向验证</span>
+      <span class="r-why">先把修复临时改回坏的样子，确认新测试<b>确实变红</b>，再改回来。没做这一步，你得到的只是一条「能通过」的测试，而不是「能发现这个 bug」的测试。</span>
+    </div>
+  </div>
+
+  <h3>四道守卫：它们替你记住容易忘的事</h3>
+  <figure>
+    <div class="d">
+      <div class="steps">
+        <span class="from">ModularityTest</span><span class="arrow">→</span><span class="to">模块边界</span><span class="what">跨模块引用 <code>internal</code> 包、循环依赖 → 构建红</span>
+        <span class="from">MigrationVersionFormatTest</span><span class="arrow">→</span><span class="to">迁移命名</span><span class="what">纯数字号、同秒重复 → 构建红<small>并行会话抢同一个版本号会让应用直接起不来</small></span>
+        <span class="from">MigrationSeedOverlapTest</span><span class="arrow">→</span><span class="to">迁移污染种子</span><span class="what">往种子表插行却不给 id（或 &lt; 900）→ 构建红</span>
+        <span class="from">ApiSurfaceTest</span><span class="arrow">→</span><span class="to">接口声明</span><span class="what">端点没标 <code>@ApiAccess</code>、用 <code>@RequestMapping</code> 不写 <code>method</code> → 红</span>
+        <span class="from">ApiContractTest</span><span class="arrow">→</span><span class="to">授权真伪</span><span class="what">声明 ADMIN 却真能匿名调 → 红<small>抓过一次真实越权</small></span>
+      </div>
+    </div>
+    <figcaption><b>四道守卫全部是「不报错但会出事」的那一类。</b>它们的价值在于把「靠自觉」变成「构建失败」。</figcaption>
+  </figure>
+
+  <h3>接口变了必须做的两件事</h3>
+  <ol>
+    <li><b>标 <code>@ApiAccess</code></b>（在控制器类或方法上）。不标 → <code>ApiSurfaceTest</code> 红；标错 → <code>ApiContractTest</code> 红（它真的会去发请求，验证声明的 ADMIN 确实 403）。</li>
+    <li><b>在 <code>ApiWalkthroughTest</code> 里加一段真实调用</b>。不加 → 覆盖断言红，并且点名是哪条端点没被打到。</li>
+  </ol>
+  <p>跑完会更新响应结构快照 <code>src/test/resources/api-shape.json</code>。<b>改字段（改名 / 增删 / 改类型）</b>时快照会红并逐条列差异；确认是有意变更后，用 <code>-Dapi.shape.update=true</code> 重新生成，<b>review 那份 diff</b> 再提交。</p>
+
+  <h2>测试里最容易骗自己的两件事</h2>
+  <ul>
+    <li><b>用桩把真问题盖住。</b>把上游端口桩掉之后，「每轮都调一次上游、但只上报最后一轮 token」这种缺陷永远不会被发现——测试证明的是分支走对了，不是账记对了。</li>
+    <li><b>把「当前是错的」写成绿的。</b>掌握度算法有一条测试，断言的是「信息增益目前低于随机」——它是<b>如实记录缺陷</b>，不是认可那个行为。写这种测试时必须在测试名或注释里说清楚：它保护的是「知道这件事」，不是「就这样吧」。</li>
+  </ul>
+
+  <h2>并发会话：两件必须各占一份的东西</h2>
+  <div class="rules">
+    <div class="rule">
+      <span class="n">1</span>
+      <span class="r">数据库：每个会话一个独占库</span>
+      <span class="r-why">由 <code>test-db.sh</code> 自动分配，不要手工指定共用库。</span>
+    </div>
+    <div class="rule">
+      <span class="n">2</span>
+      <span class="r">端口：<code>PAIDEIA_BACKEND_PORT</code> / <code>PAIDEIA_APP_PORT</code> / <code>PAIDEIA_ADMIN_PORT</code></span>
+      <span class="r-why">不覆盖的话，e2e 的 <code>reuseExistingServer</code> 会<b>静默复用别人的服务</b>——测试是绿的，但打的是别人的进程和别人的库。</span>
+    </div>
+  </div>
+
+  <h2>接口自查：二十秒走一遍</h2>
+  <p><code>ApiWalkthroughTest</code> 是一个手动跑的端到端自查：自己注册账号、把 69 步（覆盖 62 个端点）走一遍、注销收尾、比对结构快照，并在 <code>.agent/testing/runs/</code> 留一份报告。它不改部署脚本、不接 CI。</p>
+  <p>五个已经踩到的坑，读一遍能省半天：</p>
+  <ul>
+    <li><code>RequestMappingHandlerMapping</code> 有<b>两个</b> Bean（Actuator 也注册了一个），注入必须带 <code>@Qualifier</code>。</li>
+    <li>业务端点<b>不要</b>用不写 <code>method</code> 的 <code>@RequestMapping</code>：它会响应所有动词，按方法枚举的检查会静默跳过它。</li>
+    <li>附件接口<b>按字节嗅探类型</b>，白名单是 png / jpeg / gif / webp / pdf。</li>
+    <li><b>注销后 access 令牌仍可用</b>（到期才失效）——断言「立刻 401」是错的。</li>
+    <li>共用测试库会与 e2e 的 <code>devdata</code> 漂移，表现为 Flyway checksum mismatch。自查请用独立库。</li>
+  </ul>
+
+  <h2>自查清单</h2>
+  <div class="notes">
+    <ul>
+      <li>跑的是 <code>scripts/test-db.sh</code> 吗？Skipped 是 0 吗？</li>
+      <li>新逻辑有测试吗？修 bug 做了反向验证吗？</li>
+      <li>新端点标了 <code>@ApiAccess</code>、加进了 <code>ApiWalkthroughTest</code> 吗？快照 diff 看过吗？</li>
+      <li>改了共享包，跑的是三端 e2e 而不是一个文件吗？</li>
+      <li>并发会话下，端口和库都是自己的吗？</li>
+    </ul>
+  </div>
+
+  <div class="notes">
+    <h2>权威清单在哪</h2>
+    <ul class="paths">
+      <li><code>AGENTS.md</code> 的「测试」与「节奏」</li>
+      <li><code>.agent/notes/dev-workflow.md</code> 的「测试节奏」「实测基线」「接口自查」</li>
+      <li><code>.agent/notes/api-testing-standard.md</code> — 接口测试的标准与边界</li>
+      <li><code>.agent/testing/runs/</code> — 每次自查的报告</li>
+      <li><code>scripts/test-db.sh</code> — 独占库的唯一入口</li>
+    </ul>
+  </div>
+</main>
+
+</body>
+</html>

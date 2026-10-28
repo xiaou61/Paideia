@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>13 · 提交、评审与发布 — Paideia 架构导读</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="nav.js"></script>
+
+<main>
+  <p class="kicker">13 / 工程规范</p>
+  <h1>提交、评审与发布</h1>
+  <p class="question"><strong>这页回答：</strong>什么时候该提交？哪些事要单独授权？一次发版实际发生了什么？</p>
+
+  <h2>先看一个具体场景</h2>
+  <p>你改完了一个切片：后端三处、前端一处，测试跑绿了。接下来有三件不同的事——<b>提交</b>、<b>推送</b>、<b>部署</b>。它们不是一回事，授权也不同。</p>
+
+  <table>
+    <thead><tr><th>动作</th><th>谁决定</th><th>粒度</th><th>失败/后悔的代价</th></tr></thead>
+    <tbody>
+      <tr><td><b>本地提交</b></td><td>改完一轮能独立验证的工作就提交</td><td>一个切片一次</td><td>可改、可 reset，代价最小</td></tr>
+      <tr><td><b>推送</b></td><td><b>必须单独授权</b></td><td>一次明确的指认</td><td>公开仓库，提交即公开</td></tr>
+      <tr><td><b>部署</b></td><td><b>必须单独授权</b></td><td>一条命令</td><td>线上中断；可回滚但有损</td></tr>
+    </tbody>
+  </table>
+
+  <h3>为什么提交要切小</h3>
+  <p>这个仓库可能<b>同时有多个会话在改同一个工作区</b>。攒着不提交，会让「哪些改动属于谁」变得不可判定，也让误操作的回退范围变大。分笔提交把回退粒度压到一轮——出问题时你能只扔掉那一轮。</p>
+  <p>同时这也是一条工程纪律的另一面：<b>不要用一个「顺手改」把无关文件卷进本次提交</b>。提交时说得出「这一笔在做什么」；说不出来就该拆。</p>
+
+  <h3>并发会话：一个会话一棵树</h3>
+  <figure>
+    <div class="d">
+      <div class="flow">
+        <div class="box">主树保持 <code>master</code><small>只用于 review、落库、部署</small></div>
+        <div class="link"></div>
+        <div class="box box--svc">每个会话开自己的树<small><code>git worktree add .worktrees/&lt;名字&gt; -b &lt;分支&gt;</code></small></div>
+        <div class="link"></div>
+        <div class="box">互不踩 <code>target/</code>、<code>node_modules</code>、工作区状态<small>并行 e2e 还要各占一组端口</small></div>
+        <div class="link"></div>
+        <div class="box box--fail">合并后必须删<small>没有任何机制会自动回收</small></div>
+      </div>
+    </div>
+    <figcaption><b>代价是磁盘，不是内存。</b>只 checkout 约 5 MB（<code>.git</code> 共享）；跑过后端测试 +100 MB；跑过 <code>pnpm install</code> +814 MB——一棵真用起来的树接近 1 GB。</figcaption>
+  </figure>
+
+  <h2>提交前必须做的一件事：扫一遍暂存区</h2>
+  <div class="warn">
+    <b>这不是形式主义，是发生过的事故。</b>本仓库是公开仓库：一旦凭据进入 Git 历史，删文件不解决问题（历史、fork、缓存仍可检索），<b>只有轮换凭据才算处理完</b>。而且并发会话会把你的工作区改动卷进它的 <code>git add</code>——所以不能只扫自己写的文件，要扫 <code>git diff --cached</code>。
+  </div>
+  <ul>
+    <li>禁止进入任何被跟踪文件：凭据、密钥、令牌、密码、私钥、连接串、服务器地址。包括源码、配置、文档、<code>.agent/</code> 工件、更新历史、提交信息、Issue 与 PR 正文。</li>
+    <li>本地敏感配置放<b>被忽略</b>的文件（<code>.env.local</code>、<code>application-local.yml</code>、<code>*.local.*</code>），仓库里只留占位示例。</li>
+    <li>引用密钥只写环境变量名，不写值。</li>
+  </ul>
+
+  <h2>评审：按区间，不按 commit</h2>
+  <p>审查用 <code>ocr</code>，由人发起，<b>不装钩子、不接 CI</b>——避免每个 commit 都消耗模型额度。三条口径：</p>
+  <div class="rules">
+    <div class="rule rule--key">
+      <span class="n">1</span>
+      <span class="r">审区间，不逐 commit</span>
+      <span class="r-why">逐 commit 会重复计费，而且拆碎的提交单独看会丢掉完整意图、产生误报。</span>
+    </div>
+    <div class="rule rule--key">
+      <span class="n">2</span>
+      <span class="r">只修 critical 与 high</span>
+      <span class="r-why">medium / low <b>不修、也不积压</b>。报告仍然全量归档——它是证据，与「改哪些」是两件事。</span>
+    </div>
+    <div class="rule rule--key">
+      <span class="n">3</span>
+      <span class="r">运维与一次性脚本不进审查范围</span>
+      <span class="r-why">排除 <code>deploy/**</code>、<code>scripts/**</code>、<code>*.ps1</code>、<code>*.sh</code>、<code>*.py</code>、<code>*.mjs</code>。一次实测里 84 条 high 有三成落在这类文件上，人肉筛掉每次都要重做。<code>content/</code> 不在排除清单里。</span>
+    </div>
+  </div>
+  <p>报告写到 <code>.agent/reviews/&lt;YYYY-MM-DD&gt;-&lt;范围&gt;.md</code> 并随仓库提交。报告里只记范围、结论与证据，<b>不回显 provider / api_key 之类的配置</b>。</p>
+
+  <h2>发版：一条命令，只传差异</h2>
+  <figure>
+    <div class="d">
+      <div class="flow">
+        <div class="box">本地构建 jar</div>
+        <div class="link"></div>
+        <div class="box">解包 <code>exploded/</code>，算清单<small>自家文件 SHA-256；依赖按「同名 + 同大小」判断</small></div>
+        <div class="link"></div>
+        <div class="box box--svc">与服务器清单比对，只传差异<small>82 MB 的 jar 里自家代码只有 1.4 MB</small></div>
+        <div class="link"></div>
+        <div class="box box--data">服务器覆盖后用 <code>jar c0fm</code> 重打包</div>
+        <div class="link"></div>
+        <div class="box">重启单元，探活 <code>/actuator/health</code></div>
+        <div class="link"></div>
+        <div class="box box--you">纯后端约 60 秒；前端有改动才多那 80 秒</div>
+      </div>
+    </div>
+    <figcaption><b>增量发版。</b>全量传 82 MB 约 20 分钟；现在纯后端一次不到一分半。</figcaption>
+  </figure>
+
+  <div class="notes">
+    <ul>
+      <li><b><code>jar c0fm</code> 不是 <code>jar cfm</code>。</b>少了那个 <code>0</code>，嵌套 jar 会被 deflate，Boot 4 直接起不来——真断过六分钟。这是发版链路上最贵的一个字符。</li>
+      <li><b>别用 <code>pnpm -r build</code> 发版。</b>它会把 Electron 桌面壳一起打（首次还要下载 Electron），近二十分钟。前端没改时脚本本来就会跳过。</li>
+      <li><b><code>exploded/</code> 与 <code>exploded.manifest</code> 由脚本维护</b>，不要手工删；删了下次退化成全量传输。</li>
+      <li><b>没有「发布」这个节点。</b>改完随手部署即可，不需要攒批次——所以也不要把检查挂在一个虚构的「发布前」阶段上。</li>
+      <li><b>回滚有损。</b>增量发版是覆盖式的，回滚要重新走一遍旧版本；数据库迁移不自动回退。</li>
+    </ul>
+  </div>
+
+  <h2>每次实际修改都要留一行</h2>
+  <p>改完追加 <code>.agent/history/updates.md</code>：变更、决策、依据、验证、本地提交边界、远端推送状态。它不是流水账——<b>半年后「这条规则为什么存在」的答案在这里</b>，而不在提交标题里。</p>
+  <p>写的时候注意一条：<b>heredoc 里有反引号时要用 <code>&lt;&lt;'EOF'</code>（带引号）</b>，否则反引号会被当命令替换执行，内容静默丢失。</p>
+
+  <h2>自查清单</h2>
+  <div class="notes">
+    <ul>
+      <li>这一笔说得清「在做什么」吗？无关文件被卷进来了吗？</li>
+      <li><code>git diff --cached</code> 扫过凭据了吗？</li>
+      <li>并发会话在工作区里时，我提交的路径是显式列出来的吗？</li>
+      <li>是推送/部署吗？——<b>有单独授权吗？</b></li>
+      <li><code>updates.md</code> 追加了吗？</li>
+    </ul>
+  </div>
+
+  <div class="notes">
+    <h2>权威清单在哪</h2>
+    <ul class="paths">
+      <li><code>AGENTS.md</code> — 「节奏」与「保密规则」两节</li>
+      <li><code>.agent/rules/always.md</code> — 提交授权、审查工具与报告归档</li>
+      <li><code>.agent/notes/dev-workflow.md</code> — 发版耗时拆解、工作树磁盘占用</li>
+      <li><code>scripts/release.ps1</code> — 发版全流程</li>
+      <li><code>.agent/history/updates.md</code> — 每条规则与每次变更的来历</li>
+    </ul>
+  </div>
+</main>
+
+</body>
+</html>
