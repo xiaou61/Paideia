@@ -122,7 +122,7 @@
     <ul>
       <li><b>复习会话的答案绝不下发。</b><code>review_sessions.items_json</code> 里带着答案与解析，响应由服务端裁剪成 <code>itemId / 题干 / 选项</code>。把整行 JSON 直接返回是最容易犯的错。</li>
       <li><b>复习出题要花钱。</b>它走 AI 出题 + 积分预留结算，和对话同一条账务管线。</li>
-      <li><b>这些表没有外键。</b>删用户时靠 <code>KnowledgeUserDeletionListener</code> 的表清单级联，漏一张就是隐私事故（见 <a href="10-trust-boundary.html">10</a> 的「注销」一节）。</li>
+      <li><b>这些表没有外键。</b>删用户时靠 <code>KnowledgeUserDeletionListener</code> 的表清单级联，漏一张就是隐私事故（见 <a href="11-trust-boundary.html">11</a> 的「注销」一节）。</li>
       <li><b>统计以「最后一次写入」为准。</b>并发作答时不做合并，这是简化，写在设计文档里。</li>
     </ul>
   </div>

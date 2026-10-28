@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10 · AIOps 自诊断 — Paideia 架构导读</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="nav.js"></script>
+
+<main>
+  <p class="kicker">10 / 自诊断</p>
+  <h1>系统自己写事故报告</h1>
+  <p class="question"><strong>这张图回答：</strong>凌晨 nobody 在看，服务器出问题怎么被抓住？为什么最后交给人看的是一段结论，而不是一堆曲线？</p>
+
+  <h2>先看一个具体场景</h2>
+  <p>凌晨一点，某个接口错误率上升。没人盯着屏幕，是 <b>SLO 燃尽率</b>先叫的——它算的不是「现在错误率多少」，而是「按这个速度烧，本月的可用性预算还能撑几天」。</p>
+  <p>告警打进应用，生成一条事件。诊断器去把指标、日志、链路和最近一次发版拼成一份「证据」，交给模型写结论。你早上打开管理端，看到的是一段人话：<b>哪个接口、从几点开始、最可能跟什么有关、还有什么没法确认</b>。</p>
+
+  <figure>
+    <div class="d">
+      <div class="flow">
+        <div class="box box--fail">凌晨 1 点：某个接口开始报错</div>
+        <div class="link"></div>
+        <div class="box">告警规则：按错误预算的消耗速度判断<small>不是简单看阈值超没超</small></div>
+        <div class="link"></div>
+        <div class="box box--svc">事件：按指纹去重，落一条 OPEN<small>同一告警不会刷出几十条</small></div>
+        <div class="link"></div>
+        <div class="box box--svc">取证：按固定目录拉指标 / 日志 / 链路 / 发版记录<small>拉不到的标「未知」，不假装没有</small></div>
+        <div class="link"></div>
+        <div class="box box--ext">模型：把证据写成结论<small>它只能看证据，不能自己发查询</small></div>
+        <div class="link"></div>
+        <div class="box box--data">落库：诊断记录 + 关联事件</div>
+        <div class="link"></div>
+        <div class="box box--you">你：早上打开管理端，读到结论</div>
+      </div>
+    </div>
+    <figcaption><b>从「有告警」到「有人话结论」是一条自动流水线。</b>但流水线的每一步都刻意不允许自由发挥。</figcaption>
+  </figure>
+
+  <h2>这里真正难的六件事</h2>
+
+  <h3>一、取证：查询是常量，不是模型现编的</h3>
+  <p>采集器里有一份<b>固定的指标目录</b>（目标是否可达、CPU、内存、磁盘、5xx 速率、慢请求……），每个名字绑定一条写死的 PromQL；日志也是一条写死的 LogQL。</p>
+  <div class="warn">
+    <b>这不是懒，是边界。</b>让模型自己写 PromQL 会同时引入三个问题：它可能编出不存在的指标名、查询会变成注入面、而且同一份证据每次都不一样——<b>诊断就无法复现</b>。所以「加一个新指标」是一次代码改动（在目录里加一行），而不是换一句提示词。
+  </div>
+  <p>降级策略同样重要：Prometheus 或 Loki 不可达时，<b>不让整次诊断失败</b>，而是把那一项标成 <code>UNKNOWN</code>。日志为空时写的是「无匹配日志（或 Loki 不可达）」——把不确定性如实交给模型，而不是让它以为自己看到了全部。</p>
+
+  <h3>二、告警去重：指纹只取稳定标签</h3>
+  <p>一条告警带着几十个标签，但指纹只取其中稳定的几个（告警名、级别、实例、job、挂载点、服务……）。同一指纹<b>同时只能有一个 OPEN 事件</b>，靠唯一键保证；恢复之后再次触发，是一条新事件。</p>
+  <div class="rules">
+    <div class="rule rule--key"><span class="n">1</span><span class="r">为什么不把全部标签算进指纹</span><span class="r-why">每次告警的注解里可能带时间戳、随机值，算进去就等于「每次都是新告警」——一次故障刷出几十条事件，反而淹没真正的问题。</span></div>
+    <div class="rule rule--key"><span class="n">2</span><span class="r">为什么恢复后再触发是新事件</span><span class="r-why">「抖了一次又恢复」和「持续没恢复」是两件不同的事。合并成一条，就看不出它抖了几次。</span></div>
+  </div>
+
+  <h3>三、诊断编排：单飞、冷却、不留队列</h3>
+  <figure>
+    <div class="d">
+      <div class="steps">
+        <span class="from">告警</span><span class="arrow">→</span><span class="to">冷却</span><span class="what">同一指纹刚诊断过就跳过<small>风暴时可能每分钟都来；<b>冷却只作用于告警</b></small></span>
+        <span class="from">手动</span><span class="arrow">→</span><span class="to">不冷却</span><span class="what">人是主动来的，重复点最多多花一次钱<small>用同一个窗口挡住，只会让管理员想复诊时被拒</small></span>
+        <span class="from">并发</span><span class="arrow">→</span><span class="to">单飞</span><span class="what">同一时刻只跑一次<small>并发跑多次既浪费积分，也会让两份报告互相矛盾</small></span>
+        <span class="from">忙时</span><span class="arrow">→</span><span class="to">拒绝</span><span class="what">手动 429、告警 skip，都<b>不排队</b><small>排队会让最后那份报告基于过期证据</small></span>
+        <span class="from">重启</span><span class="arrow">→</span><span class="to">清僵尸</span><span class="what">超过 10 分钟的 PENDING / RUNNING 视为残留</span>
+      </div>
+    </div>
+    <figcaption><b>整套编排只为一件事：让每份报告都基于「当下的证据」。</b></figcaption>
+  </figure>
+
+  <h3>四、「没有数据」是最容易出错的地方</h3>
+  <p>告警规则里最常见的不是「阈值写错」，而是<b>没数据时它算出了什么</b>。这个项目在演练中实测抓到过三个这样的缺陷，都不是理论问题：</p>
+
+  <figure>
+    <div class="d">
+      <div class="rules">
+        <div class="rule rule--danger"><span class="n">1</span><span class="r">5xx 速率在完全没有请求时是空集</span><span class="r-why">空集被当成了 <code>NoData</code> ——告警既不触发也不恢复，卡在一个说不清的状态里。正解是给一个显式的 <code>or vector(0)</code> 兜底。</span></div>
+        <div class="rule rule--danger"><span class="n">2</span><span class="r">SLI 没有样本时算出的是 <code>NaN</code></span><span class="r-why"><code>NaN</code> 参与比较永远为假，而且会被当成一个「数值」往下传。正解是显式判 <code>NaN</code> 并当作未知。</span></div>
+        <div class="rule rule--danger"><span class="n">3</span><span class="r">protobuf 会省略零值字段</span><span class="r-why">上游没填的 <code>status</code> 在解析后是空串，而不是 <code>"0"</code>。按字符串比较的代码会把「正常」判成「异常」。正解是按枚举缺省值处理。</span></div>
+      </div>
+    </div>
+    <figcaption><b>三个都不是「逻辑写错」，而是「没数据时」的默认行为。</b>它们只在演练里出现，因为平时的流量总能让表达式有值。</figcaption>
+  </figure>
+
+  <h3>五、模型能看什么，不能做什么</h3>
+  <p>诊断模型的输入只有那份证据包：指标快照、脱敏后的日志片段、慢链路摘要、最近的变更记录。它<b>不能</b>发查询、不能读业务表、不能执行命令。</p>
+  <p>输出被约束成结构化结论：现象、起始时间、最可能的关联、还需要确认什么。<b>「还需要确认什么」是必须项</b>——让模型明确说出自己不确定的部分，比让它给出一个自信的错答案有用得多。</p>
+
+  <h3>六、怎么知道诊断本身准不准</h3>
+  <p>有一套 <b>12 条金集</b>：5xx、CPU、延迟、上游 401、登录撞库、磁盘、堆、MySQL、Redis、定时任务、慢链路、采集不可达。每条给一份固定的证据，断言模型输出里必须出现的关键判断。</p>
+  <div class="notes">
+    <ul>
+      <li><b>prompt 模式</b>：不调用真实模型、断言提示词与结构解析，13 条断言全绿，能在 CI 里跑。</li>
+      <li><b>live 模式</b>：真调 12 次模型，默认<b>关闭</b>（要花钱、结果有随机性），只在手动评测时打开。</li>
+      <li><b>这不是「测了模型准不准」，是「测了它至少不胡说」。</b>真正的准确率没有标定过，所以页面上不写「准确率 92%」这种数字。</li>
+    </ul>
+  </div>
+
+  <h2>设计取舍</h2>
+  <ul>
+    <li><b>为什么只诊断、不自动修复：</b>自动修复需要一个「动作」库和一套回滚保证，而误判的代价远高于晚几分钟。现在最激进的自动化只是「生成事件 + 写结论」，人还是决定者。</li>
+    <li><b>为什么诊断也要计积分：</b>它是一次真实的模型调用。混进「对话」那本账会让「为什么这个月花得多」解释不清，所以走独立的 <code>OPS_DIAGNOSIS</code> 流水。</li>
+    <li><b>为什么不用现成的 APM 告警联动：</b>现成方案能告警，但生成的是一堆指标准则；这里要的是「一段能直接读的结论」，所以中间那层取证与提示词必须自己写。</li>
+    <li><b>为什么金集默认关掉 live：</b>每次 12 次调用是真实成本，而且结果不稳定会让 CI 变成掷硬币。评测是人的动作，不是门禁。</li>
+  </ul>
+
+  <h2>诚实缺口（如实记录，不粉饰）</h2>
+  <div class="warn">
+    <b>三件事没有验证过：</b>① 金集的 <b>live 模式</b>没有在真实 key 下跑过；② <b>真实高流量下的快烧</b>（错误预算一分钟内烧掉几个百分点）只在合成数据上验过；③ 生产环境的 <b>AI 调用计数</b>目前为空——线上真人还没有走过这条路。这三条写在验收报告里，不是遗漏。
+  </div>
+
+  <div class="notes">
+    <h2>代码在哪</h2>
+    <ul class="paths">
+      <li><code>backend/paideia-app/…/ops/OpsEvidenceCollector.java</code> — 固定指标目录与降级</li>
+      <li><code>backend/paideia-app/…/ops/OpsDiagnosisService.java</code> — 冷却、单飞、僵尸清理</li>
+      <li><code>backend/paideia-app/…/ops/OpsIncidentService.java</code> — 指纹与 OPEN 去重</li>
+      <li><code>backend/paideia-app/…/ops/OpsLogRedactor.java</code>、<code>TempoTraceRedactor.java</code> — 脱敏</li>
+      <li><code>backend/paideia-ai/…/diagnosis/OpsDiagnosisPrompt.java</code> — 提示词与输出约束</li>
+      <li><code>deploy/ops/provisioning/alerting/paideia-rules.yaml</code> — 告警规则；<code>prometheus-rules.test.yml</code> — 规则单测</li>
+      <li><code>backend/paideia-ai/src/test/resources/ops-eval/golden-set.json</code> — 12 条金集</li>
+    </ul>
+  </div>
+</main>
+
+</body>
+</html>

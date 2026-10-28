@@ -107,7 +107,7 @@
   <p><b>代价写在明面上：</b></p>
   <ul>
     <li><b>登出不能立刻生效。</b>登出只吊销 refresh 家族，已签发的 access 在剩余寿命内仍然可用。要立刻失效就得引入令牌黑名单——那就变回有状态了。</li>
-    <li><b>任何「浏览器自己发起的请求」都拿不到凭据。</b><code>&lt;img&gt;</code>、iframe 导航、Service Worker 注册都不带 <code>Authorization</code> 头。为此有三处刻意的免鉴权（见 <a href="10-trust-boundary.html">10</a>），以及一处放弃的尝试（Grafana 面板，见 <a href="09-observability.html">09</a>）。</li>
+    <li><b>任何「浏览器自己发起的请求」都拿不到凭据。</b><code>&lt;img&gt;</code>、iframe 导航、Service Worker 注册都不带 <code>Authorization</code> 头。为此有三处刻意的免鉴权（见 <a href="11-trust-boundary.html">11</a>），以及一处放弃的尝试（Grafana 面板，见 <a href="09-observability.html">09</a>）。</li>
     <li><b>令牌里的角色是签发时的快照。</b>把某人从管理员改成学习者，他的旧令牌在过期前仍然是管理员。这是选择无状态的必然后果。</li>
   </ul>
   <p><b>什么时候该改：</b>如果真的需要「改权限立刻生效」或「封号立刻踢下线」，就必须引入短期黑名单或降到 5 分钟 access 寿命，并接受每次刷新多一次数据库往返。</p>
@@ -135,7 +135,7 @@
   </div>
 
   <div class="warn">
-    <b>改这一层之前先读 <a href="10-trust-boundary.html">10</a>。</b>新增一条 <code>/admin/**</code> 规则时，位置比内容更容易出错；已经有一次真缺陷是「<code>/sandbox/admin/**</code> 写在 <code>/sandbox/**</code> 之后」，它不报错，是契约测试抓到的。
+    <b>改这一层之前先读 <a href="11-trust-boundary.html">11</a>。</b>新增一条 <code>/admin/**</code> 规则时，位置比内容更容易出错；已经有一次真缺陷是「<code>/sandbox/admin/**</code> 写在 <code>/sandbox/**</code> 之后」，它不报错，是契约测试抓到的。
   </div>
 </main>
 

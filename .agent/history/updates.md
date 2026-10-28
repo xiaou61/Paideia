@@ -7383,3 +7383,17 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：`node .agent/html/render-check.mjs --shots` → 18 页 × 1440/1280 / 0 失败；内部链接全量存在性检查通过（无 `07-data-model.html` 残留）
 - 本地提交：本轮单独提交
 - 远端推送：未执行
+
+## 2026-10-28 13:05:00 +0800 · 架构导读：AIOps 独立成页 + 首页加「十四件真正难的事」
+
+- 类型：docs
+- 变更：
+  - 新增 `10-aiops.html`（WORK-042/043）：取证查询是固定目录（模型与管理员输入不进 PromQL/LogQL，加指标=改代码）、降级标 UNKNOWN 而不是失败、告警去重只取稳定标签且同一指纹只能一个 OPEN、诊断编排三条（冷却只作用于告警 / 单飞 / 忙时拒绝不排队）、「没有数据」的三次真事故（5xx 空集 NoData、SLI NaN 被当数值、proto3 省略 status 零值成空串）、12 条金集与 prompt/live 两种模式、以及三条未验证缺口
+  - 首页新增「十四件真正难的事」表：每条一句话 + 指向专题，作为最短阅读路径
+  - 因插入 10，原 10–17 后移为 11–18（信任边界/简历/交互式内容/MCP/四篇规范）；全部 href 与「见 NN」标签同步重写并做存在性检查
+  - `nav.js` 19 条（含总览）；`render-check.mjs` 期望值 19
+- 决策：AIOps 从 09 的一小节提升为独立页——它是本仓唯一「系统自己诊断自己」的闭环，且其难点（固定查询、单飞、无数据语义）与观测基础是两套问题
+- 依据：`OpsDiagnosisService`（冷却只作用于告警 / 单飞 / 十分钟僵尸）、`OpsEvidenceCollector`（固定 METRICS 目录与降级文案）、`OpsIncidentService`（指纹标签集与 dedupe_key）、`golden-set.json` 12 条、WORK-043 的 tasks/report 里的三条未验证项
+- 验证：`node .agent/html/render-check.mjs --shots` → 19 页 × 1440/1280 / 0 失败；内部链接全量存在性检查通过；跨页序号标签修正 4 处（02×2、05、07）
+- 本地提交：本轮单独提交
+- 远端推送：未执行

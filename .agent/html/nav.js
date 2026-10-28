@@ -1,6 +1,6 @@
 /*
- * 侧栏导航：一份清单，17 个页面共用。改专题顺序/标题只改这里。
- * 前半讲「系统怎么跑」，后半讲「代码怎么写」；14 之前插一条分组标题。
+ * 侧栏导航：一份清单，19 个页面共用。改专题顺序/标题只改这里。
+ * 前半讲「系统怎么跑」，后半讲「代码怎么写」；15 之前插一条分组标题。
  */
 (function () {
   var TOPICS = [
@@ -14,16 +14,17 @@
     ['07-sql-sandbox.html', '07', 'SQL 工作台与沙箱'],
     ['08-frontend.html', '08', '前端与流式渲染'],
     ['09-observability.html', '09', '可观测与发版'],
-    ['10-trust-boundary.html', '10', '信任边界'],
-    ['11-resume.html', '11', '简历与求职'],
-    ['12-interactive-content.html', '12', '交互式内容'],
-    ['13-mcp-tools.html', '13', 'MCP 工具面'],
-    ['14-code-conventions.html', '14', '代码规范'],
-    ['15-testing.html', '15', '测试规范'],
-    ['16-commit-review-release.html', '16', '提交、评审与发布'],
-    ['17-docs-and-decisions.html', '17', '文档与决策']
+    ['10-aiops.html', '10', 'AIOps 自诊断'],
+    ['11-trust-boundary.html', '11', '信任边界'],
+    ['12-resume.html', '12', '简历与求职'],
+    ['13-interactive-content.html', '13', '交互式内容'],
+    ['14-mcp-tools.html', '14', 'MCP 工具面'],
+    ['15-code-conventions.html', '15', '代码规范'],
+    ['16-testing.html', '16', '测试规范'],
+    ['17-commit-review-release.html', '17', '提交、评审与发布'],
+    ['18-docs-and-decisions.html', '18', '文档与决策']
   ];
-  var GROUP_AT = '14';
+  var GROUP_AT = '15';
 
   var here = decodeURIComponent((location.pathname.split('/').pop() || 'index.html'));
   var items = TOPICS.map(function (t) {
@@ -34,7 +35,7 @@
 
   document.body.insertAdjacentHTML('afterbegin',
     '<aside class="sidebar">' +
-      '<a class="brand" href="index.html">Paideia 架构导读<small>17 页 · 离线可读</small></a>' +
+      '<a class="brand" href="index.html">Paideia 架构导读<small>19 页 · 离线可读</small></a>' +
       '<nav>' + items + '</nav>' +
     '</aside>');
 })();
