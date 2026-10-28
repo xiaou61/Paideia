@@ -28,6 +28,7 @@ export type {
   SandboxStatus,
 } from './client'
 export { EntryToc } from './entry-toc'
+export { PracticeEntry } from './practice-entry'
 export { findCategoryBySlug } from './category-tree'
 export { orderChapters } from './chapter-order'
 export { MAX_HEADING_LEVEL, createSlugger, extractHeadings, slugify } from './heading-slug'
