@@ -7283,3 +7283,14 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：`ApiWalkthroughTest` 1 条 **0 失败**，连跑两次稳定（46.16s / 41.59s）；`api-shape.json` 只多 5 条端点。守卫反向验证：把 `&lt;` 放回去 → 报 1 处、退出码 1；改回 → 0 处。非 app 切片 352/0/14。
 - 本地提交：本笔
 - 远端推送：未执行（随 WORK-046 一起推）
+
+## 2026-10-28 11:35 +0800 · WORK-046 · 推送、部署与线上导入
+
+- 类型：deployment
+- 变更：`work-046-books` 推到 `origin/master`（`4ed8c9b..d4fad51`，快进，含另一会话的两笔 `ff4ea06`/`d686ef7`）；从**干净的工作树**跑 `release.ps1 -WithWeb`（164.8 秒，健康检查通过）；线上跑两遍导入。
+- 线上结果：`books` id=53（顶层、line_kind NULL）、`books-man-month` id=54（parent_id=53、line_kind NULL）、5 篇 `published` 且 sort_order 0..4；`learning_tracks` 中无这两条线；第一次 `created 5 / updated 0`、第二次 `created 0 / updated 0`；`/actuator/health` UP、根路径 200。
+- 决策：生产库**没有可用管理员口令**（部署实例不加载种子），导入用一次性管理员——随机 28 位口令 + bcrypt 插入 `tmp-import-*`，跑完立刻删除。复核：该前缀计数 0、用它登录 401、本地临时凭据文件已删。
+- 依据：首次插入失败是因为 env 文件没加引号，`source` 时 `$2a$10$` 被 shell 当变量展开，哈希前缀被吃掉（列长 54 而非 60）。改成单引号后通过。
+- 验证：见 `testing/report.md` 的「线上验证」一节。
+- 本地提交：本笔
+- 远端推送：已执行（用户明确授权）
