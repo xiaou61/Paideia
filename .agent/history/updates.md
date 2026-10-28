@@ -7589,3 +7589,20 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
   - 时间轴拖动无 e2e 覆盖
 - 本地提交：本批单独提交
 - 远端推送：未执行
+
+## 2026-10-28 15:52:00 +0800 · WORK-050 合并入 master 并部署
+
+- 类型：deployment
+- 变更：
+  - `work-050-memory` 合并入 master（先把它落后的一批 master 提交合进分支、在合并后的状态重跑关键测试）
+  - `powershell -File scripts/release.ps1` 发版，319.4 秒（前端重建 110.1s + 打包 70.1s + 上传 24.8s）
+- 验证：
+  - `/actuator/health` → `{"status":"UP"}`
+  - `GET /api/v1/ai/memories/candidates` 无凭证返回 **401**（端点已上线，不是 404）
+  - Flyway：`Migrating schema paideia to version "20261028150000 - memory relevance candidates and ttl"`，
+    `Successfully applied 1 migration … now at version v20261028150000 (execution time 00:05.002s)`
+  - 合并后重跑：后端单测 371 run / 0 fail / 15 skipped；记忆与边界 49 run / 0 fail；前端 15 个包 typecheck、assistant 43 条
+- 修掉一处测试隔离缺陷：`MemoryCandidateTest` 的 `@BeforeEach` 没清 `ai_user_settings`，
+  用例数一多就撞上"上一个用例关过记忆"的状态（合并后第一次跑红，补清后绿）
+- 本地提交：合并提交 + 日志提交，**未 push**
+- 工作树：`.worktrees/memory` 已删除，分支 `work-050-memory` 已删除
