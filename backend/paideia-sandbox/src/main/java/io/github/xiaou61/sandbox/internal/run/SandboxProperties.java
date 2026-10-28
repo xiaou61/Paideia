@@ -40,11 +40,30 @@ public class SandboxProperties {
      */
     private String sqlImage = "";
 
-    /** SQL 专用上限：mysqld 常驻约 348 MB，用 Java/Python 的 256m 会被 OOM 杀掉。 */
-    private String sqlMemory = "512m";
+    /**
+     * SQL 专用上限。
+     *
+     * <p>`/tmp` 的 tmpfs 里那份 78MB datadir **也计入容器内存**，加上 mysqld 的约 350MB 常驻，
+     * 512m 会让 mysqld 在 InnoDB 初始化结束后被 OOM 静默杀掉（日志里一行错误都没有）。
+     * 2026-10-28 实测：512m 起不来、1g 正常。--memory-swap 必须同时给，否则 swap 会兜住 OOM。
+     */
+    private String sqlMemory = "1g";
     private String sqlCpus = "1";
     private int sqlPidsLimit = 128;
     private long sqlTimeoutMs = 20_000;
+
+    /**
+     * SQL 常驻容器池的大小（WORK-049）。**0 = 关闭池化**，全部走一次性容器。
+     *
+     * <p>池化把一次执行从 3.5–4.2 秒降到约 120 毫秒：省掉起容器、拷 datadir 与起 mysqld。
+     * 代价是隔离从"一人一个容器"降为"共享 mysqld、按库+账号隔离"。
+     *
+     * <p>每个池容器常驻约 400MB，开之前先看宿主 `available` 有多少。
+     */
+    private int sqlPoolSize = 2;
+
+    /** 取不到池容器时最多等多久（毫秒）。超时即回落一次性容器——排队会让 p99 变得不可预测。 */
+    private long sqlPoolAcquireTimeoutMs = 1500;
     /**
      * SQL 的日配额（WORK-035 T-17 从 20 提到 500）。
      *
@@ -318,6 +337,22 @@ public class SandboxProperties {
 
     public long getSqlTimeoutMs() {
         return sqlTimeoutMs;
+    }
+
+    public int getSqlPoolSize() {
+        return sqlPoolSize;
+    }
+
+    public void setSqlPoolSize(int sqlPoolSize) {
+        this.sqlPoolSize = sqlPoolSize;
+    }
+
+    public long getSqlPoolAcquireTimeoutMs() {
+        return sqlPoolAcquireTimeoutMs;
+    }
+
+    public void setSqlPoolAcquireTimeoutMs(long sqlPoolAcquireTimeoutMs) {
+        this.sqlPoolAcquireTimeoutMs = sqlPoolAcquireTimeoutMs;
     }
 
     public void setSqlTimeoutMs(long sqlTimeoutMs) {

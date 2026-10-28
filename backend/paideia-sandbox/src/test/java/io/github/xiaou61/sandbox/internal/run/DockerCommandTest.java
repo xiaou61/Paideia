@@ -126,7 +126,9 @@ class DockerCommandTest {
 
         assertThat(command).contains("--rm", "--network=none", "--read-only",
                 "--cap-drop=ALL", "--security-opt=no-new-privileges", "--stop-timeout=0");
-        assertThat(command).contains("--memory=512m", "--memory-swap=512m", "--cpus=1", "--pids-limit=128");
+        // 1g 而不是 512m：tmpfs 里的 78MB datadir 也计入容器内存，512m 会让 mysqld
+        // 在 InnoDB 初始化结束后被 OOM 静默杀掉（2026-10-28 实测）
+        assertThat(command).contains("--memory=1g", "--memory-swap=1g", "--cpus=1", "--pids-limit=128");
         assertThat(command).contains("/tmp:rw,size=768m,exec");
         assertThat(command).contains("--user", "999:999");
         assertThat(command)
@@ -150,7 +152,7 @@ class DockerCommandTest {
 
         assertThat(command).contains("--rm", "--network=none", "--read-only",
                 "--cap-drop=ALL", "--security-opt=no-new-privileges", "--stop-timeout=0");
-        assertThat(command).contains("--memory=512m", "--user", "999:999");
+        assertThat(command).contains("--memory=1g", "--user", "999:999");
         assertThat(command).contains(DockerCommand.scriptFor("sql", true));
         assertThat(DockerCommand.scriptFor("sql", true)).contains("EXPLAIN FORMAT=TREE");
         assertThat(DockerCommand.scriptFor("sql", true))

@@ -3,7 +3,7 @@ artifact: test-report
 work_id: WORK-049
 work: AIOps 缺口修复：事件闭环、历史复用、告警关联与评测可信度
 status: passed
-verified_commit: 79e2519
+verified_commit: b40f2a6
 created: 2026-10-28
 updated: 2026-10-28
 ---
@@ -35,7 +35,7 @@ live 金集用线上平台凭据跑过 4 轮（凭据只在测试进程环境变
 | AC-008 阈值两侧一致 | install-ops 渲染后核对 drop-in 与规则文件；脚本正负向 | 0 | 通过 | drop-in 0.85/0.90/36 ↔ 规则 0.15 free/0.90/36；越界脚本 exit 1。**边界翻转未做**：会让摘要变化的阈值必然同时触发配对告警 |
 | AC-009 重启补诊断 | `... -Dtest=OpsDiagnosisServiceTest,OpsIncidentMapperTest ...` | 0 | 通过 | `catchUpPicksOpenWithoutDone`、`catchUpSkipsWhenUserMissing`、`catchUpCandidateIsSingleAndSkipsDone`（有 DONE 的事件被跳过） |
 | AC-010 金集 ≥20 条 prompt 模式 | `... -Dtest=OpsDiagnosisGoldenSetTest ...` | 0 | 通过 | 24 条：26 执行 / 0 失败 / **1 跳过（live）**；`goldenSetIsWideEnough` 阈值已改 20 |
-| AC-011 live 评测 | `PAIDEIA_OPS_EVAL=1 ... mvn -B -pl paideia-ai -am -Dtest=OpsDiagnosisGoldenSetTest test`（凭据取自线上配置，只进环境变量） | 1 | 通过 | 24 条全跑：v5 原始 20/24；按修正后的 token 重判**22/24**；残留 04/15 是模型未引用数值。报告与重判说明：`testing/evidence/live-eval-v5.md` |
+| AC-011 live 评测 | `PAIDEIA_OPS_EVAL=1 ... mvn -B -pl paideia-ai -am -Dtest=OpsDiagnosisGoldenSetTest test`（凭据取自线上配置，只进环境变量） | 1 | 通过 | 24 条全跑：v5 原始 20/24；重判**22/24**；单独复跑 04/15 均通过（15 首次为 0 字节空回答）。报告与重判说明：`testing/evidence/live-eval-v5.md` |
 | AC-012 生产快烧演练 | 临时把快烧规则表达式改为 `vector(1)`，2 分钟后恢复 | 0 | 通过 | 事件 #10（critical）→ 诊断 #13 DONE → 恢复规则后自动 RESOLVED（07:29:40 → 07:31:46） |
 | AC-013 事件页 Grafana 深链 | 生产 e2e（Playwright，`E2E_BASE_URL`） | 0 | 通过 | 登录 → 事件页 → 点第一条 → 两个链接 href 分别含 `from/to` 与 `viewPanel=10` |
 | AC-014 日志单元可配置 | `... -Dtest=OpsEvidenceCollectorTest ...` | 0 | 通过 | `customUnitIsWhitelisted`：配置 `rustfs` 后查询用 `unit="rustfs.service"`，未知单元仍抛错 |
@@ -67,8 +67,8 @@ live 金集用线上平台凭据跑过 4 轮（凭据只在测试进程环境变
 
 ## 失败与未验证项
 
-1. **v5 提示词尚未随生产 jar 发布**：14:52 的部署由另一个会话从 master 发出，包含 P0–P3；
-   v5 在 15:20 之后提交，等下一次发版生效。在此之前生产诊断仍用 v4（「预算告急」不强制引用数值）。
+1. **v5 已上线**：2026-10-28 16:26 从干净工作树执行 `release.ps1 -WithWeb`（242.8 秒），
+   `BOOT-INF/lib/paideia-ai-*.jar` 内 `OpsDiagnosisPrompt.class` 含 `ops-diagnosis-v5`；健康检查 200。
 2. **AC-011 残留 2 条真实失败**：live 跑了 4 轮（首轮 19/24、5 条重跑 4/5、第二轮 21/24、v5 全量 20/24）。
    过程修掉两类问题：① 金集里 8 个 token 过度依赖格式（`92.0`/`1638.0`/`诊断#5`/`诊断#6`/`诊断#8`/
    `口令`/`重启生产`/`历史查询失败`），已按「同一事实的不同写法」放宽；② 提示词只要求「快烧/慢烧」
@@ -88,10 +88,10 @@ live 金集用线上平台凭据跑过 4 轮（凭据只在测试进程环境变
 
 ## 剩余风险
 
-- v5 上线前，生产诊断仍是 v4：「SLO 预算告急」不强制引用 SLI 与燃尽率。
 - 阈值渲染依赖 `install-ops.sh`；只跑 `release.ps1` 不会更新 drop-in 与 Grafana 规则，两侧会不一致。
 - live 金集是抖动源：同一用例在不同轮次可能通过或不通过（实测 04 在三轮里两过一失）。
-  它只作观察，不作 CI 门禁；判断时应看失败清单，而不是只看单个通过率。
+  它只作观察，不作 CI 门禁；15 曾返回 0 字节空回答（思考吃满 `max_tokens`，生产端按失败退款）。
+  判断时应看失败清单，而不是只看单个通过率。
 - 历史查询在事件表变大后是两次带 `LIMIT` 的索引查询；当前量级（每天 <20）无压力，未做压测。
 - 演练改的是 provisioned 文件并重启 Grafana；恢复后已核对 `vector(1)` 计数为 0。若 Grafana 将来
   支持 provisioning 热加载，演练步骤要相应调整。

@@ -138,6 +138,14 @@ class OpsDiagnosisGoldenSetTest {
             Path answers = Path.of("target", "ops-eval-answers");
             Files.createDirectories(answers);
             Files.writeString(answers.resolve(entry.getKey() + ".md"), answer, StandardCharsets.UTF_8);
+            // 空回答不是「缺 mustMention」：flash 的思考 token 吃满 max_tokens 时 content 为空，
+            // 生产端会按失败退款；这里单独标记，别把模型抖动误读成提示词缺陷。
+            if (answer.isBlank()) {
+                failures.add(entry.getKey() + "：上游返回空内容");
+                report.append("| ").append(entry.getKey())
+                        .append(" | 失败 | 空回答（思考可能吃满 max_tokens） |  |\n");
+                continue;
+            }
 
             List<String> missing = new ArrayList<>();
             for (JsonNode fact : testCase.path("expected").path("mustMention")) {
