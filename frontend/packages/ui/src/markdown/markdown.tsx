@@ -96,6 +96,67 @@ function readCodePlugin(): CodeHighlighter | undefined {
 }
 
 /**
+ * mermaid 同样懒加载，而且**只在长文里真的出现 ```` ```mermaid ```` 时**才下载——
+ * 它带的是整个 mermaid 运行时（按图类型拆成动态 chunk，但核心本身就不小）。流式回答不启用：
+ * 模型输出的 mermaid 是文本，不是我们要执行的渲染指令。
+ *
+ * <p>`themeCSS` 只让流程图的连线**流起来**（虚线位移动画），一眼能看出方向；系统开启
+ * 「减少动态效果」时在 CSS 里自行关掉。不指定 `theme`：mermaid 的配色是按主题重度定制的，
+ * 写死一套在另一种主题下会很难看。已知限制：深色主题下图内仍是浅底。
+ */
+type MermaidPlugin = Awaited<typeof import('@streamdown/mermaid')>['mermaid']
+
+const MERMAID_CONFIG = {
+  startOnLoad: false,
+  securityLevel: 'strict',
+  themeCSS:
+    '.flowchart-link{stroke-dasharray:6 4;animation:pd-flow 1.2s linear infinite}' +
+    '@keyframes pd-flow{to{stroke-dashoffset:-20}}' +
+    '@media (prefers-reduced-motion:reduce){.flowchart-link{animation:none;stroke-dasharray:none}}',
+} as const
+
+let mermaidPlugin: MermaidPlugin | undefined
+let mermaidLoading: Promise<void> | null = null
+const mermaidSubscribers = new Set<() => void>()
+
+function loadMermaidPlugin(): Promise<void> {
+  if (mermaidPlugin !== undefined) {
+    return Promise.resolve()
+  }
+  mermaidLoading ??= import('@streamdown/mermaid')
+    .then((module) => {
+      mermaidPlugin = module.createMermaidPlugin({ config: MERMAID_CONFIG })
+      mermaidSubscribers.forEach((notify) => notify())
+    })
+    .catch(() => {
+      // 加载失败就保持「不渲染图」。重试留给下一次页面打开
+      mermaidLoading = null
+    })
+  return mermaidLoading
+}
+
+function useMermaidPlugin(enabled: boolean): MermaidPlugin | undefined {
+  const subscribe = useCallback((notify: () => void) => {
+    if (!enabled) {
+      return NOOP_UNSUBSCRIBE
+    }
+    mermaidSubscribers.add(notify)
+    void loadMermaidPlugin()
+    return () => {
+      mermaidSubscribers.delete(notify)
+    }
+  }, [enabled])
+  return useSyncExternalStore(subscribe, readMermaidPlugin, readMermaidPlugin)
+}
+
+function readMermaidPlugin(): MermaidPlugin | undefined {
+  return mermaidPlugin
+}
+
+/** 认得出「这一行起了一个 mermaid 围栏」就够了；具体图由插件自己解析。 */
+const MERMAID_FENCE = /(^|\n)\s*```mermaid\b/
+
+/**
  * 静态（长文）模式的呈现开关。**这两个是模块常量，不是每次渲染新建的字面量**——
  * 上游那个组件的记忆化比较里含 props 的引用相等，随手新建的对象会白让它重算一遍顶层。
  */
@@ -182,7 +243,9 @@ export function Markdown({
   documentBlocks = true,
 }: MarkdownProps) {
   const hasFence = useMemo(() => /(^|\n)\s*```/.test(markdown), [markdown])
+  const hasMermaid = useMemo(() => MERMAID_FENCE.test(markdown), [markdown])
   const codePlugin = useCodeHighlighting(hasFence)
+  const mermaidPlugin = useMermaidPlugin(!streaming && hasMermaid)
   // 合并后的对象身份必须稳定：它进上游的块级记忆化比较，每次渲染换一个新对象会让记忆化全失效
   const mergedComponents = useMemo(
     () => (streaming ? components : { ...documentComponents, ...components }),
@@ -195,12 +258,13 @@ export function Markdown({
    */
   const plugins = useMemo<PluginConfig | undefined>(() => {
     const highlight = codePlugin === undefined ? {} : { code: codePlugin }
+    const diagram = mermaidPlugin === undefined ? {} : { mermaid: mermaidPlugin }
     if (streaming) {
       return renderers === undefined ? (codePlugin === undefined ? undefined : highlight) : { ...highlight, renderers }
     }
     const merged = documentBlocks ? [...documentRenderers, ...(renderers ?? [])] : (renderers ?? [])
-    return { ...highlight, renderers: merged }
-  }, [streaming, renderers, documentBlocks, codePlugin])
+    return { ...highlight, ...diagram, renderers: merged }
+  }, [streaming, renderers, documentBlocks, codePlugin, mermaidPlugin])
 
   /**
    * 解释文本的嵌套渲染入口：把"用同一套渲染器"这件事实现在**这一处**，块组件不必依赖
