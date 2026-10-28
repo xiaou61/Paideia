@@ -7411,3 +7411,33 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：`scripts/test-db.sh mvn -pl paideia-app -am -Dtest=CategoryServiceTest,KnowledgeReadIntegrationTest` → 1/0 与 14/0；`release.ps1 -SkipWeb` 111.8 秒且健康检查通过；线上 `GET /api/v1/knowledge/categories` 返回 26 个顶层分类且 `architecture-from-zero` 的 lineKind=reading；`?categoryId=58` 顺序为总览→边界→…→评审；学习者端 e2e `knowledge.spec.ts` 打线上 **8 passed / 1 skipped**
 - 本地提交：`116a5fa`，本条目单独一笔
 - 远端推送：未执行
+
+## 2026-10-28 15:16:36 +0800 · WORK-051 · WORK-051 使用独立 worktree 实施
+
+- 类型：decision
+- 变更：在 .worktrees/WORK-051 新建分支 work/WORK-051（基于 62f37bb）；主树因有 76 个来源不明的改动按单写入方隔离
+- 决策：按 AGENTS.md 的并发会话约定，一个会话一个工作树；主树保持 master 只做 review/落库/部署
+- 依据：git worktree list 无同名分支与目录；.worktrees 已 gitignore；requirements.md 已先提交才能出现在新工作树
+- 验证：git worktree list 显示 F:/Paideia/.worktrees/WORK-051 62f37bb [work/WORK-051]
+- 本地提交：62f37bb（仅需求工件）
+- 远端推送：未执行
+
+## 2026-10-28 15:18:39 +0800 · WORK-051 · 签署 .agent/changes/WORK-051-手绘风配图围栏块/requirements.md、.agent/changes/WORK-051-手绘风配图围栏块/proposal.md、.agent/changes/WORK-051-手绘风配图围栏块/design.md、.agent/changes/WORK-051-手绘风配图围栏块/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-051-手绘风配图围栏块/requirements.md、.agent/changes/WORK-051-手绘风配图围栏块/proposal.md、.agent/changes/WORK-051-手绘风配图围栏块/design.md、.agent/changes/WORK-051-手绘风配图围栏块/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-051-手绘风配图围栏块/requirements.md、.agent/changes/WORK-051-手绘风配图围栏块/proposal.md、.agent/changes/WORK-051-手绘风配图围栏块/design.md、.agent/changes/WORK-051-手绘风配图围栏块/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-28 15:49:27 +0800 · WORK-051 · sketch 围栏块实现完成，9/10 验收通过，AC-008 体积增量待裁决
+
+- 类型：implementation
+- 变更：新增 @paideia/ui 的 sketch 围栏块（契约/布局/绘制/组件/注册）、手写字体子集与生成脚本、主题配色令牌、devdata 样例条目 61、e2e/sketch.spec.ts；依赖 roughjs 4.6.6 与 subset-font（devDependency）
+- 决策：坐标不交给作者：框宽按文字实测、整行居中；抖动 seed 由节点 id 派生保证刷新一致；颜色走 CSS 变量，切主题无需 JS；roughjs 动态 import
+- 依据：frontend/packages/ui/src/markdown/renderers/sketch*.ts、scripts/build-sketch-font.mjs、db/devdata/V956__seed_sketch_block.sql
+- 验证：typecheck 0；ui 单测 18/18（全量 227 passed / 1 failed，失败为既有的 AnalyticsPage 硬编码颜色）；e2e 1 passed（独占库）；构建入口 chunk gzip 291.21→293.63 kB（+2.42，AC-008 未达标）；对比度浅色 14.3–15.0、深色 10.2–11.7
+- 本地提交：1be235b
+- 远端推送：未执行
