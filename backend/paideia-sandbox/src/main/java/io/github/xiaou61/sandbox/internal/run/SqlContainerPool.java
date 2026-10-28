@@ -120,8 +120,12 @@ class SqlContainerPool {
         if (slot.container != null) {
             return;
         }
-        destroy(slot);
         String name = "paideia-sql-pool-" + slot.index;
+        destroy(slot);
+        // **先无条件按名字删一次**：上一次进程留下的同名容器（可能是 512m 时代起的、mysqld
+        // 早已死掉）会让 `docker run --name` 直接失败，而失败信息曾经被吞掉，表现是
+        // 每次执行都跟一个死容器磨满 30 秒就绪超时。删一个不存在的容器是幂等的。
+        runQuietly(List.of("docker", "rm", "-f", name), 10);
         List<String> command = List.of(
                 "docker", "run", "-d", "--name", name,
                 "--network=none",
@@ -143,8 +147,11 @@ class SqlContainerPool {
                 "-e", "TZ=UTC",
                 properties.getSqlImage(),
                 "sh", "-c", BOOT_SCRIPT);
-        runQuietly(command, 30);
+        String output = runQuietly(command, 30);
         slot.container = name;
+        if (!output.isEmpty()) {
+            log.warn("sql.pool.run_output name={} output={}", name, output);
+        }
         if (!waitReady(name)) {
             destroy(slot);
             throw new SandboxUnavailableException("池容器未就绪：" + name);
@@ -213,18 +220,24 @@ class SqlContainerPool {
         log.info("sql.pool.container_removed name={}", name);
     }
 
-    private void runQuietly(List<String> command, int timeoutSeconds) {
+    /** 跑一条 docker 命令，返回它的输出（失败时调用方据此打日志，不再静默吞掉）。 */
+    private String runQuietly(List<String> command, int timeoutSeconds) {
         try {
             Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+            // 先等再读：输出只有几十字节（容器 id / 报错），不会写满管道；
+            // 反过来先 readAllBytes 会一直阻塞，超时就不再是超时了。
             if (!process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
+                return "timeout";
             }
-            process.getInputStream().close();
-        } catch (IOException | InterruptedException cause) {
-            if (cause instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
-            log.debug("sql.pool.command_failed command={} reason={}", command.get(0), cause.getMessage());
+            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+            return process.exitValue() == 0 ? "" : output;
+        } catch (IOException cause) {
+            log.warn("sql.pool.command_failed command={} reason={}", command.get(0), cause.getMessage());
+            return cause.getMessage() == null ? "io-error" : cause.getMessage();
+        } catch (InterruptedException cause) {
+            Thread.currentThread().interrupt();
+            return "interrupted";
         }
     }
 
