@@ -15,129 +15,159 @@
   <p class="question"><strong>这张图回答：</strong>我打开浏览器点开这个站点，一共用到了哪几台机器、几个进程、哪些外部服务？「11 个模块」是 11 个服务吗？</p>
 
   <h2>先看一个具体场景</h2>
-  <p>你打开浏览器输入地址，看到网页；登录、点开一门课、做题、问 AI、写笔记。管理员在另一个页面加了一篇新文章，第二天所有人都看得到。这一整套东西，跑在<b>一台机器上的一个程序</b>里，外面只连着一个数据库和一个 AI 服务。</p>
-  <p>记住这一句就够：它<b>不是一堆互相调用的微服务</b>。所以不存在「某个服务挂了」，出问题就是那个程序直接报错。</p>
+  <p>你打开浏览器输入地址，看到网页；登录、点开一门课、做题、问 AI、写笔记。管理员在另一个页面加了一篇新文章，第二天所有人都看得到。</p>
+  <p>这一整套东西，跑在<b>一台机器上的一个程序</b>里，外面只连着一个数据库、一个附件存储、一个 AI 服务。记住这一句就够：它<b>不是一堆互相调用的微服务</b>。</p>
 
   <figure>
-    <div class="diagram">
-<pre class="mermaid">
-flowchart TB
-  A["你：在浏览器输入地址"] --> B["程序：把网页发给你"]
-  B --> C["你：注册 / 登录<br/>它给你一张令牌，之后每次请求都带上"]
-  C --> D["你：看课、做题、写笔记<br/>它读写 MySQL 和附件存储"]
-  D --> E["你：问 AI<br/>它用自己的账号去调上游，花的是平台的钱"]
-  E --> F["管理员：在 /admin/ 加一篇<br/>用的还是同一个程序，只是权限不同"]
-</pre>
+    <div class="d">
+      <div class="flow">
+        <div class="box box--you">你：在浏览器输入地址</div>
+        <div class="link"></div>
+        <div class="box box--svc">程序：把网页发给你<small>前端构建产物由同一个进程托管</small></div>
+        <div class="link"></div>
+        <div class="box box--svc">你注册 / 登录<small>它发一张短令牌，之后每次请求都带上</small></div>
+        <div class="link"></div>
+        <div class="box box--svc">你看课、做题、写笔记<small>它读写 MySQL 和附件存储</small></div>
+        <div class="link"></div>
+        <div class="box box--svc">你问 AI<small>它用自己的账号调上游，花的是平台的钱</small></div>
+        <div class="link"></div>
+        <div class="box box--you">管理员：在 /admin/ 加一篇<small>同一个程序，只是权限不同</small></div>
+      </div>
     </div>
     <figcaption><b>一次完整体验。</b>从头到尾只有一个程序在干活，它同时扮演网页服务器、接口服务器和定时任务。</figcaption>
   </figure>
 
   <h2>它内部是怎么做到的</h2>
-  <p>部署上是<b>一台机器、一个 Java 进程、一个数据库</b>。十一个 Maven 模块是<b>编译期边界</b>，不是部署单元——它们全部打进同一个 jar，由同一个 <code>systemd</code> 单元跑起来。前端有两个可运行面（学习者端、管理端），构建成静态资源后由这同一个进程提供，管理端挂在 <code>/admin/</code> 子路径下。</p>
-  <p>外部依赖只有四个：MySQL（唯一数据源，不可替换）、对象存储（附件，走 S3 协议，有端口抽象）、AI 上游（OpenAI 兼容接口，唯一真正花钱的地方）、以及两个可选增强（面经判定服务、抓取与监控）。</p>
+  <p>把那个程序拆开看，是五层。箭头只许<b>从上往下</b>：下面一层不需要知道谁在调它。</p>
 
   <figure>
-    <div class="diagram">
-<pre class="mermaid">
-flowchart LR
-  L["学习者<br/>浏览器 / Electron 壳"] --> APP["@paideia/app<br/>学习者端"]
-  A["管理员<br/>浏览器"] --> ADM["@paideia/admin<br/>管理端 /admin/"]
-  APP --> API["paideia-app<br/>单进程 · 178 个端点"]
-  ADM --> API
-  API --> DB[("MySQL<br/>59 张表")]
-  API --> OBJ["RustFS<br/>S3 兼容对象存储"]
-  API --> LLM["AI 上游<br/>OpenAI 兼容接口"]
-  API --> LAYA["Laya 判定服务<br/>面经相关性重排"]
-  API --> MON["Prometheus / Loki / Tempo<br/>Grafana 同源反代"]
-  API <--> MCP["外部 MCP 客户端<br/>PAT 鉴权的 /mcp"]
-</pre>
+    <div class="d">
+      <div class="layer">
+        <div class="layer-name">① 访问层</div>
+        <div class="layer-body">
+          <div class="box">学习者端 app<small>@paideia/app</small></div>
+          <div class="box">管理端 admin<small>挂在 /admin/</small></div>
+          <div class="box box--ext">Electron 桌面壳<small>装的是同一套页面</small></div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">② 装配层</div>
+        <div class="layer-body">
+          <div class="box box--svc"><b>paideia-app</b><small>唯一的装配点：把十个模块的 Bean 拼起来<br/>178 个端点 · 6 个定时任务 · 前端静态资源</small></div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">③ 业务层</div>
+        <div class="layer-body">
+          <div class="box">account<small>账号 / 登录 / 令牌</small></div>
+          <div class="box">knowledge<small>知识库 / 学习线 / 题目</small></div>
+          <div class="box">note<small>笔记 / 分享 / 举报</small></div>
+          <div class="box">ai<small>对话 / 积分 / 记忆 / 速递</small></div>
+          <div class="box">sandbox<small>SQL 与代码执行</small></div>
+          <div class="box">mcp<small>对外工具目录</small></div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">④ 底座层</div>
+        <div class="layer-body">
+          <div class="box">platform<small>异常 / 业务码 / Clock</small></div>
+          <div class="box">persistence<small>MyBatis / 会话</small></div>
+          <div class="box">security<small>JWT / 规则</small></div>
+          <div class="box">web<small>响应包装 / 错误映射</small></div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">⑤ 数据与外部</div>
+        <div class="layer-body">
+          <div class="box box--data">MySQL<small>59 张表，唯一数据源</small></div>
+          <div class="box box--data">RustFS<small>S3 协议，放附件</small></div>
+          <div class="box box--ext">AI 上游<small>OpenAI 兼容，唯一花钱的地方</small></div>
+          <div class="box box--ext">Laya<small>面经相关性判定</small></div>
+          <div class="box box--ext">Prometheus / Loki / Tempo<small>监控，见 09</small></div>
+        </div>
+      </div>
     </div>
-    <figcaption><b>系统上下文。</b>箭头是「谁调谁」。注意学习者端和管理端是两条独立构建产物，但共用同一个后端与同一套前端库。</figcaption>
+    <figcaption><b>五层。</b>③ 里的六个模块互相之间<b>没有箭头</b>——它们只认识底座层，谁也不认识谁。</figcaption>
   </figure>
 
-  <h2>十一个模块，一条向下的依赖链</h2>
-  <p>依赖方向是<b>依赖方 → 被依赖方</b>，而且只许单向下行：底层的模块不需要知道谁在调它。<code>spring-modulith</code> 在构建期挡循环依赖，<code>ModularityTest</code> 在测试期挡「跨模块去引用别人的 <code>internal</code> 包」——所以模块之间只能通过公开契约接口说话，实现类改名不会波及别的模块。</p>
+  <h3>三条铁律，谁违反谁被构建挡住</h3>
+  <div class="rules">
+    <div class="rule rule--key">
+      <span class="n">1</span>
+      <span class="r">依赖只许单向下行</span>
+      <span class="r-why"><code>spring-modulith</code> 在构建期检查循环依赖，环出现就构建失败。</span>
+    </div>
+    <div class="rule rule--key">
+      <span class="n">2</span>
+      <span class="r">只许引用别人的公开契约，不许碰 <code>internal</code> 包</span>
+      <span class="r-why"><code>ModularityTest</code> 守着。所以跨模块只能通过 <code>KnowledgeApi</code> 这类接口说话，实现类改名不会波及调用方。</span>
+    </div>
+    <div class="rule rule--key">
+      <span class="n">3</span>
+      <span class="r">只有 <code>paideia-app</code> 能依赖所有人</span>
+      <span class="r-why">它是唯一的装配点。除了它，没有任何模块依赖别人的应用层。</span>
+    </div>
+  </div>
 
+  <h3>部署形态：一个进程，不是一个集群</h3>
   <figure>
-    <div class="diagram">
-<pre class="mermaid">
-flowchart TB
-  platform["paideia-platform"]
-  web["paideia-web"]
-  persistence["paideia-persistence"]
-  security["paideia-security"]
-  account["paideia-account"]
-  knowledge["paideia-knowledge"]
-  note["paideia-note"]
-  ai["paideia-ai"]
-  sandbox["paideia-sandbox"]
-  mcp["paideia-mcp"]
-  app["paideia-app"]
-  web --> platform
-  persistence --> platform
-  security --> platform
-  account --> platform
-  account --> persistence
-  account --> security
-  knowledge --> platform
-  knowledge --> persistence
-  knowledge --> security
-  note --> platform
-  note --> persistence
-  note --> security
-  ai --> platform
-  ai --> persistence
-  ai --> security
-  ai --> knowledge
-  ai --> sandbox
-  sandbox --> platform
-  sandbox --> persistence
-  sandbox --> security
-  mcp --> platform
-  mcp --> persistence
-  mcp --> security
-  app --> platform
-  app --> web
-  app --> persistence
-  app --> security
-  app --> account
-  app --> knowledge
-  app --> note
-  app --> ai
-  app --> sandbox
-  app --> mcp
-</pre>
+    <div class="d">
+      <div class="flow">
+        <div class="box">一台机器 · 一个 <code>systemd</code> 单元<small>重启命令只有一条</small></div>
+        <div class="link"></div>
+        <div class="box box--svc">一个 jar<small>11 个模块全在里面，82 MB</small></div>
+        <div class="link"></div>
+        <div class="row" style="justify-content:center">
+          <div class="box">HTTP 接口<small>/api/v1/**</small></div>
+          <div class="box">前端静态资源<small>顺带把 / 和 /admin/ 也发了</small></div>
+          <div class="box">定时任务<small>同一个进程内的线程</small></div>
+        </div>
+      </div>
     </div>
-    <figcaption><b>模块依赖。</b>由 <code>scripts/gen-arch-diagram.mjs</code> 从 11 个 <code>pom.xml</code> 生成（33 条依赖），权威副本在 <code>docs/architecture/01-module-dependencies.md</code>。</figcaption>
+    <figcaption><b>部署单元只有一个。</b>所以「发了后端但前端没更新」这种事不存在，它们本来就在同一个 jar 里。</figcaption>
   </figure>
 
+  <h2>设计取舍：为什么是单体，代价是什么</h2>
+  <p>这个项目从第一天就可以选微服务，但没有选。判断依据不是「谁更先进」，而是三件具体的事：</p>
+  <ul>
+    <li><b>事务边界在库里，不在网络里。</b>「扣积分 + 落消息 + 写流水」必须在同一个事务里成立，拆成服务就得引入分布式事务或最终一致——为一个人的项目换来的复杂度不划算。</li>
+    <li><b>没有独立扩容的需求。</b>真正重的只有 AI 调用，而它的耗时是上游决定的，多开几个实例并不能让它更快。</li>
+    <li><b>排障成本。</b>一个进程 + 一个库，出问题看一份日志、一条链路。拆开之后第一件事就是建一套分布式追踪，而那套东西本身也要维护。</li>
+  </ul>
+  <p><b>代价是真实的，写在明面上：</b></p>
+  <ul>
+    <li>没有按模块独立发版的能力——改一行笔记模块的代码，也要重启整个进程（纯后端一次约 60 秒，见 <a href="09-observability.html">09</a>）。</li>
+    <li>一个模块把内存打爆，全体一起挂。目前只有 AI 长文本与 SQL 沙箱有这种潜力。</li>
+    <li>模块边界靠构建期检查，不靠网络隔离。有人绕过契约去用别人的 Mapper，构建能挡住，但如果他改的是同一个模块的内部，谁也拦不住。</li>
+  </ul>
+  <p><b>什么时候该拆：</b>当 AI 调用成为主要负载、需要给沙箱单独设资源上限、或者要按模块独立发版时。在那之前，拆只会多出两份运维负担。</p>
+
+  <h2>读图要点</h2>
   <div class="notes">
-    <h2>读图要点</h2>
     <ul>
-      <li><b><code>paideia-app</code> 是唯一的装配点。</b>它依赖全部十个模块，负责把各自登记的 Bean 拼起来。除它之外，没有任何模块依赖别人的「应用层」。</li>
-      <li><b><code>paideia-ai</code> 为什么依赖 <code>knowledge</code> 和 <code>sandbox</code>：</b>助手要能读知识库条目、要在 SQL 沙箱里跑自己生成的 SQL。这两个依赖是<b>能力依赖</b>，不是数据依赖——AI 模块没有拿到别人的表。</li>
-      <li><b>三个底座模块之间互不依赖。</b><code>platform</code>（异常、业务码、时间、Clock）、<code>persistence</code>（MyBatis 与会话）、<code>security</code>（JWT 与规则）各自独立，谁也不认识谁。</li>
-      <li><b>没有消息队列。</b>全仓的异步只有两种形态：请求线程内的异步任务，和 <code>@Scheduled</code> 定时任务（清理过期状态、抓取、每日速递）。看到架构规则里提到消息中间件时不要去找代码，那是没落地的决策。</li>
-      <li><b>外部依赖里最容易误判的是对象存储。</b>它有一个端口接口，本地磁盘实现与 S3 实现可以配置切换——「端口可换」这句话的真假，取决于同一批用例有没有在两种实现上都跑过。</li>
+      <li><b><code>paideia-ai</code> 为什么依赖 <code>knowledge</code> 和 <code>sandbox</code>：</b>助手要能读知识库条目、要在 SQL 沙箱里跑自己生成的 SQL。这是<b>能力依赖</b>，不是数据依赖——AI 模块没有拿到别人的表。</li>
+      <li><b>三个底座模块互不依赖。</b><code>platform</code>（异常、业务码、时间）、<code>persistence</code>（MyBatis 与会话）、<code>security</code>（JWT 与规则）各自独立，谁也不认识谁。</li>
+      <li><b>没有消息队列。</b>全仓的异步只有两种：请求线程内的异步任务，和 <code>@Scheduled</code> 定时任务。看到架构规则里提到消息中间件时不要去找代码——那是没落地的决策。</li>
+      <li><b>外部依赖里只有 MySQL 不可替换。</b>对象存储有端口抽象（本地磁盘 / S3 可配置切换），AI 上游是唯一真正花钱的地方，Laya 与监控都是可选增强。</li>
+      <li><b>「端口可换」这句话的真假，取决于同一批用例有没有在两种实现上都跑过。</b>只写了一层接口不算。</li>
     </ul>
   </div>
 
   <div class="notes">
     <h2>代码在哪</h2>
     <ul class="paths">
-      <li><code>backend/pom.xml</code> — 模块清单与依赖声明，图的唯一事实源</li>
-      <li><code>backend/paideia-app/</code> — 装配点；启动类、<code>ModularityTest</code>、所有业务编排都在这</li>
+      <li><code>backend/pom.xml</code> — 模块清单与依赖声明，本文所有箭头的事实源</li>
+      <li><code>backend/paideia-app/</code> — 装配点：启动类、<code>ModularityTest</code>、业务编排</li>
       <li><code>backend/paideia-platform/</code> — 异常基类与业务码、<code>Clock</code></li>
       <li><code>frontend/apps/app</code>、<code>frontend/apps/admin</code>、<code>frontend/apps/desktop</code> — 三个可运行端</li>
+      <li><code>docs/architecture/01-module-dependencies.md</code> — 由 <code>gen-arch-diagram.mjs</code> 生成的完整依赖清单（33 条边）</li>
     </ul>
   </div>
 
   <div class="warn">
-    <b>看图时最容易犯的错：</b>把模块当微服务，然后去找它们之间的 HTTP 调用。没有。所有跨模块调用都是同进程的方法调用，失败不会变成超时，也不会重试——出问题就是一个异常向上抛，由 <code>GlobalExceptionHandler</code> 转成业务码（见 <a href="02-request-lifecycle.html">02</a>）。
+    <b>最容易犯的错：</b>把模块当微服务，然后去找它们之间的 HTTP 调用。没有。所有跨模块调用都是同进程的方法调用，失败不会变成超时、不会重试——出问题就是一个异常向上抛，由 <code>GlobalExceptionHandler</code> 转成业务码（见 <a href="02-request-lifecycle.html">02</a>）。
   </div>
 </main>
 
-<script src="vendor/mermaid.min.js"></script>
-<script src="diagram.js"></script>
 </body>
 </html>

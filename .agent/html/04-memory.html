@@ -16,83 +16,132 @@
 
   <h2>先看一个具体场景</h2>
   <p>你跟助手说「我不爱看视频，只看文字」。这句话当时不会立刻改变什么。你们接着聊，聊到第六轮的时候，后台趁你没注意，把这句话提炼成一条短记忆存起来。</p>
-  <p>下次你随口问「推荐点东西看看」，它在开头就把这条记忆翻出来塞进提示词——于是推荐里没有视频。你不需要再说一遍，也没法直接看见这个过程。</p>
+  <p>下次你随口问「推荐点东西看看」，它在开头就把这条记忆翻出来塞进提示词——于是推荐里没有视频。你不用再说一遍，也看不见这个过程。</p>
 
   <figure>
-    <div class="diagram">
-<pre class="mermaid">
-flowchart TB
-  A["你：说『我不爱看视频』"] --> B["这句话先只存在当前对话里"]
-  B --> C["你们继续聊<br/>到第 6 轮时后台自动整理一次"]
-  C --> D["系统：把它提炼成一条短句<br/>『偏好文字教程，不看视频』存进你的记忆表"]
-  D --> E["下次你问『推荐点东西』"]
-  E --> F["系统：用你这句话当关键词<br/>翻出最多 8 条记忆，一起塞进提示词"]
-  F --> G["你看到：推荐里真的没有视频"]
-</pre>
+    <div class="d">
+      <div class="flow">
+        <div class="box box--you">你：说「我不爱看视频」</div>
+        <div class="link"></div>
+        <div class="box">这句话先只存在当前对话里<small>模型这一轮就能看到，但它不会自己记住</small></div>
+        <div class="link"></div>
+        <div class="box box--svc">你们继续聊，到第 6 轮时后台自动整理一次<small>异步跑，不占你这一轮的响应时间</small></div>
+        <div class="link"></div>
+        <div class="box box--data">提炼成一条短句存进记忆表<small>「偏好文字教程，不看视频」</small></div>
+        <div class="link"></div>
+        <div class="box box--svc">下次你问「推荐点东西」<small>用你这句话当关键词翻出最多 8 条记忆</small></div>
+        <div class="link"></div>
+        <div class="box box--you">你看到：推荐里真的没有视频</div>
+      </div>
     </div>
     <figcaption><b>记忆不是模型自己决定的。</b>写入有三个明确入口，读取则每轮都自动跑一次。</figcaption>
   </figure>
 
   <h2>它内部是怎么做到的</h2>
-  <p>记忆不是「模型自己决定记什么」，而是<b>三条明确的写入路径</b>加一条<b>自动的读取路径</b>。读取一直是自动的（每一轮都用你这句话当关键词去找），只有写入需要触发条件。所以「加个开启个性化记忆的开关」这个需求如果按字面理解会做错——召回本来就在跑，缺的是写入的自动化程度。</p>
-  <p>两张表：<code>ai_memories_structured</code>（短结构，512 字符以内）与 <code>ai_memories_text</code>（长文本，1024 字符以内）。<b>两张都带 <code>user_id</code></b>——「记忆是全局的」指的是跨身份、跨页面都生效，不是所有人共享。这一条被误解过一次，值得写进图里。</p>
+  <p>记忆不是「一个开关」，是<b>三个开关 + 三条写入路径 + 一条读取路径</b>。这张图把四者放在一起：实线是数据流，虚线是开关对它的影响。</p>
 
   <figure>
-    <div class="diagram">
-<pre class="mermaid">
-flowchart TB
-  U["用户"] --> Q["这一轮的输入"]
-  Q --> RC["召回：用本轮输入当关键词检索<br/>最多 8 条进提示词"]
-  U --> M1["说「记住这条」"]
-  M1 --> W1["手动写入"]
-  U --> A1["聊满 6 轮"]
-  A1 --> W2["MemoryExtractionService<br/>异步批量提取<br/>条件 UPDATE 抢游标"]
-  U --> S1["修改知识点自评"]
-  S1 --> W3["SelfAssessmentMemoryBridge<br/>写一条结构化记忆"]
-  W1 --> T1[("ai_memories_structured")]
-  W1 --> T2[("ai_memories_text")]
-  W2 --> T1
-  W2 --> T2
-  W3 --> T1
-  RC --> T1
-  RC --> T2
-  SW["ai_user_settings<br/>记忆开关 · 引用记忆 · 引用历史"] -.-> RC
-  SW -.-> W2
-</pre>
+    <div class="d">
+      <div class="layer">
+        <div class="layer-name">读取<br/>（每轮自动）</div>
+        <div class="layer-body">
+          <div class="box box--svc">用本轮输入当关键词检索<small>全文索引可用走全文，否则退化成 LIKE</small></div>
+          <div class="box">取最近 8 条<small>不重新打分排序——这是已知限制</small></div>
+          <div class="box">拼进系统提示<small>排在你的历史窗口之前</small></div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">写入 ①<br/>手动</div>
+        <div class="layer-body">
+          <div class="box box--you">你说「记住这条」</div>
+          <div class="box">明确意图，直接落库<small>可选结构化（短）或长文本</small></div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">写入 ②<br/>自动</div>
+        <div class="layer-body">
+          <div class="box">每满 6 轮触发一次</div>
+          <div class="box">把最近 40 条记忆全喂给模型判断重复<small>重复时<b>覆盖</b>，不追加；用条件 UPDATE 抢游标防重复提取</small></div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">写入 ③<br/>自评变化</div>
+        <div class="layer-body">
+          <div class="box">你改一次知识点自评</div>
+          <div class="box">写一条结构化记忆<small>这是「你哪块弱」能进脑子而不只是进表的唯一桥</small></div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">开关<br/>（三个）</div>
+        <div class="layer-body">
+          <div class="box">总开关 <code>memoryEnabled</code><small>关掉 = 写入停止 + 召回跳过</small></div>
+          <div class="box">引用已存记忆</div>
+          <div class="box">引用对话历史</div>
+          <div class="box box--fail">清空并关闭是一个端点<small>避免「先删后关」中途被打断又被写回</small></div>
+        </div>
+      </div>
     </div>
-    <figcaption><b>一读三写。</b>实线是数据流，虚线是开关对路径的影响。关掉开关只让写入停止、召回跳过，<b>不删已有数据</b>。</figcaption>
+    <figcaption><b>一读三写三个开关。</b>关掉开关<b>不删已有数据</b>——删除是另一个明确动作。</figcaption>
   </figure>
 
+  <h3>记忆在提示词里的位置</h3>
+  <p>这一点决定了「为什么它有时候像记得、有时候像忘了」。每次请求发给上游的内容是分段的，顺序固定：</p>
+
+  <div class="d">
+    <div class="rules">
+      <div class="rule"><span class="n">1</span><span class="r">系统提示 + 场景说明</span><span class="r-why">公共行为，同场景所有人一样</span></div>
+      <div class="rule"><span class="n">2</span><span class="r">记忆片段（≤ 8 条）</span><span class="r-why">只要命中关键词就进来；命中不了就是没有</span></div>
+      <div class="rule"><span class="n">3</span><span class="r">对话历史窗口</span><span class="r-why">按条数截断，越老越先掉出去</span></div>
+      <div class="rule"><span class="n">4</span><span class="r">当前页面上下文</span><span class="r-why">你在哪篇文章里问的，这个信息只在当轮存在</span></div>
+      <div class="rule"><span class="n">5</span><span class="r">你这一句话</span><span class="r-why">最后才是本体</span></div>
+    </div>
+  </div>
+
+  <h3>两张表、两个上限</h3>
+  <table>
+    <thead><tr><th>表</th><th>放什么</th><th>上限</th><th>怎么进提示词</th></tr></thead>
+    <tbody>
+      <tr><td><code>ai_memories_structured</code></td><td>键值式的短记忆（偏好、目标、约束）</td><td>512 字符</td><td>每轮都参与召回，最常用</td></tr>
+      <tr><td><code>ai_memories_text</code></td><td>一段话的长记忆（背景、经历）</td><td>1024 字符</td><td>按关键词命中才进</td></tr>
+    </tbody>
+  </table>
+  <p><b>两张表都带 <code>user_id</code>，严格私有。</b>「记忆是全局的」这句话指的是跨身份、跨页面都生效，<b>不是所有人共享</b>——这一条被误解过一次，所以写进图里。</p>
+
+  <h2>设计取舍：为什么不用向量检索</h2>
+  <ul>
+    <li><b>规模不需要。</b>一个人的记忆量级是几十到几百条，关键词 + 时间排序已经够用；向量库在这里只会多一套要备份、要迁移的外部依赖。</li>
+    <li><b>数据库不支持。</b>项目只用 MySQL，社区版不能对 <code>VECTOR</code> 列做排序。真要上向量就得引入第二个数据库。</li>
+    <li><b>代价是召回不精确。</b>所以有两条补救：自评变化会写一条结构化记忆（保证「你哪块弱」这种关键信息一定在），以及手动「记住这条」让用户能把重要的事钉死。</li>
+    <li><b>判重为什么全喂给模型，而不是先检索再判。</b>检索判重会在「说法不同但意思相同」时失效（「不爱看视频」vs「偏好文字」）。把最近 40 条直接给模型看，准确率更高，代价是每次整理多几百 token。</li>
+    <li><b>为什么关掉不删。</b>用户关开关的心理预期是「别再用它」，不一定是「销毁它」。真要销毁有一个明确的清空动作，两步分开。</li>
+  </ul>
+
+  <h2>读图要点</h2>
   <div class="notes">
-    <h2>读图要点</h2>
     <ul>
-      <li><b>写入路径一：手动。</b>用户说「记住这条」，明确意图，直接落库。可带结构（键值式的短记忆）或长文本。</li>
-      <li><b>写入路径二：每满 6 轮自动提取（异步）。</b>不阻塞对话；用一条带条件的 UPDATE 抢游标（<code>extracted_upto</code> 一类的列配 <code>&lt;=&gt;</code> 比较），并发或重复触发都不会重复提取同一段。判重不靠检索，而是<b>把最近 40 条结构化记忆全喂给模型</b>，让它判断「这条已有」还是「这条是新的」——重复时用覆盖，不追加。</li>
-      <li><b>写入路径三：自评变化。</b>改一次知识点自评就写一条结构化记忆。这是「你哪块弱」能进脑子而不只是进表的唯一桥；没有它，助手只能在你问的时候临时去查自评表。</li>
-      <li><b>读取：每轮都跑，最多 8 条。</b>全文索引可用时走全文检索，否则退化成 LIKE。召回结果<b>不重新打分排序</b>——这是已知限制，不是设计意图。</li>
-      <li><b>开关是三个，不是一个：</b>总开关、引用已存记忆、引用对话历史。清空并关闭是<b>一个端点</b>，避免「先删后关」中间被打断导致数据又被写回来。</li>
       <li><b>提取本身要花钱</b>（虽然不贵），所以走独立的 <code>MEMORY_EXTRACT</code> 流水。用户在积分面板上能看出「没聊几次为什么花了钱」。</li>
-      <li><b>已知缺口：写入前没有 PII / 密钥过滤。</b>用户把 token 粘进对话，提取路径可能把它写成一条记忆。这是这份导读里唯一一处「读代码就知道该补、但确实还没补」的地方。</li>
+      <li><b>提取在异步线程里跑。</b>所以它失败不影响你这一轮的回答；但也意味着「刚说完就想让它记住」不会立刻生效，最快也要等下一轮或第 6 轮。</li>
+      <li><b>游标是条件 UPDATE 抢的</b>（<code>&lt;=&gt;</code> 比较），并发或重复触发都不会把同一段对话提取两次。这条有反向验证过。</li>
+      <li><b>已知缺口：写入前没有 PII / 密钥过滤。</b>用户把 token 粘进对话，提取路径可能把它写成一条记忆。这是读代码就知道该补、但确实还没补的一项。</li>
     </ul>
   </div>
 
   <div class="notes">
     <h2>代码在哪</h2>
     <ul class="paths">
-      <li><code>backend/paideia-ai/…/memory/MemoryStore.java</code> — 召回（<code>RECALL_LIMIT = 8</code>）、写入、判重的池子</li>
-      <li><code>backend/paideia-ai/…/memory/MemoryExtractionService.java</code> — 每轮触发条件与游标抢占</li>
+      <li><code>backend/paideia-ai/…/memory/MemoryStore.java</code> — 召回（<code>RECALL_LIMIT = 8</code>）、写入、判重池</li>
+      <li><code>backend/paideia-ai/…/memory/MemoryExtractionService.java</code> — 触发条件与游标抢占</li>
+      <li><code>backend/paideia-ai/…/memory/MemoryProperties.java</code> — <code>roundsPerExtraction = 6</code></li>
       <li><code>backend/paideia-ai/…/memory/SelfAssessmentMemoryBridge.java</code> — 自评 → 记忆的桥</li>
       <li><code>backend/paideia-ai/…/settings/AiSettingsStore.java</code> — 三个开关与「清空并关闭」</li>
-      <li><code>backend/paideia-app/src/main/resources/db/migration/V6__create_memory_tables.sql</code>、<code>V12__memory_auto_extraction_and_settings.sql</code></li>
+      <li><code>db/migration/V6__create_memory_tables.sql</code>、<code>V12__memory_auto_extraction_and_settings.sql</code></li>
     </ul>
   </div>
 
   <div class="warn">
-    <b>别把「记忆」和「会话历史」混为一谈。</b>历史是逐字的消息记录，按会话窗口截断；记忆是从历史里提炼出来的短句。注入提示词时两者是两段不同的内容，开关也是分开的（引用记忆 / 引用历史）。调参时先分清是哪一段给多了或给少了。
+    <b>别把「记忆」和「会话历史」混为一谈。</b>历史是逐字的消息记录，按窗口截断；记忆是从历史里提炼出来的短句。注入提示词时两者是两段不同的内容，开关也是分开的。调参时先分清是哪一段给多了或给少了。
   </div>
 </main>
 
-<script src="vendor/mermaid.min.js"></script>
-<script src="diagram.js"></script>
 </body>
 </html>

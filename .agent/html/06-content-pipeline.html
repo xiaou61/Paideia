@@ -19,65 +19,105 @@
   <p>九点你打开「每日速递」，看到一屏今天的内容。另一条线是面经：抓完先进草稿箱，管理员看过才放出来——因为抓来的东西可能是垃圾。</p>
 
   <figure>
-    <div class="diagram">
-<pre class="mermaid">
-flowchart TB
-  A["没人操作，早上 8 点定时任务自己启动"] --> B["出去抓：Hacker News、RSS、GitHub 趋势"]
-  B --> C["几十条原始内容，标题 + 链接"]
-  C --> D["只调一次 AI：写摘要 + 给每条打 0–100 重要度"]
-  D --> E["按重要度排好，存进当天的速递表"]
-  E --> F["你：9 点打开『每日速递』<br/>看到今天这一屏"]
-  G["另一条线：抓面经"] --> H["先扔进草稿箱"]
-  H --> I["管理员：看过才发布<br/>（抓来的可能是垃圾）"]
-</pre>
+    <div class="d">
+      <div class="flow">
+        <div class="box">没人操作，早上 8 点定时任务自己启动<small>按北京时间解释 cron，不是「上次跑完 +24h」</small></div>
+        <div class="link"></div>
+        <div class="box box--ext">出去抓：Hacker News、RSS、GitHub 趋势</div>
+        <div class="link"></div>
+        <div class="box">几十条原始内容：标题 + 链接 + 一点正文</div>
+        <div class="link"></div>
+        <div class="box box--svc">只调一次 AI：写摘要 + 给每条打 0–100 重要度<small>摘要、去重、打分在同一轮里完成</small></div>
+        <div class="link"></div>
+        <div class="box box--data">按重要度排好，存进当天的速递表</div>
+        <div class="link"></div>
+        <div class="box box--you">你：9 点打开「每日速递」，看到今天这一屏</div>
+      </div>
     </div>
-    <figcaption><b>平台上的内容分两种：人写的和机器抓的。</b>机器抓的要么每天过期（速递），要么必须人工过一道（面经）。</figcaption>
+    <figcaption><b>这条线上没有人。</b>它每天自己跑一次，失败也只是少一期，不会影响其它功能。</figcaption>
   </figure>
 
   <h2>它内部是怎么做到的</h2>
-  <p>三条互不干扰的源：<b>人工文稿</b>（markdown，脚本导入）、<b>抓取</b>（面经，进草稿）、<b>聚合</b>（新闻 / GitHub，落速递表）。前两条最终都变成 <code>knowledge_entries</code>，第三条<b>不进知识库</b>——速递是独立的两张表，因为它每天过期、且不属于学习路径。</p>
-  <p>「一天只调一次 AI」是硬约束，不是优化：抓回来的几十条会被压缩成一次摘要调用，摘要、去重、0–100 重要度打分在同一轮里完成。这条约束决定了这套系统的成本上限是「每天几分钱」而不是「随流量线性增长」。</p>
+  <p>三条互不干扰的源，各自的「产物」和「把关人」都不一样。关键区别在最后两列：</p>
 
+  <table>
+    <thead><tr><th>源</th><th>怎么进来</th><th>频率</th><th>落到哪</th><th>谁把关</th></tr></thead>
+    <tbody>
+      <tr><td><b>人工文稿</b></td><td><code>scripts/import-course.mjs</code> 走管理端接口，幂等导入</td><td>人工触发</td><td><code>knowledge_entries</code></td><td>写稿的人 + code review</td></tr>
+      <tr><td><b>面经抓取</b></td><td><code>EssayCollectionJob</code> 每天抓牛客列表，抽成可读题目，再做相关性判定</td><td>每天一次</td><td>先草稿，发布后进 <code>knowledge_entries</code></td><td><b>管理员逐条过</b></td></tr>
+      <tr><td><b>每日速递</b></td><td>HN / RSS / GitHub 三源汇总 → 一次 AI 摘要打分</td><td>每天一次（cron）</td><td><code>digest_items</code>、<code>digest_weeklies</code></td><td>没有人工，靠打分与源筛选</td></tr>
+    </tbody>
+  </table>
+
+  <h3>三条源各自的关键动作</h3>
   <figure>
-    <div class="diagram">
-<pre class="mermaid">
-flowchart TB
-  subgraph 人工
-    MD["content/courses · content/reading<br/>markdown"] --> IMP["scripts/import-course.mjs"]
-  end
-  subgraph 抓取
-    NC["牛客面经列表"] --> ES["EssayCollectionService"]
-    ES --> EEX["EssayExtractor<br/>正文 → 可读题目"]
-    EEX --> LAYA["TechEssayFilter<br/>Laya 相关性重排"]
-    LAYA --> DRAFT["草稿条目"]
-  end
-  subgraph 聚合
-    HN["Hacker News"] --> DC["DigestCollectionService"]
-    RSS["RSS 源"] --> DC
-    GH["GitHub 趋势 + Star 历史"] --> DC
-    DC --> DS["DigestSummarizer<br/>一次 AI 调用：摘要 + 重要度"]
-  end
-  IMP --> ENT[("knowledge_entries")]
-  DRAFT --> ENT
-  DS --> DI[("digest_items")]
-  DW["DigestWeeklyService"] --> DI
-  DI --> PAGE["每日速递页"]
-  ENT --> PAGE2["知识库 / 学习线"]
-</pre>
+    <div class="d">
+      <div class="layer">
+        <div class="layer-name">人工</div>
+        <div class="layer-body">
+          <div class="box">md 文件</div>
+          <div class="box">导入脚本<small>不认识的分类绝不写入；源文件删了也不删线上条目</small></div>
+          <div class="box box--data">entries</div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">抓取</div>
+        <div class="layer-body">
+          <div class="box box--ext">牛客列表</div>
+          <div class="box">正文抽取<small>把一页帖子抽成「题目 + 面经正文」</small></div>
+          <div class="box box--ext">Laya 判定<small>只给固定候选重排，不做生成</small></div>
+          <div class="box box--fail">草稿</div>
+          <div class="box">管理员发布</div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">聚合</div>
+        <div class="layer-body">
+          <div class="box box--ext">HN / RSS / GitHub</div>
+          <div class="box">收集 + 指纹去重</div>
+          <div class="box box--svc">一次 AI：摘要 + 0–100 分</div>
+          <div class="box box--data">digest_items</div>
+        </div>
+      </div>
     </div>
-    <figcaption><b>三条源。</b>抓取默认落草稿、人工导入幂等、聚合每天一次。三条都不互相依赖，任何一条挂了不影响另外两条。</figcaption>
+    <figcaption><b>三条源互不依赖。</b>任何一条挂了，另外两条照常。</figcaption>
   </figure>
 
+  <h3>定时任务的三条纪律</h3>
+  <div class="rules">
+    <div class="rule rule--key">
+      <span class="n">1</span>
+      <span class="r">用带时区的 cron，不用「每 24 小时」</span>
+      <span class="r-why"><code>fixedDelay=24h</code> 的锚点是「上次跑完」，会随重启漂移；cron 的锚点是墙上时间。</span>
+    </div>
+    <div class="rule rule--key">
+      <span class="n">2</span>
+      <span class="r">异常必须自己吞掉并记录</span>
+      <span class="r-why"><code>@Scheduled</code> 抛出的异常只会让 Spring 打一行错误，下一轮照旧。所以每个任务都自己记成功/失败，指标挂在 <code>ScheduledTaskMetrics</code> 上。</span>
+    </div>
+    <div class="rule rule--key">
+      <span class="n">3</span>
+      <span class="r">重启后要能补当天内容</span>
+      <span class="r-why">换成 cron 后重启不再自动补，所以另有一个启动任务带「今天已有就跳过」的判断。少了它，部署完要等一整晚。</span>
+    </div>
+  </div>
+
+  <h2>设计取舍：为什么一天只调一次 AI</h2>
+  <p>抓回来的可能是 60 条，逐条调 AI 就是 60 次调用。压成一次，成本上限从「随源数量增长」变成「每天一次」——现在这条线的月成本是几分钱量级。</p>
+  <p><b>代价是：</b>一次调用要处理几十条，单条精度不如逐条分析；某一条特别长的内容可能挤占预算。所以先做<b>源内筛选</b>（按热度、时间窗），再交给模型。</p>
+  <ul>
+    <li><b>为什么抓取必须先落草稿：</b>面经是外部文本，抽取和判定都可能错。直接发布等于让垃圾上线，而且发布是有外链、有 SEO 的公开行为，撤回来成本更高。</li>
+    <li><b>为什么 GitHub 是「页面优先 + Search 兜底」：</b>生产机访问趋势页经常超时。兜底条件是「最近 3 天、≥ 50 星、最多 30 条」——不要以为那是主路径。</li>
+    <li><b>为什么必须指纹去重：</b>同一条内容今天抓到、明天还会抓到。指纹（标题 + 链接一类）靠唯一键覆盖；弄丢指纹的结果是每天多一批重复标题。</li>
+  </ul>
+
+  <h2>读图要点</h2>
   <div class="notes">
-    <h2>读图要点</h2>
     <ul>
-      <li><b>定时任务从不用「每 24 小时」。</b>速递用带时区的 cron（默认北京 08:00，可配），因为 <code>fixedDelay=24h</code> 的锚点是「上次跑完」，会随重启漂移。</li>
-      <li><b>异常必须吞掉并记录。</b><code>@Scheduled</code> 抛出的异常只会让 Spring 打一行错误，下一轮照旧——所以每个任务都自己记成功/失败，指标挂在 <code>ScheduledTaskMetrics</code> 上。没有这个指标，「昨晚跑没跑」只能靠猜。</li>
-      <li><b>重启后要能补当天内容。</b>换成 cron 之后重启不再自动补，所以额外的启动任务带着「今天已经有内容就跳过」的判断。少了这个判断，部署完就要等一整晚。</li>
-      <li><b>抓取永远先落草稿。</b>面经是外部文本，相关性判定也可能错；直接发布等于让抓取失败的垃圾内容上线。管理员复查后才进知识库。</li>
-      <li><b>GitHub 趋势页经常超时</b>（生产机访问不到时是常态），所以是「页面优先 + Search 兜底」，兜底条件是「最近 3 天、≥50 星、最多 30 条」。不要以为那是主路径。</li>
-      <li><b>抓来的正文是不可信输入。</b>它会被喂给模型做摘要——这是整条生产线唯一的安全风险面（提示注入）。读这一层时先看它对输入做了什么，而不是看它画得多漂亮。</li>
+      <li><b>抓来的正文是不可信输入。</b>它会被喂给模型做摘要——这是整条生产线<b>唯一的安全风险面</b>（提示注入）。读这一层先看它对输入做了什么，而不是看它画得多漂亮。</li>
       <li><b>速递的「今天」按北京时间算</b>，与库里的 UTC 存储是两个概念。跨时区显示的 bug 十次有九次出在这里。</li>
+      <li><b>速递不进知识库。</b>它是独立的两张表，因为每天过期、也不属于学习路径。把它塞进 <code>knowledge_entries</code> 会让分类树和搜索被新闻淹没。</li>
+      <li><b>没有人工审核不等于没有把关。</b>速递的把关是「源 + 打分 + 排序」，面经的把关是「管理员」。两者风险等级不同，所以流程不同。</li>
     </ul>
   </div>
 
@@ -87,19 +127,17 @@ flowchart TB
       <li><code>backend/paideia-ai/…/digest/DigestJob.java</code> — 每日采集调度、启动补跑判断</li>
       <li><code>backend/paideia-ai/…/digest/DigestCollectionService.java</code> — 三源汇总、去重、调用摘要</li>
       <li><code>backend/paideia-ai/…/digest/GithubTrendingSource.java</code>、<code>GithubStarHistory.java</code> — 趋势页与兜底</li>
-      <li><code>backend/paideia-ai/…/essay/EssayCollectionJob.java</code>、<code>NowcoderEssaySource.java</code> — 面经抓取</li>
+      <li><code>backend/paideia-ai/…/essay/EssayCollectionJob.java</code>、<code>NowcoderEssaySource.java</code></li>
       <li><code>backend/paideia-ai/…/decision/TechEssayFilter.java</code> — 判定服务调用</li>
       <li><code>scripts/import-course.mjs</code> — 人工内容导入</li>
-      <li><code>backend/paideia-app/…/ops/ScheduledTaskMetrics.java</code> — 定时任务的成功/失败计数</li>
+      <li><code>backend/paideia-app/…/ops/ScheduledTaskMetrics.java</code> — 定时任务的成败计数</li>
     </ul>
   </div>
 
   <div class="warn">
-    <b>这条线上最贵的错误是「重复采集」。</b>每条内容都有一个指纹（标题+链接一类的哈希），靠唯一键覆盖。改采集逻辑时如果弄丢了指纹，第二天就会出现一堆标题相同的重复条目，而且是每天多一批。
+    <b>改采集逻辑时先确认指纹还在。</b>「重复采集」这条线最贵的错误不是抓不到，而是每天多一批重复条目——而且它不会报错，只会让速递页越来越像一锅粥。
   </div>
 </main>
 
-<script src="vendor/mermaid.min.js"></script>
-<script src="diagram.js"></script>
 </body>
 </html>

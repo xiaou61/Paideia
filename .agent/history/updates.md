@@ -7332,3 +7332,19 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：`node .agent/html/render-check.mjs --shots` → 11 页 / 29 张图 / 0 失败（每页图数与 index 卡片标注逐一核对）
 - 本地提交：本轮单独提交
 - 远端推送：未执行
+
+## 2026-10-28 11:20:00 +0800 · 架构导读改为纯手写 HTML/CSS 图，并每页补「设计取舍」
+
+- 类型：docs
+- 变更：
+  - 删除 `.agent/html/vendor/mermaid.min.js`（5.2 MB）与 `diagram.js`：页面不再引任何图表库，所有图改为 `style.css` 中的手写图元（`.flow` / `.steps` / `.layer` / `.rules` / `.box` / `.link`）拼装，打开即渲染、无脚本、无网络
+  - 10 个专题页全部重写：每页固定四段——先看一个具体场景 / 它内部是怎么做到的 / 设计取舍 / 读图要点 + 代码在哪。新增「设计取舍」段落在每页明确写出「为什么这么做、代价是什么、什么时候该改」
+  - 用分层图、判定阶梯、规则顺序表替代原来的箭头图：模块全景从 33 条边的依赖图改为五层结构 + 三条硬规则；数据模型从外键图改为九域表 + 内容域外键块 + 注销清单叙事
+  - `render-check.mjs` 改为查「布局与依赖」：1440/1280 两个宽度下控制台无报错、`.d` 无横向溢出、侧栏 11 条、除 `nav.js` 外不得引任何脚本
+- 决策：
+  - 用户反馈「用 drawio 渲染很卡、不要用渲染器、要手工画、要更详细、要体现架构思维」→ 图表库整块去掉；图的表达力靠分层与判定顺序，而不是靠自动布线
+  - 每页把「取舍」写成一等段落：只画结构不写取舍，看不出架构判断；这也是原版被认为「体现不出架构思维」的根因
+- 依据：`docs/architecture/README.md` 的两类图约定；`SecurityConfiguration` / `ConversationService` / `CreditService` / `TokenService` / `MemoryStore` / `MasteryModel` / 迁移文件的实际代码
+- 验证：`node .agent/html/render-check.mjs` → 11 页 × 两个宽度 / 0 失败；`rg mermaid .agent/html` 仅剩产品渲染器的一句描述
+- 本地提交：本轮单独提交
+- 远端推送：未执行

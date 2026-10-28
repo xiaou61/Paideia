@@ -110,20 +110,93 @@ code, kbd {
   white-space: nowrap;
 }
 
-/* ── 图 ─────────────────────────────────────────────── */
+/* ── 图：全部手写 HTML/CSS，不跑任何渲染引擎 ─────────── */
 figure { margin: 22px 0 26px; }
-.diagram {
+.d {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 18px;
-  overflow-x: auto;
+  padding: 22px;
 }
-.diagram svg { max-width: none; height: auto; display: block; margin: 0 auto; }
-/* 宽图不被压缩，改为横向滚动；滚动这件事必须说出来，否则右半截等于不存在。 */
-figure.scrollable figcaption::before { content: "← 可横向滚动 →   "; color: var(--accent); font-weight: 600; }
 figcaption { margin-top: 10px; font-size: 13.5px; color: var(--muted); }
 figcaption b { color: var(--fg); font-weight: 600; }
+
+/* 竖排流程：方框 + 箭头 */
+.flow { display: flex; flex-direction: column; align-items: center; }
+.box {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 16px;
+  background: var(--bg);
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: center;
+  max-width: 520px;
+}
+.box b { font-weight: 600; }
+.box small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.box--svc { border-color: color-mix(in srgb, var(--accent) 42%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.box--data { border-color: #3f8f7f; background: color-mix(in srgb, #3f8f7f 9%, transparent); }
+.box--ext { border-style: dashed; }
+.box--fail { border-color: #c0504d; background: color-mix(in srgb, #c0504d 9%, transparent); }
+.box--you { border-color: var(--accent); font-weight: 600; }
+
+.link { width: 2px; height: 26px; background: var(--line); position: relative; flex: none; }
+.link::after {
+  content: ""; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+  border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 7px solid var(--line);
+}
+.link--dashed { background: none; border-left: 2px dashed var(--line); width: 0; }
+.link-label {
+  font-size: 11.5px; color: var(--muted); background: var(--card);
+  padding: 0 6px; position: relative; top: -2px;
+}
+
+/* 横排 / 分层 */
+.row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.layer {
+  display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 14px; align-items: center;
+  padding: 12px; border: 1px dashed var(--line); border-radius: 10px;
+}
+.layer + .layer { margin-top: 10px; }
+.layer-name { font-size: 12px; color: var(--muted); text-align: right; line-height: 1.4; }
+.layer-body { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* 判定阶梯（时序 / 规则顺序） */
+.steps { display: grid; grid-template-columns: 92px 20px 108px minmax(0, 1fr); align-items: stretch; }
+.steps > span { padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; line-height: 1.5; }
+.steps > span:nth-last-child(-n + 4) { border-bottom: 0; }
+.steps .from { color: var(--muted); text-align: right; padding-right: 6px; }
+.steps .arrow { color: var(--accent); text-align: center; }
+.steps .to { font-weight: 600; }
+.steps .what { padding-left: 8px; }
+.steps .what small { display: block; color: var(--muted); font-size: 12.5px; }
+.steps .fail .what, .steps > .what.fail { color: #b45309; }
+
+/* 规则阶梯：单列，说明跟在标题下面（两列会在宽屏上留出一大片空白） */
+.rules { display: flex; flex-direction: column; }
+.rule {
+  display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 2px 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--line); align-items: baseline;
+}
+.rule:last-child { border-bottom: 0; }
+.rule .n { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+.rule .r { font-size: 14px; }
+.rule .r code { white-space: normal; word-break: break-all; }
+.rule .r-why { grid-column: 2; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.rule--key .r { font-weight: 600; }
+.rule--danger { background: color-mix(in srgb, #c0504d 7%, transparent); }
+
+/* 小徽标 */
+.tag {
+  display: inline-block; font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
+  padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line);
+  color: var(--muted); font-weight: 600; vertical-align: 1px;
+}
+.tag--ok { color: #2f7d5d; border-color: #3f8f7f; }
+.tag--bad { color: #a5403d; border-color: #c0504d; }
+.tag--money { color: #8a6d1f; border-color: #b8912f; }
 
 /* ── 要点 / 注意 / 代码位置 ─────────────────────────── */
 .notes {

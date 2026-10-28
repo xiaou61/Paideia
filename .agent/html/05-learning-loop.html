@@ -19,96 +19,120 @@
   <p>过两天你打开首页和复习页，发现推给你的题变多了，而且总和「索引」有关。等你连着答对几道，它又慢慢往上调回去。</p>
 
   <figure>
-    <div class="diagram">
-<pre class="mermaid">
-flowchart TB
-  A["你：读完一课"] --> B["你：点『练一练』，做了 3 道题"]
-  B --> C["系统：当场判对错<br/>（答案就在正文里，不另存一份）"]
-  C --> D["你：错了 2 道，都关于『索引』"]
-  D --> E["系统：把『索引』的掌握度往下调<br/>同时记下你答错的具体题目"]
-  E --> F["你：过两天打开首页 / 复习页"]
-  F --> G["你看到：『索引』的题变多了<br/>答对几次之后又慢慢减少"]
-</pre>
+    <div class="d">
+      <div class="flow">
+        <div class="box box--you">你：读完一课</div>
+        <div class="link"></div>
+        <div class="box box--you">你：点「练一练」，做了 3 道题</div>
+        <div class="link"></div>
+        <div class="box box--svc">系统：当场判对错<small>答案就在正文里，不另存一份</small></div>
+        <div class="link"></div>
+        <div class="box box--fail">你：错了 2 道，都关于「索引」</div>
+        <div class="link"></div>
+        <div class="box box--data">系统：把「索引」的掌握度往下调<small>同时记下你答错的具体题目</small></div>
+        <div class="link"></div>
+        <div class="box">你：过两天打开首页 / 复习页</div>
+        <div class="link"></div>
+        <div class="box box--you">你看到：「索引」的题变多了<small>答对几次之后又慢慢减少</small></div>
+      </div>
     </div>
     <figcaption><b>「你哪块弱」不是猜的</b>，是每次答题时时累加出来的一个数字。</figcaption>
   </figure>
 
   <h2>它内部是怎么做到的</h2>
-  <p>内容全部来自仓库里的 markdown（<code>content/courses/</code>、<code>content/reading/</code>），由 <code>scripts/import-course.mjs</code> 走<b>管理端已有的写接口</b>幂等导入——不新增导入接口，也不在启动时读文件。第二次运行应当 <code>created 0 / updated 0</code>。</p>
-  <p>「学习线」不是一张表，而是<b>分类上的一个标记</b>：<code>knowledge_categories.line_kind</code> 非空即是一条线，线名、slug、顺序都来自分类自己，站就是它下面的<b>已发布条目</b>。所以新增一条线只需要建分类 + 写内容，不改代码、不加迁移。</p>
-  <p>题目也<b>没有表</b>：题干、选项、答案只存在于条目正文的围栏块里，那是唯一权威。数据库只存「身份 + 证据 + 状态」。</p>
+  <p>这条链上有三个反直觉的设计：<b>内容是代码</b>、<b>学习线不是表</b>、<b>题目也不是表</b>。三个都是为了「同一份事实只存在一个地方」。</p>
 
+  <h3>一、内容在仓库里，不在后台里</h3>
   <figure>
-    <div class="diagram">
-<pre class="mermaid">
-flowchart LR
-  MD["content/courses · content/reading<br/>markdown 文稿"] --> IMP["scripts/import-course.mjs<br/>走管理端 API，幂等"]
-  IMP --> CAT[("knowledge_categories<br/>line_kind 非空 = 一条线")]
-  IMP --> ENT[("knowledge_entries<br/>正文含 quiz 围栏")]
-  CAT --> LINE["LearningLineService<br/>站 = 该分类下已发布条目"]
-  LINE --> VIEW["学习者读一站"]
-  VIEW --> PROG[("learning_progress")]
-  ENT --> ATT[("question_attempts<br/>每次作答 + fingerprint")]
-  PROG --> ATT
-  ATT --> MAS["MasteryModel<br/>按概念更新"]
-  MAS --> STATE[("concept_mastery_state")]
-  STATE --> SEL["PracticeSelector<br/>选题 · 复习排期"]
-  SEL --> REV[("review_sessions<br/>AI 出题，答案不下发")]
-  REV --> ATT
-</pre>
+    <div class="d">
+      <div class="steps">
+        <span class="from">仓库</span><span class="arrow">→</span><span class="to">md 文件</span><span class="what"><code>content/courses/</code>、<code>content/reading/</code><small>总览的 frontmatter 声明这条线叫什么、属于 <code>course</code> 还是 <code>reading</code>、排第几</small></span>
+        <span class="from">md 文件</span><span class="arrow">→</span><span class="to">导入脚本</span><span class="what"><code>scripts/import-course.mjs</code><small>走<b>管理端已有的接口</b>，不新增导入 API；重复运行应当 created 0 / updated 0</small></span>
+        <span class="from">导入脚本</span><span class="arrow">→</span><span class="to">分类表</span><span class="what"><code>knowledge_categories.line_kind</code> 非空 = 这是一条线<small>线名、slug、顺序都来自这条记录本身</small></span>
+        <span class="from">分类表</span><span class="arrow">→</span><span class="to">学习线</span><span class="what"><code>LearningLineService</code> 把「该分类下已发布的条目」按顺序摊成站<small>站序由服务端决定，前端不自己排序</small></span>
+        <span class="from">你</span><span class="arrow">→</span><span class="to">进度</span><span class="what">读完一站落 <code>learning_progress</code></span>
+      </div>
     </div>
-    <figcaption><b>闭环。</b>读、练、判、记、选，五步都有落库的地方，但「题」本身不在库里——它跟着正文走。</figcaption>
+    <figcaption><b>新增一条学习线，只需要建分类 + 写内容</b>，不改代码、不加迁移。</figcaption>
   </figure>
 
-  <h2>掌握度与选题：一个已知有缺陷的算法</h2>
-  <figure>
-    <div class="diagram">
-<pre class="mermaid">
-flowchart LR
-  A["一次作答"] --> B["question_concepts<br/>映射到概念（可一题多概念）"]
-  B --> C["MasteryModel：BKT 顺序更新<br/>先验 + 答对/答错似然"]
-  C --> D[("concept_mastery_state")]
-  D --> E["ability（m） = 1200 + （m − 0.5）× 400"]
-  E --> F["选题：挑难度 ≈ 能力的题"]
-  F --> G[("question_difficulty<br/>Elo 跨会话累积")]
-  G --> F
-  F --> A
-</pre>
+  <h3>二、题目没有表：题干就是权威</h3>
+  <p>题目存在条目正文的围栏块里（<code>quiz</code> / <code>sql-challenge</code> 这类），数据库只存「这道题被做过」的证据与状态。这样正文改了，旧统计不会套到新题上——靠的是下面这个四元组：</p>
+
+  <div class="d">
+    <div class="row">
+      <div class="box box--data">entry_id<small>哪一篇</small></div>
+      <div class="box box--data">block_key<small>正文里第几个围栏块</small></div>
+      <div class="box box--data">question_key<small>块内第几题（blockKey#index）</small></div>
+      <div class="box box--data">fingerprint<small>题干 + 选项 + 答案的 SHA-256</small></div>
     </div>
-    <figcaption><b>算法回路。</b>BKT 是顺序更新，所以必须把状态存下来；Elo 要跨会话累积，所以难度也存下来。两条都以「最后一次写入」为准。</figcaption>
+    <p style="margin:14px 0 0"><b>前三个回答「是哪一道题」，第四个回答「还是不是同一道题」。</b>内容一改，fingerprint 变，历史统计自动失效，不会被错误复用。</p>
+  </div>
+
+  <p>判分有两种来源，记录在 <code>judged_by</code>：<code>server</code> 表示服务端按正文里的标准答案判；<code>client</code> 表示代码挑战在客户端跑完上报。后者是信任边界上的一个让步，只用在沙箱题型。</p>
+
+  <h3>三、掌握度：一个会自我强化的回路</h3>
+  <figure>
+    <div class="d">
+      <div class="flow">
+        <div class="box box--data">一次作答落 <code>question_attempts</code></div>
+        <div class="link"></div>
+        <div class="box"><code>question_concepts</code> 把这道题映射到概念<small>一题可以多概念，一期权重都是 1.00</small></div>
+        <div class="link"></div>
+        <div class="box box--svc"><code>MasteryModel</code>：BKT 顺序更新<small>先验 + 答对/答错的似然 → 新的掌握度</small></div>
+        <div class="link"></div>
+        <div class="box box--data"><code>concept_mastery_state</code> 存下来<small>BKT 是顺序的，所以状态必须落库</small></div>
+        <div class="link"></div>
+        <div class="box">把掌握度换算成能力值：<code>1200 + (m − 0.5) × 400</code></div>
+        <div class="link"></div>
+        <div class="box box--svc"><code>PracticeSelector</code> 挑难度≈能力的题<small>难度来自 <code>question_difficulty</code>，Elo 跨会话累积</small></div>
+        <div class="link link--dashed"></div>
+        <div class="box box--fail">选出来的题又回到第一步——这就是缺陷所在</div>
+      </div>
+    </div>
+    <figcaption><b>回路本身没错，错在参数。</b>难度永远贴着能力走，模型就永远拿不到「明显太难」或「明显太简单」的题。</figcaption>
   </figure>
 
+  <div class="warn">
+    <b>这里有实测过的真缺陷，别当成理论。</b>用生产模型跑离线模拟：信息增益 <b>0.6303</b>，随机选题是 <b>0.7619</b>——<b>比随机低 17.3%</b>。根因是上面的回路：掌握度低 → 能力值低 → 挑简单题 → 答对 → 掌握度只微涨，于是系统长期在 50% 正确率附近震荡，爬不上去。这是一条<b>写成断言「当前是错的」的绿色测试</b>，不是漏测。
+  </div>
+
+  <h2>设计取舍：为什么这么别扭</h2>
+  <ul>
+    <li><b>内容放仓库，是为了能 review。</b>一门课五十多篇，改动要能 diff、能回滚、能跟着代码一起发版。放后台纯手录，改一个字都没有审计。</li>
+    <li><b>代价是改内容要跑脚本。</b>所以脚本必须幂等、必须 <code>--dry-run</code>、必须只碰自己负责的分类——删内容时宁可留一条旧课，也不静默删线上数据。</li>
+    <li><b>不建题目表，是为了避免两份真相。</b>题库表一旦存在，正文和表就会有一天不一致，而没人知道该信哪个。代价是统计要自己算 fingerprint。</li>
+    <li><b>BKT 管「会不会」，Elo 管「有多难」。</b>两套模型分工明确，互不替代：一个更新学生状态，一个更新题目属性。</li>
+    <li><b>全站默认解锁。</b>不要因为「要有学习路径」而重新引入前置门槛——那是被明确撤销过的方向。</li>
+  </ul>
+
+  <h2>读图要点</h2>
   <div class="notes">
-    <h2>读图要点</h2>
     <ul>
-      <li><b>题目的身份是四元组：</b><code>entry_id + block_key + question_key + fingerprint</code>。fingerprint 是「题干 + 选项 + 答案」的 SHA-256——内容一改，旧统计就不会套到新题上。这是这套设计里最关键的防污染机制。</li>
-      <li><b>判分有两种来源：</b><code>judged_by = server</code>（服务端按正文判定）和 <code>client</code>（代码挑战由客户端跑完上报）。后者是信任边界上的一个让步，只在沙箱题型上用。</li>
-      <li><b>全站默认解锁。</b>不要因为「要有学习路径」而重新引入前置门槛——那是被明确撤销过的方向，再加回来会挡掉一半用户。</li>
-      <li><b>复习会话的答案绝不下发。</b><code>review_sessions.items_json</code> 里带着答案与解析，响应由服务端裁剪成 <code>itemId / 题干 / 选项</code>。把整行 JSON 直接返回给前端是最容易犯的错。</li>
-      <li><b>实际效果有实测数据，而且不好看：</b>信息增益 <b>0.6303</b>，随机选题是 <b>0.7619</b>——比随机<b>低 17.3%</b>。根因是 <code>ability(mastery)</code> 的映射与「专挑难度≈能力」的规则合起来把难度锁死了，BKT 在 50% 正确率附近永远震荡、爬不上去。这是一条<b>写得像断言「当前是错的」的绿色测试</b>，不是漏测。</li>
-      <li><b>这些表没有外键。</b>删用户时靠 <code>KnowledgeUserDeletionListener</code> 里那张表清单级联，漏一张就是隐私事故（见 <a href="07-data-model.html">07</a>）。</li>
+      <li><b>复习会话的答案绝不下发。</b><code>review_sessions.items_json</code> 里带着答案与解析，响应由服务端裁剪成 <code>itemId / 题干 / 选项</code>。把整行 JSON 直接返回是最容易犯的错。</li>
+      <li><b>复习出题要花钱。</b>它走 AI 出题 + 积分预留结算，和对话同一条账务管线。</li>
+      <li><b>这些表没有外键。</b>删用户时靠 <code>KnowledgeUserDeletionListener</code> 的表清单级联，漏一张就是隐私事故（见 <a href="07-data-model.html">07</a>）。</li>
+      <li><b>统计以「最后一次写入」为准。</b>并发作答时不做合并，这是简化，写在设计文档里。</li>
     </ul>
   </div>
 
   <div class="notes">
     <h2>代码在哪</h2>
     <ul class="paths">
-      <li><code>scripts/import-course.mjs</code> — 内容导入；线的声明全部来自课程文件的 frontmatter，脚本里没有写死课名</li>
-      <li><code>backend/paideia-knowledge/…/learning/LearningLineService.java</code> — 线的投影与站序（服务端唯一真相）</li>
-      <li><code>backend/paideia-knowledge/…/learning/LearningProgressService.java</code> — 读完一站</li>
+      <li><code>scripts/import-course.mjs</code> — 内容导入；线声明全部来自课程文件的 frontmatter</li>
+      <li><code>backend/paideia-knowledge/…/learning/LearningLineService.java</code> — 线的投影与站序</li>
+      <li><code>backend/paideia-knowledge/…/learning/LearningProgressService.java</code> — 进度</li>
       <li><code>backend/paideia-knowledge/…/question/MasteryModel.java</code> — BKT</li>
       <li><code>backend/paideia-knowledge/…/question/PracticeSelector.java</code> — 选题</li>
       <li><code>backend/paideia-knowledge/…/question/PrerequisiteDiagnosis.java</code>、<code>QuestionConceptSuggester.java</code></li>
-      <li><code>backend/paideia-ai/…/review/ReviewQuestionGenerator.java</code> — 复习出题（走积分）</li>
+      <li><code>backend/paideia-ai/…/review/ReviewQuestionGenerator.java</code> — 复习出题</li>
     </ul>
   </div>
 
   <div class="warn">
-    <b>改内容前先看 <code>scripts/verify_course.py</code> 与 <code>check_seed_fences.py</code>。</b>题目在正文里，围栏格式错了不会报错，只会表现为「这道题永远不会被统计」——因为解析不到 question_key。改完务必跑一次导入脚本的 <code>--dry-run</code>。
+    <b>改内容前先跑 <code>--dry-run</code>。</b>题目在正文里，围栏格式错了不会报错，只会表现为「这道题永远不会被统计」——因为解析不到 <code>question_key</code>。<code>scripts/verify_course.py</code> 与 <code>check_seed_fences.py</code> 就是为这件事存在的。
   </div>
 </main>
 
-<script src="vendor/mermaid.min.js"></script>
-<script src="diagram.js"></script>
 </body>
 </html>

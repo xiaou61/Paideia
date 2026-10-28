@@ -1,14 +1,12 @@
 #!/usr/bin/env node
 /**
- * 用真浏览器打开每个专题页，确认：
- *   每张 `pre.mermaid` 都渲染出了 SVG、页面里没有 "Syntax error"、控制台没有报错、侧栏注入了 11 条导航。
+ * 用真浏览器打开每个页面，确认：
+ *   控制台无报错、没有图横向溢出、侧栏注入 11 条导航、没有残留任何外部脚本。
  *
- * 存在的理由：mermaid 的语法错误不会让页面崩，只会把图换成一块报错文字——
- * 光看文件发现不了，必须真渲染一次。而 mermaid 的官方 CLI 要另装依赖，
- * 仓里已有 playwright + chromium，直接用。
+ * 图现在是手写 HTML/CSS，不需要渲染库——所以这里查的是「排版有没有挤破」而不是「SVG 有没有生成」。
+ * 溢出检查对应最常见的退化：某个盒子写太宽，1440 下看不见，1280 的笔记本上就被裁掉。
  *
- * 用法：node .agent/html/render-check.mjs
- *       node .agent/html/render-check.mjs --shots   # 顺带把每页整页截图存到系统临时目录
+ * 用法：node .agent/html/render-check.mjs [--shots]
  * 退出码：0 全部通过；1 有页面失败；2 环境缺 playwright/chromium。
  */
 import { readdir, mkdir } from 'node:fs/promises'
@@ -18,7 +16,6 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const SHOTS = process.argv.includes('--shots')
-
 const HERE = dirname(fileURLToPath(import.meta.url))
 // 从 app 包解析，pnpm 的符号链接与 .pnpm 布局都能走通；不写死版本号。
 const requireFromApp = createRequire(join(HERE, '..', '..', 'frontend', 'apps', 'app', 'package.json'))
@@ -39,46 +36,51 @@ const browser = await chromium.launch()
 const shotDir = join(tmpdir(), 'paideia-arch-shots')
 if (SHOTS) await mkdir(shotDir, { recursive: true })
 let bad = 0
-let total = 0
 
 for (const file of pages) {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
   const problems = []
-  page.on('console', (m) => { if (m.type() === 'error') problems.push(`console: ${m.text()}`) })
-  page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`))
+  // 1440 与 1280 各查一次：常见桌面宽度 + 更窄的笔记本，两个都过才算没被裁。
+  for (const width of [1440, 1280]) {
+    const page = await browser.newPage({ viewport: { width, height: 900 } })
+    const errors = []
+    page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`) })
+    page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
+    await page.goto(pathToFileURL(join(HERE, file)).href)
 
-  await page.goto(pathToFileURL(join(HERE, file)).href)
+    const nav = await page.locator('aside.sidebar nav a').count()
+    // 10px 容差：边框与四舍五入会造出一两像素的假溢出。
+    const overflow = await page.evaluate(() => {
+      const out = []
+      document.querySelectorAll('.d').forEach((box) => {
+        if (box.scrollWidth > box.clientWidth + 10) out.push(`${box.scrollWidth}>${box.clientWidth}`)
+      })
+      return out
+    })
+    // 图表库一旦被重新引进来，页面就会重新变慢；这条守着「不要再装回去」。
+    const libs = await page.evaluate(() =>
+      [...document.querySelectorAll('script[src]')]
+        .map((s) => s.getAttribute('src'))
+        .filter((src) => src !== 'nav.js'))
 
-  const expected = await page.locator('pre.mermaid').count()
-  if (expected > 0) {
-    // 渲染是异步的：等到每个 pre 里都长出 svg，或者超时后按实际情况报告。
-    await page.waitForFunction(() => {
-      const blocks = [...document.querySelectorAll('pre.mermaid')]
-      return blocks.length > 0 && blocks.every((b) => b.querySelector('svg'))
-    }, null, { timeout: 20000 }).catch(() => {})
+    if (errors.length) problems.push(`[${width}px] ${errors.join(' | ')}`)
+    if (overflow.length) problems.push(`[${width}px] ${overflow.length} 个图溢出：${overflow.join(', ')}`)
+    if (libs.length) problems.push(`[${width}px] 引了外部脚本：${libs.join(', ')}`)
+    if (width === 1440 && nav !== 11) problems.push(`侧栏导航是 ${nav} 条，应为 11 条`)
+    if (width === 1440 && SHOTS) {
+      await page.screenshot({ path: join(shotDir, file.replace('.html', '.png')), fullPage: true })
+    }
+    await page.close()
   }
 
-  const rendered = await page.locator('pre.mermaid svg').count()
-  const nav = await page.locator('aside.sidebar nav a').count()
-  const text = await page.locator('body').innerText()
-  const syntax = (text.match(/Syntax error/gi) || []).length
-
-  if (rendered !== expected) problems.push(`${expected} 张图只渲染出 ${rendered} 张`)
-  if (syntax > 0) problems.push(`页面里有 ${syntax} 处 "Syntax error"`)
-  if (nav !== 11) problems.push(`侧栏导航是 ${nav} 条，应为 11 条`)
-
-  total += expected
   if (problems.length) {
     bad++
-    console.log(`✗ ${file}（${rendered}/${expected} 张图）`)
+    console.log(`✗ ${file}`)
     for (const p of problems) console.log(`    ${p}`)
   } else {
-    console.log(`✓ ${file}（${expected} 张图）`)
+    console.log(`✓ ${file}`)
   }
-  if (SHOTS) await page.screenshot({ path: join(shotDir, file.replace('.html', '.png')), fullPage: true })
-  await page.close()
 }
 
 await browser.close()
-console.log(`\n${pages.length} 个页面 / ${total} 张图，失败 ${bad} 个页面。`)
+console.log(`\n${pages.length} 个页面（1440px 与 1280px 各查一次），失败 ${bad} 个。`)
 process.exit(bad ? 1 : 0)

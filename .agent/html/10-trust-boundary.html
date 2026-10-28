@@ -19,60 +19,66 @@
   <p>你把链接末尾改一个字符，立刻变成 404。这就是「<b>UUID 即凭据</b>」：没法猜、不用登录，但一旦泄露就等于把门打开了。</p>
 
   <figure>
-    <div class="diagram">
-<pre class="mermaid">
-flowchart TB
-  A["你：把笔记设为可分享"] --> B["系统：给这篇笔记生成一串随机 ID<br/>（不是 1、2、3，猜不出来）"]
-  B --> C["你：把带这串 ID 的链接发给朋友"]
-  C --> D["朋友：没登录，直接点开"]
-  D --> E["系统：只看这串 ID 对不对，不问你朋友是谁"]
-  E --> F["朋友看到：标题和正文"]
-  E -.->|"ID 猜错 / 改一个字符"| G["朋友看到：404，什么都没有"]
-</pre>
+    <div class="d">
+      <div class="flow">
+        <div class="box box--you">你：把笔记设为可分享</div>
+        <div class="link"></div>
+        <div class="box box--svc">系统：给这篇笔记生成一串随机 ID<small>不是 1、2、3，猜不出来</small></div>
+        <div class="link"></div>
+        <div class="box box--you">你：把带这串 ID 的链接发给朋友</div>
+        <div class="link"></div>
+        <div class="box">朋友：没登录，直接点开</div>
+        <div class="link"></div>
+        <div class="box box--svc">系统：只看这串 ID 对不对，不问你朋友是谁</div>
+        <div class="link"></div>
+        <div class="box box--you">朋友看到：标题和正文</div>
+        <div class="link link--dashed"></div>
+        <div class="box box--fail">ID 猜错 / 改一个字符：404，什么都没有</div>
+      </div>
     </div>
-    <figcaption><b>免登录能看，是因为链接本身就是钥匙。</b>所以这类接口必须限死「只读」，而且绝对不能暴露作者是谁。</figcaption>
+    <figcaption><b>免登录能看，是因为链接本身就是钥匙。</b>所以这类接口必须限死「只读」，而且绝不能暴露作者是谁。</figcaption>
   </figure>
 
   <h2>它内部是怎么做到的</h2>
-  <p>免鉴权的端点只有六类，每一类都有明确的理由，而且每一类的「把关手段」不一样——有的是靠 id 不可枚举，有的是靠上游自己的登录，有的是靠「它本来就不含数据」。<b>没有一类是「忘了配」。</b></p>
-  <p>这一层最危险的不是规则内容，是<b>书写顺序</b>：Spring Security 取<b>第一条匹配的规则</b>，写反了不报错、不告警、测试如果不覆盖就越权跑很久。已经出现过一次真缺陷，是契约测试抓到的。</p>
+  <p>「匿名」「登录」「管理员」「只允许本机」是<b>四种</b>不同的信任级别，不是三种。最容易被忽略的是第四种——它不属于免鉴权，而是「连网都进不来」。</p>
 
   <figure>
-    <div class="diagram">
-<pre class="mermaid">
-flowchart LR
-  U["任何人<br/>无凭据"] --> P["免鉴权端点<br/>health · auth 登录前<br/>GET 附件 · GET 分享<br/>静态资源与 PWA · Grafana 反代"]
-  L["已登录学习者"] --> Q["登录即可<br/>自己的会话 · 记忆 · 积分<br/>知识库 · 练习 · MCP（PAT）"]
-  A["管理员"] --> R["仅 ROLE_ADMIN<br/>各模块 /admin/**"]
-  M["本机进程"] --> S["仅回环<br/>actuator 指标 · ops/hooks"]
-  P --> DB[("MySQL<br/>对象存储")]
-  Q --> DB
-  R --> DB
-  S --> DB
-</pre>
+    <div class="d">
+      <div class="layer">
+        <div class="layer-name">① 匿名</div>
+        <div class="layer-body">
+          <div class="box box--fail">/actuator/health</div>
+          <div class="box box--fail">/api/v1/auth/**<small>登录注册本身</small></div>
+          <div class="box box--fail">GET 附件（UUID）</div>
+          <div class="box box--fail">GET 分享（UUID）</div>
+          <div class="box box--fail">静态资源 / PWA</div>
+          <div class="box box--fail">Grafana 反代<small>它自己有一道登录</small></div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">② 登录即可</div>
+        <div class="layer-body">
+          <div class="box">自己的会话 / 记忆 / 积分</div>
+          <div class="box">知识库 / 练习 / 复习</div>
+          <div class="box">SQL 沙箱</div>
+          <div class="box">MCP（个人访问令牌，见下）</div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">③ 仅管理员</div>
+        <div class="layer-body">
+          <div class="box box--svc">各模块 <code>/admin/**</code><small>账号 / 知识库 / 速递 / 积分 / 反馈 / 数据集 / 题目标注</small></div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">④ 仅本机</div>
+        <div class="layer-body">
+          <div class="box">/actuator/prometheus</div>
+          <div class="box">/api/v1/ops/hooks/**<small>再加一道常量时间令牌</small></div>
+        </div>
+      </div>
     </div>
-    <figcaption><b>四圈。</b>「匿名」「登录」「管理员」「仅本机」是四种不同的信任级别，不是三种——最容易被忽略的是「只允许回环」的那一圈。</figcaption>
-  </figure>
-
-  <h2>规则按顺序判定，第一条匹配就停</h2>
-  <figure>
-    <div class="diagram">
-<pre class="mermaid">
-flowchart TB
-  REQ["请求到达"] --> R1{"匹配 /actuator/health ?"}
-  R1 -->|是| OK1["放行"]
-  R1 -->|否| R2{"匹配 /api/v1/auth/** ?"}
-  R2 -->|是| OK2["放行（登录前就要能调）"]
-  R2 -->|否| R3{"匹配某个 /admin/** ?"}
-  R3 -->|是| ROLE["要求 ROLE_ADMIN<br/>不满足 → 403"]
-  R3 -->|否| R4{"匹配 /api/v1/ai/** 等宽规则 ?"}
-  R4 -->|是| AUTH["要求已登录<br/>无 token → 401"]
-  R4 -->|否| R5{"GET 且 /knowledge/files/**<br/>或 /public/shares/** ?"}
-  R5 -->|是| OK3["放行（UUID 即凭据）"]
-  R5 -->|否| LAST["anyRequest：要求已登录"]
-</pre>
-    </div>
-    <figcaption><b>判定顺序。</b><code>/admin/**</code> 必须在宽规则之前——一旦排在 <code>/api/v1/ai/**</code> 后面，它就永远不会被走到。</figcaption>
+    <figcaption><b>四圈。</b>① 里每一条都有明确理由；没有一条是「忘了配」。</figcaption>
   </figure>
 
   <h3>免鉴权端点与它们各自的凭据</h3>
@@ -80,24 +86,50 @@ flowchart TB
     <thead><tr><th>路径</th><th>为什么必须免鉴权</th><th>靠什么把关</th></tr></thead>
     <tbody>
       <tr><td><code>/actuator/health</code></td><td>探活</td><td>只返回状态，不含数据</td></tr>
-      <tr><td><code>/api/v1/auth/**</code></td><td>登录/注册发生在有身份之前</td><td>图形验证码、失败限流、邮件验证码</td></tr>
-      <tr><td><code>GET /api/v1/knowledge/files/**</code></td><td><code>&lt;img&gt;</code> 不携带 Authorization 头，要求登录则图片全裂</td><td>id 是 UUID，不可枚举即凭据；<b>只放行 GET</b></td></tr>
+      <tr><td><code>/api/v1/auth/**</code></td><td>登录发生在有身份之前</td><td>图形验证码、失败限流、邮件验证码</td></tr>
+      <tr><td><code>GET /api/v1/knowledge/files/**</code></td><td><code>&lt;img&gt;</code> 不携带 Authorization 头，要求登录则图片全裂</td><td>UUID 不可枚举；<b>只放行 GET</b></td></tr>
       <tr><td><code>GET /api/v1/public/shares/**</code></td><td>分享给未登录的人看</td><td>UUID；只含标题与正文，不含作者与学习痕迹</td></tr>
-      <tr><td><code>GET /</code>、<code>/assets/**</code>、<code>/admin/**</code>、PWA 清单与 sw.js</td><td>登录页要先能加载；Service Worker 注册是匿名请求</td><td>纯静态文件，不含数据</td></tr>
+      <tr><td><code>GET /</code>、<code>/assets/**</code>、<code>/admin/**</code>、PWA 清单与 <code>sw.js</code></td><td>登录页要先能加载；Service Worker 注册是匿名请求</td><td>纯静态文件，不含数据</td></tr>
       <tr><td><code>/api/v1/ops/grafana/**</code></td><td>iframe 导航拿不到 Bearer，Grafana 是 SPA</td><td><b>Grafana 自己的登录</b>（匿名已关闭）</td></tr>
     </tbody>
   </table>
 
+  <h3>规则按顺序判定，第一条匹配就停</h3>
+  <p>这一层最危险的不是规则内容，是<b>书写顺序</b>。写反了不报错、不告警；如果测试没覆盖，就会一直越权。</p>
+
+  <figure>
+    <div class="d">
+      <div class="steps">
+        <span class="from">请求</span><span class="arrow">→</span><span class="to">逐条比较</span><span class="what">按声明顺序，<b>第一条匹配的规则生效</b></span>
+        <span class="from">匹配</span><span class="arrow">→</span><span class="to"><code>/admin/**</code></span><span class="what">要求 ADMIN<small>必须排在宽规则之前</small></span>
+        <span class="from">匹配</span><span class="arrow">→</span><span class="to"><code>/api/v1/ai/**</code></span><span class="what">要求已登录<small>它会把后面所有 /ai/ 开头的路径吞掉</small></span>
+        <span class="from">都不匹配</span><span class="arrow">→</span><span class="to">兜底</span><span class="what">要求已登录<small>管理端接口绝不靠它保护</small></span>
+      </div>
+    </div>
+    <figcaption><b>顺序即语义。</b>写反之后，那条规则<b>永远不会被走到</b>，而且没有任何提示。</figcaption>
+  </figure>
+
+  <div class="warn">
+    <b>真缺陷长什么样：</b><code>/api/v1/sandbox/admin/**</code> 一度写在 <code>/api/v1/sandbox/**</code>（要求已登录）之后，于是<b>任何登录用户都能下架别人的数据集、看到全部举报</b>。它不报错，是合并时由 <code>ApiContractTest</code> 抓到的。
+  </div>
+
+  <h2>设计取舍：UUID 即凭据，边界在哪</h2>
+  <ul>
+    <li><b>为什么不用登录：</b>分享的本意就是「发给没账号的人看」；附件是 <code>&lt;img&gt;</code> 请求，浏览器不会带令牌。要求登录等于这两个功能直接不可用。</li>
+    <li><b>代价一：链接泄露 = 权限泄露。</b>所以 id 必须是 UUID（不可枚举），且<b>只放行 GET</b>——把 POST 一起放行等于开了匿名写入口。</li>
+    <li><b>代价二：不能撤销单个链接。</b>目前的撤销是「关掉分享」，整条链接失效。要做到单链接吊销，得再加一张令牌表。</li>
+    <li><b>代价三：审计不到「谁看的」。</b>匿名访问没有身份，只能记访问量。</li>
+    <li><b>MCP 是一条平行通道。</b>个人访问令牌由独立过滤器识别，权限按工具组切分，不走 JWT。改工具清单时要同时想「这个令牌能不能调它」。</li>
+    <li><b>积分闸不是授权闸。</b>它判断「够不够钱」，位置在 Controller 之后，返回 402。写进 Security 配置会得到错误语义（管理员也会没钱）。</li>
+  </ul>
+
+  <h2>读图要点</h2>
   <div class="notes">
-    <h2>读图要点</h2>
     <ul>
-      <li><b>「只允许回环」是第四种信任级别。</b><code>/actuator/metrics/**</code>、<code>/actuator/prometheus</code>、<code>/api/v1/ops/hooks/**</code> 不属于「免鉴权」，而是「只给本机」。前者排除公网探测，后者再加一道常量时间令牌比较。</li>
-      <li><b>真缺陷长什么样：</b><code>/api/v1/sandbox/admin/**</code> 一度写在 <code>/api/v1/sandbox/**</code>（<code>authenticated()</code>）之后，于是<b>任何登录用户都能下架别人的数据集、看全部举报</b>。它不报错，是合并时由 <code>ApiContractTest</code> 抓到的。</li>
-      <li><b>路径命名有纪律：</b>管理端接口一律 <code>/api/v1/&lt;模块&gt;/admin/**</code>。<code>/api/v1/admin/&lt;模块&gt;</code> 这种写法不匹配任何既有规则，会直接落到 <code>anyRequest()</code>——看起来加了 <code>admin</code> 其实谁都能调。</li>
-      <li><b>放行读 ≠ 放行写。</b>两处免鉴权的读都限定了 GET；写入口（上传、建分享）走的是另一条要登录的路。把 <code>POST</code> 一起放行等于开了匿名写入口。</li>
-      <li><b>积分闸不是授权。</b>它判断的是「够不够钱」，位置在 Controller 之后、调用上游之前，返回 402。把它当权限写进 Security 配置会得到错误的语义（管理员也会没钱）。</li>
-      <li><b>MCP 走 PAT，不走 JWT。</b>个人访问令牌由独立过滤器识别，权限按工具组切分——它是一条平行于登录态的信任通道，改工具清单时要同时想「这个令牌能不能调它」。</li>
+      <li><b>路径命名有纪律：</b>管理端接口一律 <code>/api/v1/&lt;模块&gt;/admin/**</code>。<code>/api/v1/admin/&lt;模块&gt;</code> 这种写法不匹配任何既有规则，会直接落到兜底——看起来加了 <code>admin</code> 其实谁都能调。</li>
+      <li><b>放行读 ≠ 放行写。</b>两处免鉴权的读都限定了 GET；写入口走的是另一条要登录的路。</li>
       <li><b>前端守卫从来不是边界。</b>路由守卫只决定显示什么；能不能做，只由 <code>/api/**</code> 上的规则决定。</li>
+      <li><b>401 与 403 的区别要在界面上体现。</b>401 应该自动换令牌重试；403 重试多少次都一样。</li>
     </ul>
   </div>
 
@@ -106,9 +138,9 @@ flowchart TB
     <ul class="paths">
       <li><code>backend/paideia-security/…/SecurityConfiguration.java</code> — 全部规则、顺序，以及每条「必须排在谁之前」的注释</li>
       <li><code>backend/paideia-security/…/LocalOnlyAuthorizationManager.java</code> — 「只允许回环」的判定</li>
-      <li><code>backend/paideia-mcp/…/security/PatAuthenticationFilter.java</code>、<code>McpSecurityConfiguration.java</code> — PAT 通道</li>
+      <li><code>backend/paideia-mcp/…/security/PatAuthenticationFilter.java</code>、<code>McpSecurityConfiguration.java</code> — 令牌通道</li>
+      <li><code>backend/paideia-note/…/share/ShareService.java</code> — <code>share_id</code> 为什么是 UUID</li>
       <li><code>backend/paideia-ai/…/billing/CreditService.java</code> — 业务闸（402）</li>
-      <li><code>backend/paideia-account/…/credential/CaptchaService.java</code>、<code>EmailCodeService.java</code> — 登录前的把关</li>
       <li><code>ApiContractTest</code> — 抓过越权缺陷的那个测试</li>
     </ul>
   </div>
@@ -118,7 +150,5 @@ flowchart TB
   </div>
 </main>
 
-<script src="vendor/mermaid.min.js"></script>
-<script src="diagram.js"></script>
 </body>
 </html>

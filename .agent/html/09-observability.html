@@ -16,95 +16,138 @@
 
   <h2>先看一个具体场景</h2>
   <p>凌晨一点，某个接口开始大量报错。系统自己发现「按这个速度烧下去，本月的可用性预算撑不过两天」，于是触发一条告警。</p>
-  <p>告警打到应用里，先生成一条事件；诊断器去把指标、日志、最近一次发版拼起来，写出一段人话结论。你第二天早上看到的不是一堆曲线，而是「哪个接口、从几点开始、可能跟什么有关」。</p>
+  <p>告警打到应用里，先生成一条事件；诊断器把指标、日志、最近一次发版拼起来，写出一段人话结论。你第二天早上看到的不是一堆曲线，而是「哪个接口、从几点开始、可能跟什么有关」。</p>
 
   <figure>
-    <div class="diagram">
-<pre class="mermaid">
-flowchart TB
-  A["凌晨 1 点：某个接口开始报错"] --> B["监控：按『错误预算的消耗速度』判断<br/>不是简单看阈值"]
-  B --> C["告警：打一个只有本机能访问的 webhook"]
-  C --> D["系统：生成一条事件，记下时间和影响范围"]
-  D --> E["诊断：把指标、日志、最近的发版记录拼起来"]
-  E --> F["诊断：写成一段人话，存进诊断记录"]
-  F --> G["你：早上打开管理端<br/>看到『哪个接口、从几点、可能跟什么有关』"]
-</pre>
+    <div class="d">
+      <div class="flow">
+        <div class="box box--fail">凌晨 1 点：某个接口开始报错</div>
+        <div class="link"></div>
+        <div class="box">监控：按「错误预算的消耗速度」判断<small>不是简单看阈值超没超</small></div>
+        <div class="link"></div>
+        <div class="box box--svc">告警：打一个只有本机能访问的 webhook</div>
+        <div class="link"></div>
+        <div class="box">系统：生成一条事件，记下时间与影响范围</div>
+        <div class="link"></div>
+        <div class="box box--svc">诊断：把指标、日志、最近的发版记录拼起来<small>日志先脱敏，不碰原始流量</small></div>
+        <div class="link"></div>
+        <div class="box box--data">写出一段人话，存进诊断记录</div>
+        <div class="link"></div>
+        <div class="box box--you">你：早上打开管理端，看到结论</div>
+      </div>
     </div>
     <figcaption><b>告警看的是「烧得多快」，不是「现在多少」。</b>一直小错和突然大错都会触发，而且都不会天天误报。</figcaption>
   </figure>
 
   <h2>它内部是怎么做到的</h2>
-  <p>三层数据各有分工：<b>指标</b>回答「是否在变坏」（Prometheus，按本机来源读取）、<b>日志</b>回答「发生了什么」（Loki）、<b>链路</b>回答「慢在哪一步」（Tempo，traceId 从 SSE 的 <code>done</code> 事件一路对到用户的那次点击）。</p>
-  <p>告警不是「阈值超了就叫」，而是 <b>SLO 燃尽率</b>：按错误预算的消耗速度触发，能在「一直小错」和「突然大错」两种情况下都合理报警。规则文件有配套的单元测试，改规则先跑测试。</p>
+  <p>三类数据各有分工，缺一类就会得出错误结论：只看指标会知道「在变坏」但不知道「为什么」；只看日志会淹没在噪音里；只看链路只知道「慢」，不知道「整体是否可接受」。</p>
 
   <figure>
-    <div class="diagram">
-<pre class="mermaid">
-flowchart LR
-  APP["paideia-app<br/>Micrometer 指标 · 结构化日志 · span"] -->|"仅本机来源可读<br/>/actuator/prometheus"| PROM["Prometheus"]
-  APP -->|日志| LOKI["Loki"]
-  APP -->|span| TEMPO["Tempo"]
-  PROM --> GRAF["Grafana<br/>管理端同源 iframe"]
-  LOKI --> GRAF
-  TEMPO --> GRAF
-  PROM --> RULES["告警规则<br/>SLO 燃尽率"]
-  RULES -->|"webhook 只允许回环来源<br/>+ 常量时间令牌"| HOOK["/api/v1/ops/hooks/**"]
-  HOOK --> INC[("ops_incidents<br/>ops_incident_events")]
-  INC --> DIAG["OpsEvidenceCollector<br/>→ OpsDiagnosisService"]
-  DIAG -->|"AI 诊断，走积分"| DG[("ops_diagnoses")]
-  GRAF --> UI["管理端运维页"]
-</pre>
+    <div class="d">
+      <div class="layer">
+        <div class="layer-name">指标</div>
+        <div class="layer-body">
+          <div class="box">Micrometer<small>JVM / HTTP / 业务计数</small></div>
+          <div class="box box--ext">Prometheus<small>只允许本机来源抓取</small></div>
+          <div class="box box--svc">SLO 燃尽率规则<small>7 条告警，规则有单元测试</small></div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">日志</div>
+        <div class="layer-body">
+          <div class="box">结构化日志</div>
+          <div class="box box--ext">Loki</div>
+          <div class="box">按 traceId 与接口聚合</div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">链路</div>
+        <div class="layer-body">
+          <div class="box">span<small>每次 AI 调用一轮一条，见 03</small></div>
+          <div class="box box--ext">Tempo</div>
+          <div class="box">回答里的 <code>traceId</code> 对到用户那次点击</div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">出口</div>
+        <div class="layer-body">
+          <div class="box box--svc">Grafana<small>同源反代，管理端 iframe 嵌入</small></div>
+          <div class="box">诊断记录<small><code>ops_diagnoses</code> / <code>ops_incidents</code></small></div>
+        </div>
+      </div>
     </div>
-    <figcaption><b>观测链路。</b>诊断的输入永远是<b>聚合指标与脱敏后的日志</b>（<code>OpsLogRedactor</code> / <code>TempoTraceRedactor</code>），不是原始流量。</figcaption>
+    <figcaption><b>三层汇到一个面板 + 一条事件流。</b>数据不交叉，只有出口是共同的。</figcaption>
   </figure>
 
-  <h2>发版：只传差异</h2>
+  <h3>告警进来之后</h3>
   <figure>
-    <div class="diagram">
-<pre class="mermaid">
-flowchart LR
-  B["本地构建 jar"] --> M["解包成 exploded/<br/>算清单：自家文件 SHA-256<br/>依赖按同名同大小"]
-  M --> C["与服务器 exploded.manifest 比对"]
-  C -->|"只传差异（纯后端约 60 秒）"| S["服务器 exploded/ 覆盖"]
-  S --> R["jar c0fm 重新打包"]
-  R --> X["systemd 重启"]
-  X --> H["/actuator/health 探活"]
-</pre>
+    <div class="d">
+      <div class="steps">
+        <span class="from">Prometheus</span><span class="arrow">→</span><span class="to">webhook</span><span class="what"><code>POST /api/v1/ops/hooks/**</code><small>只允许回环来源，再做一次常量时间令牌比较</small></span>
+        <span class="from">webhook</span><span class="arrow">→</span><span class="to">事件</span><span class="what">去重后落 <code>ops_incidents</code> + <code>ops_incident_events</code></span>
+        <span class="from">事件</span><span class="arrow">→</span><span class="to">取证</span><span class="what"><code>OpsEvidenceCollector</code>：指标快照 + 脱敏日志 + 最近发版</span>
+        <span class="from">取证</span><span class="arrow">→</span><span class="to">诊断</span><span class="what"><code>OpsDiagnosisService</code> 调 AI 写结论<small>走 <code>OPS_DIAGNOSIS</code> 流水，也计积分</small></span>
+        <span class="from">诊断</span><span class="arrow">→</span><span class="to">你</span><span class="what">管理端看到「接口 / 起始时间 / 关联变更」</span>
+      </div>
     </div>
-    <figcaption><b>增量发版。</b>82 MB 的 jar 里自家模块只有 1.4 MB、69 个文件——传全量是纯浪费。</figcaption>
+    <figcaption><b>诊断的输入永远是聚合指标与脱敏日志</b>（<code>OpsLogRedactor</code> / <code>TempoTraceRedactor</code>），不是原始流量。</figcaption>
   </figure>
 
+  <h3>发版：只传差异</h3>
+  <figure>
+    <div class="d">
+      <div class="flow">
+        <div class="box">本地构建 jar</div>
+        <div class="link"></div>
+        <div class="box">解包成 <code>exploded/</code><small>自家 69 个文件算 SHA-256，依赖按「同名同大小」判断</small></div>
+        <div class="link"></div>
+        <div class="box box--svc">与服务器上的 <code>exploded.manifest</code> 比对<small>只传差异：82 MB 的 jar 里自家代码只有 1.4 MB</small></div>
+        <div class="link"></div>
+        <div class="box box--data">服务器覆盖 <code>exploded/</code>，用 <code>jar c0fm</code> 重新打包</div>
+        <div class="link"></div>
+        <div class="box">重启 <code>systemd</code> 单元，探活 <code>/actuator/health</code></div>
+        <div class="link"></div>
+        <div class="box box--you">纯后端一次约 60 秒；前端有改动才多那 80 秒</div>
+      </div>
+    </div>
+    <figcaption><b>增量发版。</b>不这么做的话，每次发版要传 82 MB、耗时约 20 分钟。</figcaption>
+  </figure>
+
+  <h2>设计取舍：四个看起来奇怪的决定</h2>
+  <ul>
+    <li><b>指标只允许本机读。</b><code>/actuator/prometheus</code> 会暴露 JVM 内部结构与业务维度标签，不能像 <code>health</code> 那样整体放行。<b>前提是进程前面没有反向代理</b>——一挂反代，远端地址都变成回环，这条白名单立刻失效，那时必须改成独立回环管理端口。</li>
+    <li><b>Grafana 反代整体放行，安全边界交给 Grafana 自己。</b>试过三条路都不行：要求 ADMIN（iframe 导航不带 Authorization → 401）、加 <code>?ticket=</code>（静态资源与子请求不带查询串 → 逐个 401）、只放行 <code>/public/**</code>（dashboard API 又 401）。根因是本项目无 Cookie、纯 Bearer，而 Grafana 是 SPA。</li>
+    <li><b>用燃尽率而不是阈值。</b>阈值在「一直小错」和「突然大错」之间只能顾一头；燃尽率把两者统一成「预算还能撑多久」。</li>
+    <li><b>发版用 <code>jar c0fm</code>，不是 <code>cfm</code>。</b><code>cfm</code> 会 deflate 嵌套的 jar，Spring Boot 4 直接起不来——这个字符是发版链路上最贵的一次事故（真断过六分钟）。</li>
+  </ul>
+
+  <h2>读图要点</h2>
   <div class="notes">
-    <h2>读图要点</h2>
     <ul>
-      <li><b>指标端点只允许本机读。</b><code>/actuator/prometheus</code> 会暴露 JVM 内部结构与业务维度标签，不能像 <code>/health</code> 那样整体放行。注意这条白名单的前提是「进程前面没有反向代理」——一旦挂了反代，远端地址都变成回环，白名单就失效了，那时必须改成独立的回环管理端口。这句话写在代码注释里，不是修补计划。</li>
-      <li><b>Grafana 反代是<b>整体放行</b>的，安全边界交给 Grafana 自己的登录。</b>试过而放弃的三条路：要求 ADMIN（iframe 导航不带 Authorization 头 → 401）、加 <code>?ticket=</code>（静态资源与子请求不带查询串 → 逐个 401）、只放行 <code>/public/**</code>（dashboard API 又 401）。根因是本项目无 Cookie、纯 Bearer，而 Grafana 是 SPA，需要一套跨请求自动携带的会话。</li>
-      <li><b>告警 webhook 不是「免鉴权」。</b>它只允许回环来源，并在控制器里再做一次常量时间令牌比较——机器到机器，没有 JWT。</li>
-      <li><b>SLO 燃尽率告警有一类共同的坑，演练时全踩过：</b>5xx 速率在无请求时是空集被当成 NoData、SLI 无样本时算出 NaN 被当数值、protobuf 省略 status 零值被写成空串。改规则时先想「没有数据时它会怎样」。</li>
-      <li><b>别用 <code>pnpm -r build</code> 发版。</b>它会把 Electron 桌面壳一起打（首次还要下载 Electron），近二十分钟。纯后端改动用 <code>-SkipWeb</code>，前端没改时脚本本来就会跳过那 80 秒。</li>
-      <li><b><code>jar c0fm</code> 不是 <code>jar cfm</code>。</b><code>cfm</code> 会 deflate 嵌套的 jar，Spring Boot 4 直接起不来——真断过六分钟。这个字符是发版链路上最贵的一个字符。</li>
-      <li><b>服务器上的 <code>exploded/</code> 与 <code>exploded.manifest</code> 由脚本维护</b>，不要手工删。删了下次发版就退化成全量传输。</li>
+      <li><b>SLO 规则最常见的三个坑，演练时全踩过：</b>5xx 速率在无请求时是空集被当成 NoData、SLI 无样本时算出 NaN 被当数值、protobuf 省略的 status 零值被写成空串。改规则时先想「没有数据时它会怎样」。</li>
+      <li><b>告警 webhook 不是「免鉴权」。</b>它只允许回环来源，并再做一次常量时间令牌比较——机器到机器，没有 JWT。</li>
+      <li><b>别用 <code>pnpm -r build</code> 发版。</b>它会把 Electron 桌面壳一起打（首次还要下载 Electron），近二十分钟。纯后端改动用 <code>-SkipWeb</code>。</li>
+      <li><b>服务器上的 <code>exploded/</code> 与 <code>exploded.manifest</code> 由脚本维护</b>，不要手工删——删了下次就退化成全量传输。</li>
+      <li><b>健康检查有两个：</b>公开的 <code>/actuator/health</code> 与需要登录的 <code>/api/v1/health</code>。探活要用前者。</li>
     </ul>
   </div>
 
   <div class="notes">
     <h2>代码在哪</h2>
     <ul class="paths">
-      <li><code>backend/paideia-app/src/main/java/io/github/xiaou61/ops/</code> — 证据收集、诊断、事件、Grafana 反代、Loki/Tempo 客户端</li>
+      <li><code>backend/paideia-app/src/main/java/io/github/xiaou61/ops/</code> — 取证 / 诊断 / 事件 / Grafana 反代 / Loki 与 Tempo 客户端</li>
       <li><code>backend/paideia-ai/…/diagnosis/</code> — AI 诊断的提示词与结果解析</li>
       <li><code>deploy/ops/prometheus-rules.yml</code>、<code>deploy/ops/provisioning/alerting/paideia-rules.yaml</code> — 告警规则</li>
       <li><code>deploy/ops/prometheus-rules.test.yml</code> — 规则单元测试，改规则先跑它</li>
       <li><code>scripts/release.ps1</code> — 增量发版全流程</li>
-      <li><code>backend/paideia-security/…/SecurityConfiguration.java</code> 第 125–165 行 — 观测相关的全部规则与它们的理由</li>
+      <li><code>backend/paideia-security/…/SecurityConfiguration.java</code> — 观测相关的全部规则与它们的理由</li>
     </ul>
   </div>
 
   <div class="warn">
-    <b>这份导读里不含任何服务器地址、主机名与凭据。</b>公开仓库一旦提交就无法回收，历史、fork、缓存都能检索到。引用密钥只写环境变量名。
+    <b>这份导读不含任何服务器地址、主机名与凭据。</b>公开仓库一旦提交就无法回收——历史、fork、缓存都能检索到。引用密钥只写环境变量名。
   </div>
 </main>
 
-<script src="vendor/mermaid.min.js"></script>
-<script src="diagram.js"></script>
 </body>
 </html>
