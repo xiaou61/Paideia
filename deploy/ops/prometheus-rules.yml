@@ -25,6 +25,16 @@ groups:
         expr: count_over_time(paideia:baseline_cpu:current[7d])
       - record: paideia:baseline_cpu:ratio
         expr: paideia:baseline_cpu:current / clamp_min(paideia:baseline_cpu:baseline, 1)
+      # z（WORK-049）：偏离 7 天均值的标准差倍数。比值只看「比平时高多少」，
+      # 看不出「平时几乎不动」；分母下限 0.5 个百分点防止低方差把 z 放大成天文数字。
+      - record: paideia:baseline_cpu:mean7d
+        expr: avg_over_time(paideia:baseline_cpu:current[7d])
+      - record: paideia:baseline_cpu:std7d
+        expr: stddev_over_time(paideia:baseline_cpu:current[7d])
+      - record: paideia:baseline_cpu:z
+        expr: >-
+          (paideia:baseline_cpu:current - paideia:baseline_cpu:mean7d)
+          / clamp_min(paideia:baseline_cpu:std7d, 0.5)
 
       # ── HTTP 5xx 比例（%）──────────────────────────────────────────────────
       - record: paideia:baseline_5xx:current
@@ -43,6 +53,14 @@ groups:
         expr: count_over_time(paideia:baseline_5xx:current[7d])
       - record: paideia:baseline_5xx:ratio
         expr: paideia:baseline_5xx:current / clamp_min(paideia:baseline_5xx:baseline, 0.01)
+      - record: paideia:baseline_5xx:mean7d
+        expr: avg_over_time(paideia:baseline_5xx:current[7d])
+      - record: paideia:baseline_5xx:std7d
+        expr: stddev_over_time(paideia:baseline_5xx:current[7d])
+      - record: paideia:baseline_5xx:z
+        expr: >-
+          (paideia:baseline_5xx:current - paideia:baseline_5xx:mean7d)
+          / clamp_min(paideia:baseline_5xx:std7d, 0.01)
 
       # ── HTTP P95（秒）──────────────────────────────────────────────────────
       - record: paideia:baseline_p95:current
@@ -59,6 +77,14 @@ groups:
         expr: count_over_time(paideia:baseline_p95:current[7d])
       - record: paideia:baseline_p95:ratio
         expr: paideia:baseline_p95:current / clamp_min(paideia:baseline_p95:baseline, 0.001)
+      - record: paideia:baseline_p95:mean7d
+        expr: avg_over_time(paideia:baseline_p95:current[7d])
+      - record: paideia:baseline_p95:std7d
+        expr: stddev_over_time(paideia:baseline_p95:current[7d])
+      - record: paideia:baseline_p95:z
+        expr: >-
+          (paideia:baseline_p95:current - paideia:baseline_p95:mean7d)
+          / clamp_min(paideia:baseline_p95:std7d, 0.005)
 
   # ── SLO 的 SLI 与燃尽率（WORK-043 TASK-018）──────────────────────────────
   #

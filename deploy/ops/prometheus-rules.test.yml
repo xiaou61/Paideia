@@ -52,6 +52,51 @@ tests:
           - labels: '{__name__="paideia:baseline_cpu:samples7d"}'
             value: 10
 
+  # ── z-score（WORK-049）─────────────────────────────────────────────────
+  # 三种输入：稳态后尖峰（z>3）、长期一半时间高负载（绝对值大但 z 不显著）、
+  # 完全无波动（分母下限生效，z=0 而不是 Inf/NaN）。
+
+  - name: z-score：7 天稳态后的尖峰 |z|>3
+    interval: 3m
+    input_series:
+      - series: 'node_cpu_seconds_total{mode="idle",instance="test"}'
+        values: '0+180x3370 606600+90x10'
+    promql_expr_test:
+      - expr: paideia:baseline_cpu:z > bool 3
+        eval_time: 10140m
+        exp_samples:
+          - labels: '{}'
+            value: 1
+
+  - name: z-score：一半时间满载时绝对值大但 z 小于 3
+    interval: 3m
+    input_series:
+      - series: 'node_cpu_seconds_total{mode="idle",instance="test"}'
+        values: '0+180x1680 302400+0x1690'
+    promql_expr_test:
+      - expr: paideia:baseline_cpu:current > bool 99
+        eval_time: 10110m
+        exp_samples:
+          - labels: '{}'
+            value: 1
+      - expr: paideia:baseline_cpu:z < bool 3
+        eval_time: 10110m
+        exp_samples:
+          - labels: '{}'
+            value: 1
+
+  - name: z-score：完全无波动时分母下限生效，z 为 0
+    interval: 3m
+    input_series:
+      - series: 'node_cpu_seconds_total{mode="idle",instance="test"}'
+        values: '0+90x3370'
+    promql_expr_test:
+      - expr: paideia:baseline_cpu:z
+        eval_time: 10110m
+        exp_samples:
+          - labels: '{__name__="paideia:baseline_cpu:z"}'
+            value: 0
+
   # ── SLO 录制规则（WORK-043 TASK-018）────────────────────────────────────
   # 只覆盖 HTTP 可用性/延迟这两组最容易算错的：4xx 排除、actuator 排除、无流量不算失败。
   # AI/登录的算式与可用性同构（good/total），由 promtool check rules 与生产查询确认。
