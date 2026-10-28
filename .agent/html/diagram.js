@@ -8,7 +8,8 @@
     fontFamily: 'system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif',
     fontSize: 14,
     // 不按容器宽度缩放：宽图宁可横向滚动，也不要缩到看不清。.diagram 容器本来就 overflow-x:auto。
-    flowchart: { curve: 'basis', htmlLabels: true, padding: 12, useMaxWidth: false },
+    // wrappingWidth 默认 200px，中文五六个字就折行、图会挤成一条窄柱，所以放宽。
+    flowchart: { curve: 'basis', htmlLabels: true, padding: 12, useMaxWidth: false, wrappingWidth: 340 },
     sequence: { actorMargin: 30, width: 118, useMaxWidth: false },
     state: { useMaxWidth: false },
     themeVariables: { lineColor: dark ? '#6f6f7a' : '#b9b9b0' }
