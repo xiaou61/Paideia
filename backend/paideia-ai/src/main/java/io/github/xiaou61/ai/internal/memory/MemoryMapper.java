@@ -1,5 +1,6 @@
 package io.github.xiaou61.ai.internal.memory;
 
+import java.time.Instant;
 import java.util.List;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
@@ -67,6 +68,15 @@ interface MemoryMapper {
                                      @Param("limit") int limit,
                                      @Param("offset") int offset);
 
+    /**
+     * 全文那一路的召回（WORK-050 REQ-002）。
+     *
+     * <p><b>排序变了、过滤没变</b>：仍然是"命中关键词的才回来"（这一路检索的就是"他说过的某句话"，
+     * 不命中就不该进提示词），但顺序从 `id DESC` 改成**相关度优先、时间只做衰减**。
+     * 改动前它按插入顺序倒排，"最近说的"压过"最相关的"。
+     *
+     * <p>半衰期 180 天：记忆的价值随时间衰减，但不该按天塌掉。
+     */
     @Select("""
             <script>
             SELECT id, user_id, content, source, conversation_id, ref_message_id, reason, created_at
@@ -76,7 +86,10 @@ interface MemoryMapper {
                 <when test="fulltext">AND MATCH(content) AGAINST(#{keyword})</when>
                 <otherwise>AND content LIKE #{likePattern}</otherwise>
               </choose>
-            ORDER BY id DESC
+            ORDER BY
+              <if test="fulltext">MATCH(content) AGAINST(#{keyword}) DESC,</if>
+              POW(0.5, DATEDIFF(#{now}, created_at) / 180) DESC,
+              id DESC
             LIMIT #{limit}
             </script>
             """)
@@ -84,7 +97,108 @@ interface MemoryMapper {
                                @Param("keyword") String keyword,
                                @Param("likePattern") String likePattern,
                                @Param("fulltext") boolean fulltext,
+                               @Param("now") Instant now,
                                @Param("limit") int limit);
+
+    /**
+     * 结构化那一路的召回（WORK-050 REQ-003）。
+     *
+     * <p><b>不按关键词过滤</b>：这一路是"关于学习者的事实"，助手在任何话题下知道"他不懂 Redis"
+     * 都有用（可以主动关联）。所以关键词命中只用来**提权**，不作为门槛。
+     *
+     * <p>三层排序，每一层都有理由：
+     * <ol>
+     *   <li>命中关键词的排前面——"少而准"的核心；</li>
+     *   <li>命中之间按全文相关度；</li>
+     *   <li>未命中之间按 `kind` 权重 × 时间衰减。权重是"哪类事实更该被想起"：
+     *       弱项（1.5）与条目自评（1.3）比偏好（1.0）更能改变回答。</li>
+     * </ol>
+     *
+     * <p>**已知限制**：中文单字（如"锁"）在 ngram 索引上召回为零，所以 tier 1/2 恒为 0，
+     * 退化成 tier 3 的权重排序。短关键词走 LIKE 的那一支由 {@code fulltext} 分支覆盖。
+     */
+    @Select("""
+            <script>
+            SELECT id, user_id, kind, ref_id, content, source, conversation_id, ref_message_id,
+                   reason, created_at
+            FROM ai_memories_structured
+            WHERE user_id = #{userId}
+            ORDER BY
+              <choose>
+                <when test="keyword == null"></when>
+                <when test="fulltext">
+                  (MATCH(content) AGAINST(#{keyword}) &gt; 0) DESC,
+                  MATCH(content) AGAINST(#{keyword}) DESC,
+                </when>
+                <otherwise>(content LIKE #{likePattern}) DESC,</otherwise>
+              </choose>
+              (CASE kind
+                 WHEN 'weak_topic' THEN 1.5
+                 WHEN 'entry_understanding' THEN 1.3
+                 WHEN 'goal' THEN 1.2
+                 ELSE 1.0 END) * POW(0.5, DATEDIFF(#{now}, created_at) / 180) DESC,
+              id DESC
+            LIMIT #{limit}
+            </script>
+            """)
+    List<MemoryRow> selectStructuredRelevant(@Param("userId") long userId,
+                                             @Param("keyword") String keyword,
+                                             @Param("likePattern") String likePattern,
+                                             @Param("fulltext") boolean fulltext,
+                                             @Param("now") Instant now,
+                                             @Param("limit") int limit);
+
+    /**
+     * 刷新"最近一次被召回"（WORK-050 REQ-005）。
+     *
+     * <p>`GREATEST` 而不是直接赋值：并发召回时两次调用的 `now` 可能先后颠倒，
+     * 直接赋值会把时间**往回写**，那样淘汰任务会误判它已经很久没用过。
+     * 条件里带 `user_id` 与不变式一致——id 列表来自本人，但多一道不算成本。
+     */
+    @Update("""
+            <script>
+            UPDATE ai_memories_structured
+            SET last_used_at = GREATEST(COALESCE(last_used_at, #{now}), #{now})
+            WHERE user_id = #{userId} AND id IN
+            <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+            </script>
+            """)
+    int touchStructured(@Param("userId") long userId, @Param("ids") List<Long> ids,
+                        @Param("now") Instant now);
+
+    @Update("""
+            <script>
+            UPDATE ai_memories_text
+            SET last_used_at = GREATEST(COALESCE(last_used_at, #{now}), #{now})
+            WHERE user_id = #{userId} AND id IN
+            <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+            </script>
+            """)
+    int touchText(@Param("userId") long userId, @Param("ids") List<Long> ids,
+                  @Param("now") Instant now);
+
+    /**
+     * 按时间淘汰（WORK-050 REQ-004）。
+     *
+     * <p>判据是 `COALESCE(last_used_at, created_at)`：**被持续召回的记忆不会被删**，
+     * 哪怕它很旧。"记了但从来没被用上"的才会过期——这正是"少而准"想要的收敛方向。
+     *
+     * <p>`LIMIT` 分批：一次删太多会长时间持锁，而删除不急。删不完下次接着删。
+     */
+    @Delete("""
+            DELETE FROM ai_memories_structured
+            WHERE kind = #{kind} AND COALESCE(last_used_at, created_at) < #{before}
+            LIMIT #{limit}
+            """)
+    int purgeStructured(@Param("kind") String kind, @Param("before") Instant before,
+                        @Param("limit") int limit);
+
+    @Delete("""
+            DELETE FROM ai_memories_text
+            WHERE COALESCE(last_used_at, created_at) < #{before}
+            LIMIT #{limit}
+            """)
+    int purgeText(@Param("before") Instant before, @Param("limit") int limit);
 
     /**
      * 逐条删除（用户裁决 13）。

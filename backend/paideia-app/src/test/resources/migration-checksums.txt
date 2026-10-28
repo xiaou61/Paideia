@@ -38,6 +38,7 @@ src/main/resources/db/migration/V20261027150000__digest_item_language.sql -17559
 src/main/resources/db/migration/V20261027160000__add_mcp_token_daily_limit.sql -1298294830
 src/main/resources/db/migration/V20261027160100__create_mcp_token_usage.sql 278107562
 src/main/resources/db/migration/V20261027170000__create_analytics_events.sql -25620248
+src/main/resources/db/migration/V20261028150000__memory_relevance_candidates_and_ttl.sql 279443776
 src/main/resources/db/migration/V20__add_entry_read_indexes.sql -1148086735
 src/main/resources/db/migration/V21__create_ai_telemetry_tables.sql -891669932
 src/main/resources/db/migration/V22__create_learning_tracks.sql -976007377

@@ -7547,3 +7547,22 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 既有缺陷（未修，不属本项）：`tokens.test.ts` 报 `apps/admin/.../AnalyticsPage.tsx` 用了调色板颜色，违反令牌纪律。
 - 本地提交：本笔
 - 远端推送：随本笔
+## 2026-10-28 15:20:00 +0800 · WORK-050 实施：金集/评测、召回排序、时间淘汰、敏感过滤、半自动候选
+
+- 类型：implementation
+- 变更：
+  - 金集与评测器：`extraction-cases.json`（40 条）、`recall-cases.json`（30 条）、`MemoryEvalTest`（真上游，env 门）、`MemoryRecallEvalTest`（需库）
+  - `SensitiveContent` 七类形态过滤，接在 `MemoryStore` 两个底层 insert 上；自动整理逐条过滤
+  - 召回三层排序（关键词命中 → 全文相关度 → kind 权重×180 天衰减），召回后批量刷新 `last_used_at`（GREATEST）
+  - 迁移 `V20261028150000`：结构化补 ngram 全文索引、两表加 `last_used_at`、新建 `ai_memory_candidates`
+  - `MemoryRetentionPurger`（每小时、每批 500）按 kind 分档 TTL 淘汰 + 候选过期清理
+  - `PROPOSE` 动作与提示词 `memory-extract-v2`（maxTokens 2048→3072）、候选服务与三个端点、面板「待确认」区
+- 验证：
+  - 后端单测（除 paideia-app）359 run / 0 fail / 15 skipped；四个边界与迁移守卫 9 run / 0 fail
+  - 记忆相关集成 26 + 7 + 2 + 4 条全绿；前端 assistant 43 条、14 个包 typecheck 通过；面板 e2e 1 passed
+  - 召回金集首位命中率 0.267 → 1.000、MRR 0.622 → 1.000
+  - 提取复测（v2）：失败 1–3 → 0，precision 0.706 → 0.769，propose 0 → 0.833；**recall 0.857 → 0.714、错 UPDATE 0 → 0.111**
+- 阻塞：**AC-010 的「两次差异 ≤ 5 个百分点」实测不成立**（−5.9 / −7.1 pp；分母 14–17，一条翻转即 6–7 pp）。
+  需回到 requirements 改这条 AC（三次取均值 / 扩金集到 100+ / 放宽到 10 pp），report 因此停在 `draft`
+- 本地提交：4 笔（评测 / 排序淘汰过滤 / PROPOSE 候选 / 面板），分支 `work-050-memory`
+- 远端推送：未执行

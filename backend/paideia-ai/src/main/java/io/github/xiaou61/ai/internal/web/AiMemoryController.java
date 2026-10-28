@@ -1,5 +1,6 @@
 package io.github.xiaou61.ai.internal.web;
 
+import io.github.xiaou61.ai.internal.memory.MemoryCandidateService;
 import io.github.xiaou61.ai.internal.memory.MemoryStore;
 import io.github.xiaou61.ai.internal.settings.AiSettingsStore;
 import io.github.xiaou61.platform.ApiAccess;
@@ -55,10 +56,12 @@ class AiMemoryController {
     }
 
     private final MemoryStore memories;
+    private final MemoryCandidateService candidates;
     private final AiSettingsStore settings;
 
-    AiMemoryController(MemoryStore memories, AiSettingsStore settings) {
+    AiMemoryController(MemoryStore memories, MemoryCandidateService candidates, AiSettingsStore settings) {
         this.memories = memories;
+        this.candidates = candidates;
         this.settings = settings;
     }
 
@@ -131,6 +134,34 @@ class AiMemoryController {
         // 删不到（不是本人的、或本来就不存在）都返回 false，**不区分**——区分开就等于
         // 确认"某个 id 存在"。前端据此刷新列表即可。
         return ApiResponse.ok(memories.delete(userId, parsed, id));
+    }
+
+    /**
+     * 待确认的候选（WORK-050 REQ-008）。
+     *
+     * <p>被敏感信息过滤掉的那些**只回长度与原因**，正文永远是 null——把原文回给前端
+     * 等于它重新出现在浏览器里，而它本来就是因为不该留才被拦下的。
+     */
+    @GetMapping("/candidates")
+    ApiResponse<List<MemoryCandidateService.Candidate>> pendingCandidates(
+            @RequestParam(value = "limit", required = false) Integer limit,
+            @RequestParam(value = "offset", required = false) Integer offset) {
+        return ApiResponse.ok(candidates.pending(AiRequester.require(),
+                limit == null ? 20 : limit, offset == null ? 0 : offset));
+    }
+
+    /** 接受一条候选：它会成为一条正式记忆。总开关关着时拒绝（与其它写入口同一条闸）。 */
+    @PostMapping("/candidates/{id}/accept")
+    ApiResponse<Void> acceptCandidate(@PathVariable("id") long id) {
+        candidates.accept(AiRequester.require(), id);
+        return ApiResponse.ok(null);
+    }
+
+    /** 拒绝一条候选：它不会成为记忆。 */
+    @PostMapping("/candidates/{id}/reject")
+    ApiResponse<Void> rejectCandidate(@PathVariable("id") long id) {
+        candidates.reject(AiRequester.require(), id);
+        return ApiResponse.ok(null);
     }
 
     private static MemoryStore.MemoryItem.Source parseSource(String raw) {

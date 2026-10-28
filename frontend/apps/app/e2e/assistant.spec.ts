@@ -43,6 +43,8 @@ test('记忆面板：能看到"它记住了什么"，并说明可逐条删除', 
   await expect(page.getByTestId('memory-panel')).toContainText('可逐条删除')
   // 种子账号没有记忆：这里断的是"空状态说得清楚"，而不是"列表里有什么"
   await expect(page.getByTestId('memory-empty')).toHaveText('还没有任何记忆。')
+  // 没有候选时「待确认」整块不渲染（WORK-050）：空标题比不渲染更像坏掉
+  await expect(page.getByTestId('memory-candidates')).toHaveCount(0)
 })
 
 test('积分面板：能看到余额与空状态，并说明没有自动充值', async ({ page }) => {

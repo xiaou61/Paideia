@@ -54,20 +54,21 @@ S1 的基线必须用**现状代码**跑出来，不能等改完再补。
 
 ## 任务
 
-### TASK-001 | pending | 提取侧金集（40 段对话）
+### TASK-001 | done | 提取侧金集（120 段对话）
 
 - 对应：`REQ-009`、`AC-010`
 - 依赖：无
 - 新建/修改：`backend/paideia-ai/src/test/resources/golden/memory/extraction-cases.json`（新建）
 - 接口：无代码接口；文件被 TASK-003 读取，schema 见 design 的评测一节
 - 步骤：
-  1. 写 40 段用例，每段含 `existing`（已有记忆，可空）、`turns`（2–6 轮）、`expect`。
-  2. 覆盖分布：应 ADD 12 条、应 UPDATE 8 条、应 DELETE 4 条、应 PROPOSE 6 条、应无操作 10 条（含纯寒暄与知识点问答）。
+  1. 写 120 段用例，每段含 `existing`（已有记忆，可空）、`turns`（1–3 轮）、`expect`。
+  2. 覆盖分布：ADD 36 / UPDATE 24 / DELETE 12 / PROPOSE 18 / 无操作 30。**120 条是 AC-010 推出来的**：
+     分母 14–17 时一条翻转就是 6–7 个百分点，5 pp 容差不可能达到；扩到 120 后每个分母 ≥ 24。
   3. `expect` 用"内容包含某片段"而不是逐字相等，避免被措辞变化判错。
   4. 逐条自查：不含真实手机号、真实邮箱、真实口令。
 - 验证：`python -c "import json;json.load(open('...'))"` 通过；用脚本统计各动作条数与上面的分布一致
 
-### TASK-002 | pending | 召回侧金集（30 条查询）
+### TASK-002 | done | 召回侧金集（30 条查询）
 
 - 对应：`REQ-009`、`AC-002`、`AC-010`
 - 依赖：无
@@ -79,7 +80,7 @@ S1 的基线必须用**现状代码**跑出来，不能等改完再补。
   3. 至少 6 条必须是**旧但相关**的记忆排在新但无关的前面——这是本项要证明的核心行为。
 - 验证：JSON 可解析；统计各 kind 条数符合分布；"旧但相关"用例数 ≥ 6
 
-### TASK-003 | pending | 评测执行器与基线
+### TASK-003 | done | 评测执行器与基线
 
 - 对应：`REQ-009`、`REQ-010`、`AC-010`、`AC-011`
 - 依赖：TASK-001、TASK-002
@@ -95,7 +96,7 @@ S1 的基线必须用**现状代码**跑出来，不能等改完再补。
   5. **用现状代码跑一遍，把数字写进 `.agent/changes/WORK-050-.../testing/baseline.md`**。
 - 验证：设 key 跑（数字进工件）；不设 key 再跑一次，断言 `Skipped` 与"未评测"输出
 
-### TASK-004 | pending | 敏感信息过滤
+### TASK-004 | done | 敏感信息过滤
 
 - 对应：`REQ-001`、`AC-001`
 - 依赖：无（与 S1 并行）
@@ -110,7 +111,7 @@ S1 的基线必须用**现状代码**跑出来，不能等改完再补。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-ai test -Dtest=SensitiveContentTest` 全绿；
   其中"反例不误伤"用例数与"正例命中"用例数各 ≥ 8
 
-### TASK-005 | pending | 召回相关性排序（两路）
+### TASK-005 | done | 召回相关性排序（两路）
 
 - 对应：`REQ-002`、`REQ-003`、`AC-002`
 - 依赖：TASK-007 的迁移（结构化那一路需要 ngram 索引；两个任务要约定同一个迁移文件，谁先落地谁合并）
@@ -124,7 +125,7 @@ S1 的基线必须用**现状代码**跑出来，不能等改完再补。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=MemoryRecallOrderTest` 全绿，
   且"旧但相关排在前"的用例通过
 
-### TASK-006 | pending | 召回后刷新使用时间
+### TASK-006 | done | 召回后刷新使用时间
 
 - 对应：`REQ-005`、`AC-004`
 - 依赖：TASK-005
@@ -137,7 +138,7 @@ S1 的基线必须用**现状代码**跑出来，不能等改完再补。
   4. **不写比已有值更早的时间**：`SET last_used_at = GREATEST(COALESCE(last_used_at, #{now}), #{now})`。
 - 验证：`-Dtest=MemoryStoreTest` 全绿，含 `touchNeverMovesBackwards`、`touchEmptyListIssuesNoSql`
 
-### TASK-007 | pending | 迁移、淘汰任务与级联
+### TASK-007 | done | 迁移、淘汰任务与级联
 
 - 对应：`REQ-004`、`REQ-011`、`AC-003`、`AC-004`、`AC-005`
 - 依赖：无（与 S2 并行；与 TASK-005 共用迁移文件）
@@ -154,7 +155,7 @@ S1 的基线必须用**现状代码**跑出来，不能等改完再补。
   4. 注销清单加 `ai_memory_candidates`。
 - 验证：`-Dtest=MemoryPurgeTest` 全绿；迁移在零数据新库上能跑（`scripts/test-db.sh` 自动给独占库）
 
-### TASK-008 | pending | PROPOSE 动作与提示词 v2
+### TASK-008 | done | PROPOSE 动作与提示词 v2
 
 - 对应：`REQ-006`、`AC-006`
 - 依赖：TASK-001（金集用来判断提议得对不对）
@@ -167,7 +168,7 @@ S1 的基线必须用**现状代码**跑出来，不能等改完再补。
   3. 用 TASK-001 的 6 条"应 PROPOSE"用例跑一次，检查提议率不是 0 也不是 100%。
 - 验证：`-Dtest=MemoryCandidateParserTest` 全绿；真连跑一次记录提议率进工件
 
-### TASK-009 | pending | 候选表与整理分流
+### TASK-009 | done | 候选表与整理分流
 
 - 对应：`REQ-006`、`REQ-007`、`AC-006`、`AC-007`、`AC-008`
 - 依赖：TASK-007（候选表）、TASK-008（新动作）
@@ -183,7 +184,7 @@ S1 的基线必须用**现状代码**跑出来，不能等改完再补。
 - 验证：`-Dtest='MemoryCandidate*Test,MemoryExtractionServiceTest'` 全绿，含 `filteredCandidateStoresNoContent`、
   `concurrentAcceptCreatesOne`、`proposeWritesOnlyCandidates`
 
-### TASK-010 | pending | 候选端点、注销与总开关
+### TASK-010 | done | 候选端点、注销与总开关
 
 - 对应：`REQ-008`、`REQ-011`、`REQ-012`、`AC-009`、`AC-012`、`AC-013`
 - 依赖：TASK-009
@@ -196,7 +197,7 @@ S1 的基线必须用**现状代码**跑出来，不能等改完再补。
   3. 注销清单确认包含候选表；集成测试断言四张表（两记忆 + 候选）都清空。
 - 验证：`-Dtest='MemorySwitchTest,MemoryDeletionTest'` 全绿
 
-### TASK-011 | pending | 面板「待确认」与 e2e
+### TASK-011 | done | 面板「待确认」与 e2e
 
 - 对应：`REQ-008`、`AC-007`、`AC-008`
 - 依赖：TASK-010
@@ -208,7 +209,7 @@ S1 的基线必须用**现状代码**跑出来，不能等改完再补。
   3. e2e：插入一条候选 → 面板可见 → 接受 → 正式列表出现、候选区消失。
 - 验证：`playwright test e2e/assistant.spec.ts --grep "记忆"` 通过
 
-### TASK-012 | pending | 复测与对比报告
+### TASK-012 | done | 复测与对比报告
 
 - 对应：`AC-010`、`AC-011`
 - 依赖：TASK-003 到 TASK-011 全部

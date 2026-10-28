@@ -109,6 +109,25 @@ export interface MemorySettings {
   referenceChatHistory: boolean
 }
 
+/**
+ * 待确认的候选记忆（WORK-050 半自动提案）。
+ *
+ * <p>`status='filtered'` 的行 `content` 恒为 `null`：它是因为"疑似含敏感信息"被拦下的，
+ * 正文根本不该出现在浏览器里——面板只显示"有一条没记"和原因。
+ */
+export interface MemoryCandidate {
+  id: number
+  store: 'structured' | 'text'
+  kind: string | null
+  content: string | null
+  reason: string | null
+  conversationId: number | null
+  status: 'pending' | 'accepted' | 'rejected' | 'filtered' | 'expired'
+  decisionReason: string | null
+  createdAt: string | null
+  expiresAt: string | null
+}
+
 /** 「清空并关闭」的响应：清掉了几条 + 清空之后的设置（总开关已被后端关掉）。 */
 export interface MemoryClearResult {
   cleared: number
