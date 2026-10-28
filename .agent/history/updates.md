@@ -7260,3 +7260,15 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 未覆盖：3D 画布（`GraphCanvas3D`，1.39MB chunk）有同样模式，但它是切换后才用，本次未改；`digest-graph` 无专门 e2e，本次用一次性 Playwright 脚本验证。
 - 本地提交：ff4ea06
 - 远端推送：未执行
+
+## 2026-10-28 10:40 +0800 · WORK-046 · 书籍详解专题实施完成（未部署）
+
+- 类型：implementation + verification
+- 变更：工作树 `.worktrees/work-046` / 分支 `work-046-books`，四笔提交（da25c94 后端 sortOrder、526e50f 导入脚本父分类、ae3d9b8 前端页面与内容、本笔记录）。
+- 交付：`/books` 与 `/books/:slug` 两个页面、页头「书籍详解」入口、《人月神话》5 篇内容、导入脚本一级父分类、`EntrySummary.sortOrder`。
+- 决策（实施中新增，记入报告「与设计的一致性」）：设计写"按 slug 从树里定位"，实现时漏了"书挂在 books 下面"这层——`categories.find()` 找不到子分类，**e2e 第一次跑就红了**（章节页一行都没有）。改为递归 `findCategoryBySlug` 并补 4 条单测。
+- 验证：后端切片 352/0/14 + 9/0/0；前端 typecheck 通过、`@paideia/knowledge` 59 条单测；e2e 20 条全绿（books 4 + mobile 16）；导入两遍幂等（`created 2/updated 3` → `created 0/updated 0`）；另用独立内容源验证了"父分类不存在时被创建"这条路径（两次 `+ 父分类`/`+ 分类` → 第二次全复用）。
+- 如实缺口：**线上未部署、未导入**，生产 `/books` 现在是空态；卡片篇数受单次 100 条上限约束。
+- 既有缺陷（**未修**，不属本项）：① `ApiWalkthroughTest` 的全接口覆盖断言少了 WORK-042/043/027 的 11 个端点；② `GET /api/v1/ai/admin/runs/meta` 返回 500。重录 `api-shape.json` 时临时注掉过覆盖断言，**跑完已还原**。
+- 本地提交：见上方三笔
+- 远端推送：未执行（等授权）
