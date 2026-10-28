@@ -131,7 +131,8 @@ class McpToolInvokerTest {
         ToolResult third = invoker.invoke(READER, view, "knowledge_search", Map.of());
 
         assertThat(third.error()).isTrue();
-        assertThat(third.text()).contains("过于频繁");
+        // 只说"过于频繁"会让模型立刻重试；必须给出上限与剩余秒数
+        assertThat(third.text()).contains("过于频繁").contains("每分钟最多 2 次").contains("秒再试");
     }
 
     @Test
@@ -293,6 +294,26 @@ class McpToolInvokerTest {
                 "knowledge_search", Map.of());
 
         verify(usage).record(eq(1L), any(), anyBoolean());
+    }
+
+    /**
+     * 被拒的调用不烧每日配额。
+     *
+     * <p>配额按"今天累计"判、按"实际执行"记。若被拒的也累加，一个对配额上限反复重试的客户端
+     * 会把自己的计数越推越高，一整天都解不开——而它一次活都没干。
+     */
+    @Test
+    void deniedCallDoesNotConsumeQuota() {
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        when(usage.callsToday(1L, today)).thenReturn(5);
+        McpViewRegistry.PatCaller limited = new McpViewRegistry.PatCaller(
+                7L, 1L, "learner", Set.of(ToolScope.READ), Set.of(), 5);
+
+        ToolResult result = invoker(100).invoke(limited, McpViews.parse("/x/knowledge").orElseThrow(),
+                "knowledge_search", Map.of());
+
+        assertThat(result.text()).contains("每日上限");
+        verify(usage, never()).record(anyLong(), any(), anyBoolean());
     }
 
     @Test

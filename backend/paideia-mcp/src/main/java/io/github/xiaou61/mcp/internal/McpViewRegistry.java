@@ -130,7 +130,7 @@ class McpViewRegistry {
 
         var specification = McpServer.sync(transport)
                 .serverInfo("paideia", "0.0.1")
-                .instructions("Paideia 个性化学习平台。工具按视图分组：" + view.name() + "。");
+                .instructions(instructions(view, descriptors.size()));
         for (ToolDescriptor descriptor : descriptors) {
             specification.tool(toMcpTool(descriptor), (exchange, arguments) ->
                     invoke(exchange, view, descriptor.name(), arguments));
@@ -138,6 +138,25 @@ class McpViewRegistry {
         McpSyncServer server = specification.build();
         log.info("mcp.view.built view={} endpoint={} tools={}", view.name(), endpoint, descriptors.size());
         return new McpView(view.name(), transport, server);
+    }
+
+    /**
+     * 服务器级说明（MCP `instructions`）。
+     *
+     * <p>工具描述只回答"这个工具干什么"；"先搜后读、写之前先确认、被拒不要原样重试"是**跨工具**
+     * 的约定，没有别的地方能放。原文案只有一句平台名与视图名，等于让模型自己猜工作流。
+     *
+     * <p>保持 4 行以内：它进每一次会话的上下文，长了自己就成了 bloat。
+     */
+    private static String instructions(McpViews view, int toolCount) {
+        return """
+                Paideia 是个人学习平台（知识库、笔记、学习进度、简历与面试）。
+                当前视图「%s」，可见 %d 个工具。
+                工作方式：
+                1. 检索类工具只返回 id 与标题；需要正文时再用对应的详情工具，不要凭标题复述内容。
+                2. 写工具会改动用户数据（笔记、标记、记忆）；调用前先向用户确认要写什么。
+                3. 工具返回 isError 时把原因告诉用户；若是被拒（权限、频率、每日上限），不要原样重试，按消息里的建议处理。
+                """.formatted(view.name(), toolCount);
     }
 
     /** 描述符 → MCP 的 Tool。注解与 outputSchema 都要带上：客户端据此决定是否二次确认。 */

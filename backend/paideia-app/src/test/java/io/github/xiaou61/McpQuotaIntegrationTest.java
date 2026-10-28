@@ -67,12 +67,12 @@ class McpQuotaIntegrationTest {
         assertThat(second).as("第二次应当成功").doesNotContain("每日上限");
         assertThat(third).as("第三次应当被配额拦下").contains("每日上限");
 
-        // 计数落库：今天这个凭据记了 3 次（含被拒的那次——被拒也要留痕）
+        // 计数落库：今天这个凭据记了 2 次——**被拒的那次不计**，否则重试会把配额越烧越高
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
         assertThat(usage.callsToday(created.id(), today))
-                .as("被拒的调用也要计数，否则日志与数字对不上")
-                .isEqualTo(3);
-        assertThat(usage.totals(created.id()).calls()).isEqualTo(3);
+                .as("被拒的调用不占配额，只留审计与指标")
+                .isEqualTo(2);
+        assertThat(usage.totals(created.id()).calls()).isEqualTo(2);
 
         tokens.deleteAllFor(userId);
     }

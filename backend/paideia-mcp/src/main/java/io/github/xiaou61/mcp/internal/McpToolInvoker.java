@@ -28,7 +28,8 @@ import org.springframework.stereotype.Component;
  *   <li><b>配额</b>：按 token 查当天累计次数，达到凭据上限不执行（数据库，防长期失控）；</li>
  *   <li><b>执行</b>；</li>
  *   <li><b>截断</b>：超长文本裁到上限并标记；</li>
- *   <li><b>审计 + 计数 + 指标</b>：三者同一处收尾，不会出现"日志记了但计数没记"的分叉。</li>
+ *   <li><b>审计 + 计数 + 指标</b>：三者同一处收尾，不会出现"日志记了但计数没记"的分叉；
+ *       其中**计数只记真正执行过的**，被拒的只进审计与指标（否则重试会把配额烧光）。</li>
  * </ol>
  *
  * <p>**限流在配额之前**：限流是内存判定（几乎零成本），配额要查库。先过便宜的。
@@ -73,7 +74,10 @@ class McpToolInvoker {
         } catch (RuntimeException unexpected) {
             // 服务端日志留完整堆栈；返回给客户端的只有一句
             errors.error("mcp.tool.failed userId={} tool={}", caller.userId(), toolName, unexpected);
-            outcome = Outcome.ok(ToolResult.fail("工具执行失败，请稍后重试"));
+            // 不带异常类型：对模型没有信息量，只说下一步。原样重试几乎必然再失败，所以要明说
+            outcome = Outcome.ok(ToolResult.fail(
+                    "工具执行失败，这次没有返回任何结果。不要原样重试——可以缩小查询范围再试，"
+                            + "或直接告诉用户这项操作暂时不可用。"));
         }
         ToolResult result = cap(outcome.result());
         double seconds = (System.nanoTime() - started) / 1_000_000_000.0;
@@ -109,7 +113,9 @@ class McpToolInvoker {
             return Outcome.denied("没有名为「" + toolName + "」的工具", Denial.PERMISSION);
         }
         if (!limiter.allow(caller.tokenId())) {
-            return Outcome.denied("调用过于频繁，请稍后再试", Denial.RATE_LIMIT);
+            return Outcome.denied("调用过于频繁：这个凭据每分钟最多 " + limiter.perMinute()
+                    + " 次，请等约 " + limiter.secondsUntilReset(caller.tokenId())
+                    + " 秒再试，或减少调用频率。", Denial.RATE_LIMIT);
         }
         Integer dailyLimit = caller.dailyCallLimit();
         if (dailyLimit != null && usage.callsToday(caller.tokenId(), today) >= dailyLimit) {
@@ -143,15 +149,21 @@ class McpToolInvoker {
     /**
      * 收尾三件事：写用量、打指标。
      *
+     * <p><b>被拒的调用不写用量</b>：`mcp_token_usage.calls` 是"实际执行了多少次"，每日配额也按它判。
+     * 把被拒的也算进去会让一个反复重试的客户端把自己锁死一整天，而它一次活都没干；
+     * "拒了几次、为什么拒"由审计日志的 `denied=` 与 `paideia.mcp.denied` 指标留痕。
+     *
      * <p>计数失败不传播（{@code McpUsageRecorder.record} 内部已吞）；指标写入理论上不会失败，
      * 但仍包一层，避免一处旁路把整次调用炸掉。
      */
     private void record(McpViewRegistry.PatCaller caller, String toolName, LocalDate today,
                         ToolResult result, Denial denial, double seconds) {
-        try {
-            usage.record(caller.tokenId(), today, result.error());
-        } catch (RuntimeException failure) {
-            errors.warn("mcp.usage.record.failed tokenId={} tool={}", caller.tokenId(), toolName, failure);
+        if (!denial.denied()) {
+            try {
+                usage.record(caller.tokenId(), today, result.error());
+            } catch (RuntimeException failure) {
+                errors.warn("mcp.usage.record.failed tokenId={} tool={}", caller.tokenId(), toolName, failure);
+            }
         }
         try {
             String toolset = catalog.find(toolName)
