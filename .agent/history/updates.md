@@ -7397,3 +7397,17 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：`node .agent/html/render-check.mjs --shots` → 19 页 × 1440/1280 / 0 失败；内部链接全量存在性检查通过；跨页序号标签修正 4 处（02×2、05、07）
 - 本地提交：本轮单独提交
 - 远端推送：未执行
+
+## 2026-10-28 13:46:50 +0800 · 修复：学习线分类在知识库浏览树里不可见
+
+- 类型：fix
+- 变更：
+  - `CategoryService.tree()` 不再过滤 `line_kind` 非空的分类（原过滤会把 26 条学习线整体藏掉，用户在 `/learn` 读过的条目在知识库里找不到）
+  - `EntryMapper.pagePublished` / `EntryService.listPublished`：当请求的分类是学习线时按 `sort_order` 排，其它分类仍按发布时间倒序——同一批条目的两个入口顺序不能相反
+  - 新增 `CategoryServiceTest`（浏览树保留轨道分类）、`KnowledgeReadIntegrationTest.lineCategoryListsChaptersInCourseOrder`
+- 决策：分类页对学习线按关卡顺序，而不是改成"只显示去 /learn"——藏内容正是这次要修的病；分类页保留全部条目，另给一条通往关卡地图的链接（前端已有）
+- 依据：`V17__add_learning_lines.sql`（线只是分类标记）、`LearningLineService`（线清单另有入口）、`CategoryTree.assemble`（父节点缺失挂根、不丢子树）
+- 同类排查：搜索、`/learn` 线清单、AI 的 `knowledge_list_categories`、管理端 `fullTree` 都不过滤 `line_kind`；`identity/config.ts` 的 `preferredCategories` 目前无调用方，是死配置，未改
+- 验证：`scripts/test-db.sh mvn -pl paideia-app -am -Dtest=CategoryServiceTest,KnowledgeReadIntegrationTest` → 1/0 与 14/0；`release.ps1 -SkipWeb` 111.8 秒且健康检查通过；线上 `GET /api/v1/knowledge/categories` 返回 26 个顶层分类且 `architecture-from-zero` 的 lineKind=reading；`?categoryId=58` 顺序为总览→边界→…→评审；学习者端 e2e `knowledge.spec.ts` 打线上 **8 passed / 1 skipped**
+- 本地提交：`116a5fa`，本条目单独一笔
+- 远端推送：未执行
