@@ -203,4 +203,82 @@ class GithubTrendingSourceTest {
 
         assertThat(items).extracting(FetchedItem::title).containsExactly("real/repo");
     }
+
+    @Test
+    @DisplayName("页面被截断时重试一次：第二次拿到完整页就用它")
+    void truncatedPageIsRetriedOnce() {
+        // 实测线上：同一代理有时 2 秒回完整 584KB，有时 30 秒只回 344KB（article 少一半）。
+        // 截断时解析出的条目数直接腰斩，用户看到的就是"今天只有 18 条"。
+        String truncated = PAGE;
+        String complete = PAGE + """
+                <article class="Box-row">
+                  <h2><a href="/second/repo">second/repo</a></h2>
+                  <p class="col-9">Another project</p>
+                  <a href="/second/repo/stargazers">500</a>
+                  <span class="d-inline-block float-sm-right">900 stars today</span>
+                </article>
+                """;
+        java.util.concurrent.atomic.AtomicInteger dailyCall =
+                new java.util.concurrent.atomic.AtomicInteger();
+        StubHttp http = new StubHttp(url -> {
+            if (url.contains("stargazers/history")) {
+                return HISTORY;
+            }
+            if (url.contains("since=weekly")) {
+                return WEEKLY_PAGE;
+            }
+            // 只认"全语言日榜"这一条：语言榜（/trending/java?since=daily）走下面的分支
+            if (url.endsWith("/trending?since=daily")) {
+                // 第一次给截断页，第二次给完整页（语言榜走下面的分支，不计入）
+                return dailyCall.incrementAndGet() == 1 ? truncated : complete;
+            }
+            if (url.contains("/trending/")) {
+                return "";   // 语言榜本用例不关心
+            }
+            throw new DigestSource.DigestSourceException("不该请求：" + url);
+        });
+
+        List<FetchedItem> items = source.fetch(properties(), http, NOW);
+
+        assertThat(dailyCall.get()).as("截断后应重试一次").isEqualTo(2);
+        assertThat(items).extracting(FetchedItem::title)
+                .contains("trending-owner/hot-repo", "second/repo");
+    }
+
+    @Test
+    @DisplayName("除全语言日榜外还抓语言榜：全语言榜只有 11 条，语言榜各自还有十几条")
+    void languagePagesAreAlsoFetched() {
+        String javaPage = """
+                <article class="Box-row">
+                  <h2><a href="/java-owner/java-repo">java-repo</a></h2>
+                  <span class="d-inline-block float-sm-right">700 stars today</span>
+                </article>
+                """;
+        StubHttp http = new StubHttp(url -> {
+            if (url.contains("stargazers/history")) {
+                return HISTORY;
+            }
+            if (url.contains("/trending/java")) {
+                return javaPage;
+            }
+            if (url.contains("since=weekly")) {
+                return WEEKLY_PAGE;
+            }
+            if (url.contains("github.com/trending")) {
+                return PAGE;
+            }
+            throw new DigestSource.DigestSourceException("不该请求：" + url);
+        });
+
+        List<FetchedItem> items = source.fetch(properties(), http, NOW);
+
+        assertThat(items).extracting(FetchedItem::title)
+                .contains("trending-owner/hot-repo", "java-owner/java-repo");
+        assertThat(http.requested).anyMatch(url -> url.contains("/trending/java?since=daily"));
+        assertThat(http.requested).anyMatch(url -> url.contains("/trending/python?since=daily"));
+        assertThat(http.requested).anyMatch(url -> url.contains("/trending/typescript?since=daily"));
+        // 周榜不为每个语言再抓一遍（请求次数会被"截断重试"放大，所以断言"没有语言×周榜的组合"）
+        assertThat(http.requested)
+                .noneMatch(url -> url.contains("/trending/") && url.contains("since=weekly"));
+    }
 }

@@ -58,13 +58,31 @@ class GithubTrendingSource {
     private static final String SOURCE_FALLBACK = "GitHub 新项目";
 
     /**
-     * 日榜/周榜各取前 15，并集最多 30。
+     * 日榜/周榜各取前 25，并集最多 50。
      *
-     * <p>原值是 10，实测线上只出 14 条（日榜 10 ∪ 周榜 10 去重后）——用户直接反馈
-     * 「一共就 14 个是不是太少了」。提到 15 之后并集上限 30，与 Search 兜底页的
-     * `per_page=30` 对齐，两条通路的产量一致。
+     * <p>原值是 10（线上只出 14 条，用户反馈「太少」），提到 15 后仍偏少：GitHub 的
+     * trending 页面一页就是 25 条，取 25 才算把这一页用满。总量仍由
+     * `maxItemsPerRun`（默认 60、按分组轮转分配）兜住，不会把其它分组挤没。
      */
-    private static final int PAGE_LIMIT = 15;
+    private static final int PAGE_LIMIT = 25;
+
+    /**
+     * 一页 trending 正常应有 25 条，**低于这个数视为响应被截断**。
+     *
+     * <p>2026-10-28 实测：同一台机器连 GitHub 的 nginx 反代三次，两次拿到完整的 584KB，
+     * 一次 30 秒只回 344KB（`<article>` 少一半）。截断时解析出的条目数直接腰斩——当天日志是
+     * 「日榜 12、周榜 14、去重 25、入候选 18」，用户看到"18 条太少"，真相是那一页只抓到一半。
+     * 取 20 作阈值：完整是 25，截断通常只剩十几个，留出余量。
+     */
+    private static final int MIN_COMPLETE_PAGE_REPOS = 20;
+
+    /**
+     * 额外抓的语言榜。**不超过三个**：每个候选都要调一次 `stargazers/history`，
+     * 而 api.github.com 未认证时是 60 次/小时——现在约 25 个候选，加三个语言榜约 50 个，
+     * 刚好在限额内；再加就会大批 403（虽然会退回页面数字，但"次日真实增量"就没了）。
+     * 想加更多语言，先配 `paideia.digest.github-token`。
+     */
+    private static final List<String> LANGUAGE_PAGES = List.of("java", "python", "typescript");
 
     /** history 并发度：25 个候选约 5 秒，远低于顺序的 40 秒。 */
     private static final int MAX_HISTORY_THREADS = 6;
@@ -94,7 +112,14 @@ class GithubTrendingSource {
         LocalDate referenceDay = Instant.ofEpochMilli(nowMillis)
                 .atZone(ZoneOffset.UTC).toLocalDate().minusDays(1);
 
-        List<PageRepo> daily = fetchPage(http, properties.getGithubTrendingUrl(), false);
+        List<PageRepo> daily = new ArrayList<>(
+                fetchPage(http, properties.getGithubTrendingUrl(), false));
+        // 全语言日榜今天只给了 11 条（2026-10-28 实测，页面完整），单靠它 + 周榜去重后只有 18 条。
+        // 语言榜各有 15–17 条，合并才是"今天够看"的量。周榜仍只取全语言——周维度上语言榜重叠更多，
+        // 多抓两页换不来新仓库，只会多花 history 配额。
+        for (String language : LANGUAGE_PAGES) {
+            daily.addAll(fetchPage(http, properties.getGithubTrendingUrl() + "/" + language, false));
+        }
         List<PageRepo> weekly = fetchPage(http, properties.getGithubTrendingUrl(), true);
         List<Candidate> candidates = merge(daily, weekly);
         if (!candidates.isEmpty()) {
@@ -121,6 +146,22 @@ class GithubTrendingSource {
     }
 
     private List<PageRepo> fetchPage(DigestHttp http, String baseUrl, boolean weekly) {
+        List<PageRepo> repos = fetchPageOnce(http, baseUrl, weekly);
+        if (repos.size() >= MIN_COMPLETE_PAGE_REPOS) {
+            return repos;
+        }
+        // 疑似截断：同样的请求重试一次，取更多的那份。代理层没有重试能力（它已经返回了 200），
+        // 所以只能在解析这一侧兜。
+        List<PageRepo> retry = fetchPageOnce(http, baseUrl, weekly);
+        if (retry.size() > repos.size()) {
+            log.info("GitHub trending {} 首次只解析出 {} 条（疑似截断），重试得到 {} 条",
+                    weekly ? "weekly" : "daily", repos.size(), retry.size());
+            return retry;
+        }
+        return repos;
+    }
+
+    private List<PageRepo> fetchPageOnce(DigestHttp http, String baseUrl, boolean weekly) {
         String url = appendSince(baseUrl, weekly ? "weekly" : "daily");
         try {
             return parsePage(http.getText(url, USER_AGENT), weekly);
