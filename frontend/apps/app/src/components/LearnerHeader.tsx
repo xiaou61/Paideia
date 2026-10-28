@@ -63,6 +63,9 @@ const NAV = [
   // 不进 preferredNav —— 身份排序只管那几个老入口，新入口固定排在后面。
   { key: 'camp' as const, group: 'learn' as const, to: '/camp', label: '训练营', testId: 'learner-nav-camp' },
   { key: 'knowledge' as const, group: 'knowledge' as const, to: '/knowledge', label: '知识库', testId: 'learner-nav-knowledge' },
+  // 书籍详解（WORK-046）：按书读，和"按主题查"并列的第二条轴。
+  // 不进 preferredNav —— 它靠组内排后，不靠身份推荐。
+  { key: 'books' as const, group: 'knowledge' as const, to: '/books', label: '书籍详解', testId: 'learner-nav-books' },
   { key: 'graph' as const, group: 'knowledge' as const, to: '/graph', label: '知识图谱', testId: 'learner-nav-graph' },
   { key: 'notes' as const, group: 'knowledge' as const, to: '/notes', label: '我的笔记', testId: 'learner-nav-notes' },
   { key: 'sql-practice' as const, group: 'practice' as const, to: '/practice/sql', label: 'SQL 练习', testId: 'learner-nav-sql-practice' },

@@ -58,6 +58,9 @@ const ROUTES = [
   // 编辑页与提案页是三栏/两栏布局，窄屏必须自动堆叠——那正是最容易出横向溢出的地方。
   { path: '/#/resume', name: '我的简历' },
   { path: '/#/resume/create', name: '新建简历' },
+  // 书籍详解（WORK-046）：书列表与章节目录在手机上也要能打开且不撑破布局。
+  { path: '/#/books', name: '书籍详解' },
+  { path: '/#/books/books-man-month', name: '书籍章节' },
   { path: '/#/login', name: '登录' },
   { path: '/#/register', name: '注册' },
   { path: '/#/share/00000000-0000-0000-0000-000000000000', name: '分享页' },
@@ -70,6 +73,20 @@ test.describe('移动端布局', () => {
       await expectNoOverflow(page, `${route.name} 在 ${page.viewportSize()?.width}px 下`)
     })
   }
+
+  test('书籍章节正文在窄屏不横向溢出（含概念图与出处头）', async ({ page }) => {
+    await signIn(page)
+    await page.goto('/#/books/books-man-month')
+    const chapters = page.locator('[data-testid^="book-chapter-"]')
+    await expect(chapters.first()).toBeVisible({ timeout: 15_000 })
+
+    // 首条是总览；种子里它带一张 code-map 与一段引用块（出处头的正文形态）
+    await chapters.first().click()
+    await expect(page.getByTestId('markdown-body')).toBeVisible()
+    await expect(page.getByTestId('code-map')).toBeVisible()
+
+    await expectNoOverflow(page, '书籍章节正文')
+  })
 
   test('条目详情无横向溢出，且长文有可展开的本页目录', async ({ page }) => {
     await signIn(page)
@@ -104,6 +121,8 @@ test.describe('移动导航抽屉', () => {
     await expect(drawer).toBeVisible()
 
     await expect(page.getByTestId('learner-nav-knowledge-drawer')).toBeVisible()
+    // 书籍详解（WORK-046）在手机上必须有入口：新加的导航项不该只在桌面出现
+    await expect(page.getByTestId('learner-nav-books-drawer')).toBeVisible()
     await expect(page.getByTestId('learner-nav-notes-drawer')).toBeVisible()
     await expect(page.getByTestId('learner-nav-my-assessments-drawer')).toBeVisible()
     // 搜索框在手机上原来完全没有入口，抽屉里必须补回来
