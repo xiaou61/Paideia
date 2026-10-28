@@ -7,6 +7,7 @@ import {
   type ConceptNode,
   type Point,
 } from '@paideia/knowledge'
+import { Spinner } from '@paideia/ui'
 import { useEffect, useRef, useState } from 'react'
 
 import { resolveVar, tierColor } from './tier-style'
@@ -31,6 +32,8 @@ interface Props {
 export function GraphCanvas2D({ nodes, edges, layoutKeyValue, selectedId, onSelect }: Props) {
   const container = useRef<HTMLDivElement | null>(null)
   const [failed, setFailed] = useState(false)
+  /** 渲染器建好之前显示"正在绘制"：这段时间在软件 WebGL 下是 100ms 以上的主线程阻塞，空白看起来像卡死。 */
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
     let disposed = false
@@ -129,6 +132,16 @@ export function GraphCanvas2D({ nodes, edges, layoutKeyValue, selectedId, onSele
 
         // 这三个选项在 sigma 4 的运行期设置里存在，但没进导出的类型声明；
         // 断言一次比把默认值改成手写渲染层便宜得多。
+        //
+        // 建渲染器会编译 WebGL 着色器：有 GPU 加速时是一两毫秒，退回软件渲染（SwiftShader）时
+        // **实测阻塞主线程约 180ms**（2026-10-27 实测：同一台机器走 D3D11 时长任务 0 个，
+        // 走 SwiftShader 时 1 个 181ms 的长任务）。先让出一帧，让页面先画出来并显示"正在绘制"，
+        // 否则这段阻塞落在点击的同一次任务里，用户看到的是"点了没反应"。
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+        if (disposed || container.current === null) {
+          return
+        }
+
         const renderer = new Sigma(graph, container.current, {
           labelDensity: 2,
           // 节点半径最小 6（未接触档），阈值取 6 会把它们全部隐去标签——
@@ -140,6 +153,12 @@ export function GraphCanvas2D({ nodes, edges, layoutKeyValue, selectedId, onSele
                 ({ ...data, labelVisibility: 'visible' }) }
             : {}),
         } as ConstructorParameters<typeof Sigma>[2])
+        if (disposed) {
+          // 让出的这一帧里用户可能已经离开；不 kill 就漏一个 WebGL 上下文
+          renderer.kill()
+          return
+        }
+        setReady(true)
 
         renderer.on('clickNode', ({ node }) => onSelect(Number(node)))
         renderer.on('clickStage', () => onSelect(-1))
@@ -175,12 +194,23 @@ export function GraphCanvas2D({ nodes, edges, layoutKeyValue, selectedId, onSele
   }
 
   return (
-    <div
-      ref={container}
-      className="h-full w-full"
-      data-testid="graph-canvas-2d"
-      data-selected={selectedId ?? ''}
-    />
+    <div className="relative h-full w-full">
+      <div
+        ref={container}
+        className="h-full w-full"
+        data-testid="graph-canvas-2d"
+        data-selected={selectedId ?? ''}
+      />
+      {ready ? null : (
+        <p
+          className="text-muted-foreground pointer-events-none absolute inset-0 flex items-center justify-center gap-2 text-sm"
+          data-testid="graph-drawing"
+        >
+          <Spinner />
+          正在绘制图谱…
+        </p>
+      )}
+    </div>
   )
 }
 
