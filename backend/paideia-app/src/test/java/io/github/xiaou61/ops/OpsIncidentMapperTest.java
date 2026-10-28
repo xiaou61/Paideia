@@ -33,10 +33,48 @@ class OpsIncidentMapperTest {
     OpsDiagnosisMapper diagnoses;
 
     @Test
+    @DisplayName("120 条历史能按 50/50/20 翻完，不重不漏（AC-003）")
+    void paginationAcrossPagesWith120Rows() {
+        Instant base = Instant.parse("2103-01-01T00:00:00Z");
+        for (int i = 0; i < 120; i++) {
+            incidents.upsertFiring(null, "bulk-" + UUID.randomUUID(), "warning",
+                    Map.of("instance", "bulk-" + i, "job", "j"),
+                    base.plusSeconds(i), base.plusSeconds(i));
+        }
+
+        java.util.Set<Long> seen = new java.util.HashSet<>();
+        int pages = 0;
+        Instant cursorTime = null;
+        Long cursorId = null;
+        int limit = 50;
+        while (true) {
+            // 第一页用 beforeLastSeen 当上界，把 2104 的行挡在外面；后续页只跟游标
+            var page = pages == 0
+                    ? mapper.listPage(null, base.minusSeconds(1), base.plusSeconds(3600),
+                            Long.MAX_VALUE, limit)
+                    : mapper.listPage(null, base.minusSeconds(1), cursorTime, cursorId, limit);
+            pages++;
+            assertThat(page).hasSizeLessThanOrEqualTo(limit);
+            for (OpsIncident row : page) {
+                assertThat(seen.add(row.getId())).as("重复行 %s", row.getId()).isTrue();
+            }
+            if (page.size() < limit) {
+                break;
+            }
+            OpsIncident last = page.getLast();
+            cursorTime = last.getLastSeen();
+            cursorId = last.getId();
+        }
+
+        assertThat(pages).isEqualTo(3);
+        assertThat(seen).hasSize(120);
+    }
+
+    @Test
     @DisplayName("补诊断候选只有一条，且跳过已有 DONE 的事件")
     void catchUpCandidateIsSingleAndSkipsDone() {
-        // 用远超其他用例的未来时间戳隔离共享测试库（分页用例用的是 2099）
-        Instant now = Instant.parse("2102-01-01T00:00:00Z");
+        // 用远超其他用例的未来时间戳隔离共享测试库（分页用例用的是 2101/2103）
+        Instant now = Instant.parse("2104-01-01T00:00:00Z");
         Instant since = now.minusSeconds(60);
         Instant diagnosedBefore = now.minusSeconds(600);
         long first = incidents.upsertFiring(null, "catch-" + UUID.randomUUID(), "warning",
@@ -134,7 +172,7 @@ class OpsIncidentMapperTest {
     @Test
     @DisplayName("相同 last_seen 翻页不丢行：keyset 用 id 破平")
     void pageWithEqualLastSeenDoesNotSkip() {
-        // 三条用 2101、补诊断用例用 2102，互不进入对方的查询区间
+        // 三条用 2101，跨页用例 2103、补诊断用例 2104，靠 since 与 beforeLastSeen 各自隔离
         Instant same = Instant.parse("2101-01-01T00:00:00Z");
         long first = incidents.upsertFiring(null, "page-" + UUID.randomUUID(), "warning",
                 Map.of("instance", "p1", "job", "j"), same, same).id();
