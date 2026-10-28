@@ -7337,3 +7337,15 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：单测 78 条通过；`learn.spec` 8 passed、`navigation.spec` 6 passed；后端切片 352/0/14 + 9/0/0；`ApiWalkthroughTest` 1/0。
 - 本地提交：本笔
 - 远端推送：已执行
+
+## 2026-10-28 17:20 +0800 · WORK-048 · 练习册与「测一测」入口实施
+
+- 类型：implementation
+- 变更：`quiz` 块不再在条目页内联渲染；新增 `extractQuizzes` 纯函数（行级三态状态机）把题从正文摘出来，正文末尾出现「测一测 · N 题」入口，点开是面板。单题渲染抽成 `QuizQuestionView` 由内联版与面板版共用。新增 `scripts/check_quiz_explain.py` 门禁。
+- 决策：不建题目表——题目身份已是 `(条目, 块, 题号) + 指纹`，`question_attempts` 一直按它记账；"练习册"只是集合视图。
+- 决策：门禁设为**严格**而非告警，因为实测 139 个块 / 412 道题**缺解析为 0**，存量干净。
+- 依据：`extractQuizzes` 必须用行级状态机而不是正则——代码示例里会出现 ```quiz 字样，正则会把示例误摘。有专门用例。
+- 验证：`practice.test.ts` 8 条；ui 216 条、knowledge 78 条；typecheck 三个包通过；e2e question-attempt 1 / source-reading 10 / markdown-render 3 全绿；门禁反向验证（把一题的 explain 改名会报红）。
+- 既有缺陷（未修，不属本项）：`tokens.test.ts` 报 `apps/admin/.../AnalyticsPage.tsx` 用了调色板颜色，违反令牌纪律。
+- 本地提交：本笔
+- 远端推送：随本笔
