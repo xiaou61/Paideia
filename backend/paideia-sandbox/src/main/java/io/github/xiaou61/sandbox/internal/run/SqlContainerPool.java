@@ -273,14 +273,15 @@ class SqlContainerPool {
      *
      * <p>`exec` 之后 sleep 保持容器常驻；mysqld 用 `&` 放后台，与一次性脚本一致。
      */
-    private static final String BOOT_SCRIPT = String.join("; ",
+    static final String BOOT_SCRIPT = String.join("; ",
             "mkdir -p /tmp/nofiles",
             "cp -a /opt/datadir-base /tmp/data",
             "chmod -R u+w /tmp/data",
+            // `&` 后面**不能再接 `;`**：`cmd &;` 是 sh 语法错误，容器起来就退出
+            // （2026-10-28 线上踩过：每次执行都等满 30 秒就绪再回落，比不做池化还慢）
             "mysqld --skip-networking --socket=/tmp/m.sock --datadir=/tmp/data --user=mysql"
                     + " --secure-file-priv=/tmp/nofiles --local-infile=0 --skip-log-bin"
-                    + " --mysqlx=0 --pid-file=/tmp/data/mysqld.pid --log-error=/tmp/mysqld.log &",
-            "sleep 100000");
+                    + " --mysqlx=0 --pid-file=/tmp/data/mysqld.pid --log-error=/tmp/mysqld.log & sleep 100000");
 
     /**
      * 一次执行：建库 + 建受限账号 → 灌数据集 → 跑用户 SQL → 删库删账号。

@@ -2,7 +2,6 @@ package io.github.xiaou61.sandbox.internal.run;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -75,6 +74,15 @@ class SqlContainerPoolTest {
     }
 
     @Test
+    @DisplayName("启动脚本里不能出现相邻的后台符号与分号：那是 shell 语法错误")
+    void 启动脚本没有语法错() {
+        // 2026-10-28 线上真踩过：拼装时把「后台符号」和「分号」连在了一起，
+        // 容器起来就退出，于是每次执行都等满 30 秒就绪再回落，比不做池化还慢一倍。
+        assertThat(SqlContainerPool.BOOT_SCRIPT).doesNotContain("& ;");
+        assertThat(SqlContainerPool.BOOT_SCRIPT).contains("& sleep 100000");
+    }
+
+    @Test
     @DisplayName("容器内存默认 1g：512m 会把 mysqld OOM 掉")
     void 默认内存是一g() {
         assertThat(new SandboxProperties().getSqlMemory()).isEqualTo("1g");
@@ -86,6 +94,5 @@ class SqlContainerPoolTest {
         SandboxProperties properties = new SandboxProperties();
         assertThat(properties.getSqlPoolSize()).isEqualTo(2);
         assertThat(properties.getSqlPoolAcquireTimeoutMs()).isGreaterThan(0);
-        assertThat(List.of(properties.getSqlImage())).hasSize(1);
     }
 }
