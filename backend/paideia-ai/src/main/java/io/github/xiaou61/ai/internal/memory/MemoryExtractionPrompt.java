@@ -25,8 +25,13 @@ import java.util.Locale;
  */
 public final class MemoryExtractionPrompt {
 
-    /** 与设计一致的版本号；改文案必须改它。 */
-    static final String VERSION = "memory-extract-v1";
+    /**
+     * 与设计一致的版本号；改文案必须改它。
+     *
+     * <p>public 是为了让离线评测（`MemoryEvalTest`）在报告里写明"这份数字对应哪版提示词"——
+     * 没有它，跨版本的指标差异永远无法归因。
+     */
+    public static final String VERSION = "memory-extract-v1";
 
     private MemoryExtractionPrompt() {
     }

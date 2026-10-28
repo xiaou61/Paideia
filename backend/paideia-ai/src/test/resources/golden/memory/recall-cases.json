@@ -1,0 +1,345 @@
+{
+  "version": 1,
+  "note": "召回侧金集（WORK-050 TASK-002）。每例一个独立用户，记忆由测试写入（created_at = now - ageDays，last_used_at 为 NULL）。判定语义：① 关键词命中（MATCH>0）的排在未命中之前；② 命中之间按相关度；③ 未命中之间按 kind 权重 × 时间衰减（半衰期 180 天）。因此含关键词的那条无论多旧都应当排第一——这正是本项要证明的行为。禁止写入真实个人信息。",
+  "halfLifeDays": 180,
+  "kindWeights": { "weak_topic": 1.5, "entry_understanding": 1.3, "goal": 1.2, "preference": 1.0 },
+  "cases": [
+    {
+      "id": "RC-001",
+      "group": "weak_topic",
+      "note": "旧但相关压过新但无关",
+      "query": "Redis 持久化该选 RDB 还是 AOF",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "weak_topic", "text": "他不清楚 Redis 持久化该选 RDB 还是 AOF", "ageDays": 240 },
+        { "store": "structured", "id": 2, "kind": "preference", "text": "他喜欢先给结论再解释", "ageDays": 2 },
+        { "store": "structured", "id": 3, "kind": "goal", "text": "他准备参加春招", "ageDays": 3 },
+        { "store": "text", "id": 4, "text": "他在学校做过一个图书管理系统", "ageDays": 4 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-002",
+      "group": "weak_topic",
+      "note": "同一知识点的第二次提问",
+      "query": "MySQL 索引失效有哪几种情况",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "weak_topic", "text": "他记不住 MySQL 索引失效的几种情况", "ageDays": 210 },
+        { "store": "structured", "id": 2, "kind": "preference", "text": "他要求回答尽量简短", "ageDays": 1 },
+        { "store": "text", "id": 3, "text": "他说自己英语不好，看英文文档吃力", "ageDays": 5 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-003",
+      "group": "weak_topic",
+      "note": "GC 日志",
+      "query": "GC 日志里的年轻代老年代怎么看",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "weak_topic", "text": "他看不懂 GC 日志里的分代数据", "ageDays": 200 },
+        { "store": "structured", "id": 2, "kind": "goal", "text": "他计划下个月面试字节", "ageDays": 2 },
+        { "store": "text", "id": 3, "text": "他平时用 IDEA 写代码", "ageDays": 6 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-004",
+      "group": "weak_topic",
+      "note": "Kafka rebalance",
+      "query": "Kafka rebalance 什么时候触发",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "weak_topic", "text": "他把 Kafka 的 rebalance 搞混过", "ageDays": 260 },
+        { "store": "structured", "id": 2, "kind": "preference", "text": "他希望例子用 Java 写", "ageDays": 3 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-005",
+      "group": "weak_topic",
+      "note": "并发基础",
+      "query": "线程池的核心参数怎么配",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "weak_topic", "text": "他不懂线程池的核心参数怎么配", "ageDays": 150 },
+        { "store": "structured", "id": 2, "kind": "goal", "text": "他想三个月内补到能投大厂后端", "ageDays": 1 },
+        { "store": "text", "id": 3, "text": "他今年大三", "ageDays": 7 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-006",
+      "group": "weak_topic",
+      "note": "分布式事务",
+      "query": "分布式事务有哪些方案",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "weak_topic", "text": "他对分布式事务的方案没有概念", "ageDays": 190 },
+        { "store": "structured", "id": 2, "kind": "preference", "text": "他要求结论先行", "ageDays": 4 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-007",
+      "group": "weak_topic",
+      "note": "JVM 内存模型",
+      "query": "JVM 的内存模型怎么划分",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "weak_topic", "text": "他分不清 JVM 的内存模型各个区域", "ageDays": 220 },
+        { "store": "text", "id": 2, "text": "他说最近在翻 DDIA", "ageDays": 2 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-008",
+      "group": "weak_topic",
+      "note": "网络协议",
+      "query": "TCP 三次握手为什么不能是两次",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "weak_topic", "text": "他不理解 TCP 三次握手为什么不能两次", "ageDays": 170 },
+        { "store": "structured", "id": 2, "kind": "goal", "text": "他准备明年春招", "ageDays": 3 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-009",
+      "group": "weak_topic",
+      "note": "算法：动态规划",
+      "query": "动态规划怎么找状态转移方程",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "weak_topic", "text": "他不会找动态规划的状态转移方程", "ageDays": 300 },
+        { "store": "structured", "id": 2, "kind": "preference", "text": "他喜欢用 Java 举例", "ageDays": 1 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-010",
+      "group": "weak_topic",
+      "note": "消息队列选型",
+      "query": "消息队列怎么选型",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "weak_topic", "text": "他说不清楚消息队列该按什么选型", "ageDays": 180 },
+        { "store": "text", "id": 2, "text": "他在做毕业设计", "ageDays": 5 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-011",
+      "group": "weak_topic",
+      "note": "缓存穿透",
+      "query": "缓存穿透和缓存击穿有什么区别",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "weak_topic", "text": "他把缓存穿透与缓存击穿混在一起", "ageDays": 160 },
+        { "store": "structured", "id": 2, "kind": "goal", "text": "他打算投后端开发岗", "ageDays": 2 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-012",
+      "group": "weak_topic",
+      "note": "Spring 循环依赖",
+      "query": "Spring 循环依赖为什么能解决",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "weak_topic", "text": "他不明白 Spring 循环依赖是怎么被解决的", "ageDays": 230 },
+        { "store": "structured", "id": 2, "kind": "preference", "text": "他要简短回答", "ageDays": 6 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-013",
+      "group": "preference",
+      "note": "偏好：回答长度",
+      "query": "以后回答能不能短一点",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "preference", "text": "他希望回答尽量简短", "ageDays": 200 },
+        { "store": "structured", "id": 2, "kind": "goal", "text": "他准备春招", "ageDays": 3 },
+        { "store": "text", "id": 3, "text": "他做过图书管理系统", "ageDays": 4 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-014",
+      "group": "preference",
+      "note": "偏好：举例语言",
+      "query": "例子用 Java 写可以吗",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "preference", "text": "他希望例子用 Java 而不是 Python", "ageDays": 190 },
+        { "store": "structured", "id": 2, "kind": "weak_topic", "text": "他记不住索引失效的情况", "ageDays": 1 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-015",
+      "group": "preference",
+      "note": "偏好：讲解顺序",
+      "query": "能不能先讲原理再举例子",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "preference", "text": "他要求先讲原理再举例子", "ageDays": 210 },
+        { "store": "text", "id": 2, "text": "他说英语不好", "ageDays": 2 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-016",
+      "group": "preference",
+      "note": "偏好：不要代码块",
+      "query": "别给我贴大段代码",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "preference", "text": "他不喜欢大段代码，希望先讲思路", "ageDays": 240 },
+        { "store": "structured", "id": 2, "kind": "goal", "text": "他想面字节", "ageDays": 2 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-017",
+      "group": "preference",
+      "note": "偏好：中文讲解",
+      "query": "术语能不能都用中文说",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "preference", "text": "他希望术语用中文讲，别中英混用", "ageDays": 170 },
+        { "store": "text", "id": 2, "text": "他今年大三", "ageDays": 5 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-018",
+      "group": "preference",
+      "note": "偏好：先给结论",
+      "query": "以后先给结论好吗",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "preference", "text": "他要结论先行", "ageDays": 200 },
+        { "store": "structured", "id": 2, "kind": "weak_topic", "text": "他不懂 Kafka rebalance", "ageDays": 3 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-019",
+      "group": "goal",
+      "note": "目标：求职方向（查询必须与目标句共享关键词，否则无从判定）",
+      "query": "我的目标岗位现在准备还来得及吗",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "goal", "text": "他的目标是后端开发岗", "ageDays": 250 },
+        { "store": "structured", "id": 2, "kind": "preference", "text": "他要简短回答", "ageDays": 1 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-020",
+      "group": "goal",
+      "note": "目标：时间线（查询与目标句共享「春招」）",
+      "query": "春招我该准备什么",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "goal", "text": "他计划参加明年春招", "ageDays": 220 },
+        { "store": "text", "id": 2, "text": "他做过图书管理系统", "ageDays": 2 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-021",
+      "group": "goal",
+      "note": "目标：目标公司",
+      "query": "字节的面试我该怎么准备",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "goal", "text": "他下个月要面试字节", "ageDays": 200 },
+        { "store": "structured", "id": 2, "kind": "preference", "text": "他喜欢例子用 Java", "ageDays": 3 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-022",
+      "group": "goal",
+      "note": "目标：学习期限",
+      "query": "三个月够吗",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "goal", "text": "他计划三个月内补到能投大厂", "ageDays": 210 },
+        { "store": "text", "id": 2, "text": "他说英语不好", "ageDays": 4 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-023",
+      "group": "entry_understanding",
+      "note": "自评桥写的条目弱项",
+      "query": "索引原理这一条我没太懂",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "entry_understanding", "text": "他对条目《索引原理》的自评：还不懂", "ageDays": 180, "refId": 101 },
+        { "store": "structured", "id": 2, "kind": "preference", "text": "他要结论先行", "ageDays": 2 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-024",
+      "group": "entry_understanding",
+      "note": "条目自评：TCP 那一篇",
+      "query": "TCP 那一篇我还想再看一遍",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "entry_understanding", "text": "他对条目《TCP 三次握手》的自评：模糊", "ageDays": 160, "refId": 102 },
+        { "store": "structured", "id": 2, "kind": "goal", "text": "他准备春招", "ageDays": 3 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-025",
+      "group": "entry_understanding",
+      "note": "条目自评：事务隔离级别",
+      "query": "事务隔离级别这块再讲讲",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "entry_understanding", "text": "他对条目《事务隔离级别》的自评：还不懂", "ageDays": 190, "refId": 103 },
+        { "store": "text", "id": 2, "text": "他今年大三", "ageDays": 1 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-026",
+      "group": "entry_understanding",
+      "note": "条目自评：垃圾回收",
+      "query": "垃圾回收那一篇还有疑问",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "entry_understanding", "text": "他对条目《垃圾回收》的自评：模糊", "ageDays": 200, "refId": 104 },
+        { "store": "structured", "id": 2, "kind": "preference", "text": "他希望例子用 Java", "ageDays": 5 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-027",
+      "group": "blank_keyword",
+      "note": "无关键词：按权重与新鲜度，弱项优先于偏好",
+      "query": "",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "weak_topic", "text": "他记不住 MySQL 索引失效的情况", "ageDays": 10 },
+        { "store": "structured", "id": 2, "kind": "preference", "text": "他要简短回答", "ageDays": 1 },
+        { "store": "structured", "id": 3, "kind": "goal", "text": "他准备春招", "ageDays": 2 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-028",
+      "group": "blank_keyword",
+      "note": "无关键词：条目自评（1.3）压过偏好（1.0）",
+      "query": "   ",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "entry_understanding", "text": "他对条目《索引原理》的自评：还不懂", "ageDays": 12, "refId": 101 },
+        { "store": "structured", "id": 2, "kind": "preference", "text": "他喜欢先讲原理", "ageDays": 1 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-029",
+      "group": "blank_keyword",
+      "note": "无关键词：目标（1.2）压过偏好（1.0）",
+      "query": "",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "goal", "text": "他下个月要面试字节", "ageDays": 15 },
+        { "store": "structured", "id": 2, "kind": "preference", "text": "他要结论先行", "ageDays": 2 }
+      ],
+      "expectFirst": 1
+    },
+    {
+      "id": "RC-030",
+      "group": "blank_keyword",
+      "note": "无关键词：同权重时新的优先",
+      "query": "",
+      "memories": [
+        { "store": "structured", "id": 1, "kind": "weak_topic", "text": "他不清楚消息队列怎么选型", "ageDays": 120 },
+        { "store": "structured", "id": 2, "kind": "weak_topic", "text": "他不懂线程池参数怎么配", "ageDays": 8 }
+      ],
+      "expectFirst": 2
+    }
+  ]
+}
