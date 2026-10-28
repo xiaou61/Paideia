@@ -25,6 +25,11 @@ export interface EntrySummary {
   categoryName: string | null
   /** 正文前 200 字（未清洗）；可能为 null（老数据或正文为空）。 */
   excerpt: string | null
+  /**
+   * 作者声明的站序（WORK-046）。列表本身按发布时间倒序返回，
+   * 书籍章节页要"按书里的顺序"读，靠这个字段在客户端重排。手工建的条目可能为 null。
+   */
+  sortOrder?: number | null
   updatedAt: string
 }
 

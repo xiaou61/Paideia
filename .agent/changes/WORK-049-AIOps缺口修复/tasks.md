@@ -219,7 +219,7 @@ approver_role: CTO
   2. 把 switch 改为列表遍历与 `contains` 校验；日志总行数仍受 `maxLogLines` 限制 → 绿。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=OpsEvidenceCollectorTest -Dsurefire.failIfNoSpecifiedTests=false test` → 0 failed
 
-### TASK-012 | pending | 收口：回归、部署与生产证据（AC-001/008/011/012/015）
+### TASK-012 | done | 收口：回归、部署与生产证据（AC-001/008/011/012/015）
 
 - 对应：`AC-001`、`AC-008`、`AC-011`、`AC-012`、`AC-015`
 - 依赖：TASK-001..011

@@ -2,6 +2,7 @@ import {
   EntryToc,
   KnowledgeNeighborhood,
   MarkdownBody,
+  PracticeEntry,
   SelfAssessmentButtons,
   createKnowledgeApi,
   createLearningApi,
@@ -15,6 +16,7 @@ import {
   AppShell,
   PageHeader,
   Spinner,
+  extractQuizzes,
 } from '@paideia/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAssistantContext } from '@paideia/assistant'
@@ -126,6 +128,17 @@ export function KnowledgeEntryPage() {
       clear: () => learning.reset(entryId),
     })
   }, [valid, serverProgress.isPending, serverProgress.data, entry.data, entryId])
+
+  /**
+   * 练习册（WORK-048）：把正文里的 `quiz` 围栏摘出来，交给末尾的入口卡。
+   *
+   * <p>在**数据层**摘而不是做一个"只收集不渲染"的渲染器：后者要在渲染期写共享状态，
+   * React 严格模式会把渲染跑两遍，同一道题就被收两次。
+   */
+  const practice = useMemo(
+    () => extractQuizzes(entry.data?.body ?? ''),
+    [entry.data?.body],
+  )
 
   // 把"当前在读哪一条"交给悬浮壳：它是唯一知道这件事的地方。
   // 离开页面时清空，壳随即回到"打开一条内容后可用"的状态。
@@ -267,7 +280,7 @@ export function KnowledgeEntryPage() {
             </details>
 
             <MarkdownBody
-              markdown={entry.data.body}
+              markdown={practice.body}
               mediaBaseUrl={API_BASE_URL}
               entryId={entry.data.id}
               entryTitle={entry.data.title}
@@ -276,6 +289,16 @@ export function KnowledgeEntryPage() {
               sandbox={sandbox}
               progress={progressPort}
               recordAttempt={recordAttempt}
+            />
+
+            {/* 练习册（WORK-048）：题目从正文里摘出来，读完想测再测 */}
+            <PracticeEntry
+              quizzes={practice.quizzes}
+              entryTitle={entry.data.title}
+              onAttempt={recordAttempt}
+              onScore={(quizId, correct, total) =>
+                progressPort?.update({ quizzes: { [quizId]: { score: correct, total } } })
+              }
             />
 
             <div className="mt-10">

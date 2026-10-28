@@ -8,6 +8,7 @@ import type {
   CreditsView,
   HistoryMessage,
   InterviewEvaluationView,
+  MemoryCandidate,
   MemoryClearResult,
   MemorySettings,
   MemoryView,
@@ -51,6 +52,17 @@ export interface AssistantApi {
    * 前端跟着它走等于把"一页多少条"这个决定放在看不见的地方。
    */
   memories(limit?: number, offset?: number): Promise<MemoryView[]>
+  /**
+   * 待确认的候选记忆（WORK-050）。
+   *
+   * <p>它不是"记忆"——它是助手拿不准、排队等用户点一下的东西。被敏感信息拦下的那些
+   * `content` 为 null，前端只能显示一句"有一条没记"。
+   */
+  pendingCandidates(limit?: number, offset?: number): Promise<MemoryCandidate[]>
+  /** 接受一条候选：它成为一条正式记忆。 */
+  acceptCandidate(id: number): Promise<void>
+  /** 拒绝一条候选：它永远不会成为记忆。 */
+  rejectCandidate(id: number): Promise<void>
   /** 逐条删除。返回是否真的删掉了一行（不是本人的会返回 false）。 */
   deleteMemory(source: MemoryView['source'], id: number): Promise<boolean>
   /**
@@ -153,6 +165,13 @@ export function createAssistantApi(client: ApiClient): AssistantApi {
         body: JSON.stringify(settings),
       }),
 
+    pendingCandidates: (limit = 20, offset = 0) =>
+      client.requestEnvelope<MemoryCandidate[]>(
+        `${base}/memories/candidates?limit=${limit}&offset=${offset}`),
+    acceptCandidate: (id: number) =>
+      client.requestEnvelope<void>(`${base}/memories/candidates/${id}/accept`, { method: 'POST' }),
+    rejectCandidate: (id: number) =>
+      client.requestEnvelope<void>(`${base}/memories/candidates/${id}/reject`, { method: 'POST' }),
     memories: (limit = 200, offset = 0) =>
       client.requestEnvelope<MemoryView[]>(`${base}/memories?limit=${limit}&offset=${offset}`),
 

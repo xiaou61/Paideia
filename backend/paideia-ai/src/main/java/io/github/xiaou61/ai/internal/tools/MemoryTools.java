@@ -122,8 +122,13 @@ public final class MemoryTools {
             if (!settings.get(context.userId()).memoryEnabled()) {
                 return ToolResult.fail("个性化记忆已关闭，这条不会被记住。可以在「记忆」里打开。");
             }
-            long id = memories.rememberText(context.userId(), content);
-            return ToolResult.ok("已记住。", Map.of("memoryId", id));
+            try {
+                long id = memories.rememberText(context.userId(), content);
+                return ToolResult.ok("已记住。", Map.of("memoryId", id));
+            } catch (io.github.xiaou61.platform.BizException rejected) {
+                // 敏感内容过滤是写入闸，不是故障：把它变成一句用户能看懂的话
+                return ToolResult.fail(rejected.getMessage());
+            }
         }
     }
 }

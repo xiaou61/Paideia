@@ -1,0 +1,2910 @@
+{
+  "version": 1,
+  "note": "提取侧金集（WORK-050 TASK-001）。用例是构造的，不是线上真实语料——线上真人会话太少。它衡量的是「在这个构造分布上准不准」，不代表真实用户分布。禁止在此文件写入任何真实手机号、真实邮箱、真实口令或连接串。",
+  "targetPromptVersion": "memory-extract-v2",
+  "cases": [
+    {
+      "id": "EX-001",
+      "group": "add",
+      "note": "明确的弱项：知识点没搞懂",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "Redis 的持久化我一直没搞明白，RDB 和 AOF 到底差在哪？"
+        },
+        {
+          "role": "assistant",
+          "content": "RDB 是定时快照，AOF 是追加命令日志……"
+        },
+        {
+          "role": "user",
+          "content": "懂了点，但我还是记不住什么时候该用哪个"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "kind": "weak_topic",
+            "contentContains": "持久化"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-002",
+      "group": "add",
+      "note": "明确的学习目标，带时间",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "我想三个月内把 Java 后端补到能投大厂的程度，从哪开始？"
+        },
+        {
+          "role": "assistant",
+          "content": "先看并发和 JVM，再补分布式……"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "kind": "goal",
+            "contentContains": "大厂"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-003",
+      "group": "add",
+      "note": "回答风格的偏好",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "以后回答尽量短一点，别写一大段，我看不完"
+        },
+        {
+          "role": "assistant",
+          "content": "好，之后我会尽量精简。"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "kind": "preference",
+            "contentContains": "短"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-004",
+      "group": "add",
+      "note": "背景事实，不需要 kind 白名单",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "我是二本计算机的，今年大三，时间还够吗？"
+        },
+        {
+          "role": "assistant",
+          "content": "够，大三开始准备是很常见的时间点……"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "text",
+            "contentContains": "大三"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-005",
+      "group": "add",
+      "note": "第二处明确弱项",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "GC 日志里那些年轻代老年代的数字我完全看不懂"
+        },
+        {
+          "role": "assistant",
+          "content": "先看 YGC 的频率，再看每次回收后的占用……"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "kind": "weak_topic",
+            "contentContains": "GC"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-006",
+      "group": "add",
+      "note": "目标带具体的公司与时点",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "下个月要面字节，你觉得我该重点补系统设计还是算法？"
+        },
+        {
+          "role": "assistant",
+          "content": "后端岗系统设计的权重更高……"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "kind": "goal",
+            "contentContains": "字节"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-007",
+      "group": "add",
+      "note": "讲例子的偏好",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "举例的时候最好用 Java，Python 我不熟"
+        },
+        {
+          "role": "assistant",
+          "content": "好，后面都用 Java 举例。"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "kind": "preference",
+            "contentContains": "Java"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-008",
+      "group": "add",
+      "note": "做过的项目，属于背景",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "我做过一个图书管理系统，Spring Boot 写的，能写进简历吗？"
+        },
+        {
+          "role": "assistant",
+          "content": "能，但要把重点放在你解决的具体问题上……"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "text",
+            "contentContains": "图书管理"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-009",
+      "group": "add",
+      "note": "反复记不住的知识点",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "MySQL 索引失效的几种情况我老是记不住"
+        },
+        {
+          "role": "assistant",
+          "content": "最常见的三种：函数包列、隐式类型转换、最左前缀断裂……"
+        },
+        {
+          "role": "user",
+          "content": "第三种我又忘了什么意思了"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "kind": "weak_topic",
+            "contentContains": "索引"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-010",
+      "group": "add",
+      "note": "受限条件：英语，影响讲解方式",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "我英语不太好，看官方文档很吃力，有没有中文的资料"
+        },
+        {
+          "role": "assistant",
+          "content": "可以先看中文翻译版，再回头补原文的关键段落……"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "text",
+            "contentContains": "英语"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-011",
+      "group": "add",
+      "note": "讲解顺序的偏好",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "讲概念的时候先给结论再解释，别一上来就铺垫"
+        },
+        {
+          "role": "assistant",
+          "content": "好，结论先行。"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "kind": "preference",
+            "contentContains": "结论"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-012",
+      "group": "add",
+      "note": "第三处弱项",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "Kafka 的 rebalance 我老是搞混，消费者组一变化就乱"
+        },
+        {
+          "role": "assistant",
+          "content": "rebalance 的触发条件有三种……"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "kind": "weak_topic",
+            "contentContains": "rebalance"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-013",
+      "group": "update",
+      "note": "目标改了：大厂 → 先攒经验",
+      "existing": [
+        {
+          "store": "structured",
+          "id": 11,
+          "kind": "goal",
+          "text": "他的目标是进大厂做后端"
+        }
+      ],
+      "turns": [
+        {
+          "role": "user",
+          "content": "我改主意了，大厂先不冲了，想先去小公司攒两年经验"
+        },
+        {
+          "role": "assistant",
+          "content": "那准备重点会不太一样……"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "structured",
+            "targetId": 11,
+            "contentContains": "小公司"
+          }
+        ],
+        "forbidAdd": true
+      }
+    },
+    {
+      "id": "EX-014",
+      "group": "update",
+      "note": "同一件事说第二次，且更完整",
+      "existing": [
+        {
+          "store": "structured",
+          "id": 12,
+          "kind": "weak_topic",
+          "text": "他说自己不懂 Redis 持久化"
+        }
+      ],
+      "turns": [
+        {
+          "role": "user",
+          "content": "Redis 持久化我昨天看了一遍，RDB 懂了，AOF 重写还是不明白"
+        },
+        {
+          "role": "assistant",
+          "content": "AOF 重写是把命令历史压缩……"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "structured",
+            "targetId": 12,
+            "contentContains": "AOF"
+          }
+        ],
+        "forbidAdd": true
+      }
+    },
+    {
+      "id": "EX-015",
+      "group": "update",
+      "note": "偏好反转",
+      "existing": [
+        {
+          "store": "structured",
+          "id": 13,
+          "kind": "preference",
+          "text": "他喜欢详细的长回答"
+        }
+      ],
+      "turns": [
+        {
+          "role": "user",
+          "content": "其实我更喜欢简短的回答，太长了看不下去"
+        },
+        {
+          "role": "assistant",
+          "content": "明白，之后尽量精简。"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "structured",
+            "targetId": 13,
+            "contentContains": "简"
+          }
+        ],
+        "forbidAdd": true
+      }
+    },
+    {
+      "id": "EX-016",
+      "group": "update",
+      "note": "时间线变了",
+      "existing": [
+        {
+          "store": "structured",
+          "id": 14,
+          "kind": "goal",
+          "text": "他准备参加秋招"
+        }
+      ],
+      "turns": [
+        {
+          "role": "user",
+          "content": "秋招我不参加了，改成准备明年春招"
+        },
+        {
+          "role": "assistant",
+          "content": "春招的节奏会宽松一些……"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "structured",
+            "targetId": 14,
+            "contentContains": "春招"
+          }
+        ],
+        "forbidAdd": true
+      }
+    },
+    {
+      "id": "EX-017",
+      "group": "update",
+      "note": "技术方向收窄",
+      "existing": [
+        {
+          "store": "text",
+          "id": 21,
+          "text": "他说自己在同时学 Python 和 Java"
+        }
+      ],
+      "turns": [
+        {
+          "role": "user",
+          "content": "Python 我不学了，专心写 Java"
+        },
+        {
+          "role": "assistant",
+          "content": "收窄方向对求职更有利……"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "text",
+            "targetId": 21,
+            "contentContains": "Java"
+          }
+        ],
+        "forbidAdd": true
+      }
+    },
+    {
+      "id": "EX-018",
+      "group": "update",
+      "note": "弱项被补上，说法要更准",
+      "existing": [
+        {
+          "store": "structured",
+          "id": 15,
+          "kind": "weak_topic",
+          "text": "他不懂 MySQL 索引失效"
+        }
+      ],
+      "turns": [
+        {
+          "role": "user",
+          "content": "索引失效我搞懂了，现在只剩最左前缀那种情况还会看错"
+        },
+        {
+          "role": "assistant",
+          "content": "最左前缀是复合索引……"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "structured",
+            "targetId": 15,
+            "contentContains": "最左前缀"
+          }
+        ],
+        "forbidAdd": true
+      }
+    },
+    {
+      "id": "EX-019",
+      "group": "update",
+      "note": "讲解偏好细化",
+      "existing": [
+        {
+          "store": "structured",
+          "id": 16,
+          "kind": "preference",
+          "text": "他喜欢用例子讲解"
+        }
+      ],
+      "turns": [
+        {
+          "role": "user",
+          "content": "光给例子我还是不懂，最好先讲原理再举例子"
+        },
+        {
+          "role": "assistant",
+          "content": "好，先原理后例子。"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "structured",
+            "targetId": 16,
+            "contentContains": "原理"
+          }
+        ],
+        "forbidAdd": true
+      }
+    },
+    {
+      "id": "EX-020",
+      "group": "update",
+      "note": "岗位目标改了",
+      "existing": [
+        {
+          "store": "structured",
+          "id": 17,
+          "kind": "goal",
+          "text": "他的目标是算法岗"
+        }
+      ],
+      "turns": [
+        {
+          "role": "user",
+          "content": "算法岗我不打算做了，还是走后端开发"
+        },
+        {
+          "role": "assistant",
+          "content": "后端岗的考察面更宽……"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "structured",
+            "targetId": 17,
+            "contentContains": "后端"
+          }
+        ],
+        "forbidAdd": true
+      }
+    },
+    {
+      "id": "EX-021",
+      "group": "delete",
+      "note": "目标已达成",
+      "existing": [
+        {
+          "store": "structured",
+          "id": 31,
+          "kind": "goal",
+          "text": "他计划三个月内学会 Redis"
+        }
+      ],
+      "turns": [
+        {
+          "role": "user",
+          "content": "Redis 我现在用得挺顺了，那个三个月的计划算完成了吧"
+        },
+        {
+          "role": "assistant",
+          "content": "算完成了，可以往下走分布式……"
+        }
+      ],
+      "expect": {
+        "delete": [
+          {
+            "store": "structured",
+            "targetId": 31
+          }
+        ],
+        "forbidAdd": true
+      }
+    },
+    {
+      "id": "EX-022",
+      "group": "delete",
+      "note": "目标不成立了",
+      "existing": [
+        {
+          "store": "structured",
+          "id": 32,
+          "kind": "goal",
+          "text": "他在准备秋招"
+        }
+      ],
+      "turns": [
+        {
+          "role": "user",
+          "content": "我不找工作了，改考研，秋招那些准备都放下了"
+        },
+        {
+          "role": "assistant",
+          "content": "那复习节奏要重新排……"
+        }
+      ],
+      "expect": {
+        "delete": [
+          {
+            "store": "structured",
+            "targetId": 32
+          }
+        ],
+        "add": [
+          {
+            "store": "structured",
+            "kind": "goal",
+            "contentContains": "考研"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-023",
+      "group": "delete",
+      "note": "弱项不再成立",
+      "existing": [
+        {
+          "store": "structured",
+          "id": 33,
+          "kind": "weak_topic",
+          "text": "他不懂 Git rebase"
+        }
+      ],
+      "turns": [
+        {
+          "role": "user",
+          "content": "rebase 我现在天天用，那个不用记着了"
+        }
+      ],
+      "expect": {
+        "delete": [
+          {
+            "store": "structured",
+            "targetId": 33
+          }
+        ],
+        "forbidAdd": true
+      }
+    },
+    {
+      "id": "EX-024",
+      "group": "delete",
+      "note": "用户明确要求撤掉一条",
+      "existing": [
+        {
+          "store": "text",
+          "id": 41,
+          "text": "他说自己英语不好"
+        }
+      ],
+      "turns": [
+        {
+          "role": "user",
+          "content": "英语那条记忆删了吧，我最近在学，不想被老当成短板"
+        }
+      ],
+      "expect": {
+        "delete": [
+          {
+            "store": "text",
+            "targetId": 41
+          }
+        ],
+        "add": [
+          {
+            "store": "text",
+            "contentContains": "英语"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-025",
+      "group": "propose",
+      "note": "从一次提问推断基础薄弱，证据不足，应提议而不是直接记",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "什么是数据库索引？"
+        },
+        {
+          "role": "assistant",
+          "content": "索引是加快查询的数据结构……"
+        }
+      ],
+      "expect": {
+        "propose": [
+          {
+            "contentContains": "索引"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-026",
+      "group": "propose",
+      "note": "情绪化陈述，方向不明，证据不足",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "今天又被面试官问倒了，好烦"
+        },
+        {
+          "role": "assistant",
+          "content": "被问到哪一块了？可以针对性补一下……"
+        },
+        {
+          "role": "user",
+          "content": "算了不想说"
+        }
+      ],
+      "expect": {
+        "propose": [
+          {
+            "contentContains": "面试"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-027",
+      "group": "propose",
+      "note": "提到在读一本书，动机不明",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "最近在翻 DDIA，感觉有点难啃"
+        },
+        {
+          "role": "assistant",
+          "content": "可以先看一致性那几章……"
+        }
+      ],
+      "expect": {
+        "propose": [
+          {
+            "contentContains": "DDIA"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-028",
+      "group": "propose",
+      "note": "摇摆的方向，不该直接写成目标",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "我有点想转 Go，但也可能只是图新鲜"
+        },
+        {
+          "role": "assistant",
+          "content": "可以先用 Go 写个小服务试试手感……"
+        }
+      ],
+      "expect": {
+        "propose": [
+          {
+            "contentContains": "Go"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-029",
+      "group": "propose",
+      "note": "可能是一次性事件，也可能是目标，需要确认",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "下周有个面试，有点紧张"
+        },
+        {
+          "role": "assistant",
+          "content": "哪家？什么岗？可以按岗准备……"
+        },
+        {
+          "role": "user",
+          "content": "先不说了"
+        }
+      ],
+      "expect": {
+        "propose": [
+          {
+            "contentContains": "面试"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-030",
+      "group": "propose",
+      "note": "自我评价，可信度不明",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "我觉得我基础还行，就是项目太弱"
+        },
+        {
+          "role": "assistant",
+          "content": "那可以补一个能讲清取舍的项目……"
+        }
+      ],
+      "expect": {
+        "propose": [
+          {
+            "contentContains": "项目"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-031",
+      "group": "skip",
+      "note": "纯寒暄",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "你好"
+        },
+        {
+          "role": "assistant",
+          "content": "你好，有什么想聊的？"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-032",
+      "group": "skip",
+      "note": "纯知识问答，与本人无关",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "HTTP 和 HTTPS 有什么区别？"
+        },
+        {
+          "role": "assistant",
+          "content": "HTTPS 是 HTTP 加上 TLS……"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-033",
+      "group": "skip",
+      "note": "一次性请求，贴代码",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "帮我看看这段代码为什么死循环：```while (i < n) { i = i - 1; }```"
+        },
+        {
+          "role": "assistant",
+          "content": "i 在递减，条件永远成立……"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-034",
+      "group": "skip",
+      "note": "纯知识问答",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "快速排序的平均时间复杂度是多少？"
+        },
+        {
+          "role": "assistant",
+          "content": "O(n log n)，最坏 O(n^2)。"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-035",
+      "group": "skip",
+      "note": "一次性翻译请求",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "帮我翻译这句：the quick brown fox jumps over the lazy dog"
+        },
+        {
+          "role": "assistant",
+          "content": "敏捷的棕色狐狸跳过懒狗。"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-036",
+      "group": "skip",
+      "note": "收尾致谢",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "好的，谢谢，明白了"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-037",
+      "group": "skip",
+      "note": "纯知识问答",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "varchar 和 text 在 MySQL 里有什么区别？"
+        },
+        {
+          "role": "assistant",
+          "content": "varchar 有长度上限、可建索引前缀……"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-038",
+      "group": "skip",
+      "note": "一次性性能问题，不含个人信息",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "这条 SQL 为什么慢：```select * from t where a = 1 order by b limit 10```"
+        },
+        {
+          "role": "assistant",
+          "content": "可能缺 (a, b) 复合索引……"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-039",
+      "group": "skip",
+      "note": "寒暄",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "在吗"
+        },
+        {
+          "role": "assistant",
+          "content": "在，你说。"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-040",
+      "group": "skip",
+      "note": "纯知识问答",
+      "existing": [],
+      "turns": [
+        {
+          "role": "user",
+          "content": "Spring 的 AOP 是怎么实现的？"
+        },
+        {
+          "role": "assistant",
+          "content": "运行时靠动态代理，编译期靠字节码增强……"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-041",
+      "group": "add",
+      "note": "分布式锁只懂一种",
+      "turns": [
+        {
+          "role": "user",
+          "content": "分布式锁我只知道 Redis 那套，别的方案完全没概念"
+        },
+        {
+          "role": "assistant",
+          "content": "还有 zk 和数据库唯一索引两种"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "contentContains": "分布式锁",
+            "kind": "weak_topic"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-042",
+      "group": "add",
+      "note": "限流算法分不清",
+      "turns": [
+        {
+          "role": "user",
+          "content": "令牌桶和漏桶我一直分不清，面试问到我只能瞎说"
+        },
+        {
+          "role": "assistant",
+          "content": "令牌桶允许突发，漏桶强制匀速"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "contentContains": "漏桶",
+            "kind": "weak_topic"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-043",
+      "group": "add",
+      "note": "MVCC 读视图",
+      "turns": [
+        {
+          "role": "user",
+          "content": "MVCC 的 Read View 我看了两遍还是不明白它在什么时候生成"
+        },
+        {
+          "role": "assistant",
+          "content": "在快照读开始时生成"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "contentContains": "MVCC",
+            "kind": "weak_topic"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-044",
+      "group": "add",
+      "note": "AQS 队列",
+      "turns": [
+        {
+          "role": "user",
+          "content": "AQS 的等待队列我看不懂"
+        },
+        {
+          "role": "assistant",
+          "content": "它是一条 CLH 变体的双向队列"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "contentContains": "AQS",
+            "kind": "weak_topic"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-045",
+      "group": "add",
+      "note": "类加载机制",
+      "turns": [
+        {
+          "role": "user",
+          "content": "双亲委派我背过，但没真懂为啥要这么设计"
+        },
+        {
+          "role": "assistant",
+          "content": "核心是保证核心类不被篡改"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "contentContains": "双亲委派",
+            "kind": "weak_topic"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-046",
+      "group": "add",
+      "note": "看不懂执行计划",
+      "turns": [
+        {
+          "role": "user",
+          "content": "explain 出来的结果我看不太懂，type 那一列不知道哪个好"
+        },
+        {
+          "role": "assistant",
+          "content": "从 system 到 ALL 越靠后越差"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "contentContains": "explain",
+            "kind": "weak_topic"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-047",
+      "group": "add",
+      "note": "主从延迟",
+      "turns": [
+        {
+          "role": "user",
+          "content": "主从延迟导致读到旧数据这个问题我总绕不明白"
+        },
+        {
+          "role": "assistant",
+          "content": "要么强制走主库，要么接受最终一致"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "contentContains": "主从延迟",
+            "kind": "weak_topic"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-048",
+      "group": "add",
+      "note": "线程状态",
+      "turns": [
+        {
+          "role": "user",
+          "content": "线程那几个状态之间怎么转换我老是记不住"
+        },
+        {
+          "role": "assistant",
+          "content": "RUNNABLE 到 BLOCKED 是被 synchronized 挡住"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "contentContains": "状态",
+            "kind": "weak_topic"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-049",
+      "group": "add",
+      "note": "IO 多路复用",
+      "turns": [
+        {
+          "role": "user",
+          "content": "select、poll、epoll 的区别我搞不清"
+        },
+        {
+          "role": "assistant",
+          "content": "epoll 用回调代替轮询"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "contentContains": "epoll",
+            "kind": "weak_topic"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-050",
+      "group": "add",
+      "note": "熔断与降级",
+      "turns": [
+        {
+          "role": "user",
+          "content": "熔断和降级我总分不清哪个是哪个"
+        },
+        {
+          "role": "assistant",
+          "content": "熔断是切断调用，降级是退到备选"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "contentContains": "熔断",
+            "kind": "weak_topic"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-051",
+      "group": "add",
+      "note": "目标：一线公司",
+      "turns": [
+        {
+          "role": "user",
+          "content": "我想今年把八股文过一遍，目标是一线互联网"
+        },
+        {
+          "role": "assistant",
+          "content": "先按语言基础、中间件、系统设计分块"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "contentContains": "一线",
+            "kind": "goal"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-052",
+      "group": "add",
+      "note": "目标：能讲项目",
+      "turns": [
+        {
+          "role": "user",
+          "content": "我计划年底前把项目经验补到能讲二十分钟"
+        },
+        {
+          "role": "assistant",
+          "content": "把取舍和踩过的坑都备好"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "contentContains": "二十分钟",
+            "kind": "goal"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-053",
+      "group": "add",
+      "note": "目标：先基础后源码",
+      "turns": [
+        {
+          "role": "user",
+          "content": "我准备先用三个月补基础，再去看框架源码"
+        },
+        {
+          "role": "assistant",
+          "content": "这个顺序对"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "contentContains": "源码",
+            "kind": "goal"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-054",
+      "group": "add",
+      "note": "目标：基础设施方向",
+      "turns": [
+        {
+          "role": "user",
+          "content": "希望能进一家做基础设施的公司"
+        },
+        {
+          "role": "assistant",
+          "content": "存储与调度这两块要重点补"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "contentContains": "基础设施",
+            "kind": "goal"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-055",
+      "group": "add",
+      "note": "目标：吃透并发",
+      "turns": [
+        {
+          "role": "user",
+          "content": "我给自己定的目标是把并发这块吃透"
+        },
+        {
+          "role": "assistant",
+          "content": "从内存模型到并发容器一路下去"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "contentContains": "并发",
+            "kind": "goal"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-056",
+      "group": "add",
+      "note": "目标：保底 offer",
+      "turns": [
+        {
+          "role": "user",
+          "content": "想在今年秋招前拿到两个 offer 保底"
+        },
+        {
+          "role": "assistant",
+          "content": "先拿一个再来谈挑选"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "contentContains": "offer",
+            "kind": "goal"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-057",
+      "group": "add",
+      "note": "偏好：表结构举例",
+      "turns": [
+        {
+          "role": "user",
+          "content": "讲数据库的时候多用具体表结构举例，别光说概念"
+        },
+        {
+          "role": "assistant",
+          "content": "好，后面都带表结构"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "contentContains": "表结构",
+            "kind": "preference"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-058",
+      "group": "add",
+      "note": "偏好：少用缩写",
+      "turns": [
+        {
+          "role": "user",
+          "content": "不要用英文缩写，我看不懂"
+        },
+        {
+          "role": "assistant",
+          "content": "好，都用中文全称"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "contentContains": "缩写",
+            "kind": "preference"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-059",
+      "group": "add",
+      "note": "偏好：三百字以内",
+      "turns": [
+        {
+          "role": "user",
+          "content": "每次回答控制在三百字以内"
+        },
+        {
+          "role": "assistant",
+          "content": "明白，尽量精简"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "contentContains": "三百字",
+            "kind": "preference"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-060",
+      "group": "add",
+      "note": "偏好：先说面试相关性",
+      "turns": [
+        {
+          "role": "user",
+          "content": "先告诉我这个知识点在面试里会不会问"
+        },
+        {
+          "role": "assistant",
+          "content": "好，先说考不考"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "contentContains": "面试",
+            "kind": "preference"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-061",
+      "group": "add",
+      "note": "偏好：代码要有注释",
+      "turns": [
+        {
+          "role": "user",
+          "content": "代码示例加注释，别只贴代码"
+        },
+        {
+          "role": "assistant",
+          "content": "好，关键行都加注释"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "structured",
+            "contentContains": "注释",
+            "kind": "preference"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-062",
+      "group": "add",
+      "note": "背景：开发环境",
+      "turns": [
+        {
+          "role": "user",
+          "content": "我用的是 Mac，本地没装 Docker"
+        },
+        {
+          "role": "assistant",
+          "content": "可以用 brew 装"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "text",
+            "contentContains": "Mac"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-063",
+      "group": "add",
+      "note": "背景：学校课程",
+      "turns": [
+        {
+          "role": "user",
+          "content": "我们学校的课基本不教工程实践"
+        },
+        {
+          "role": "assistant",
+          "content": "那得自己补项目和工具链"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "text",
+            "contentContains": "工程实践"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-064",
+      "group": "add",
+      "note": "背景：实习经历",
+      "turns": [
+        {
+          "role": "user",
+          "content": "我实习过半年，做的是后台管理系统"
+        },
+        {
+          "role": "assistant",
+          "content": "这段可以写进简历"
+        }
+      ],
+      "expect": {
+        "add": [
+          {
+            "store": "text",
+            "contentContains": "实习"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-065",
+      "group": "update",
+      "note": "目标从大厂改成本地",
+      "turns": [
+        {
+          "role": "user",
+          "content": "我想了想，还是留本地，不进大厂了"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "structured",
+            "targetId": 101,
+            "contentContains": "本地"
+          }
+        ],
+        "forbidAdd": true
+      },
+      "existing": [
+        {
+          "store": "structured",
+          "id": 101,
+          "kind": "goal",
+          "text": "他想进一线大厂"
+        }
+      ]
+    },
+    {
+      "id": "EX-066",
+      "group": "update",
+      "note": "弱项范围缩小",
+      "turns": [
+        {
+          "role": "user",
+          "content": "分布式锁 Redis 那套我学会了，只剩 zk 的没看"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "structured",
+            "targetId": 102,
+            "contentContains": "zk"
+          }
+        ],
+        "forbidAdd": true
+      },
+      "existing": [
+        {
+          "store": "structured",
+          "id": 102,
+          "kind": "weak_topic",
+          "text": "他不懂分布式锁"
+        }
+      ]
+    },
+    {
+      "id": "EX-067",
+      "group": "update",
+      "note": "偏好反转：长度",
+      "turns": [
+        {
+          "role": "user",
+          "content": "越详细越好看不完，还是短点好"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "structured",
+            "targetId": 103,
+            "contentContains": "短"
+          }
+        ],
+        "forbidAdd": true
+      },
+      "existing": [
+        {
+          "store": "structured",
+          "id": 103,
+          "kind": "preference",
+          "text": "他希望回答越详细越好"
+        }
+      ]
+    },
+    {
+      "id": "EX-068",
+      "group": "update",
+      "note": "偏好细化：举例语言",
+      "turns": [
+        {
+          "role": "user",
+          "content": "例子请用 Go，我在学 Go"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "structured",
+            "targetId": 104,
+            "contentContains": "Go"
+          }
+        ],
+        "forbidAdd": true
+      },
+      "existing": [
+        {
+          "store": "structured",
+          "id": 104,
+          "kind": "preference",
+          "text": "他喜欢用例子讲"
+        }
+      ]
+    },
+    {
+      "id": "EX-069",
+      "group": "update",
+      "note": "目标公司改了",
+      "turns": [
+        {
+          "role": "user",
+          "content": "腾讯不面了，改面阿里"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "structured",
+            "targetId": 105,
+            "contentContains": "阿里"
+          }
+        ],
+        "forbidAdd": true
+      },
+      "existing": [
+        {
+          "store": "structured",
+          "id": 105,
+          "kind": "goal",
+          "text": "他准备面腾讯"
+        }
+      ]
+    },
+    {
+      "id": "EX-070",
+      "group": "update",
+      "note": "时间线推后",
+      "turns": [
+        {
+          "role": "user",
+          "content": "三个月不够，改成六个月"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "structured",
+            "targetId": 106,
+            "contentContains": "六个月"
+          }
+        ],
+        "forbidAdd": true
+      },
+      "existing": [
+        {
+          "store": "structured",
+          "id": 106,
+          "kind": "goal",
+          "text": "他计划三个月内完成复习"
+        }
+      ]
+    },
+    {
+      "id": "EX-071",
+      "group": "update",
+      "note": "弱项部分解决",
+      "turns": [
+        {
+          "role": "user",
+          "content": "动态规划我现在会了，只剩状态压缩那类没掌握"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "structured",
+            "targetId": 107,
+            "contentContains": "状态压缩"
+          }
+        ],
+        "forbidAdd": true
+      },
+      "existing": [
+        {
+          "store": "structured",
+          "id": 107,
+          "kind": "weak_topic",
+          "text": "他不会写动态规划"
+        }
+      ]
+    },
+    {
+      "id": "EX-072",
+      "group": "update",
+      "note": "背景更正：学历",
+      "turns": [
+        {
+          "role": "user",
+          "content": "更正一下，我是专升本，不是普通本科"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "text",
+            "targetId": 108,
+            "contentContains": "专升本"
+          }
+        ],
+        "forbidAdd": true
+      },
+      "existing": [
+        {
+          "store": "text",
+          "id": 108,
+          "text": "他是本科生"
+        }
+      ]
+    },
+    {
+      "id": "EX-073",
+      "group": "update",
+      "note": "偏好放宽：可以给代码",
+      "turns": [
+        {
+          "role": "user",
+          "content": "贴代码也行，只要带解释"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "structured",
+            "targetId": 109,
+            "contentContains": "代码"
+          }
+        ],
+        "forbidAdd": true
+      },
+      "existing": [
+        {
+          "store": "structured",
+          "id": 109,
+          "kind": "preference",
+          "text": "他要求不要贴代码"
+        }
+      ]
+    },
+    {
+      "id": "EX-074",
+      "group": "update",
+      "note": "方向从算法改客户端",
+      "turns": [
+        {
+          "role": "user",
+          "content": "算法不做了，转客户端"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "structured",
+            "targetId": 110,
+            "contentContains": "客户端"
+          }
+        ],
+        "forbidAdd": true
+      },
+      "existing": [
+        {
+          "store": "structured",
+          "id": 110,
+          "kind": "goal",
+          "text": "他目标算法岗"
+        }
+      ]
+    },
+    {
+      "id": "EX-075",
+      "group": "update",
+      "note": "弱项已掌握：幂等",
+      "turns": [
+        {
+          "role": "user",
+          "content": "幂等我搞清楚了，用唯一键就行"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "structured",
+            "targetId": 111,
+            "contentContains": "幂等"
+          }
+        ],
+        "forbidAdd": true
+      },
+      "existing": [
+        {
+          "store": "structured",
+          "id": 111,
+          "kind": "weak_topic",
+          "text": "他不清楚接口幂等怎么做"
+        }
+      ]
+    },
+    {
+      "id": "EX-076",
+      "group": "update",
+      "note": "偏好：可以更专业",
+      "turns": [
+        {
+          "role": "user",
+          "content": "通俗过头了，可以直接用专业术语"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "structured",
+            "targetId": 112,
+            "contentContains": "术语"
+          }
+        ],
+        "forbidAdd": true
+      },
+      "existing": [
+        {
+          "store": "structured",
+          "id": 112,
+          "kind": "preference",
+          "text": "他希望讲解尽量通俗"
+        }
+      ]
+    },
+    {
+      "id": "EX-077",
+      "group": "update",
+      "note": "目标期限拉长",
+      "turns": [
+        {
+          "role": "user",
+          "content": "一个月太赶，改成两个月"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "structured",
+            "targetId": 113,
+            "contentContains": "两个月"
+          }
+        ],
+        "forbidAdd": true
+      },
+      "existing": [
+        {
+          "store": "structured",
+          "id": 113,
+          "kind": "goal",
+          "text": "他想一个月内刷完 200 题"
+        }
+      ]
+    },
+    {
+      "id": "EX-078",
+      "group": "update",
+      "note": "背景：实习结束",
+      "turns": [
+        {
+          "role": "user",
+          "content": "实习结束了，已经回学校了"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "text",
+            "targetId": 114,
+            "contentContains": "结束"
+          }
+        ],
+        "forbidAdd": true
+      },
+      "existing": [
+        {
+          "store": "text",
+          "id": 114,
+          "text": "他在某公司实习"
+        }
+      ]
+    },
+    {
+      "id": "EX-079",
+      "group": "update",
+      "note": "弱项：限流只剩一种",
+      "turns": [
+        {
+          "role": "user",
+          "content": "令牌桶我懂了，漏桶还是不行"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "structured",
+            "targetId": 115,
+            "contentContains": "漏桶"
+          }
+        ],
+        "forbidAdd": true
+      },
+      "existing": [
+        {
+          "store": "structured",
+          "id": 115,
+          "kind": "weak_topic",
+          "text": "他不懂限流算法"
+        }
+      ]
+    },
+    {
+      "id": "EX-080",
+      "group": "update",
+      "note": "偏好：先原理",
+      "turns": [
+        {
+          "role": "user",
+          "content": "结论先行听腻了，先讲原理"
+        }
+      ],
+      "expect": {
+        "update": [
+          {
+            "store": "structured",
+            "targetId": 116,
+            "contentContains": "原理"
+          }
+        ],
+        "forbidAdd": true
+      },
+      "existing": [
+        {
+          "store": "structured",
+          "id": 116,
+          "kind": "preference",
+          "text": "他要结论先行"
+        }
+      ]
+    },
+    {
+      "id": "EX-081",
+      "group": "delete",
+      "note": "目标已达成",
+      "turns": [
+        {
+          "role": "user",
+          "content": "并发那块我吃透了，那个目标可以划掉了"
+        }
+      ],
+      "expect": {
+        "delete": [
+          {
+            "store": "structured",
+            "targetId": 201
+          }
+        ]
+      },
+      "existing": [
+        {
+          "store": "structured",
+          "id": 201,
+          "kind": "goal",
+          "text": "他要吃透并发"
+        }
+      ]
+    },
+    {
+      "id": "EX-082",
+      "group": "delete",
+      "note": "方向放弃",
+      "turns": [
+        {
+          "role": "user",
+          "content": "客户端我不做了，那条别记了"
+        }
+      ],
+      "expect": {
+        "delete": [
+          {
+            "store": "structured",
+            "targetId": 202
+          }
+        ]
+      },
+      "existing": [
+        {
+          "store": "structured",
+          "id": 202,
+          "kind": "goal",
+          "text": "他准备转客户端"
+        }
+      ]
+    },
+    {
+      "id": "EX-083",
+      "group": "delete",
+      "note": "弱项不再成立",
+      "turns": [
+        {
+          "role": "user",
+          "content": "类加载机制我彻底搞懂了"
+        }
+      ],
+      "expect": {
+        "delete": [
+          {
+            "store": "structured",
+            "targetId": 203
+          }
+        ]
+      },
+      "existing": [
+        {
+          "store": "structured",
+          "id": 203,
+          "kind": "weak_topic",
+          "text": "他不懂类加载机制"
+        }
+      ]
+    },
+    {
+      "id": "EX-084",
+      "group": "delete",
+      "note": "背景过时",
+      "turns": [
+        {
+          "role": "user",
+          "content": "我不在实习了，那条删掉吧"
+        }
+      ],
+      "expect": {
+        "delete": [
+          {
+            "store": "text",
+            "targetId": 204
+          }
+        ]
+      },
+      "existing": [
+        {
+          "store": "text",
+          "id": 204,
+          "text": "他在实习"
+        }
+      ]
+    },
+    {
+      "id": "EX-085",
+      "group": "delete",
+      "note": "弱项已解决",
+      "turns": [
+        {
+          "role": "user",
+          "content": "AQS 我现在看懂了，不用记这个短板了"
+        }
+      ],
+      "expect": {
+        "delete": [
+          {
+            "store": "structured",
+            "targetId": 205
+          }
+        ]
+      },
+      "existing": [
+        {
+          "store": "structured",
+          "id": 205,
+          "kind": "weak_topic",
+          "text": "他看不懂 AQS"
+        }
+      ]
+    },
+    {
+      "id": "EX-086",
+      "group": "delete",
+      "note": "目标作废",
+      "turns": [
+        {
+          "role": "user",
+          "content": "字节不面了，那个目标撤掉"
+        }
+      ],
+      "expect": {
+        "delete": [
+          {
+            "store": "structured",
+            "targetId": 206
+          }
+        ]
+      },
+      "existing": [
+        {
+          "store": "structured",
+          "id": 206,
+          "kind": "goal",
+          "text": "他要面字节"
+        }
+      ]
+    },
+    {
+      "id": "EX-087",
+      "group": "delete",
+      "note": "偏好取消",
+      "turns": [
+        {
+          "role": "user",
+          "content": "以后不用管字数了，我爱看长的"
+        }
+      ],
+      "expect": {
+        "delete": [
+          {
+            "store": "structured",
+            "targetId": 207
+          }
+        ]
+      },
+      "existing": [
+        {
+          "store": "structured",
+          "id": 207,
+          "kind": "preference",
+          "text": "他要求回答控制在三百字以内"
+        }
+      ]
+    },
+    {
+      "id": "EX-088",
+      "group": "delete",
+      "note": "环境变了：换电脑",
+      "turns": [
+        {
+          "role": "user",
+          "content": "我换 Windows 了，Mac 那条不用记"
+        }
+      ],
+      "expect": {
+        "delete": [
+          {
+            "store": "text",
+            "targetId": 208
+          }
+        ]
+      },
+      "existing": [
+        {
+          "store": "text",
+          "id": 208,
+          "text": "他用的是 Mac"
+        }
+      ]
+    },
+    {
+      "id": "EX-089",
+      "group": "propose",
+      "note": "从一次提问推断基础，证据不足",
+      "turns": [
+        {
+          "role": "user",
+          "content": "什么是线程安全？"
+        },
+        {
+          "role": "assistant",
+          "content": "多个线程访问同一份数据不出错"
+        }
+      ],
+      "expect": {
+        "propose": [
+          {
+            "contentContains": "线程"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-090",
+      "group": "propose",
+      "note": "在刷题，动机不明",
+      "turns": [
+        {
+          "role": "user",
+          "content": "最近在刷题，一天两三道"
+        },
+        {
+          "role": "assistant",
+          "content": "保持频率比数量重要"
+        }
+      ],
+      "expect": {
+        "propose": [
+          {
+            "contentContains": "刷题"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-091",
+      "group": "propose",
+      "note": "情绪陈述，方向不明",
+      "turns": [
+        {
+          "role": "user",
+          "content": "最近有点焦虑，感觉学不完"
+        },
+        {
+          "role": "assistant",
+          "content": "先砍掉不重要的部分"
+        }
+      ],
+      "expect": {
+        "propose": [
+          {
+            "contentContains": "焦虑"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-092",
+      "group": "propose",
+      "note": "摇摆的选择",
+      "turns": [
+        {
+          "role": "user",
+          "content": "在想要不要读研，也可能直接工作"
+        },
+        {
+          "role": "assistant",
+          "content": "两条路的准备重点不一样"
+        }
+      ],
+      "expect": {
+        "propose": [
+          {
+            "contentContains": "读研"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-093",
+      "group": "propose",
+      "note": "他人评价，可信度不明",
+      "turns": [
+        {
+          "role": "user",
+          "content": "同事说我不太适合做开发"
+        },
+        {
+          "role": "assistant",
+          "content": "他具体说哪方面？"
+        }
+      ],
+      "expect": {
+        "propose": [
+          {
+            "contentContains": "同事"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-094",
+      "group": "propose",
+      "note": "看过一点，深浅不明",
+      "turns": [
+        {
+          "role": "user",
+          "content": "我之前看过一点 Rust，挺喜欢的"
+        },
+        {
+          "role": "assistant",
+          "content": "可以从所有权入手"
+        }
+      ],
+      "expect": {
+        "propose": [
+          {
+            "contentContains": "Rust"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-095",
+      "group": "propose",
+      "note": "可能的机会，不确定",
+      "turns": [
+        {
+          "role": "user",
+          "content": "下个月可能有个机会，还说不准"
+        },
+        {
+          "role": "assistant",
+          "content": "先按最可能的岗位准备"
+        }
+      ],
+      "expect": {
+        "propose": [
+          {
+            "contentContains": "机会"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-096",
+      "group": "propose",
+      "note": "自我评价，可信度不明",
+      "turns": [
+        {
+          "role": "user",
+          "content": "我数学底子还行"
+        },
+        {
+          "role": "assistant",
+          "content": "那算法推导会轻松一点"
+        }
+      ],
+      "expect": {
+        "propose": [
+          {
+            "contentContains": "数学"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-097",
+      "group": "propose",
+      "note": "想试开源，动机不明",
+      "turns": [
+        {
+          "role": "user",
+          "content": "想试试参与开源项目"
+        },
+        {
+          "role": "assistant",
+          "content": "从文档和小 issue 开始"
+        }
+      ],
+      "expect": {
+        "propose": [
+          {
+            "contentContains": "开源"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-098",
+      "group": "propose",
+      "note": "在考虑转岗",
+      "turns": [
+        {
+          "role": "user",
+          "content": "也在考虑转测试，还没定"
+        },
+        {
+          "role": "assistant",
+          "content": "测试岗的考察面不一样"
+        }
+      ],
+      "expect": {
+        "propose": [
+          {
+            "contentContains": "测试"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-099",
+      "group": "propose",
+      "note": "自我感觉，可能只是谦虚",
+      "turns": [
+        {
+          "role": "user",
+          "content": "我算法题做得还凑合"
+        },
+        {
+          "role": "assistant",
+          "content": "那可以往难题走"
+        }
+      ],
+      "expect": {
+        "propose": [
+          {
+            "contentContains": "算法"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-100",
+      "group": "propose",
+      "note": "在看书，动机不明",
+      "turns": [
+        {
+          "role": "user",
+          "content": "最近在看计算机网络那本书"
+        },
+        {
+          "role": "assistant",
+          "content": "重点看 TCP 与 HTTP 两章"
+        }
+      ],
+      "expect": {
+        "propose": [
+          {
+            "contentContains": "计算机网络"
+          }
+        ]
+      }
+    },
+    {
+      "id": "EX-101",
+      "group": "skip",
+      "note": "寒暄",
+      "turns": [
+        {
+          "role": "user",
+          "content": "早上好"
+        },
+        {
+          "role": "assistant",
+          "content": "早上好，今天想聊什么？"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-102",
+      "group": "skip",
+      "note": "纯知识：进程与线程",
+      "turns": [
+        {
+          "role": "user",
+          "content": "进程和线程的区别是什么？"
+        },
+        {
+          "role": "assistant",
+          "content": "进程有独立地址空间"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-103",
+      "group": "skip",
+      "note": "一次性：正则调试",
+      "turns": [
+        {
+          "role": "user",
+          "content": "这个正则为什么匹配不到：```^\\\\d{3}-\\\\d{4}$```"
+        },
+        {
+          "role": "assistant",
+          "content": "少了转义"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-104",
+      "group": "skip",
+      "note": "纯知识：B+ 树",
+      "turns": [
+        {
+          "role": "user",
+          "content": "为什么 MySQL 索引用 B+ 树不用 B 树？"
+        },
+        {
+          "role": "assistant",
+          "content": "非叶子节点只存键"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-105",
+      "group": "skip",
+      "note": "一次性：命令查询",
+      "turns": [
+        {
+          "role": "user",
+          "content": "Linux 怎么看占用端口的进程？"
+        },
+        {
+          "role": "assistant",
+          "content": "ss -lntp 或者 lsof -i"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-106",
+      "group": "skip",
+      "note": "纯知识：HTTP 状态码",
+      "turns": [
+        {
+          "role": "user",
+          "content": "301 和 302 有什么区别？"
+        },
+        {
+          "role": "assistant",
+          "content": "301 是永久重定向"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-107",
+      "group": "skip",
+      "note": "一次性：格式转换",
+      "turns": [
+        {
+          "role": "user",
+          "content": "把这段 JSON 转成 YAML"
+        },
+        {
+          "role": "assistant",
+          "content": "好的"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-108",
+      "group": "skip",
+      "note": "纯感谢",
+      "turns": [
+        {
+          "role": "user",
+          "content": "明白了，谢谢"
+        },
+        {
+          "role": "assistant",
+          "content": "不客气"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-109",
+      "group": "skip",
+      "note": "纯知识：CAP",
+      "turns": [
+        {
+          "role": "user",
+          "content": "CAP 定理到底在说什么？"
+        },
+        {
+          "role": "assistant",
+          "content": "一致性、可用性、分区容忍三者取舍"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-110",
+      "group": "skip",
+      "note": "一次性：报错解读",
+      "turns": [
+        {
+          "role": "user",
+          "content": "这个报错什么意思：`java.lang.NullPointerException`"
+        },
+        {
+          "role": "assistant",
+          "content": "空指针，某个对象是 null"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-111",
+      "group": "skip",
+      "note": "纯知识：线程池参数",
+      "turns": [
+        {
+          "role": "user",
+          "content": "线程池的七个参数分别是什么？"
+        },
+        {
+          "role": "assistant",
+          "content": "corePoolSize、maximumPoolSize"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-112",
+      "group": "skip",
+      "note": "一次性：Git 命令",
+      "turns": [
+        {
+          "role": "user",
+          "content": "怎么把一个 commit 拆成两个？"
+        },
+        {
+          "role": "assistant",
+          "content": "用 rebase -i 选 edit"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-113",
+      "group": "skip",
+      "note": "纯知识：最左前缀",
+      "turns": [
+        {
+          "role": "user",
+          "content": "联合索引为什么要最左前缀？"
+        },
+        {
+          "role": "assistant",
+          "content": "因为索引按定义顺序排序"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-114",
+      "group": "skip",
+      "note": "一次性：Docker 命令",
+      "turns": [
+        {
+          "role": "user",
+          "content": "docker 怎么看容器日志？"
+        },
+        {
+          "role": "assistant",
+          "content": "docker logs -f 容器名"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-115",
+      "group": "skip",
+      "note": "纯知识：哈希冲突",
+      "turns": [
+        {
+          "role": "user",
+          "content": "HashMap 的哈希冲突怎么解决？"
+        },
+        {
+          "role": "assistant",
+          "content": "链地址法，超过阈值转红黑树"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-116",
+      "group": "skip",
+      "note": "纯确认",
+      "turns": [
+        {
+          "role": "user",
+          "content": "所以应该先学并发再学 JVM？"
+        },
+        {
+          "role": "assistant",
+          "content": "对，并发更能用上"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-117",
+      "group": "skip",
+      "note": "纯知识：时间复杂",
+      "turns": [
+        {
+          "role": "user",
+          "content": "为什么哈希表查询是 O(1)？"
+        },
+        {
+          "role": "assistant",
+          "content": "平均情况按哈希直接定位"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-118",
+      "group": "skip",
+      "note": "一次性：URL 编码",
+      "turns": [
+        {
+          "role": "user",
+          "content": "空格在 URL 里应该编码成什么？"
+        },
+        {
+          "role": "assistant",
+          "content": "%20 或加号"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-119",
+      "group": "skip",
+      "note": "纯知识：设计模式",
+      "turns": [
+        {
+          "role": "user",
+          "content": "单例模式有哪几种写法？"
+        },
+        {
+          "role": "assistant",
+          "content": "饿汉、懒汉、双重检查、枚举"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    },
+    {
+      "id": "EX-120",
+      "group": "skip",
+      "note": "纯知识：TCP 与 UDP",
+      "turns": [
+        {
+          "role": "user",
+          "content": "TCP 和 UDP 该怎么选？"
+        },
+        {
+          "role": "assistant",
+          "content": "要可靠用 TCP"
+        }
+      ],
+      "expect": {
+        "skip": true
+      }
+    }
+  ]
+}

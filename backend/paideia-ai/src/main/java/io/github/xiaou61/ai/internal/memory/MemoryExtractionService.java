@@ -1,5 +1,6 @@
 package io.github.xiaou61.ai.internal.memory;
 
+import io.github.xiaou61.ai.MemoryCandidate;
 import io.github.xiaou61.ai.MemoryExtractor;
 import io.github.xiaou61.ai.ModelAccess;
 import io.github.xiaou61.ai.TokenUsage;
@@ -8,6 +9,7 @@ import io.github.xiaou61.ai.internal.conversation.ConversationService;
 import io.github.xiaou61.ai.internal.credential.CredentialService;
 import io.github.xiaou61.ai.internal.settings.AiSettingsStore;
 import io.github.xiaou61.platform.BizException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.RejectedExecutionException;
@@ -44,6 +46,7 @@ public class MemoryExtractionService {
     private final AiSettingsStore settings;
     private final ConversationService conversations;
     private final MemoryStore memories;
+    private final MemoryCandidateService candidates;
     private final MemoryExtractor extractor;
     private final CredentialService credentials;
     private final CreditService credits;
@@ -54,6 +57,7 @@ public class MemoryExtractionService {
                             AiSettingsStore settings,
                             ConversationService conversations,
                             MemoryStore memories,
+                            MemoryCandidateService candidates,
                             MemoryExtractor extractor,
                             CredentialService credentials,
                             CreditService credits,
@@ -63,6 +67,7 @@ public class MemoryExtractionService {
         this.settings = settings;
         this.conversations = conversations;
         this.memories = memories;
+        this.candidates = candidates;
         this.extractor = extractor;
         this.credentials = credentials;
         this.credits = credits;
@@ -141,8 +146,7 @@ public class MemoryExtractionService {
                 MemoryExtractor.MemoryExtraction result = extractor.extract(
                         new MemoryExtractor.MemoryExtractionRequest(slice.turns(), pool), access.get());
                 usage = result.usage();
-                int affected = memories.applyAuto(userId, slice.conversationId(), slice.upToMessageId(),
-                        result.candidates());
+                int affected = apply(userId, slice, result.candidates());
                 int charged = credits.settleMemoryExtraction(userId, reserved, access.get().model(),
                         usage == null ? null : usage.inputTokens(),
                         usage == null ? null : usage.outputTokens(),
@@ -167,6 +171,44 @@ public class MemoryExtractionService {
             log.warn("ai.memory.extraction_crashed userId={} conversationId={}",
                     userId, slice.conversationId(), unexpected);
         }
+    }
+
+    /**
+     * 把一次判定的候选分流到三个去处（WORK-050 REQ-006）。
+     *
+     * <p>三路各有自己的语义：`PROPOSE` 进候选表等用户点；命中敏感信息的**只记一条"未记录"**
+     * （正文不落库）；其余交给 {@link MemoryStore#applyAuto} 直接生效。
+     *
+     * <p>顺序与"整批一个事务"的旧语义并不冲突：`applyAuto` 仍然是一个事务，
+     * 候选与过滤记录各自是独立的小事务——它们失败不该让已经生效的记忆回滚。
+     */
+    private int apply(long userId, ConversationService.ExtractionSlice slice,
+                      List<MemoryCandidate> candidates) {
+        List<MemoryCandidate> direct = new ArrayList<>();
+        int proposed = 0;
+        int filtered = 0;
+        for (MemoryCandidate candidate : candidates) {
+            if (candidate.action() == MemoryCandidate.Action.PROPOSE) {
+                this.candidates.propose(userId, candidate.store(), candidate.kind(), candidate.refId(),
+                        candidate.content(), slice.conversationId(), slice.upToMessageId(),
+                        candidate.reason());
+                proposed++;
+                continue;
+            }
+            if (candidate.content() != null && SensitiveContent.find(candidate.content()).isPresent()) {
+                this.candidates.recordFiltered(userId, candidate.store(), candidate.content(),
+                        slice.conversationId(), slice.upToMessageId());
+                filtered++;
+                continue;
+            }
+            direct.add(candidate);
+        }
+        int affected = memories.applyAuto(userId, slice.conversationId(), slice.upToMessageId(), direct);
+        if (proposed > 0 || filtered > 0) {
+            log.info("ai.memory.split userId={} proposed={} filtered={} applied={}",
+                    userId, proposed, filtered, affected);
+        }
+        return affected;
     }
 
     /** 失败也要过账：拿到了用量就按用量扣，没拿到就全额退回（与对话那条同一条纪律）。 */

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { AssistantApi } from './client'
 import { MemoryPanel } from './memory-panel'
-import type { MemorySettings, MemoryView } from './types'
+import type { MemoryCandidate, MemorySettings, MemoryView } from './types'
 
 /**
  * 记忆面板的三块界面语义（WORK-013）。
@@ -35,6 +35,22 @@ function memory(overrides: Partial<MemoryView> = {}): MemoryView {
   }
 }
 
+function candidate(overrides: Partial<MemoryCandidate> = {}): MemoryCandidate {
+  return {
+    id: 7,
+    store: 'text',
+    kind: null,
+    content: '他最近在翻 DDIA',
+    reason: '动机不明',
+    conversationId: 3,
+    status: 'pending',
+    decisionReason: null,
+    createdAt: '2026-10-28T10:00:00Z',
+    expiresAt: '2026-11-11T10:00:00Z',
+    ...overrides,
+  }
+}
+
 function settings(overrides: Partial<MemorySettings> = {}): MemorySettings {
   return {
     memoryEnabled: true,
@@ -61,6 +77,9 @@ function fakeApi(overrides: Partial<AssistantApi> = {}): AssistantApi {
     conversations: unused,
     messages: unused,
     memories: vi.fn(async () => [] as MemoryView[]),
+    pendingCandidates: vi.fn(async () => [] as MemoryCandidate[]),
+    acceptCandidate: vi.fn(async () => undefined),
+    rejectCandidate: vi.fn(async () => undefined),
     deleteMemory: vi.fn(async () => true),
     settings: vi.fn(async () => settings()),
     saveSettings: vi.fn(async (value: MemorySettings) => value),
@@ -183,5 +202,40 @@ describe('记忆面板 · 危险区', () => {
 
     expect(api.clearMemories).not.toHaveBeenCalled()
     expect((screen.getByTestId('memory-enabled') as HTMLInputElement).checked).toBe(true)
+  })
+})
+
+describe('记忆面板 · 待确认候选（WORK-050）', () => {
+  it('有候选时显示内容与理由，点「记住」调接受端点并同时重拉两张表', async () => {
+    const acceptCandidate = vi.fn(async () => undefined)
+    const pendingCandidates = vi.fn(async () => [candidate()])
+    const api = fakeApi({ pendingCandidates, acceptCandidate })
+
+    render(<MemoryPanel api={api} />)
+
+    expect(await screen.findByTestId('memory-candidates')).toBeTruthy()
+    expect(screen.getByText('他最近在翻 DDIA')).toBeTruthy()
+    expect(screen.getByText('理由：动机不明')).toBeTruthy()
+
+    fireEvent.click(screen.getByTestId('memory-candidate-accept-7'))
+
+    await waitFor(() => expect(acceptCandidate).toHaveBeenCalledWith(7))
+    // 接受之后既重拉记忆列表、也重拉候选：只刷一边会让"待确认"留着已经生效的那条
+    await waitFor(() => expect(pendingCandidates).toHaveBeenCalledTimes(2))
+  })
+
+  it('被敏感信息拦下的那条只显示"没有记录"，不显示原文', async () => {
+    const api = fakeApi({
+      pendingCandidates: vi.fn(async () => [
+        candidate({ id: 9, content: null, reason: null, status: 'filtered', decisionReason: 'sensitive' }),
+      ]),
+    })
+
+    render(<MemoryPanel api={api} />)
+
+    expect(await screen.findByText(/疑似含敏感信息/)).toBeTruthy()
+    // 只能"知道了"（拒绝），不能"记住"——它没有内容可记
+    expect(screen.getByTestId('memory-candidate-dismiss-9')).toBeTruthy()
+    expect(screen.queryByTestId('memory-candidate-accept-9')).toBeNull()
   })
 })

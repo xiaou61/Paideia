@@ -47,6 +47,7 @@ const NAV_GROUP_OF = {
   'learner-nav-review': 'learner-nav-group-learn',
   'learner-nav-camp': 'learner-nav-group-learn',
   'learner-nav-knowledge': 'learner-nav-group-knowledge',
+  'learner-nav-books': 'learner-nav-group-knowledge',
   'learner-nav-graph': 'learner-nav-group-knowledge',
   'learner-nav-notes': 'learner-nav-group-knowledge',
   'learner-nav-sql-practice': 'learner-nav-group-practice',

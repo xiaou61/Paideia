@@ -34,6 +34,8 @@ export const documentRenderers: CustomRenderer[] = [
 ]
 
 export { SourceReadingProvider, useSourceReading } from './context'
+// 单题渲染（WORK-048）：内联小测与练习册面板共用，避免两套 UI 各自演进
+export { QuizQuestionView } from './quiz'
 export type {
   DocumentContextValue,
   EntryProgress,

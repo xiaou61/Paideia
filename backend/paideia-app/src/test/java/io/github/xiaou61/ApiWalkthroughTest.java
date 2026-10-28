@@ -291,6 +291,9 @@ class ApiWalkthroughTest {
 
         // ---- 学习线与学习记录（WORK-020）----
         call("学习线清单", "GET", "/api/v1/learning/lines", bearer, null);
+        // 推荐理由（WORK-047）：它只做润色，失败也要 200 + 空理由。这里打一次不带 body 的请求让
+        // 端点被覆盖到——那种情况是 400（参数非法），所以交给 bestEffort。
+        bestEffort("POST", "/api/v1/learning/advice", bearer);
         call("我的学习记录", "GET", "/api/v1/learning/progress", bearer, null);
         call("单站记录", "GET", "/api/v1/learning/entries/" + entryId, bearer, null);
         call("上报得分", "PUT", "/api/v1/learning/entries/" + entryId, bearer,
@@ -690,6 +693,25 @@ class ApiWalkthroughTest {
         // 面板的图线走 Grafana 的 POST 查询接口（唯一的 POST 例外，语义仍是只读）
         bestEffort("POST", "/api/v1/ops/grafana/api/ds/query", adminToken());
 
+        // ---- 数据大屏、运维诊断与事件（WORK-042 / WORK-043 / WORK-045）----
+        // 这几条自 2026-10-27 起就没被走到，于是"全接口自查"一直是红的。
+        //
+        // 有真实 id 才能成功的（单条报告、事件详情、补备注、评分）**用不存在的 id**：
+        // 端点被走到、404/409 不影响结论——与上面速递删除同一条口径。
+        // 诊断默认是关闭的，所以 POST 会返回 409 而不是 202，同样交给 bestEffort。
+        call("运维数据总览", "GET", "/api/v1/ops/admin/analytics/overview", adminToken(), null);
+        call("诊断列表", "GET", "/api/v1/ops/admin/diagnoses", adminToken(), null);
+        call("诊断统计", "GET", "/api/v1/ops/admin/diagnoses/stats", adminToken(), null);
+        bestEffort("GET", "/api/v1/ops/admin/diagnoses/999999999", adminToken());
+        bestEffort("POST", "/api/v1/ops/admin/diagnoses", adminToken());
+        bestEffort("POST", "/api/v1/ops/admin/diagnoses/999999999/feedback", adminToken());
+        call("事件列表", "GET", "/api/v1/ops/admin/incidents", adminToken(), null);
+        bestEffort("GET", "/api/v1/ops/admin/incidents/999999999", adminToken());
+        bestEffort("POST", "/api/v1/ops/admin/incidents/999999999/notes", adminToken());
+        // Grafana 告警进来的入口：不带 X-Paideia-Ops-Token 就是 401，这正是设计。
+        // 这里只要求"端点被打到"，不要求它能成功。
+        bestEffort("POST", "/api/v1/ops/hooks/grafana", null);
+
         // ---- 每日速递（WORK-027）----
         // 读接口在学习者端；管理端两个走 ADMIN。抓取由定时任务做，自查不触发。
         call("速递当日", "GET", "/api/v1/digest", bearer, null);
@@ -707,6 +729,8 @@ class ApiWalkthroughTest {
             // 没有数据时用 bestEffort 打一次不存在的 id：端点被走到，404 不影响结论
             bestEffort("DELETE", "/api/v1/digest/admin/items/999999999", adminToken());
         }
+        // 点击埋点（数据大屏的阅读量来源）。同样用不存在的 id：只要求端点到。
+        bestEffort("POST", "/api/v1/digest/items/999999999/click", bearer);
 
 
         } catch (RuntimeException | AssertionError failure) {

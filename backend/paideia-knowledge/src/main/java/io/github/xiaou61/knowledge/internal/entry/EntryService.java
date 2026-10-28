@@ -49,9 +49,12 @@ public class EntryService {
     /**
      * 列表项：**不含正文**（正文可能有几十 KB），但带一句**截断的摘要**——只给标题的列表
      * 卡片会显得空荡（用户反馈"页面过于单调"）。
+     *
+     * <p>`sortOrder` 是作者声明的站序（WORK-046）。列表响应本身按发布时间倒序，
+     * 需要"按书里的顺序读"的地方（书籍章节页）靠这个字段在客户端重排。
      */
     public record EntrySummary(Long id, String title, Long categoryId, String categoryName,
-                               String excerpt, Instant updatedAt) {
+                               String excerpt, Integer sortOrder, Instant updatedAt) {
     }
 
     /** 关系与相邻条目用的最小引用。 */
@@ -119,6 +122,7 @@ public class EntryService {
                         row.getCategoryId(),
                         nameOf(categoriesById, row.getCategoryId()),
                         row.getExcerpt(),
+                        row.getSortOrder(),
                         row.getUpdatedAt()))
                 .toList();
         return PageResult.of(total, page, items);

@@ -1,6 +1,6 @@
 import type { ApiClient } from '@paideia/core'
 
-import type { ConceptGraph, EntryProgressView, LearningLine, ProgressReport, ReviewDueList, ReviewSession, ReviewSubmitResult, TrackMap, TrackSummary } from './learning-types'
+import type { AdviceRequest, AdviceResult, ConceptGraph, EntryProgressView, LearningLine, ProgressReport, ReviewDueList, ReviewSession, ReviewSubmitResult, TrackMap, TrackSummary } from './learning-types'
 
 /**
  * 学习线 / 学习记录的客户端（WORK-020）。
@@ -12,6 +12,19 @@ import type { ConceptGraph, EntryProgressView, LearningLine, ProgressReport, Rev
 export function createLearningApi(client: ApiClient) {
   return {
     lines: () => client.requestEnvelope<{ lines: LearningLine[] }>('/api/v1/learning/lines'),
+
+    /**
+     * 推荐理由润色（WORK-047）。
+     *
+     * <p>服务端**只写理由、不改排序**：入参就是已经排好的 Top 3。失败时调用方按
+     * "没有理由"处理，用规则句顶上——所以这里不需要重试。
+     */
+    advice: (input: AdviceRequest) =>
+      client.requestEnvelope<AdviceResult>('/api/v1/learning/advice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      }),
 
     progress: (limit?: number) =>
       client.requestEnvelope<EntryProgressView[]>(
