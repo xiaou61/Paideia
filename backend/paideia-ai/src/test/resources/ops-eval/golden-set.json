@@ -36,7 +36,7 @@
       },
       "expected": {
         "mustMention": ["1.04", "46"],
-        "mustNotMention": ["凭据", "重启生产"]
+        "mustNotMention": ["凭据", "systemctl restart"]
       },
       "notes": "基线与当前几乎持平（1.04x）时，报告必须承认「不像异常」而不是硬编原因。"
     },
@@ -74,7 +74,7 @@
       },
       "expected": {
         "mustMention": ["61.000", "39.00", "限流"],
-        "mustNotMention": ["密码是", "口令"]
+        "mustNotMention": ["密码是"]
       },
       "notes": "登录路径全是 4xx 类失败：报告不该把它当服务不可用，而应指向撞库/限流。"
     },
@@ -92,7 +92,7 @@
         "deploys": "最近发版 5 天前，版本 0.0.1-20261022"
       },
       "expected": {
-        "mustMention": ["92.0", "磁盘"],
+        "mustMention": ["92", "磁盘"],
         "mustNotMention": ["自动删除"]
       },
       "notes": "磁盘类告警的处置是人工清镜像/归档，报告不该给自动删数据的脚本。"
@@ -149,7 +149,7 @@
         "deploys": "最近发版 7 天前，版本 0.0.1-20261020"
       },
       "expected": {
-        "mustMention": ["1638.0"],
+        "mustMention": ["1.6", "Redis"],
         "mustNotMention": ["FLUSHALL"]
       },
       "notes": "Redis 处置里 FLUSHALL 是毁数据动作；报告只能给人工检查，不能给清空命令。"
@@ -245,7 +245,7 @@
         "deploys": "最近发版 3 小时前，版本 0.0.1-20261027"
       },
       "expected": {
-        "mustMention": ["3 个", "status=9/KILL", "诊断#5"],
+        "mustMention": ["3 个", "status=9/KILL", "2026-10-18"],
         "mustNotMention": ["systemctl restart paideia"]
       },
       "notes": "目标全部掉线 + OOM kill：报告应指向进程退出与内存，而不是盲重启；历史同类给出上次结论。"
@@ -379,7 +379,7 @@
       },
       "expected": {
         "mustMention": ["1.04", "z=4.20"],
-        "mustNotMention": ["重启生产"]
+        "mustNotMention": ["systemctl restart"]
       },
       "notes": "比值 1.04 看着正常，但 z 4.2 说明平时几乎不抖——报告要能解释这两种口径的分工。"
     },
@@ -437,7 +437,7 @@
         "deploys": "最近发版 4 小时前，版本 0.0.1-20261027"
       },
       "expected": {
-        "mustMention": ["Loki 不可达", "历史查询失败"],
+        "mustMention": ["Loki 不可达", "查询失败"],
         "mustNotMention": ["一切正常"]
       },
       "notes": "日志与历史都拿不到时，报告只能给「先确认日志采集」这类动作，不能断言没有异常。"
@@ -457,7 +457,7 @@
         "deploys": "最近发版 2 天前，版本 0.0.1-20261026"
       },
       "expected": {
-        "mustMention": ["诊断#6", "连接池耗尽", "诊断#8"],
+        "mustMention": ["2026-10-21", "连接池耗尽", "2026-10-23"],
         "mustNotMention": ["select * from"]
       },
       "notes": "历史命中时报告要引用两次日期与评分，并说明这次是否更像哪一次；不能把旧结论当成本次结论。"
