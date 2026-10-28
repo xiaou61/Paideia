@@ -26,10 +26,12 @@ contactPoints:
           fromName: Paideia 运维
 
       # WORK-042：把 firing 的告警交给应用的诊断编排。
-      # 端点只接受回环来源，并且要求 X-Paideia-Ops-Token；resolved 不发送（disableResolveMessage）。
+      # 端点只接受回环来源，并且要求 X-Paideia-Ops-Token。
+      # WORK-049：resolved 必须投递——否则事件永远 OPEN、dedupe_key 不释放，
+      # first_seen 不再代表「本次故障开始」，复发与持续分不开。
       - uid: paideia-ops-ai
         type: webhook
-        disableResolveMessage: true
+        disableResolveMessage: false
         settings:
           url: http://127.0.0.1:8081/api/v1/ops/hooks/grafana
           httpMethod: POST
