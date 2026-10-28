@@ -47,7 +47,10 @@ public interface EntryMapper {
                 <otherwise>AND (title LIKE #{likePattern} OR body LIKE #{likePattern})</otherwise>
               </choose>
             </if>
-            ORDER BY published_at DESC, id DESC
+            <choose>
+              <when test="byChapter">ORDER BY sort_order ASC, published_at ASC, id ASC</when>
+              <otherwise>ORDER BY published_at DESC, id DESC</otherwise>
+            </choose>
             LIMIT #{limit} OFFSET #{offset}
             </script>
             """)
@@ -55,6 +58,7 @@ public interface EntryMapper {
                               @Param("keyword") String keyword,
                               @Param("fulltext") boolean fulltext,
                               @Param("likePattern") String likePattern,
+                              @Param("byChapter") boolean byChapter,
                               @Param("limit") int limit,
                               @Param("offset") long offset);
 

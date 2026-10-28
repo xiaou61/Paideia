@@ -103,6 +103,40 @@ class KnowledgeReadIntegrationTest {
     }
 
     @Test
+    void lineCategoryListsChaptersInCourseOrder() throws Exception {
+        // 学习线在分类页也要按关卡顺序：章节 1 反而发布得更早，按发布时间倒序会把它排到后面。
+        jdbcTemplate.update("""
+                INSERT INTO knowledge_categories (name, slug, sort_order, line_kind, created_at, updated_at)
+                VALUES ('测试学习线', 'test-line-order', 999, 'reading', ?, ?)
+                """, "2026-01-01 00:00:00.000", "2026-01-01 00:00:00.000");
+        long lineId = jdbcTemplate.queryForObject(
+                "SELECT id FROM knowledge_categories WHERE slug = 'test-line-order'", Long.class);
+        try {
+            jdbcTemplate.update("""
+                    INSERT INTO knowledge_entries
+                        (category_id, sort_order, title, body, status, published_at, created_at, updated_at)
+                    VALUES (?, 1, '章节一', 'a', 'published', ?, ?, ?)
+                    """, lineId, "2026-01-05 00:00:00.000",
+                    "2026-01-01 00:00:00.000", "2026-01-01 00:00:00.000");
+            jdbcTemplate.update("""
+                    INSERT INTO knowledge_entries
+                        (category_id, sort_order, title, body, status, published_at, created_at, updated_at)
+                    VALUES (?, 2, '章节二', 'b', 'published', ?, ?, ?)
+                    """, lineId, "2026-01-06 00:00:00.000",
+                    "2026-01-01 00:00:00.000", "2026-01-01 00:00:00.000");
+
+            mockMvc.perform(get("/api/v1/knowledge/entries?categoryId=" + lineId + "&size=50")
+                            .header("Authorization", learner()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.items[0].title").value("章节一"))
+                    .andExpect(jsonPath("$.data.items[1].title").value("章节二"));
+        } finally {
+            jdbcTemplate.update("DELETE FROM knowledge_entries WHERE category_id = ?", lineId);
+            jdbcTemplate.update("DELETE FROM knowledge_categories WHERE id = ?", lineId);
+        }
+    }
+
+    @Test
     void unknownCategoryYieldsEmptyPageInsteadOfError() throws Exception {
         mockMvc.perform(get("/api/v1/knowledge/entries?categoryId=999999").header("Authorization", learner()))
                 .andExpect(status().isOk())

@@ -100,14 +100,18 @@ public class EntryService {
         boolean fulltext = SearchQuery.usesFulltext(keyword);
         String likePattern = keyword == null ? null : SearchQuery.likePattern(keyword);
 
+        Map<Long, Category> categoriesById = categoriesById();
+        // 学习线按关卡顺序排，其它分类仍按发布时间倒序：分类页与 /learn 是同一批条目的两个入口，
+        // 把"总览"排到最后会与关卡走法正好相反。
+        Category scoped = categoryId == null ? null : categoriesById.get(categoryId);
+        boolean byChapter = scoped != null && scoped.getLineKind() != null && !scoped.getLineKind().isBlank();
+
         long total = entryMapper.countPublished(categoryIds, keyword, fulltext, likePattern);
         if (total == 0L) {
             return PageResult.of(0L, page, List.of());
         }
         List<Entry> rows = entryMapper.pagePublished(
-                categoryIds, keyword, fulltext, likePattern, page.limit(), page.offset());
-
-        Map<Long, Category> categoriesById = categoriesById();
+                categoryIds, keyword, fulltext, likePattern, byChapter, page.limit(), page.offset());
         List<EntrySummary> items = rows.stream()
                 .map(row -> new EntrySummary(
                         row.getId(),
