@@ -2,7 +2,7 @@
 artifact: requirements
 work_id: WORK-049
 work: AIOps 缺口修复：事件闭环、历史复用、告警关联与评测可信度
-status: draft
+status: approved
 mode: strict
 mode_reason: 跨 paideia-app（事件/诊断/证据/控制器）、paideia-ai（提示词版本与金集）、管理端前端、Grafana provisioning 与部署脚本、生产演练；涉及事件生命周期语义、诊断成本、证据预算与运维权限
 workflow: full
@@ -10,6 +10,9 @@ depends_on: []
 related_to: [WORK-043, WORK-042, WORK-028, WORK-036]
 created: 2026-10-28
 updated: 2026-10-28
+approved_by: xiaou61
+approved_at: 2026-10-28 13:55:09 +0800
+approver_role: CTO
 ---
 
 # AIOps 缺口修复需求

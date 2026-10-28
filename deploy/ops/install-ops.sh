@@ -28,6 +28,23 @@ TEMPO_VERSION=3.1.1
 
 say() { printf '\n=== %s ===\n' "$1"; }
 
+# 阈值单一来源（WORK-049）：同一份值渲染进 Grafana 规则，也注入应用环境变量。
+THRESHOLDS_FILE="$HERE/ops-thresholds.conf"
+[ -f "$THRESHOLDS_FILE" ] || { echo "✗ 缺少 $THRESHOLDS_FILE"; exit 1; }
+# shellcheck disable=SC1090
+. "$THRESHOLDS_FILE"
+awk -v v="${DISK_USED_ERROR:-}" 'BEGIN{exit !(v>0 && v<1)}' \
+    || { echo "✗ DISK_USED_ERROR 必须在 0 与 1 之间"; exit 1; }
+awk -v v="${UNIT_MEMORY_ERROR:-}" 'BEGIN{exit !(v>0 && v<1)}' \
+    || { echo "✗ UNIT_MEMORY_ERROR 必须在 0 与 1 之间"; exit 1; }
+case "${BACKUP_STALE_HOURS:-}" in
+    ''|*[!0-9]*) echo "✗ BACKUP_STALE_HOURS 必须是正整数"; exit 1 ;;
+esac
+DISK_FREE_RATIO=$(awk -v v="$DISK_USED_ERROR" 'BEGIN{printf "%.2f", 1-v}')
+DISK_FREE_PERCENT=$(awk -v v="$DISK_USED_ERROR" 'BEGIN{printf "%.0f", (1-v)*100}')
+UNIT_MEMORY_RATIO=$(awk -v v="$UNIT_MEMORY_ERROR" 'BEGIN{printf "%.2f", v}')
+UNIT_MEMORY_PERCENT=$(awk -v v="$UNIT_MEMORY_ERROR" 'BEGIN{printf "%.0f", v*100}')
+
 say "目录与服务账号"
 mkdir -p "$OPS_DIR" "$BACKUP_DIR" /etc/paideia-backup "$TEXTFILE_DIR" /etc/prometheus /etc/blackbox
 mkdir -p /etc/grafana/provisioning/datasources /etc/grafana/provisioning/dashboards /etc/grafana/provisioning/alerting
@@ -71,6 +88,20 @@ install -m 0644 "$HERE/grafana.ini"       /etc/grafana/grafana.ini
 cp -r "$HERE/provisioning/." /etc/grafana/provisioning/
 chown -R grafana:grafana /etc/grafana/provisioning 2>/dev/null || true
 
+# 阈值渲染（WORK-049）：规则文件是模板，安装时替换；残留占位符就退出，
+# 否则 Grafana 会加载一条表达式里带 `__X__` 的规则——它不报错，只是永远不触发。
+sed -i \
+    -e "s/__DISK_FREE_RATIO__/${DISK_FREE_RATIO}/g" \
+    -e "s/__DISK_FREE_PERCENT__/${DISK_FREE_PERCENT}/g" \
+    -e "s/__UNIT_MEMORY_RATIO__/${UNIT_MEMORY_RATIO}/g" \
+    -e "s/__UNIT_MEMORY_PERCENT__/${UNIT_MEMORY_PERCENT}/g" \
+    -e "s/__BACKUP_STALE_HOURS__/${BACKUP_STALE_HOURS}/g" \
+    /etc/grafana/provisioning/alerting/paideia-rules.yaml
+if grep -qE '__[A-Z][A-Z0-9_]*__' /etc/grafana/provisioning/alerting/paideia-rules.yaml; then
+    echo "✗ paideia-rules.yaml 仍有未渲染的阈值占位符"
+    exit 1
+fi
+
 # webhook 令牌（WORK-042）：仓库只有占位符，真实值只存在于服务器 600 文件里。
 # 生成一次后不再变；重装不会把已发出的令牌换掉。
 OPS_HOOK_TOKEN_FILE=/etc/paideia-ops/hook.token
@@ -94,6 +125,9 @@ cat > "$OPS_CONF" <<CONFEOF
 [Service]
 Environment="PAIDEIA_OPS_HOOK_TOKEN=${OPS_HOOK_TOKEN}"
 Environment="PAIDEIA_OPS_DIAGNOSIS_USER_ID=${DIAGNOSIS_USER_ID}"
+Environment="PAIDEIA_OPS_THRESHOLDS_DISKUSEDERROR=${DISK_USED_ERROR}"
+Environment="PAIDEIA_OPS_THRESHOLDS_UNITMEMORYERROR=${UNIT_MEMORY_ERROR}"
+Environment="PAIDEIA_OPS_THRESHOLDS_BACKUPSTALEHOURS=${BACKUP_STALE_HOURS}"
 CONFEOF
 
 say "凭据文件（已存在则保留）"

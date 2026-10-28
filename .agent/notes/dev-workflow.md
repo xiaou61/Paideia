@@ -728,3 +728,12 @@ cd /tmp && curl -O https://arthas.aliyun.com/arthas-boot.jar && /opt/jdk25/bin/j
 - **诊断链路**：确定性采集（摘要 + 固定指标 + firing 告警 + 脱敏日志 + 发版时间）→ 一次 DeepSeek 调用；报告落 `ops_diagnoses`，流水种类 `OPS_DIAGNOSIS`。手动触发记触发者 id；告警触发用 systemd drop-in 里的 `PAIDEIA_OPS_DIAGNOSIS_USER_ID`。webhook 只接受回环 + `X-Paideia-Ops-Token`（令牌在 `/etc/paideia-ops/hook.token`，600）。
 - **实测成本**：一次诊断约 1000 input / 3000 output tokens，扣 11–13 积分，耗时约 25 秒；10 分钟冷却 + 单飞挡住告警风暴。
 - **发布**：装/改监控走 `install-ops.sh`（服务器必须带代理；本次 GitHub 经 7890 的 TLS 失败，二进制从本机下载后 scp 过去）；它只重启监控单元，`release.ps1` 只重启 `paideia`。本次两次发版 122.8 / 68.5 秒。
+
+## AIOps 缺口修复（WORK-049，2026-10-28）
+
+- **事件自动关闭终于生效**：`contact-points.yaml` 的 webhook 收件人原先 `disableResolveMessage: true`，Grafana 根本不发 resolved，事件永远 OPEN、`dedupe_key` 不释放。改为 false 后必须重跑 `install-ops.sh` 并重启 Grafana（provisioning 不热加载）。
+- **金集 live 模式**：`PAIDEIA_OPS_EVAL=1 DEEPSEEK_API_KEY=... mvn -B -pl paideia-ai -am -Dtest=OpsDiagnosisGoldenSetTest test`，报告写到 `paideia-ai/target/ops-eval-report.md`。24 条、每条一次调用；**不进 CI**，只在改提示词或证据结构后手动跑。
+- **同实例复用只认明确带 `instance` 标签的事件**：应用级告警（5xx/AI）不带 instance，不做跨事件复用——否则一次无关诊断会压掉后面所有告警。这是 2026-10-28 实测（共享测试库时 hook 用例大面积被 `cooldown-or-busy` 跳过）之后收紧的。
+- **阈值单一来源**：`deploy/ops/ops-thresholds.conf` → `install-ops.sh` 渲染 Grafana 占位符 + 写 systemd drop-in。仓库检查 `node scripts/check-ops-thresholds.mjs`。改完要重启 `paideia` 与 `grafana-server`，否则两侧不一致。
+- **证据 `<context>`**：历史同类（同指纹 3 条，不足补同告警名 2 条）与同期 OPEN 事件（5 条），≤2000 字符；提示词升到 `ops-diagnosis-v4`。历史只带结论首行与评分，不带全文。
+- **测试库共享的坑**：mapper 用例不要断言「全表最新一条」——别的用例会插 `now+180s` 的事件。用 2100+ 的未来时间戳并显式给上界（`beforeLastSeen`）隔离。

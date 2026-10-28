@@ -128,8 +128,8 @@ class OpsHookIntegrationTest {
     }
 
     @Test
-    @DisplayName("resolved 事件不建行")
-    void resolvedIsIgnored() throws Exception {
+    @DisplayName("没有 OPEN 事件时 resolved 不建行")
+    void resolvedWithoutOpenIsIgnored() throws Exception {
         mockMvc.perform(loopback(post("/api/v1/ops/hooks/grafana"))
                         .header("X-Paideia-Ops-Token", "test-token")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -233,6 +233,38 @@ class OpsHookIntegrationTest {
         assertThat(matching).filteredOn(row -> OpsIncident.STATUS_OPEN.equals(row.getStatus()))
                 .hasSize(1);
         assertThat(matching).filteredOn(row -> OpsIncident.STATUS_RESOLVED.equals(row.getStatus()))
+                .hasSize(1);
+    }
+
+    @Test
+    @DisplayName("重复 resolved 只追加一条恢复时间线")
+    void resolvedTwiceAppendsOneEvent() throws Exception {
+        String alert = "alert-" + UUID.randomUUID();
+        String resolved = """
+                {"status":"resolved","alerts":[{"status":"resolved",
+                 "labels":{"alertname":"%s","severity":"warning"}}]}
+                """.formatted(alert);
+
+        String first = mockMvc.perform(loopback(post("/api/v1/ops/hooks/grafana"))
+                        .header("X-Paideia-Ops-Token", "test-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(PAYLOAD.formatted(alert)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        awaitFinished(json.readTree(first).path("data").path("id").asLong());
+
+        for (int i = 0; i < 2; i++) {
+            mockMvc.perform(loopback(post("/api/v1/ops/hooks/grafana"))
+                            .header("X-Paideia-Ops-Token", "test-token")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(resolved))
+                    .andExpect(status().isOk());
+        }
+
+        OpsIncident incident = incidentsFor(alert).getFirst();
+        assertThat(incident.getStatus()).isEqualTo(OpsIncident.STATUS_RESOLVED);
+        assertThat(incidentMapper.listEvents(incident.getId(), 50))
+                .filteredOn(event -> OpsIncidentEvent.KIND_RESOLVED.equals(event.getKind()))
                 .hasSize(1);
     }
 

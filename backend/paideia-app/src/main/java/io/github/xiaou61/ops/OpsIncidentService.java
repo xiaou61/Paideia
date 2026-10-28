@@ -136,6 +136,47 @@ class OpsIncidentService {
         return last == null || !last.plusSeconds(cooldownSeconds).isAfter(now);
     }
 
+    /**
+     * 同实例复用窗口（WORK-049）：近 {@code windowSeconds} 内已有 DONE 诊断时返回其 id。
+     *
+     * <p>instance 取事件 `labels_json` 里的值；**没有 instance 标签就不做跨事件复用**——
+     * 应用级告警（5xx、AI）本来就不带实例，按「全局」匹配会让一次无关诊断压掉后面所有告警，
+     * 而那条被跳过的告警不一定真的相关。宁可多花一次，不可少诊断一次。
+     */
+    Optional<Long> recentDoneDiagnosisForInstance(long incidentId, Instant now, long windowSeconds) {
+        OpsIncident current = incidents.findById(incidentId).orElse(null);
+        if (current == null) {
+            return Optional.empty();
+        }
+        String instance = instanceOf(current.getLabelsJson());
+        if (instance.isEmpty()) {
+            return Optional.empty();
+        }
+        for (OpsDiagnosisMapper.RecentDone row
+                : diagnoses.recentDoneSince(now.minusSeconds(windowSeconds), 20)) {
+            if (row.incidentId() != null && instance.equals(instanceOf(row.labelsJson()))) {
+                return Optional.of(row.diagnosisId());
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** 重启补诊断的候选（WORK-049）；过滤条件全在 SQL 里。 */
+    Optional<OpsIncident> catchUpCandidate(Instant since, Instant diagnosedBefore) {
+        return incidents.findCatchUpCandidate(since, diagnosedBefore);
+    }
+
+    private static String instanceOf(String labelsJson) {
+        if (labelsJson == null || labelsJson.isBlank()) {
+            return "";
+        }
+        try {
+            return JSON.readTree(labelsJson).path("instance").asText("");
+        } catch (JsonProcessingException e) {
+            return "";
+        }
+    }
+
     /** 在诊断行插入成功后调用；单飞保证不会有并发 claim。 */
     void markDiagnosed(long incidentId, Instant now) {
         incidents.markDiagnosed(incidentId, now);
@@ -174,7 +215,7 @@ class OpsIncidentService {
         return incidents.findById(id);
     }
 
-    List<View> list(String status, int limit) {
+    List<View> list(String status, int limit, Integer sinceHours, Instant beforeLastSeen, Long beforeId) {
         String normalized = status == null || status.isBlank()
                 ? null : status.strip().toUpperCase(java.util.Locale.ROOT);
         if (normalized != null
@@ -182,8 +223,19 @@ class OpsIncidentService {
                 && !OpsIncident.STATUS_RESOLVED.equals(normalized)) {
             throw new BizException(ErrorCode.INVALID_ARGUMENT, "status 只能是 OPEN 或 RESOLVED");
         }
+        if ((beforeLastSeen == null) != (beforeId == null)) {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT, "beforeLastSeen 与 beforeId 必须同时提供");
+        }
+        Instant since = null;
+        if (sinceHours != null) {
+            if (sinceHours <= 0) {
+                throw new BizException(ErrorCode.INVALID_ARGUMENT, "sinceHours 必须是正整数");
+            }
+            since = Instant.now().minus(java.time.Duration.ofHours(sinceHours));
+        }
         int capped = Math.max(1, Math.min(100, limit));
-        return incidents.listRecent(normalized, capped).stream().map(View::of).toList();
+        return incidents.listPage(normalized, since, beforeLastSeen, beforeId, capped)
+                .stream().map(View::of).toList();
     }
 
     Detail detail(long id) {
@@ -201,6 +253,22 @@ class OpsIncidentService {
         incidents.findById(id)
                 .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "事件不存在"));
         appendEvent(id, OpsIncidentEvent.KIND_NOTE, message, actorUserId);
+        return detail(id);
+    }
+
+    /**
+     * 手动关闭（WORK-049）。重复调用不追加第二条时间线：条件 UPDATE 只成功一次，
+     * 没更新的那次直接返回当前详情。
+     */
+    Detail close(long id, long actorUserId) {
+        OpsIncident incident = incidents.findById(id)
+                .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "事件不存在"));
+        if (!OpsIncident.STATUS_OPEN.equals(incident.getStatus())) {
+            return detail(id);
+        }
+        if (incidents.resolveById(id, Instant.now()) == 1) {
+            appendEvent(id, OpsIncidentEvent.KIND_CLOSED, "人工关闭", actorUserId);
+        }
         return detail(id);
     }
 

@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -37,6 +38,7 @@ class OpsDiagnosisServiceTest {
     private OpsEvidenceCollector evidence;
     private OpsDiagnoser diagnoser;
     private OpsIncidentService incidents;
+    private OpsIncidentContext contexts;
     private OpsProperties properties;
     private AtomicReference<Runnable> pending;
     private TaskExecutor executor;
@@ -48,19 +50,22 @@ class OpsDiagnosisServiceTest {
         evidence = mock(OpsEvidenceCollector.class);
         diagnoser = mock(OpsDiagnoser.class);
         incidents = mock(OpsIncidentService.class);
+        contexts = mock(OpsIncidentContext.class);
         properties = new OpsProperties();
         properties.getDiagnosis().setCooldownSeconds(600);
         pending = new AtomicReference<>();
         executor = pending::set;
-        service = new OpsDiagnosisService(mapper, evidence, diagnoser, incidents, properties, executor);
+        service = new OpsDiagnosisService(mapper, evidence, diagnoser, incidents, contexts,
+                properties, executor);
+        when(contexts.build(any(), any(), any())).thenReturn("无历史同类事件\n无同期事件\n");
 
         org.mockito.Mockito.doAnswer(invocation -> {
             OpsDiagnosisRow row = invocation.getArgument(0);
             row.setId(99L);
             return 1;
         }).when(mapper).insert(any());
-        when(evidence.collect(anyString(), any(), any())).thenReturn(new OpsDiagnoser.Evidence(
-                "manual", null, null, "summary", "metrics", "baselines",
+        when(evidence.collect(anyString(), any(), any(), any())).thenReturn(new OpsDiagnoser.Evidence(
+                "manual", null, null, "summary", "metrics", "baselines", "ctx",
                 "alerts", "logs", null, "deploys"));
         when(diagnoser.diagnose(anyLong(), any())).thenReturn(new OpsDiagnoser.Diagnosis(
                 "report", new TokenUsage(1, 2, 3), "deepseek-flash"));
@@ -143,5 +148,56 @@ class OpsDiagnosisServiceTest {
         service.cleanupStale();
 
         verify(mapper).markStale(any(Instant.class), anyString(), any(Instant.class));
+    }
+
+    @Test
+    @DisplayName("同实例窗口内有 DONE 诊断时复用，不新开")
+    void reuseWithinWindowSkips() {
+        when(incidents.canDiagnose(eq(5L), any(), anyLong())).thenReturn(true);
+        when(incidents.recentDoneDiagnosisForInstance(eq(5L), any(), eq(600L)))
+                .thenReturn(java.util.Optional.of(42L));
+
+        assertThat(service.start("alert", 5L, "http-5xx", null, USER)).isEqualTo(-1L);
+
+        verify(mapper, never()).insert(any());
+        verify(incidents).appendEvent(eq(5L), eq(OpsIncidentEvent.KIND_NOTE),
+                org.mockito.ArgumentMatchers.contains("复用诊断 #42"), isNull());
+    }
+
+    @Test
+    @DisplayName("关联窗口配 0 时不做复用检查")
+    void reuseDisabledWhenZero() {
+        properties.getDiagnosis().setRelatedWindowSeconds(0);
+        when(incidents.canDiagnose(eq(5L), any(), anyLong())).thenReturn(true);
+
+        assertThat(service.start("alert", 5L, "http-5xx", null, USER)).isEqualTo(99L);
+
+        verify(incidents, never()).recentDoneDiagnosisForInstance(anyLong(), any(), anyLong());
+        verify(mapper).insert(any());
+    }
+
+    @Test
+    @DisplayName("重启后对无 DONE 的 OPEN 事件补一次诊断")
+    void catchUpPicksOpenWithoutDone() {
+        properties.getDiagnosis().setUserId(1);
+        OpsIncident incident = new OpsIncident();
+        incident.setId(5L);
+        incident.setAlertName("disk-low");
+        when(incidents.catchUpCandidate(any(), any())).thenReturn(java.util.Optional.of(incident));
+        when(incidents.canDiagnose(eq(5L), any(), anyLong())).thenReturn(true);
+
+        service.cleanupStale();
+
+        verify(incidents).appendEvent(eq(5L), eq(OpsIncidentEvent.KIND_NOTE), eq("重启补诊断"), isNull());
+        verify(mapper).insert(any());
+    }
+
+    @Test
+    @DisplayName("诊断账号未配置时不补诊断")
+    void catchUpSkipsWhenUserMissing() {
+        service.cleanupStale();
+
+        verify(incidents, never()).catchUpCandidate(any(), any());
+        verify(mapper, never()).insert(any());
     }
 }

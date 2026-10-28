@@ -6,6 +6,12 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Empty,
   EmptyDescription,
   EmptyHeader,
@@ -14,7 +20,7 @@ import {
   PageHeader,
   Spinner,
 } from '@paideia/ui'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { api } from '../api'
@@ -68,26 +74,62 @@ const STATUS: Record<Incident['status'], { label: string; variant: 'warning' | '
 const KIND_LABEL: Record<string, string> = {
   FIRED: '告警触发',
   RESOLVED: '告警恢复',
+  CLOSED: '人工关闭',
   DIAGNOSIS_STARTED: '开始诊断',
   DIAGNOSIS_DONE: '诊断完成',
   DIAGNOSIS_FAILED: '诊断失败',
   NOTE: '备注',
 }
 
+const SINCE: { label: string; hours: number | null }[] = [
+  { label: '全部', hours: null },
+  { label: '24 小时', hours: 24 },
+  { label: '7 天', hours: 168 },
+]
+
+const PAGE_SIZE = 50
+
+/**
+ * 事件页（WORK-043；WORK-049 加分页/关闭/深链）。
+ *
+ * <p>分页用 keyset：游标是最后一行的 `lastSeen + id`，因为事件表只增不减，
+ * OFFSET 会随历史线性变慢。每页 50 条，取满才认为可能还有下一页。
+ */
 export function IncidentsPage() {
   const [status, setStatus] = useState<'OPEN' | 'ALL'>('ALL')
+  const [sinceHours, setSinceHours] = useState<number | null>(null)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [note, setNote] = useState('')
+  const [confirmClose, setConfirmClose] = useState(false)
   const queryClient = useQueryClient()
 
-  const incidents = useQuery({
-    queryKey: ['admin-ops-incidents', status],
-    queryFn: () =>
-      api.requestEnvelope<Incident[]>(
-        `/api/v1/ops/admin/incidents?limit=50${status === 'OPEN' ? '&status=OPEN' : ''}`,
-      ),
+  const incidents = useInfiniteQuery({
+    queryKey: ['admin-ops-incidents', status, sinceHours],
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE) })
+      if (status === 'OPEN') {
+        params.set('status', 'OPEN')
+      }
+      if (sinceHours !== null) {
+        params.set('sinceHours', String(sinceHours))
+      }
+      if (pageParam) {
+        params.set('beforeLastSeen', pageParam.lastSeen)
+        params.set('beforeId', String(pageParam.id))
+      }
+      return api.requestEnvelope<Incident[]>(`/api/v1/ops/admin/incidents?${params.toString()}`)
+    },
+    initialPageParam: null as { lastSeen: string; id: number } | null,
+    getNextPageParam: (lastPage) => {
+      if (lastPage.length < PAGE_SIZE) {
+        return undefined
+      }
+      const last = lastPage.at(-1)
+      return last ? { lastSeen: last.lastSeen, id: last.id } : undefined
+    },
     refetchInterval: 15_000,
   })
+  const rows = incidents.data?.pages.flat() ?? []
 
   const detail = useQuery({
     queryKey: ['admin-ops-incident', selectedId],
@@ -110,13 +152,25 @@ export function IncidentsPage() {
     },
   })
 
+  const closeIncident = useMutation({
+    mutationFn: () =>
+      api.requestEnvelope<IncidentDetail>(`/api/v1/ops/admin/incidents/${selectedId}/close`, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      setConfirmClose(false)
+      void queryClient.invalidateQueries({ queryKey: ['admin-ops-incident', selectedId] })
+      void queryClient.invalidateQueries({ queryKey: ['admin-ops-incidents'] })
+    },
+  })
+
   return (
     <>
       <PageHeader
         title="事件"
         description="同一告警的重复通知归到一个事件；时间线只追加。"
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               variant={status === 'ALL' ? 'default' : 'outline'}
               size="sm"
@@ -131,6 +185,16 @@ export function IncidentsPage() {
             >
               进行中
             </Button>
+            {SINCE.map((option) => (
+              <Button
+                key={option.label}
+                variant={sinceHours === option.hours ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSinceHours(option.hours)}
+              >
+                {option.label}
+              </Button>
+            ))}
           </div>
         }
       />
@@ -143,7 +207,7 @@ export function IncidentsPage() {
         <p className="text-muted-foreground text-sm">
           事件读取失败：{errorMessage(incidents.error)}
         </p>
-      ) : incidents.data.length === 0 ? (
+      ) : rows.length === 0 ? (
         <Empty data-testid="incidents-empty">
           <EmptyHeader>
             <EmptyTitle>没有事件</EmptyTitle>
@@ -155,7 +219,7 @@ export function IncidentsPage() {
       ) : (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
           <div className="space-y-2" data-testid="incidents-list">
-            {incidents.data.map((incident) => (
+            {rows.map((incident) => (
               <button
                 key={incident.id}
                 type="button"
@@ -180,6 +244,16 @@ export function IncidentsPage() {
                 </p>
               </button>
             ))}
+            {incidents.hasNextPage ? (
+              <Button
+                variant="outline"
+                className="w-full"
+                disabled={incidents.isFetchingNextPage}
+                onClick={() => void incidents.fetchNextPage()}
+              >
+                {incidents.isFetchingNextPage ? '加载中…' : '加载更多'}
+              </Button>
+            ) : null}
           </div>
 
           <Card data-testid="incident-detail">
@@ -222,6 +296,27 @@ export function IncidentsPage() {
                       <dd>{formatTime(detail.data.incident.lastSeen)}</dd>
                     </div>
                   </dl>
+
+                  <div className="mb-4 flex flex-wrap gap-4 text-sm">
+                    <a
+                      className="text-primary underline underline-offset-4"
+                      href={grafanaLinks(detail.data.incident).panel}
+                      target="_blank"
+                      rel="noreferrer"
+                      data-testid="incident-grafana-panel"
+                    >
+                      在 Grafana 打开该时间窗
+                    </a>
+                    <a
+                      className="text-primary underline underline-offset-4"
+                      href={grafanaLinks(detail.data.incident).logs}
+                      target="_blank"
+                      rel="noreferrer"
+                      data-testid="incident-grafana-logs"
+                    >
+                      查该时段错误日志
+                    </a>
+                  </div>
 
                   <h3 className="mb-2 text-sm font-medium">时间线</h3>
                   <ol className="border-border mb-4 space-y-2 border-l pl-3" data-testid="incident-timeline">
@@ -269,12 +364,51 @@ export function IncidentsPage() {
                     >
                       {addNote.isPending ? '提交中…' : '添加备注'}
                     </Button>
+                    {detail.data.incident.status === 'OPEN' ? (
+                      <Button
+                        variant="outline"
+                        onClick={() => setConfirmClose(true)}
+                        disabled={closeIncident.isPending}
+                        data-testid="incident-close"
+                      >
+                        关闭事件
+                      </Button>
+                    ) : null}
                   </div>
                   {addNote.isError ? (
                     <p className="text-destructive mt-2 text-sm">
                       备注失败：{errorMessage(addNote.error)}
                     </p>
                   ) : null}
+                  {closeIncident.isError ? (
+                    <p className="text-destructive mt-2 text-sm">
+                      关闭失败：{errorMessage(closeIncident.error)}
+                    </p>
+                  ) : null}
+
+                  <Dialog open={confirmClose} onOpenChange={() => setConfirmClose(false)}>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>关闭事件</DialogTitle>
+                        <DialogDescription>
+                          关闭「{detail.data.incident.alertName}」后，同一告警再触发会新建一个事件。
+                          这一步没有撤销。
+                        </DialogDescription>
+                      </DialogHeader>
+                      <DialogFooter>
+                        <Button variant="ghost" onClick={() => setConfirmClose(false)}>
+                          取消
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          disabled={closeIncident.isPending}
+                          onClick={() => closeIncident.mutate()}
+                        >
+                          {closeIncident.isPending ? '关闭中…' : '确认关闭'}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </>
               ) : null}
             </CardContent>
@@ -283,6 +417,23 @@ export function IncidentsPage() {
       )}
     </>
   )
+}
+
+/**
+ * 事件时间窗的 Grafana 深链（WORK-049）。走已有反代，不开新端口、不加权限。
+ * 日期非法时回退到「最近一小时」，避免把 NaN 写进 URL。
+ */
+function grafanaLinks(incident: Incident): { panel: string; logs: string } {
+  const base = '/api/v1/ops/grafana/d/paideia-ops/ops'
+  const first = Date.parse(incident.firstSeen)
+  const last = Date.parse(incident.resolvedAt ?? incident.lastSeen)
+  const from = Number.isFinite(first) ? first - 15 * 60_000 : Date.now() - 3_600_000
+  const to = Number.isFinite(last) ? last + 15 * 60_000 : Date.now()
+  return {
+    panel: `${base}?from=${from}&to=${to}`,
+    // 面板 10 是「应用与 Laya 最近错误日志（Loki）」。
+    logs: `${base}?viewPanel=10&from=${from}&to=${to}`,
+  }
 }
 
 function formatTime(value: string): string {

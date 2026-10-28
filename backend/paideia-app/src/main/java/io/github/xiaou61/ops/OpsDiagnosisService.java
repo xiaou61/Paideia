@@ -41,6 +41,7 @@ class OpsDiagnosisService {
     private final OpsEvidenceCollector evidence;
     private final OpsDiagnoser diagnoser;
     private final OpsIncidentService incidents;
+    private final OpsIncidentContext contexts;
     private final OpsProperties properties;
     private final TaskExecutor executor;
     private final AtomicBoolean running = new AtomicBoolean();
@@ -50,12 +51,14 @@ class OpsDiagnosisService {
                         OpsEvidenceCollector evidence,
                         OpsDiagnoser diagnoser,
                         OpsIncidentService incidents,
+                        OpsIncidentContext contexts,
                         OpsProperties properties,
                         @Qualifier("applicationTaskExecutor") TaskExecutor executor) {
         this.mapper = mapper;
         this.evidence = evidence;
         this.diagnoser = diagnoser;
         this.incidents = incidents;
+        this.contexts = contexts;
         this.properties = properties;
         this.executor = executor;
     }
@@ -90,6 +93,20 @@ class OpsDiagnosisService {
                     log.debug("ops.diagnosis.skipped incidentId={} reason=cooldown-or-closed", incidentId);
                     running.set(false);
                     return -1;
+                }
+                // 同实例复用（WORK-049）：告警风暴里不同 alertname 是不同事件，冷却挡不住它们。
+                // 只认 DONE；上一次 FAILED 不拦，否则一次失败会让后续告警全部失声。
+                long window = config.getRelatedWindowSeconds();
+                if (window > 0) {
+                    Optional<Long> reused = incidents.recentDoneDiagnosisForInstance(incidentId, now, window);
+                    if (reused.isPresent()) {
+                        incidents.appendEvent(incidentId, OpsIncidentEvent.KIND_NOTE,
+                                "复用诊断 #" + reused.get() + "（同实例，" + window + " 秒内已有结论）",
+                                null);
+                        log.info("ops.diagnosis.reused incidentId={} diagnosisId={}", incidentId, reused.get());
+                        running.set(false);
+                        return -1;
+                    }
                 }
             } else if (alert) {
                 Instant previous = alertCooldowns.get(alertName);
@@ -199,13 +216,40 @@ class OpsDiagnosisService {
         if (changed > 0) {
             log.warn("ops.diagnosis.stale-cleaned count={}", changed);
         }
+        catchUp(now);
+    }
+
+    /**
+     * 重启补诊断（WORK-049）：应用挂了的那段时间里建立的告警，一次诊断都没有。
+     * 上限刻在 SQL 里（OPEN + 6 小时 + 无 DONE + LIMIT 1），这里只负责触发与记账。
+     */
+    private void catchUp(Instant now) {
+        OpsProperties.Diagnosis config = properties.getDiagnosis();
+        if (!config.isCatchUpEnabled() || config.getUserId() <= 0) {
+            return;
+        }
+        try {
+            Optional<OpsIncident> candidate = incidents.catchUpCandidate(
+                    now.minus(Duration.ofHours(6)), now.minus(Duration.ofMinutes(STALE_AFTER_MINUTES)));
+            if (candidate.isEmpty()) {
+                return;
+            }
+            OpsIncident incident = candidate.get();
+            log.info("ops.diagnosis.catch-up incidentId={}", incident.getId());
+            incidents.appendEvent(incident.getId(), OpsIncidentEvent.KIND_NOTE, "重启补诊断", null);
+            start("restart", incident.getId(), incident.getAlertName(), null, config.getUserId());
+        } catch (RuntimeException failure) {
+            // 补诊断失败不能拖住启动；正常诊断路径仍可用
+            log.warn("ops.diagnosis.catch-up-failed error={}", failure.toString());
+        }
     }
 
     private void run(long id, long userId, String trigger, Long incidentId,
                      String alertName, String question) {
         try {
             mapper.markRunning(id);
-            OpsDiagnoser.Evidence collected = evidence.collect(trigger, alertName, question);
+            String context = contexts.build(incidentId, alertName, Instant.now());
+            OpsDiagnoser.Evidence collected = evidence.collect(trigger, alertName, question, context);
             OpsDiagnoser.Diagnosis diagnosis = diagnoser.diagnose(userId, collected);
             TokenUsage usage = diagnosis.usage();
             mapper.markDone(id, diagnosis.model(),

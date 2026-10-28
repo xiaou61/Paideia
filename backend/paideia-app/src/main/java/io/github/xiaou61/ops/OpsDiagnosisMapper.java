@@ -100,6 +100,25 @@ interface OpsDiagnosisMapper {
     List<OpsDiagnosisRow> listByIncident(@Param("incidentId") long incidentId,
                                          @Param("limit") int limit);
 
+    /**
+     * 同实例复用窗口（WORK-049）：近 N 秒完成的诊断，带事件的标签与告警名。
+     * 用 join 而不是逐条回查——窗口里最多 20 条，N+1 会把一次判断放大成 20 次往返。
+     */
+    @Select("""
+            SELECT d.id AS diagnosis_id, d.incident_id, d.finished_at,
+                   i.labels_json, i.alert_name
+            FROM ops_diagnoses d
+            JOIN ops_incidents i ON i.id = d.incident_id
+            WHERE d.status = 'DONE' AND d.finished_at >= #{since}
+            ORDER BY d.id DESC
+            LIMIT #{limit}
+            """)
+    List<RecentDone> recentDoneSince(@Param("since") Instant since, @Param("limit") int limit);
+
+    record RecentDone(long diagnosisId, Long incidentId, Instant finishedAt,
+                      String labelsJson, String alertName) {
+    }
+
     /** 评分覆盖（WORK-043）：同一人重评只保留最后一次，不追加历史。只对已完成的诊断开放。 */
     @Update("""
             UPDATE ops_diagnoses
