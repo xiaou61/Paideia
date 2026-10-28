@@ -88,7 +88,14 @@ class SqlContainerPool {
         boolean reusable = true;
         try {
             ensureContainer(slot);
-            return Optional.of(execute(slot, request));
+            CodeRun.Result result = execute(slot, request);
+            if (containerGone(result.stderr())) {
+                // 容器没了（被 OOM、被删、daemon 重启过）：这次结果不算数，下一次重建
+                reusable = false;
+                log.warn("sql.pool.container_gone container={}", slot.container);
+                throw new SandboxUnavailableException("池容器已消失");
+            }
+            return Optional.of(result);
         } catch (RuntimeException failure) {
             // 容器可能被跑挂了（mysqld 崩、OOM、执行超时）；回收它，下一个请求重建
             reusable = false;
@@ -102,9 +109,15 @@ class SqlContainerPool {
         }
     }
 
-    /** 没有常驻容器就用 `docker run -d` 起一个，并等到 mysqld 能 ping 通。 */
+    /**
+     * 没有常驻容器就用 `docker run -d` 起一个，并等到 mysqld 能 ping 通。
+     *
+     * <p><b>热路径上不再 ping</b>：`docker exec` 在这台负载不低的机器上偶尔要 3 秒以上，
+     * 一次健康检查超时就会被判成"容器坏了"然后重建——实测一半请求因此回落。
+     * 健康由**真正的执行**来判定：exec 报"容器不存在/没在跑"才重建。
+     */
     private void ensureContainer(Slot slot) {
-        if (slot.container != null && ping(slot.container)) {
+        if (slot.container != null) {
             return;
         }
         destroy(slot);
@@ -137,6 +150,17 @@ class SqlContainerPool {
             throw new SandboxUnavailableException("池容器未就绪：" + name);
         }
         log.info("sql.pool.container_ready name={}", name);
+    }
+
+    /** `docker exec` 在容器不存在时把原因写在 stderr 上；只有这几种才算容器没了。 */
+    private static boolean containerGone(String stderr) {
+        if (stderr == null || stderr.isEmpty()) {
+            return false;
+        }
+        String lower = stderr.toLowerCase(java.util.Locale.ROOT);
+        return lower.contains("no such container")
+                || lower.contains("is not running")
+                || lower.contains("cannot connect to the docker daemon");
     }
 
     private boolean waitReady(String name) {
