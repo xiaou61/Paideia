@@ -670,6 +670,9 @@ importers:
       lucide-react:
         specifier: 1.54.0
         version: 1.54.0(@types/react@19.3.0)(react@19.3.0)
+      roughjs:
+        specifier: 4.6.6
+        version: 4.6.6
       sonner:
         specifier: 2.0.8
         version: 2.0.8(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
