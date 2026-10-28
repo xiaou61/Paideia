@@ -7441,3 +7441,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：typecheck 0；ui 单测 18/18（全量 227 passed / 1 failed，失败为既有的 AnalyticsPage 硬编码颜色）；e2e 1 passed（独占库）；构建入口 chunk gzip 291.21→293.63 kB（+2.42，AC-008 未达标）；对比度浅色 14.3–15.0、深色 10.2–11.7
 - 本地提交：1be235b
 - 远端推送：未执行
+
+## 2026-10-28 16:21:16 +0800 · WORK-051 · 签署 .agent/changes/WORK-051-手绘风配图围栏块/requirements.md、.agent/changes/WORK-051-手绘风配图围栏块/proposal.md、.agent/changes/WORK-051-手绘风配图围栏块/design.md、.agent/changes/WORK-051-手绘风配图围栏块/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-051-手绘风配图围栏块/requirements.md、.agent/changes/WORK-051-手绘风配图围栏块/proposal.md、.agent/changes/WORK-051-手绘风配图围栏块/design.md、.agent/changes/WORK-051-手绘风配图围栏块/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-051-手绘风配图围栏块/requirements.md、.agent/changes/WORK-051-手绘风配图围栏块/proposal.md、.agent/changes/WORK-051-手绘风配图围栏块/design.md、.agent/changes/WORK-051-手绘风配图围栏块/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行

@@ -2,7 +2,7 @@
 artifact: test-report
 work_id: WORK-051
 work: 手绘风配图（sketch 围栏块）
-status: partial
+status: passed
 evidence: required
 verified_commit: 1be235b
 created: 2026-10-28
@@ -32,7 +32,7 @@ updated: 2026-10-28
 | AC-005 坏 JSON 降级 | `pnpm --filter @paideia/ui test sketch` | 0 | passed | `sketch.test.tsx`「数据写坏时降级成原因+原始文本」 |
 | AC-006 流式回答里 sketch 不执行 | `pnpm --filter @paideia/ui test` | 0 | passed | `markdown.test.tsx`「流式回答里的 sketch 围栏只是代码块」 |
 | AC-007 双主题对比度 ≥ 4.5:1 | 令牌值直接计算 WCAG 比值（人工核对脚本） | 人工 | passed | 浅色 14.3–15.0:1、深色 10.2–11.7:1，副标题最差 5.0:1；另见两张截图 |
-| AC-008 入口 chunk 体积与实施前持平 | `pnpm build`（撤下改动跑一次基线 + 实施后再跑一次） | 0 | 未达标 | 基线 956.00 kB / gzip 291.21 kB；实施后 962.49 kB / gzip **293.63 kB（+2.42 kB）** |
+| AC-008 roughjs 与字体不在入口 chunk，增量 ≤ 5 kB | `pnpm build`（撤下改动跑一次基线 + 实施后再跑一次） | 0 | passed | 基线 gzip 291.21 kB → 实施后 293.63 kB（**+2.42 kB**）；字体是独立资源 `Xiaolai-Cs1btv19.woff2`，`roughjs` 在异步 chunk |
 | AC-009 单测覆盖解析/布局/降级 | `pnpm --filter @paideia/ui test sketch` | 0 | passed | 4 个测试文件 18 条全绿 |
 | AC-010 样例条目与 e2e | 同 AC-001 | 0 | passed | devdata `V956__seed_sketch_block.sql`（条目 61），e2e 1 passed |
 
@@ -45,18 +45,18 @@ updated: 2026-10-28
 
 ## 验收结果
 
-9 条通过，**AC-008 未达标**。原因是这条验收标准自己写错了：它要求"入口 chunk 与本项实施前持平"，
-但 sketch 的解析、布局、绘制调度这三部分必须参与入口模块图（注册表是静态的），
-只有 `roughjs`（27.7 kB / gzip 8.7 kB）与字体（297 kB）能拆成异步资源。
-即使把整个组件改成 `React.lazy`，入口仍会多出注册项与加载桩，**无法做到逐字节持平**。
+10 条全部通过，其中 **AC-008 在实施后按实测改写过**（见下）。
 
-实测的机制是成立的：`roughjs` 与 `Xiaolai.woff2` 都没进入口 chunk，
+原 AC-008 要求"入口 chunk 体积与本项实施前持平"，这条指标**不可实现**：sketch 的解析、布局与绘制调度
+必须参与入口模块图（`documentRenderers` 是静态注册表），只有 `roughjs` 与字体能拆成异步资源；
+即便把组件整体改成 `React.lazy`，入口仍会多出注册项与加载桩。
+
+用户 2026-10-28 答复「都可以看你了」，授权按 Agent 建议处理。于是 AC-008 改为可核对的形式：
+**`roughjs` 与手写字体都不在入口 chunk，入口 gzip 增量 ≤ 5 kB**。实测 +2.42 kB，落在限内；
 字体在产物里是独立资源 `Xiaolai-Cs1btv19.woff2`，只在页面上真的出现 sketch 块时才下载。
 
 ## 失败与未验证项
 
-- **AC-008 未达标（+2.42 kB gzip）**：需要用户裁决——接受这 0.8% 的增量并把 AC-008 改成
-  "roughjs 与字体不在入口 chunk"，还是继续瘦身（改 `React.lazy` 后预计降到 +0.4 kB，仍不为 0）。
 - **AC-005 的"同页其它内容不受影响"只有组件级证据**：单测证明坏块自身降级，
   没有 e2e 证明"同一篇里另一段正常渲染"。影响有限，已写进测试计划的已知缺口。
 - **手写中文的可读性没有读者样本**：只有开发侧看图的判断。这是本项唯一的观感风险。
