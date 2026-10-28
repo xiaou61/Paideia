@@ -109,6 +109,9 @@ type MermaidPlugin = Awaited<typeof import('@streamdown/mermaid')>['mermaid']
 const MERMAID_CONFIG = {
   startOnLoad: false,
   securityLevel: 'strict',
+  // 默认主题是奶油黄，与站点的中性/靛蓝色板打架；neutral 是灰阶，观感接近本仓的卡片。
+  // 深色主题下仍是浅底（已知限制）：跟随主题要按当前主题重建插件实例，本期未做。
+  theme: 'neutral',
   themeCSS:
     '.flowchart-link{stroke-dasharray:6 4;animation:pd-flow 1.2s linear infinite}' +
     '@keyframes pd-flow{to{stroke-dashoffset:-20}}' +
