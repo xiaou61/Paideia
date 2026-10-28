@@ -54,6 +54,25 @@ export {
   type DigestWeekly,
 } from './digest-types'
 export { createServerProgressPort, mergeProgress, type ServerProgressPort } from './learning-progress'
+export {
+  DEFAULT_ROLE,
+  normalizeRole,
+  ROLES,
+  roleMeta,
+  tierOf,
+  type RoleKey,
+  type RoleMeta,
+  type TrackTier,
+} from './role-map'
+export {
+  explainParts,
+  pickAdvice,
+  ruleReason,
+  scoreTracks,
+  type RecommendTrack,
+  type ScoreParts,
+  type ScoredTrack,
+} from './recommend'
 export type {
   BlockScore,
   ConceptCarrier,

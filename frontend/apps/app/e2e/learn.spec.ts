@@ -30,29 +30,40 @@ test.describe('从零开始', () => {
     await page.getByTestId('home-entry-learn').click()
 
     await expect(page).toHaveURL(/#\/learn/)
-    await expect(page.getByRole('heading', { name: /挑一条轨道/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /从零开始/ })).toBeVisible()
 
     // 轨道集合来自服务端：只要求"至少有一条"
     await expect(firstTrack(page)).toBeVisible({ timeout: 15_000 })
   })
 
-  test('分成理论栏与实战栏，各自有卡片或明确空状态', async ({ page }) => {
+  test('岗位选择器与三段地图都在，切岗位后选中态跟着变', async ({ page }) => {
     await page.goto('/#/learn')
 
-    // 两栏都在；空的那栏必须是明确的空状态块，不是一片空白
-    await expect(page.getByTestId('learn-theory')).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByTestId('learn-practice')).toBeVisible()
-    await expect(page.getByTestId('learn-theory-count')).toBeVisible()
+    await expect(page.getByTestId('learn-roles')).toBeVisible({ timeout: 15_000 })
+    // 三段始终渲染（空段给明确空状态），所以这不依赖库里有没有内容
+    await expect(page.getByTestId('learn-core')).toBeVisible()
+    await expect(page.getByTestId('learn-advanced')).toBeVisible()
+    await expect(page.getByTestId('learn-optional')).toBeVisible()
 
-    const practiceCards = page.locator('[data-testid^="learn-track-"][data-mode="practice"]')
-    const practiceEmpty = page.getByTestId('learn-practice-empty')
-    expect((await practiceCards.count()) > 0 || (await practiceEmpty.count()) > 0).toBe(true)
+    await expect(page.getByTestId('learn-role-backend')).toHaveAttribute('aria-pressed', 'true')
+    await page.getByTestId('learn-role-ai-algo').click()
+    await expect(page.getByTestId('learn-role-ai-algo')).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByTestId('learn-role-backend')).toHaveAttribute('aria-pressed', 'false')
+  })
 
-    // 理论栏的卡片不能被打成 practice：两栏不会串
-    const theoryCards = page.locator('[data-testid^="learn-track-"]').filter({
-      hasNot: page.locator('[data-mode="practice"]'),
-    })
-    expect(await theoryCards.count()).toBeGreaterThan(0)
+  test('推荐卡：每条理由都带真实数字，不是空泛的鼓励', async ({ page }) => {
+    await page.goto('/#/learn')
+    const reasons = page.locator('[data-testid^="learn-advice-reason-"]')
+    await expect(page.getByTestId('learn-roles')).toBeVisible({ timeout: 15_000 })
+    // 库里有未完成的轨道才有推荐；没有时这一页本来就该只显示空地图
+    test.skip((await reasons.count()) === 0, '本地库里没有未完成的轨道，推荐卡无从生成')
+
+    expect(await reasons.count()).toBeLessThanOrEqual(3)
+    const texts = await reasons.evaluateAll((nodes) =>
+      nodes.map((node) => node.textContent?.trim() ?? ''),
+    )
+    // AC-004：理由必须引用具体数字（"6 关中过了 2 关"），不能是"建议你努力"
+    expect(texts.every((text) => /\d/.test(text) && text.length > 0)).toBe(true)
   })
 
   test('点轨道进入关卡地图，地图里有关卡', async ({ page }) => {
