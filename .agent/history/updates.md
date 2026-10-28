@@ -7260,3 +7260,63 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 未覆盖：3D 画布（`GraphCanvas3D`，1.39MB chunk）有同样模式，但它是切换后才用，本次未改；`digest-graph` 无专门 e2e，本次用一次性 Playwright 脚本验证。
 - 本地提交：ff4ea06
 - 远端推送：未执行
+
+## 2026-10-28 09:48:56 +0800 · WORK-046 · 签署 .agent/changes/WORK-046-书籍详解专题/requirements.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-046-书籍详解专题/requirements.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-046-书籍详解专题/requirements.md
+- 验证：回读 frontmatter：approved_by=xiaou61，1 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-28 10:05 +0800 · WORK-046 · 需求订正与方案/设计/任务起草
+
+- 类型：requirements + proposal + design + tasks
+- 变更：新增 `proposal.md`、`design.md`、`tasks.md`；`requirements.md` 回到 `draft`。
+- 决策（订正，因读码后发现与初版需求不符）：① 分类表**没有任何元数据列**（只有 id/parent_id/name/slug/sort_order），故 REQ-002 去掉"作者"成字段的要求，作者与版次放进正文出处头；② 条目表**已有 sort_order**（V17 加的），REQ-003 因此改成按它升序，不再要求显示阅读时长（表里没这列）；③ 现有分类页按 `published_at DESC` 排且不显示序号，故新增 `/books/:slug` 而不是复用 `/knowledge/categories/:id`；④ 磁盘上仍用一级目录 `content/reading/books-<slug>/` + frontmatter `line_parent`，不把 books 做成容器目录。
+- 决策（方案）：书放在分类树里不建新表；章节顺序用已有 sort_order 不在 SQL 改 ORDER BY（避免影响既有页面）；导航入口指向固定路由 `/books` 而不指向数字 id。
+- 依据：`V3__create_knowledge_tables.sql:15-29`、`V17__add_learning_lines.sql:16-19`、`EntryMapper.java:50`、`EntryService.java:92-98`、`ApiWalkthroughTest.java:877`。
+- 风险已记录：接口形态快照 `api-shape.json` 会因新增字段变红，TASK-002 里写明了用 `-Dapi.shape.update=true` 重生成并逐行 review。
+- 验证：`project-lifecycle validate .` → **未通过**，原因「需求尚未形成，但已经存在下游工件」——需求被订正回 draft 后需重新签署，符合预期，不是缺陷。
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-28 09:55:53 +0800 · WORK-046 · 签署 .agent/changes/WORK-046-书籍详解专题/requirements.md、.agent/changes/WORK-046-书籍详解专题/proposal.md、.agent/changes/WORK-046-书籍详解专题/design.md、.agent/changes/WORK-046-书籍详解专题/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-046-书籍详解专题/requirements.md、.agent/changes/WORK-046-书籍详解专题/proposal.md、.agent/changes/WORK-046-书籍详解专题/design.md、.agent/changes/WORK-046-书籍详解专题/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-046-书籍详解专题/requirements.md、.agent/changes/WORK-046-书籍详解专题/proposal.md、.agent/changes/WORK-046-书籍详解专题/design.md、.agent/changes/WORK-046-书籍详解专题/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-28 10:18:13 +0800 · 架构导读 · 新增 .agent/html/（11 页 / 19 张图）并刷新四张漂移的结构图
+
+- 类型：docs
+- 变更：
+  - 新增 `.agent/html/`：`index.html` 索引 + 10 个专题页（全景 / 请求链路 / AI 对话与积分 / 记忆 / 学习闭环 / 内容生产线 / 数据模型 / 前端与流式渲染 / 可观测与发版 / 信任边界），共用 `style.css`、`nav.js`、`diagram.js`；mermaid 12.2.0 本地副本在 `vendor/`，双击可开、不联网、不构建
+  - 新增 `.agent/html/render-check.mjs`：用 frontend 已装的 playwright + chromium 真渲染每页，校验每张图产出 SVG、页面无 "Syntax error"、无 console 错误、侧栏注入 11 条导航；`--shots` 可存整页截图
+  - 重新生成 `docs/architecture/01-module-dependencies.md`、`04-frontend-packages.md`、`05-database-tables.md`、`06-api-surface.md`：生成前 `--check` 四张全报漂移（后端新增 paideia-mcp / paideia-sandbox、前端 14→16 包、表 36→59、端点 112→178）
+- 决策：
+  - 位置沿用 `.agent/INDEX.md` 既有约定（项目理解型 HTML → `.agent/html/`），不新造目录
+  - 页面是「导读」不是第三份事实源：结构性数字与图仍以 `docs/architecture/` 的生成物与代码为准，页面里明确写了这一条
+  - 图不按容器宽度缩放（`useMaxWidth: false`）：宽图横向滚动并在 figcaption 前标注「可横向滚动」，而不是缩到看不清
+- 依据：`docs/architecture/README.md` 的两类图约定；`SecurityConfiguration`、`ConversationService`、`CreditService`、`TokenService`、`MemoryStore`、`MasteryModel` 与迁移文件的实际代码
+- 验证：`node .agent/html/render-check.mjs` → 11 个页面 / 19 张图 / 0 失败；`node scripts/gen-arch-diagram.mjs --check` → 四张一致（退出码 0）
+- 本地提交：本轮单独提交
+- 远端推送：未执行
+
+## 2026-10-28 10:15 +0800 · GitHub 热榜条数偏少
+
+- 类型：fix
+- 现象：用户问「今天热榜只有 18 个是不是太少了，能多拉取一些吗，还是很多被过滤了」。
+- 定位（实测抓页面，不是推测）：**没有任何过滤把条目丢掉**。当天 08:00 日志是「日榜 12、周榜 14、去重 25、入候选 18」；直接从服务器抓代理页后确认：全语言 `/trending?since=daily` 完整返回（584KB、`</html>` 收尾）但**只有 11 个 `<article>`**，周榜 13 个——18 = 11 ∪ 13 去重后的全部。而**语言榜反而更多**：`/trending/java` 17 条、`/trending/python` 15 条。另外实测代理不稳定：同一 url 三次里两次 200、一次 502，一次 30 秒只回 344KB（半截 body）。
+- 变更：① `PAGE_LIMIT` 15 → 25（GitHub 一页就是 25，取 25 才算用满）；② 额外抓 java/python/typescript 三个语言榜并入日榜候选；③ 响应被截断时重试一次——**判据是 HTML 是否以 `</html>` 收尾**，不是条目数（第一版按"少于 20 条"判断，会因全语言页本来就只有 11 条而天天误重试，已改）。
+- 决策：只加三个语言榜。每个候选要调一次 `stargazers/history`，api.github.com 未认证限额 60 次/小时，再加就会大批 403（虽然会退回页面数字，但"次日真实增量"就没了）。要加更多语言得先配 `paideia.digest.github-token`。
+- 验证：`GithubTrendingSourceTest` 7/0（新增两条：截断重试、语言榜合并）；`paideia-ai` 全量 354/0/14；`DigestIntegrationTest` 10/0；生产 `6a0f984` 已部署、health 200。
+- 未生效时间点：今天的速递已有内容，启动补跑按设计跳过（日志「速递启动补跑跳过：2026-10-28 已有内容」），所以**新逻辑要等 2026-10-29 08:00 那次采集**才会体现在页面上。
+- 本地提交：567181c、6a0f984
+- 远端推送：未执行
