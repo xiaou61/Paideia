@@ -67,16 +67,6 @@ class GithubTrendingSource {
     private static final int PAGE_LIMIT = 25;
 
     /**
-     * 一页 trending 正常应有 25 条，**低于这个数视为响应被截断**。
-     *
-     * <p>2026-10-28 实测：同一台机器连 GitHub 的 nginx 反代三次，两次拿到完整的 584KB，
-     * 一次 30 秒只回 344KB（`<article>` 少一半）。截断时解析出的条目数直接腰斩——当天日志是
-     * 「日榜 12、周榜 14、去重 25、入候选 18」，用户看到"18 条太少"，真相是那一页只抓到一半。
-     * 取 20 作阈值：完整是 25，截断通常只剩十几个，留出余量。
-     */
-    private static final int MIN_COMPLETE_PAGE_REPOS = 20;
-
-    /**
      * 额外抓的语言榜。**不超过三个**：每个候选都要调一次 `stargazers/history`，
      * 而 api.github.com 未认证时是 60 次/小时——现在约 25 个候选，加三个语言榜约 50 个，
      * 刚好在限额内；再加就会大批 403（虽然会退回页面数字，但"次日真实增量"就没了）。
@@ -146,29 +136,37 @@ class GithubTrendingSource {
     }
 
     private List<PageRepo> fetchPage(DigestHttp http, String baseUrl, boolean weekly) {
-        List<PageRepo> repos = fetchPageOnce(http, baseUrl, weekly);
-        if (repos.size() >= MIN_COMPLETE_PAGE_REPOS) {
-            return repos;
+        Page page = fetchPageOnce(http, baseUrl, weekly);
+        if (page.complete()) {
+            return page.repos();
         }
-        // 疑似截断：同样的请求重试一次，取更多的那份。代理层没有重试能力（它已经返回了 200），
-        // 所以只能在解析这一侧兜。
-        List<PageRepo> retry = fetchPageOnce(http, baseUrl, weekly);
-        if (retry.size() > repos.size()) {
-            log.info("GitHub trending {} 首次只解析出 {} 条（疑似截断），重试得到 {} 条",
-                    weekly ? "weekly" : "daily", repos.size(), retry.size());
-            return retry;
+        // 响应被截断（HTML 没有收尾）：同样的请求重试一次，取更多的那份。
+        // 代理层没有重试能力——它已经返回了 200，截断发生在 body 流里。
+        Page retry = fetchPageOnce(http, baseUrl, weekly);
+        if (retry.repos().size() > page.repos().size()) {
+            log.info("GitHub trending {} 响应不完整（{} 条），重试后拿到 {} 条",
+                    weekly ? "weekly" : "daily", page.repos().size(), retry.repos().size());
+            return retry.repos();
         }
-        return repos;
+        return page.repos();
     }
 
-    private List<PageRepo> fetchPageOnce(DigestHttp http, String baseUrl, boolean weekly) {
+    /** 一次抓取的结果；`complete` 表示 HTML 有收尾标签，不是半截。 */
+    private record Page(List<PageRepo> repos, boolean complete) {
+    }
+
+    private Page fetchPageOnce(DigestHttp http, String baseUrl, boolean weekly) {
         String url = appendSince(baseUrl, weekly ? "weekly" : "daily");
         try {
-            return parsePage(http.getText(url, USER_AGENT), weekly);
+            String html = http.getText(url, USER_AGENT);
+            // **按 HTML 是否收尾判断截断，不按条目数**：全语言日榜今天本来就只有 11 条，
+            // 用"少于 20 条"当截断信号会天天触发无意义的重试（2026-10-28 先写错过一版）。
+            boolean complete = html.contains("</html>");
+            return new Page(parsePage(html, weekly), complete);
         } catch (DigestSource.DigestSourceException exception) {
             log.warn("GitHub trending 页面不可达（{}）：{}",
                     weekly ? "weekly" : "daily", exception.getMessage());
-            return List.of();
+            return new Page(List.of(), false);
         }
     }
 

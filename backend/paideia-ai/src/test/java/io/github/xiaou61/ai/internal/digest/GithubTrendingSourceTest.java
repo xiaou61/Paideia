@@ -28,6 +28,7 @@ class GithubTrendingSourceTest {
               <span class="d-inline-block float-sm-right">3,856 stars today</span>
               <span itemprop="programmingLanguage">Python</span>
             </article>
+            </html>
             """;
 
     private static final String WEEKLY_PAGE = """
@@ -38,6 +39,7 @@ class GithubTrendingSourceTest {
               <span class="d-inline-block float-sm-right">8,000 stars this week</span>
               <span itemprop="programmingLanguage">Python</span>
             </article>
+            </html>
             """;
 
     /** week=2026-10-18（周日），days 从周一开始；周日 10-25 是 250，d7=850。 */
@@ -188,6 +190,7 @@ class GithubTrendingSourceTest {
                   <h2><a href="/real/repo">real/repo</a></h2>
                   <span>7 stars today</span>
                 </article>
+                </html>
                 """;
         StubHttp http = new StubHttp(url -> {
             if (url.contains("stargazers/history")) {
@@ -209,7 +212,8 @@ class GithubTrendingSourceTest {
     void truncatedPageIsRetriedOnce() {
         // 实测线上：同一代理有时 2 秒回完整 584KB，有时 30 秒只回 344KB（article 少一半）。
         // 截断时解析出的条目数直接腰斩，用户看到的就是"今天只有 18 条"。
-        String truncated = PAGE;
+        // 截断 = HTML 没有收尾标签（实测：代理 30 秒只回一半 body 时就是这样）
+        String truncated = PAGE.replace("</html>", "");
         String complete = PAGE + """
                 <article class="Box-row">
                   <h2><a href="/second/repo">second/repo</a></h2>
@@ -253,6 +257,7 @@ class GithubTrendingSourceTest {
                   <h2><a href="/java-owner/java-repo">java-repo</a></h2>
                   <span class="d-inline-block float-sm-right">700 stars today</span>
                 </article>
+                </html>
                 """;
         StubHttp http = new StubHttp(url -> {
             if (url.contains("stargazers/history")) {
