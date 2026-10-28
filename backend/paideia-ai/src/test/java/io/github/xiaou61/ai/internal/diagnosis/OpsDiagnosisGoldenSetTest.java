@@ -83,7 +83,7 @@ class OpsDiagnosisGoldenSetTest {
 
         // 每段证据都要出现，空值也要给占位——否则模型看不出"这一段本来有数据"
         assertThat(user).contains(
-                "<trigger>", "<summary>", "<metrics>", "<baselines>",
+                "<trigger>", "<summary>", "<metrics>", "<baselines>", "<context>",
                 "<alerts>", "<logs>", "<traces>", "<deploys>");
         assertThat(user).startsWith("<evidence>").endsWith("</evidence>");
         assertThat(user.length()).isLessThan(MAX_PROMPT_CHARS);
@@ -100,10 +100,10 @@ class OpsDiagnosisGoldenSetTest {
     }
 
     @Test
-    @DisplayName("金集至少 10 条，每条都带 mustMention")
+    @DisplayName("金集至少 20 条，每条都带 mustMention")
     void goldenSetIsWideEnough() {
         List<Map.Entry<String, JsonNode>> all = cases();
-        assertThat(all).hasSizeGreaterThanOrEqualTo(10);
+        assertThat(all).hasSizeGreaterThanOrEqualTo(20);
         for (Map.Entry<String, JsonNode> entry : all) {
             assertThat(entry.getValue().path("expected").path("mustMention"))
                     .as("%s 必须给出 mustMention", entry.getKey())
@@ -165,7 +165,8 @@ class OpsDiagnosisGoldenSetTest {
         return new OpsDiagnoser.Evidence(
                 text(e, "trigger"), text(e, "alertName"), null,
                 text(e, "summary"), text(e, "metrics"), text(e, "baselines"),
-                text(e, "alerts"), text(e, "logs"), text(e, "traces"), text(e, "deploys"));
+                text(e, "context"), text(e, "alerts"), text(e, "logs"),
+                text(e, "traces"), text(e, "deploys"));
     }
 
     private static String text(JsonNode node, String field) {

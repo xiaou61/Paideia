@@ -82,23 +82,30 @@ class OpsEvidenceCollector {
     }
 
     OpsDiagnoser.Evidence collect(String trigger, String alertName, String question) {
+        return collect(trigger, alertName, question, null);
+    }
+
+    OpsDiagnoser.Evidence collect(String trigger, String alertName, String question, String context) {
         OpsProperties.Diagnosis config = properties.getDiagnosis();
 
         String summaryText = formatSummary(summary.summary());
         String metricsText = formatMetrics();
         String baselinesText = formatBaselines();
+        String contextText = context == null ? "" : context.strip();
         String alertsText = firingAlerts();
         String deploysText = formatDeploy();
         String tracesText = formatTraces();
 
         int nonLogChars = summaryText.length() + metricsText.length() + baselinesText.length()
+                + contextText.length()
                 + alertsText.length() + tracesText.length() + deploysText.length();
         int logBudget = Math.max(0, config.getMaxEvidenceChars() - nonLogChars);
         String logsText = formatDiagnosisLogs(config.getMaxLogLines(), logBudget);
 
         return new OpsDiagnoser.Evidence(
                 trigger, alertName, question,
-                summaryText, metricsText, baselinesText, alertsText, logsText, tracesText, deploysText);
+                summaryText, metricsText, baselinesText, contextText,
+                alertsText, logsText, tracesText, deploysText);
     }
 
     /** 工具用的固定指标名清单；名字即白名单。 */
@@ -121,15 +128,15 @@ class OpsEvidenceCollector {
     }
 
     /**
-     * 工具用的日志查询：unit 与 level 都是枚举，拼进查询前先映射成常量。
-     * 用户/模型给的值不会成为 LogQL 片段。
+     * 工具用的日志查询：unit 必须命中配置里的白名单，level 是枚举。
+     * 用户/模型给的值不会成为 LogQL 片段（WORK-049：单元列表从代码移到配置）。
      */
     String logs(String unit, String level, int minutes, int limit) {
-        String selector = switch (unit == null ? "" : unit) {
-            case "paideia" -> "{unit=\"paideia.service\"}";
-            case "laya" -> "{unit=\"laya.service\"}";
-            default -> throw new IllegalArgumentException("未知单元");
-        };
+        String wanted = unit == null ? "" : unit.strip();
+        if (!properties.getDiagnosis().getUnits().contains(wanted)) {
+            throw new IllegalArgumentException("未知单元");
+        }
+        String selector = "{unit=\"" + wanted + ".service\"}";
         String filter = switch (level == null ? "" : level) {
             case "error" -> " |~ \"(?i)(error|exception|failed)\"";
             case "warn" -> " |~ \"(?i)(warn|warning)\"";
@@ -283,6 +290,7 @@ class OpsEvidenceCollector {
         Double day = prometheus.scalar(prefix + ":24h");
         Double sevenDay = prometheus.scalar(prefix + ":7d");
         Double ratio = prometheus.scalar(prefix + ":ratio");
+        Double z = prometheus.scalar(prefix + ":z");
         out.append(name).append(" current=").append(trimmed(current, 2)).append(unit)
                 .append(" 1h=").append(valueOrDash(oneHour, unit))
                 .append(" 24h=").append(valueOrDash(day, unit))
@@ -290,6 +298,8 @@ class OpsEvidenceCollector {
                 .append(sevenDay == null ? "—（回退）" : trimmed(sevenDay, 2) + unit)
                 .append(" baseline=").append(trimmed(baseline, 2)).append(unit)
                 .append(" ratio=").append(ratio == null ? "—" : trimmed(ratio, 2) + "x")
+                // z 是 WORK-049 加的方差口径：比值看不出「平时就抖」与「突然不抖了」的区别
+                .append(" z=").append(z == null || !Double.isFinite(z) ? "—" : trimmed(z, 2))
                 .append(" samples_7d=").append(trimmed(samples, 0))
                 .append('\n');
     }
@@ -360,13 +370,12 @@ class OpsEvidenceCollector {
         Instant to = Instant.now();
         Instant from = to.minus(Duration.ofHours(1));
         List<LokiClient.LogLine> lines = new ArrayList<>();
-        // 拆成两条固定查询而不是一条正则：unit 值里有 `.`，拼进正则要转义两层，容易错。
-        lines.addAll(loki.queryRange(
-                "{unit=\"paideia.service\"} |~ \"(?i)(error|exception|failed|timeout)\"",
-                from, to, maxLines));
-        lines.addAll(loki.queryRange(
-                "{unit=\"laya.service\"} |~ \"(?i)(error|exception|failed|timeout)\"",
-                from, to, maxLines));
+        // 每个单元一条固定查询：unit 是标签值不是正则，值里的 `.` 不需要转义。
+        for (String unit : properties.getDiagnosis().getUnits()) {
+            lines.addAll(loki.queryRange(
+                    "{unit=\"" + unit + ".service\"} |~ \"(?i)(error|exception|failed|timeout)\"",
+                    from, to, maxLines));
+        }
         if (lines.isEmpty()) {
             return "无匹配日志（或 Loki 不可达）";
         }

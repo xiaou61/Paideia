@@ -23,13 +23,14 @@ public interface OpsDiagnoser {
      * @param summary   运维摘要（七组状态）
      * @param metrics   关键指标（已格式化）
      * @param baselines 关键指标与上周同时段基线（WORK-043）
+     * @param context   历史同类事件与同期其他 OPEN 事件（WORK-049）
      * @param alerts    当前 firing 的告警（已格式化）
      * @param logs      最近日志摘录（已脱敏）
      * @param traces    错误/慢 trace 摘要（WORK-043；P2 起有值）
      * @param deploys   最近发版信息
      */
     record Evidence(String trigger, String alertName, String question,
-                    String summary, String metrics, String baselines,
+                    String summary, String metrics, String baselines, String context,
                     String alerts, String logs, String traces, String deploys) {
     }
 

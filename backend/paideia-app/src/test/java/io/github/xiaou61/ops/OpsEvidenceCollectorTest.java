@@ -48,6 +48,52 @@ class OpsEvidenceCollectorTest {
     }
 
     @Test
+    @DisplayName("基线行同时给出 ratio 与 z（WORK-049）")
+    void baselineIncludesZ() {
+        when(prometheus.scalar("paideia:baseline_cpu:current")).thenReturn(25.0);
+        when(prometheus.scalar("paideia:baseline_cpu:1h")).thenReturn(20.0);
+        when(prometheus.scalar("paideia:baseline_cpu:24h")).thenReturn(18.0);
+        when(prometheus.scalar("paideia:baseline_cpu:7d")).thenReturn(20.0);
+        when(prometheus.scalar("paideia:baseline_cpu:baseline")).thenReturn(20.0);
+        when(prometheus.scalar("paideia:baseline_cpu:ratio")).thenReturn(1.25);
+        when(prometheus.scalar("paideia:baseline_cpu:z")).thenReturn(3.14);
+        when(prometheus.scalar("paideia:baseline_cpu:samples7d")).thenReturn(20160.0);
+
+        String baselines = collector.collect("manual", null, null).baselines();
+
+        assertThat(baselines).contains("ratio=1.25x", "z=3.14");
+    }
+
+    @Test
+    @DisplayName("context 计入证据预算：预算用完后不再采日志（WORK-049）")
+    void contextCountsTowardBudget() {
+        properties.getDiagnosis().setMaxEvidenceChars(200);
+        when(loki.queryRange(anyString(), any(), any(), anyInt())).thenReturn(List.of(
+                new LokiClient.LogLine(Instant.parse("2026-10-26T10:00:00Z"), "error something")));
+
+        String logs = collector.collect("manual", null, null, "历史".repeat(200)).logs();
+
+        assertThat(logs).contains("证据预算已用完");
+        assertThat(logs).doesNotContain("something");
+    }
+
+    @Test
+    @DisplayName("配置里的日志单元可用，未知单元仍被拒（WORK-049）")
+    void customUnitIsWhitelisted() {
+        properties.getDiagnosis().setUnits(List.of("paideia", "rustfs"));
+
+        collector.logs("rustfs", "error", 5, 10);
+
+        org.mockito.Mockito.verify(loki).queryRange(
+                org.mockito.ArgumentMatchers.contains("unit=\"rustfs.service\""),
+                any(), any(), anyInt());
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> collector.logs("mysql", "error", 5, 10))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("未知单元");
+    }
+
+    @Test
     @DisplayName("摘要、固定指标与日志都进入证据，日志先脱敏")
     void collectsAndRedactsLogs() {
         when(loki.queryRange(anyString(), any(), any(), anyInt())).thenReturn(List.of(
