@@ -35,10 +35,12 @@ class DockerCodeRunner implements CodeRunner {
 
     private final SandboxProperties properties;
     private final SandboxCapability capability;
+    private final SqlContainerPool sqlPool;
 
-    DockerCodeRunner(SandboxProperties properties, SandboxCapability capability) {
+    DockerCodeRunner(SandboxProperties properties, SandboxCapability capability, SqlContainerPool sqlPool) {
         this.properties = properties;
         this.capability = capability;
+        this.sqlPool = sqlPool;
     }
 
     @Override
@@ -56,6 +58,15 @@ class DockerCodeRunner implements CodeRunner {
 
     @Override
     public CodeRun.Result run(CodeRun.Request request) {
+        // SQL 先走常驻容器池（WORK-049）：一次性容器每次要付"起容器 + 拷 78MB datadir +
+        // mysqld 初始化"约 4 秒，而数据集只有 1.4 KB。池不可用/忙/异常时返回 empty，
+        // 继续往下走原来那条一次性的路——功能不能因为池而不可用。
+        if (isSql(request.language()) && !request.project()) {
+            java.util.Optional<CodeRun.Result> pooled = sqlPool.tryRun(request);
+            if (pooled.isPresent()) {
+                return pooled.get();
+            }
+        }
         // docker run --cidfile 要求目标路径**不存在**（CLI 会先 stat，已存在就直接拒绝启动、
         // 以 exit 125 失败）。所以这里只生成一个唯一路径，不创建文件；用临时目录保证可写。
         Path cidDir;
@@ -139,8 +150,8 @@ class DockerCodeRunner implements CodeRunner {
 
         BoundedBuffer stdout = new BoundedBuffer(properties.getMaxOutputBytes());
         BoundedBuffer stderr = new BoundedBuffer(properties.getMaxOutputBytes());
-        Thread outReader = streamReader(process.getInputStream(), stdout);
-        Thread errReader = streamReader(process.getErrorStream(), stderr);
+        Thread outReader = readInto(process.getInputStream(), stdout);
+        Thread errReader = readInto(process.getErrorStream(), stderr);
 
         boolean finished;
         try {
@@ -154,8 +165,8 @@ class DockerCodeRunner implements CodeRunner {
             process.destroyForcibly();
             removeContainer(command);
         }
-        joinQuietly(outReader);
-        joinQuietly(errReader);
+        join(outReader);
+        join(errReader);
 
         long durationMs = (System.nanoTime() - started) / 1_000_000;
         log.info("sandbox trace finished={} durationMs={} events={}",
@@ -215,8 +226,8 @@ class DockerCodeRunner implements CodeRunner {
         // 两个流同时读：不读的那个会把子进程卡在 write 上
         BoundedBuffer stdout = new BoundedBuffer(properties.getMaxOutputBytes());
         BoundedBuffer stderr = new BoundedBuffer(properties.getMaxOutputBytes());
-        Thread outReader = streamReader(process.getInputStream(), stdout);
-        Thread errReader = streamReader(process.getErrorStream(), stderr);
+        Thread outReader = readInto(process.getInputStream(), stdout);
+        Thread errReader = readInto(process.getErrorStream(), stderr);
 
         boolean finished;
         try {
@@ -238,8 +249,8 @@ class DockerCodeRunner implements CodeRunner {
             removeContainer(command);
         }
 
-        joinQuietly(outReader);
-        joinQuietly(errReader);
+        join(outReader);
+        join(errReader);
         long durationMs = (System.nanoTime() - started) / 1_000_000;
 
         int exitCode = finished ? process.exitValue() : -1;
@@ -279,7 +290,7 @@ class DockerCodeRunner implements CodeRunner {
         return exitCode == 137 && (err.contains("Killed") || out.contains("Killed"));
     }
 
-    private static Thread streamReader(InputStream stream, BoundedBuffer sink) {
+    static Thread readInto(InputStream stream, BoundedBuffer sink) {
         Thread thread = new Thread(() -> {
             byte[] chunk = new byte[8192];
             try (stream) {
@@ -296,7 +307,7 @@ class DockerCodeRunner implements CodeRunner {
         return thread;
     }
 
-    private static void joinQuietly(Thread thread) {
+    static void join(Thread thread) {
         try {
             thread.join(TimeUnit.SECONDS.toMillis(2));
         } catch (InterruptedException cause) {
