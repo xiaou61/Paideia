@@ -196,7 +196,7 @@ S1 的基线必须用**现状代码**跑出来，不能等改完再补。
   3. 注销清单确认包含候选表；集成测试断言四张表（两记忆 + 候选）都清空。
 - 验证：`-Dtest='MemorySwitchTest,MemoryDeletionTest'` 全绿
 
-### TASK-011 | pending | 面板「待确认」与 e2e
+### TASK-011 | in_progress | 面板「待确认」与 e2e
 
 - 对应：`REQ-008`、`AC-007`、`AC-008`
 - 依赖：TASK-010

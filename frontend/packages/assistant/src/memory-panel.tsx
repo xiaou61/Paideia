@@ -15,7 +15,7 @@ import {
 import { useEffect, useState } from 'react'
 
 import type { AssistantApi } from './client'
-import type { MemorySettings, MemoryView } from './types'
+import type { MemoryCandidate, MemorySettings, MemoryView } from './types'
 
 /**
  * 记忆面板：看它记住了什么、控制它记不记、以及一次清干净（WORK-013 扩写；原为"查看 + 逐条删除"）。
@@ -44,6 +44,10 @@ export function MemoryPanel({ api }: { api: AssistantApi }) {
   const [clearing, setClearing] = useState(false)
   /** 清空之后的回执（清掉几条）。**不替换空态那句原文**：既有 e2e 断言的是它。 */
   const [clearedNote, setClearedNote] = useState<string | null>(null)
+  /** 待确认的候选（WORK-050）。null = 还没拉回来。 */
+  const [pending, setPending] = useState<MemoryCandidate[] | null>(null)
+  /** 候选上的忙碌位：接受/拒绝都会改两张表，连点会让乐观状态与库错位。 */
+  const [deciding, setDeciding] = useState<number | null>(null)
 
   // 设置与第一页**分开**拉：任一失败不该把另一半也拖成空白——列表看不到是最糟的结果，
   // 因为用户就是来确认"你到底记住了我什么"的
@@ -66,6 +70,20 @@ export function MemoryPanel({ api }: { api: AssistantApi }) {
     return () => {
       alive = false
     }
+  }, [api])
+
+  const loadPending = async () => {
+    try {
+      setPending(await api.pendingCandidates(20, 0))
+    } catch (cause) {
+      // 候选拉不到不该把"我记住了什么"也一起变空白：静默降级成空列表
+      setPending([])
+      setError(message(cause))
+    }
+  }
+
+  useEffect(() => {
+    void loadPending()
   }, [api])
 
   useEffect(() => {
@@ -96,6 +114,33 @@ export function MemoryPanel({ api }: { api: AssistantApi }) {
       setHasMore(page.length === PAGE)
     } catch (cause) {
       setError(message(cause))
+    }
+  }
+
+  /** 接受一条候选：它会成为一条正式记忆，所以两张表都要重拉。 */
+  const accept = async (id: number) => {
+    setDeciding(id)
+    setError(null)
+    try {
+      await api.acceptCandidate(id)
+      await Promise.all([reload(), loadPending()])
+    } catch (cause) {
+      setError(message(cause))
+    } finally {
+      setDeciding(null)
+    }
+  }
+
+  const reject = async (id: number) => {
+    setDeciding(id)
+    setError(null)
+    try {
+      await api.rejectCandidate(id)
+      await loadPending()
+    } catch (cause) {
+      setError(message(cause))
+    } finally {
+      setDeciding(null)
     }
   }
 
@@ -223,6 +268,69 @@ export function MemoryPanel({ api }: { api: AssistantApi }) {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
+
+      {/* ── 一·五、待确认：助手拿不准的，一次点击决定（WORK-050） ─────────────── */}
+      {pending !== null && pending.length > 0 ? (
+        <section className="space-y-2" data-testid="memory-candidates">
+          <p className="text-sm font-medium">待确认（{pending.length}）</p>
+          <p className="text-muted-foreground text-xs">
+            助手拿不准这些要不要长期记住，确认之后才算数。
+          </p>
+          <ul className="space-y-2">
+            {pending.map((candidate) => (
+              <li
+                key={candidate.id}
+                className="border-border space-y-1 rounded-md border p-2"
+                data-testid={`memory-candidate-${candidate.id}`}
+              >
+                <p className="text-sm">
+                  {candidate.content ?? (
+                    <span className="text-muted-foreground">
+                      有一条内容疑似含敏感信息（{candidate.decisionReason ?? 'sensitive'}），没有记录。
+                    </span>
+                  )}
+                </p>
+                {candidate.reason === null ? null : (
+                  <p className="text-muted-foreground text-xs">理由：{candidate.reason}</p>
+                )}
+                <div className="flex gap-2">
+                  {candidate.content === null ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={deciding === candidate.id}
+                      data-testid={`memory-candidate-dismiss-${candidate.id}`}
+                      onClick={() => void reject(candidate.id)}
+                    >
+                      知道了
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        size="sm"
+                        disabled={deciding === candidate.id}
+                        data-testid={`memory-candidate-accept-${candidate.id}`}
+                        onClick={() => void accept(candidate.id)}
+                      >
+                        记住
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={deciding === candidate.id}
+                        data-testid={`memory-candidate-reject-${candidate.id}`}
+                        onClick={() => void reject(candidate.id)}
+                      >
+                        不要
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {/* ── 二、记忆列表：它记住了什么 ───────────────────────────────────────── */}
       <section className="space-y-2">
