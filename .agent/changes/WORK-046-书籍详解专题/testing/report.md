@@ -68,14 +68,19 @@ verified_commit: ae3d9b8
 
 ## 不在本项范围的发现
 
-两处都在 `master` 上就存在，本项没有修，只记录：
+两处都在 `master` 上就存在。本项实施时只记录没修，**收尾时按用户要求一并修掉了**：
 
 1. **`ApiWalkthroughTest` 的全接口覆盖断言是红的**：11 个端点没被走到——
    `GET /ops/admin/analytics/overview`、`GET/POST /ops/admin/diagnoses*`、`GET /ops/admin/incidents*`、
    `POST /ops/admin/incidents/{id}/notes`、`POST /ops/hooks/grafana`、`POST /digest/items/{id}/click`。
    这些都是 WORK-042 / WORK-043 / WORK-027 之后加的，测试没跟上。
-2. **`GET /api/v1/ai/admin/runs/meta` 返回 500**（`code=50000`）。所以重录 `api-shape.json` 时
-   这条端点整个缺席。
+   **已修**：按既有口径补上（有真实 id 才能成功的用不存在的 id 交给 `bestEffort`，
+   诊断默认关闭所以 POST 是 409）。修后 `ApiWalkthroughTest` **1 条 0 失败**，
+   连跑两次稳定，快照只多出 5 条端点。
+2. **`GET /api/v1/ai/admin/runs/meta` 返回 500**。根因是
+   `TelemetrySummaryMapper.distinctModels` 的 `@Select` **没有** `<script>` 包裹却写了 `&lt;`——
+   MyBatis 只对 `<script>` 块做 XML 反转义，于是字面量 `&lt;` 被发给 MySQL，整条 SQL 语法错误。
+   **已修**（改成裸 `<`）。仓库里本来就有守卫 `scripts/check_mapper_script_xml.py` 拦这类问题，
+   但它只匹配 `"""` 文本块，漏了 `"a" + "b"` 拼接写法——**守卫也补上了**，
+   并做反向验证：把 `&lt;` 放回去守卫立刻报 1 处问题（退出码 1），改回来是 0 处。
 
-重录快照需要绕开第 1 条：临时把 `assertFullCoverage()` 注掉跑了一次，**跑完立即还原**
-（`git checkout --`，未进任何提交）。第 2 条只记录，没有排查。

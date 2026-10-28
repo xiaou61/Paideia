@@ -7272,3 +7272,14 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 既有缺陷（**未修**，不属本项）：① `ApiWalkthroughTest` 的全接口覆盖断言少了 WORK-042/043/027 的 11 个端点；② `GET /api/v1/ai/admin/runs/meta` 返回 500。重录 `api-shape.json` 时临时注掉过覆盖断言，**跑完已还原**。
 - 本地提交：见上方三笔
 - 远端推送：未执行（等授权）
+
+## 2026-10-28 11:10 +0800 · WORK-046 · 收尾修掉两处既有缺陷
+
+- 类型：bugfix
+- 变更：
+  1. `TelemetrySummaryMapper.distinctModels` 的 `&lt;` 改成裸 `<`。该 `@Select` 没有 `<script>` 包裹，MyBatis 不反转义，`GET /api/v1/ai/admin/runs/meta` 一直 500。
+  2. `scripts/check_mapper_script_xml.py` 增加对 `"a" + "b"` 拼接写法的识别——原守卫只认 `"""` 文本块，所以漏了这条。普通块检查数从 292 提到 324。
+  3. `ApiWalkthroughTest` 补上 WORK-042/043/027 之后没被走到的 11 个端点（有真实 id 才成功的用不存在 id + bestEffort；诊断默认关闭，POST 是 409）。
+- 验证：`ApiWalkthroughTest` 1 条 **0 失败**，连跑两次稳定（46.16s / 41.59s）；`api-shape.json` 只多 5 条端点。守卫反向验证：把 `&lt;` 放回去 → 报 1 处、退出码 1；改回 → 0 处。非 app 切片 352/0/14。
+- 本地提交：本笔
+- 远端推送：未执行（随 WORK-046 一起推）
