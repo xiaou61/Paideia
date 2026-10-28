@@ -56,7 +56,9 @@ class MemoryEvalTest {
         JsonNode root = readGoldSet();
         JsonNode cases = root.get("cases");
         assertThat(cases).as("金集里必须有 cases 数组").isNotNull();
-        assertThat(cases.size()).as("用例数应与 TASK-001 约定的 40 条一致").isEqualTo(40);
+        // AC-010 要求"两次差异 ≤ 5 个百分点"。分母 14–17 时一条用例翻转就是 6–7 个点，
+        // 这条容差在统计上不可能达到——所以金集扩到 120 条（每个分母 ≥ 24，一条翻转 ≤ 4.2 点）。
+        assertThat(cases.size()).as("金集扩容后应不少于 120 条").isGreaterThanOrEqualTo(120);
 
         AgentScopeMemoryExtractor extractor = new AgentScopeMemoryExtractor(
                 new MemoryProperties(), new MemoryCandidateParser(),

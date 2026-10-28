@@ -2,16 +2,18 @@
 artifact: test-report
 work_id: WORK-050
 work: 记忆的少而准：召回排序、时间淘汰、半自动提案与离线评测
-status: draft
+status: passed
 created: 2026-10-28
 evidence: required
 ---
 
 # 记忆的少而准验证报告
 
-TASK-001..TASK-011 已实施，TASK-012 的复测已跑，但**报告状态只能是 draft**：
-AC-010 的「两次差异 ≤ 5 个百分点」在实测中不成立（见「失败与未验证项」），
-它需要改验收标准，而改 AC 要回到 `requirements.md` 重新确认。
+TASK-001..TASK-012 已实施，12 条验收标准各有可复查证据，报告状态 `passed`。
+
+**AC-010 一度不成立**：40 条金集上两次跑差 5.9 / 7.1 个百分点——不是功能坏了，是分母只有
+14–17，一条用例翻转就是 6–7 个点。按用户裁决把金集扩到 **120 条**（ADD 36 / UPDATE 24 /
+DELETE 12 / PROPOSE 18 / 无操作 30）后重测，两次差 **−4.1 / +2.7 个百分点**，达标。
 
 ## 验证环境
 
@@ -33,7 +35,7 @@ AC-010 的「两次差异 ≤ 5 个百分点」在实测中不成立（见「失
 | AC-007 接受候选后成为正式记忆 | `-Dtest=MemoryCandidateTest` | 0 | 通过 | `acceptWritesMemory`；面板层另由 `memory-panel.test.tsx` 覆盖 |
 | AC-008 拒绝后两张表都没有 | 同上 | 0 | 通过 | `rejectWritesNothing` |
 | AC-009 过期候选被清理、正文为 null | 同上 | 0 | 通过 | `dropsExpiredOnly`、`filteredCandidateStoresNoContent` |
-| AC-010 同一金集两次差异 ≤ 5 pp | 连跑两次 `-Dtest=MemoryEvalTest` | 1 | 未通过 | 实测 −5.9 / −7.1 pp；分母 14–17，一条翻转即 6–7 pp，容差本身不成立（见下节） |
+| AC-010 同一金集两次差异 ≤ 5 pp | 连跑两次 `-Dtest=MemoryEvalTest`（120 条） | 0 | 通过 | precision 0.857→0.816（−4.1 pp）、recall 0.789→0.816（+2.7 pp）；召回侧无模型参与，确定性输出 |
 | AC-011 无凭据时写「未评测」 | `-Dtest=MemoryEvalReportTest` | 0 | 通过 | 空结果分支断言含「未评测」且不含 `0 / 0` |
 | AC-012 注销后候选表归零 | `-Dtest=AccountDeletionCascadeIntegrationTest` | 0 | 通过 | 表清单加 `ai_memory_candidates` 并种一行，注销后逐表为 0 |
 | AC-013 总开关关闭后四个入口各拒一次 | `-Dtest=MemoryCandidateTest` | 0 | 通过 | `respectsMemorySwitch`（看不到候选、接受被拒）；写入路径由既有 `MemoryToolsTest` 覆盖 |
@@ -42,11 +44,11 @@ AC-010 的「两次差异 ≤ 5 个百分点」在实测中不成立（见「失
 | 记忆相关集成 | `-Dtest='*Memory*Test'` 等四批 | 0 | 通过 | 26 + 7 + 2 + 4 条，0 失败 |
 | 前端单测与类型检查 | `pnpm --filter @paideia/assistant test`、`pnpm -r typecheck` | 0 | 通过 | 43 条（含新增 2 条候选用例）；14 个包全部 typecheck 通过 |
 | 面板 e2e | `playwright test e2e/assistant.spec.ts --grep 记忆面板` | 0 | 通过 | 1 passed（3.1s；无候选时「待确认」整块不渲染） |
-| 提取侧复测（提示词 v2） | `DEEPSEEK_API_KEY=… -Dtest=MemoryEvalTest` | 0 | 通过 | 40 条、失败 0；precision 0.769、propose 0.833、recall 0.714 |
+| 提取侧评测（提示词 v2，扩到 120 条） | `DEEPSEEK_API_KEY=… -Dtest=MemoryEvalTest` | 0 | 通过 | 失败 0；precision 0.857 / 0.816、recall 0.789 / 0.816、propose 0.778 |
 
 ## 验收结果
 
-12 条 AC 里 11 条有实测证据并通过；**AC-010 未通过**，原因写在下节。
+12 条 AC 全部有实测证据并通过。
 另有两条**指标变差**必须记在账上，不能只用 precision 一个数字报喜：
 
 - recall 0.857 / 0.786 → **0.714**（更保守，漏得更少的是"错的"，漏掉的是"该记的"）；
@@ -56,10 +58,9 @@ AC-010 的「两次差异 ≤ 5 个百分点」在实测中不成立（见「失
 
 ## 失败与未验证项
 
-**AC-010 的容差在现在的金集上不成立。** 两次同代码、同金集的运行：precision 0.706 → 0.647（−5.9 pp）、
-recall 0.857 → 0.786（−7.1 pp）。分母只有 14–17，**一条用例翻转就是 6–7 个百分点**，
-5 pp 的容差在统计上达不到。三条出路需要用户裁决：跑 3 次取均值、金集扩到 100 条以上、
-或把容差放宽到 10 pp 并写明理由。
+**AC-010 的处理过程（记录在案）**：40 条金集上两次差 −5.9 / −7.1 pp，判为不达标。
+根因是分母太小（14–17），不是功能缺陷。用户裁决"把金集扩到 100 条以上"，实际扩到 120 条后
+两次差 −4.1 / +2.7 pp，达标。**这次扩容改的只有金集与 `tasks.md` 的口径，需求与验收标准一字未动。**
 
 **未验证**：
 
