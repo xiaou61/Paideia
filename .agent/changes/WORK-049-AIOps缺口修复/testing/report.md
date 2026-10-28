@@ -3,7 +3,7 @@ artifact: test-report
 work_id: WORK-049
 work: AIOps 缺口修复：事件闭环、历史复用、告警关联与评测可信度
 status: partial
-verified_commit: e5dbb05
+verified_commit: a6e5e2d
 created: 2026-10-28
 updated: 2026-10-28
 ---
