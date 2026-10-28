@@ -7326,3 +7326,14 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：`@paideia/knowledge` 77 条单测通过；typecheck 通过；后端切片 352/0/14 + 9/0/0；`ApiWalkthroughTest` 1/0；e2e `learn.spec` 8 passed、`navigation.spec` 6 passed。
 - 本地提交：本笔及前三笔
 - 远端推送：待执行
+
+## 2026-10-28 15:40 +0800 · WORK-047 · 部署、内容导入与收尾
+
+- 类型：deployment + verification
+- 变更：`work-047-roles` 推到 `origin/master`（`5be4055..4686a61`）；从干净工作树跑 `release.ps1 -WithWeb`（112.4 秒）；线上重导 23 条线以刷新一句话说明。
+- 线上结果：`learning_tracks.summary` 为空的是 **0** 条；22 条轨道全部有新措辞。临时管理员照旧建→用→删，复核计数 0。
+- 决策：T-04（给 `learning/lines` 加 `lastTouchedAt`）**取消**。它是一个公共读接口的字段新增，要连带快照与集成测试；而它只给"最近学过"减 15 分，缺了推荐依然正确。记为已知限制。
+- 决策：报告里 AC-002 的证据必须是真跑过的——补了一条跨岗位段位的单测（`algorithms` 后端选读 / 算法核心），而不是把"设计上应该"写成证据。
+- 验证：单测 78 条通过；`learn.spec` 8 passed、`navigation.spec` 6 passed；后端切片 352/0/14 + 9/0/0；`ApiWalkthroughTest` 1/0。
+- 本地提交：本笔
+- 远端推送：已执行

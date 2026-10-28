@@ -27,6 +27,13 @@ describe('岗位映射（WORK-047）', () => {
     expect(tierOf('backend', 'spring').rank).toBe(1)
   })
 
+  it('同一个 slug 在不同岗位落在不同段位——切岗位必须真的重排', () => {
+    expect(tierOf('backend', 'algorithms').tier).toBe('optional')
+    expect(tierOf('ai-algo', 'algorithms').tier).toBe('core')
+    expect(tierOf('data', 'mysql-from-zero').tier).toBe('core')
+    expect(tierOf('ai-algo', 'mysql-from-zero').tier).toBe('optional')
+  })
+
   it('自由文本收敛到合法岗位，不认识就退默认', () => {
     expect(normalizeRole('data')).toBe('data')
     expect(normalizeRole('后端')).toBe(DEFAULT_ROLE)
