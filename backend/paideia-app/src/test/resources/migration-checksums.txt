@@ -8,6 +8,7 @@ src/main/resources/db/devdata/V953__seed_source_reading.sql -622326821
 src/main/resources/db/devdata/V954__fix_source_reading_starter.sql -1257614339
 src/main/resources/db/devdata/V955__mark_source_reading_line.sql 1132585320
 src/main/resources/db/devdata/V956__seed_books_line.sql 889111705
+src/main/resources/db/devdata/V957__seed_learning_tracks.sql -990403943
 src/main/resources/db/migration/V10__pin_knowledge_table_collation.sql 2036343265
 src/main/resources/db/migration/V11__create_credit_tables.sql -1253626063
 src/main/resources/db/migration/V12__memory_auto_extraction_and_settings.sql -1836449048
