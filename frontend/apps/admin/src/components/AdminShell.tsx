@@ -21,6 +21,7 @@ import {
   Cpu,
   ListOrdered,
   MessageSquareWarning,
+  Monitor,
 } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
@@ -85,6 +86,7 @@ const MENU: MenuItem[] = [
       { to: '/ai-runs/overview', label: '调用概览', icon: Activity },
       { to: '/ai-runs/list', label: '调用明细', icon: ListOrdered },
       { to: '/ai-runs/feedback', label: '回答反馈', icon: MessageSquareWarning },
+      { to: '/ai-runs/screen', label: '调用大屏', icon: Monitor },
     ],
   },
   // 运维（WORK-028）：只有一页（摘要卡片 + 完整面板），所以是叶子菜单项而不是父项分组。
@@ -110,6 +112,7 @@ const CRUMBS: Record<string, string[]> = {
   '/ai-runs/overview': ['AI 调用', '调用概览'],
   '/ai-runs/list': ['AI 调用', '调用明细'],
   '/ai-runs/feedback': ['AI 调用', '回答反馈'],
+  '/ai-runs/screen': ['AI 调用', '调用大屏'],
   '/ops/panel': ['运维'],
   '/ops/incidents': ['事件'],
   '/analytics': ['数据大屏'],

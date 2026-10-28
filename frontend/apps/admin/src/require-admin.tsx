@@ -67,7 +67,16 @@ function AccountBar() {
  * 的 `hasRole('ADMIN')` 规则上。这里集中在路由外层一处，是为了让"每个管理页面都必须
  * 先过这道门"成为构造上的事实，而不是每个页面自己记得包一层。
  */
-export function RequireAdmin({ children }: { children: ReactNode }) {
+export function RequireAdmin({ children, bare = false }: {
+  children: ReactNode
+  /**
+   * 不带侧栏与顶栏（调用大屏用）。
+   *
+   * <p>只去掉**外壳**，门一分不少：登录、角色、被拒提示都还在。全屏显示不该等于放行，
+   * 否则"大屏"就成了绕过授权的旁路。
+   */
+  bare?: boolean
+}) {
   const { status, user } = useAuth()
 
   if (status === 'loading') {
@@ -86,6 +95,14 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
           <LoginForm />
         </AuthLayout>
       </div>
+    )
+  }
+
+  if (bare) {
+    return canEnterAdmin(user) ? (
+      <div data-testid="admin-console">{children}</div>
+    ) : (
+      <div className="p-8"><AdminDenied user={user} /></div>
     )
   }
 

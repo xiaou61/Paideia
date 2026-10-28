@@ -6,6 +6,7 @@ import { AiCreditsAuditPage } from './pages/AiCreditsAuditPage'
 import { AiRunsListPage } from './pages/AiRunsListPage'
 import { AiFeedbackPage } from './pages/AiFeedbackPage'
 import { AiRunsOverviewPage } from './pages/AiRunsOverviewPage'
+import { AiRunsScreenPage } from './pages/AiRunsScreenPage'
 import { KnowledgeCategoriesPage } from './pages/KnowledgeCategoriesPage'
 import { KnowledgeConceptsPage } from './pages/KnowledgeConceptsPage'
 import { KnowledgeEntriesPage } from './pages/KnowledgeEntriesPage'
@@ -124,6 +125,16 @@ export const router = createHashRouter([
     element: (
       <RequireAdmin>
         <AiFeedbackPage />
+      </RequireAdmin>
+    ),
+  },
+  // 调用大屏：回放最近 24 小时 / 7 天的调用与步骤瀑布。
+  // **走 bare**：大屏不该带着侧栏，但那道门一个条件都没少（见 RequireAdmin 的说明）。
+  {
+    path: '/ai-runs/screen',
+    element: (
+      <RequireAdmin bare>
+        <AiRunsScreenPage />
       </RequireAdmin>
     ),
   },

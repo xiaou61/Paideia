@@ -67,6 +67,33 @@ test.describe('AI 调用统计', () => {
     await expect(trend.or(empty)).toBeVisible()
   })
 
+  test('调用大屏：侧栏能进，时间轴与调用流出得来，点一轮能看瀑布', async ({ page }) => {
+    await signIn(page)
+    // 入口必须在侧栏里（只在首页快捷卡里出现不算）
+    await page.goto(`${ADMIN_ENTRY}#/ai-runs/overview`)
+    const entry = page.getByRole('link', { name: '调用大屏' })
+    await expect(entry).toBeVisible()
+    await entry.click()
+
+    await expect(page.getByRole('heading', { name: 'AI 调用大屏' })).toBeVisible()
+    await expect(page.getByTestId('screen-timeline-track')).toBeVisible()
+    // 大屏不带侧栏：进来之后那一列不该还在
+    await expect(page.getByRole('link', { name: '调用大屏' })).toHaveCount(0)
+
+    const feed = page.getByTestId('screen-feed')
+    const empty = page.getByTestId('screen-empty')
+    await expect(feed.or(empty)).toBeVisible()
+
+    if (await feed.isVisible()) {
+      const first = feed.locator('button').first()
+      if (await first.count() > 0) {
+        await first.click()
+        await expect(page.getByTestId('screen-spans').or(page.getByTestId('screen-spans-empty')))
+          .toBeVisible()
+      }
+    }
+  })
+
   test('反馈页：侧栏能进，空状态与筛选都在', async ({ page }) => {
     await signIn(page)
     await page.goto(`${ADMIN_ENTRY}#/ai-runs/feedback`)
