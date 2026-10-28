@@ -32,6 +32,15 @@ const LIMITS = {
   quizOptions: 6,
   challengeLines: 60,
   outputLines: 30,
+  sketchTitle: 40,
+  sketchNodeId: 24,
+  sketchNodeTitle: 16,
+  sketchNodeSub: 28,
+  sketchRows: 4,
+  sketchRowNodes: 5,
+  sketchNodes: 12,
+  sketchArrows: 16,
+  sketchLabel: 12,
 } as const
 
 class BadInput extends Error {}
@@ -622,4 +631,87 @@ export function scoreQuiz(quiz: Quiz, answers: (number | null)[]): { correct: nu
     correct: quiz.questions.filter((question, index) => answers[index] === question.answer).length,
     total: quiz.questions.length,
   }
+}
+
+/* ------------------------------------------------------------------ 手绘图 */
+
+export type SketchTone = 'gray' | 'blue' | 'amber' | 'green' | 'violet'
+
+export interface SketchNode {
+  id: string
+  title: string
+  sub?: string
+  tone: SketchTone
+}
+
+export interface SketchArrow {
+  from: string
+  to: string
+  label?: string
+  /** `back` 从图下方绕回来，用于"下一步又回到开头"这类循环。 */
+  style: 'straight' | 'back'
+}
+
+export interface Sketch {
+  title?: string
+  rows: SketchNode[][]
+  arrows: SketchArrow[]
+}
+
+export const SKETCH_TONES: readonly SketchTone[] = ['gray', 'blue', 'amber', 'green', 'violet']
+
+/**
+ * 手绘图（WORK-051）。坐标不在契约里：框宽由文字量出来，行由布局算——作者只写"有哪些框、谁连谁"。
+ * 上限是内容侧天花板：超过 4 行 12 框通常意味着该拆成两张图。
+ */
+export function parseSketch(code: string): ParseResult<Sketch> {
+  return parseWith(code, (input) => {
+    const raw = asObject(input, '手绘图')
+    const rows = asArray(raw['rows'], 'rows', 1, LIMITS.sketchRows).map((row, rowIndex) => {
+      const where = `rows[${rowIndex}]`
+      return asArray(row, where, 1, LIMITS.sketchRowNodes).map((item, index) => {
+        const node = asObject(item, `${where}[${index}]`)
+        const tone = node['tone'] ?? 'gray'
+        need(
+          typeof tone === 'string' && SKETCH_TONES.includes(tone as SketchTone),
+          `${where}[${index}].tone 只能是 ${SKETCH_TONES.join(' / ')}`,
+        )
+        return {
+          id: asText(node['id'], `${where}[${index}].id`, LIMITS.sketchNodeId),
+          title: asText(node['title'], `${where}[${index}].title`, LIMITS.sketchNodeTitle),
+          sub: optionalText(node['sub'], `${where}[${index}].sub`, LIMITS.sketchNodeSub),
+          tone: tone as SketchTone,
+        }
+      })
+    })
+
+    const nodes = rows.flat()
+    need(nodes.length <= LIMITS.sketchNodes, `一张图最多 ${LIMITS.sketchNodes} 个框，当前 ${nodes.length} 个`)
+    const ids = new Set<string>()
+    for (const node of nodes) {
+      need(!ids.has(node.id), `节点 id 重复：「${node.id}」`)
+      ids.add(node.id)
+    }
+
+    const arrows = (raw['arrows'] === undefined ? [] : asArray(raw['arrows'], 'arrows', 0, LIMITS.sketchArrows)).map(
+      (item, index) => {
+        const where = `arrows[${index}]`
+        const arrow = asObject(item, where)
+        const from = asText(arrow['from'], `${where}.from`, LIMITS.sketchNodeId)
+        const to = asText(arrow['to'], `${where}.to`, LIMITS.sketchNodeId)
+        need(ids.has(from), `${where}.from 指向不存在的节点「${from}」`)
+        need(ids.has(to), `${where}.to 指向不存在的节点「${to}」`)
+        const style = arrow['style'] ?? 'straight'
+        need(style === 'straight' || style === 'back', `${where}.style 只能是 straight / back`)
+        return {
+          from,
+          to,
+          label: optionalText(arrow['label'], `${where}.label`, LIMITS.sketchLabel),
+          style: style as 'straight' | 'back',
+        }
+      },
+    )
+
+    return { title: optionalText(raw['title'], 'title', LIMITS.sketchTitle), rows, arrows }
+  })
 }

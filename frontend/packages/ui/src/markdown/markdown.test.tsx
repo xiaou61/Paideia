@@ -545,3 +545,15 @@ describe('AC-008 单一实现：两种模式渲染出同一副骨架', () => {
     expect(document).toContain('**')
   })
 })
+
+describe('平台围栏块只属于长文', () => {
+  // 模型输出的围栏是**文本**，不是我们要执行的组件。这条守住 sketch（WORK-051），
+  // 与 code-tour 那几个共享同一条边界。
+  const SKETCH = '```sketch\n{"rows":[[{"id":"a","title":"起点"}]]}\n```'
+
+  it('流式回答里的 sketch 围栏只是代码块，不会被画出来', () => {
+    const root = renderRoot(SKETCH, true)
+    expect(root?.querySelector('[data-testid="sketch-block"]')).toBeNull()
+    expect(root?.textContent).toContain('sketch')
+  })
+})

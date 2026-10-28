@@ -48,6 +48,17 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
+ * 手绘图的标签字体（WORK-051）。子集由 `scripts/build-sketch-font.mjs` 按内容生成，
+ * 只收录内容里出现过的字；缺字回退系统字体，不会出现方框。
+ * `@font-face` 是懒的：页面上真的出现 sketch 块时才下载。
+ */
+@font-face {
+  font-family: 'Paideia Sketch';
+  src: url('../markdown/renderers/sketch/Xiaolai.woff2') format('woff2');
+  font-display: swap;
+}
+
+/*
  * 2026-10-14 换向：用户在线上用过之后说"UI 特别一般、有点丑、完全是个 demo 级别"。
  * 诊断出来的真因不是某个页面写错了，而是**调色板本身没有颜色**：
  * 上一版整套令牌照 Vercel 的 Geist 取值——除破坏性红色外**每个颜色的饱和度都是 0%**
@@ -121,6 +132,22 @@
   --popover-shadow:
     0 1px 2px hsl(222 30% 12% / 5%), 0 8px 20px -4px hsl(222 30% 12% / 8%),
     0 24px 40px -8px hsl(222 30% 12% / 10%);
+  /*
+   * 手绘图配色（WORK-051）。rough.js 直接把这些变量当 stroke/fill 用，
+   * 所以切主题不需要 JS——呈现属性会被浏览器当 CSS 值解析。
+   */
+  --sk-ink: hsl(222 25% 14%);
+  --sk-muted: hsl(220 12% 42%);
+  --sk-gray-line: hsl(220 12% 42%);
+  --sk-gray-fill: hsl(220 16% 96%);
+  --sk-blue-line: hsl(214 76% 40%);
+  --sk-blue-fill: hsl(210 92% 96%);
+  --sk-amber-line: hsl(28 84% 38%);
+  --sk-amber-fill: hsl(35 100% 95%);
+  --sk-green-line: hsl(152 58% 28%);
+  --sk-green-fill: hsl(150 55% 95%);
+  --sk-violet-line: hsl(268 60% 46%);
+  --sk-violet-fill: hsl(268 70% 96%);
 }
 
 .dark {
@@ -160,6 +187,19 @@
   --glass: hsl(222 20% 12% / 70%);
   --card-shadow: 0 1px 2px hsl(0 0% 0% / 35%), 0 10px 20px -6px hsl(0 0% 0% / 45%);
   --popover-shadow: 0 1px 2px hsl(0 0% 0% / 45%), 0 18px 36px -8px hsl(0 0% 0% / 60%);
+  /* 深色下手绘框用"深底浅线"，否则浅底卡片在黑页上像一块补丁 */
+  --sk-ink: hsl(220 16% 92%);
+  --sk-muted: hsl(220 12% 68%);
+  --sk-gray-line: hsl(220 10% 64%);
+  --sk-gray-fill: hsl(222 14% 18%);
+  --sk-blue-line: hsl(210 82% 68%);
+  --sk-blue-fill: hsl(214 40% 20%);
+  --sk-amber-line: hsl(32 86% 64%);
+  --sk-amber-fill: hsl(30 45% 19%);
+  --sk-green-line: hsl(152 46% 62%);
+  --sk-green-fill: hsl(150 30% 17%);
+  --sk-violet-line: hsl(268 72% 74%);
+  --sk-violet-fill: hsl(268 30% 22%);
 }
 /*
  * inline 让工具类直接引用上面的变量而不是把值内联进每个类，
@@ -347,6 +387,18 @@
 }
 
 @layer components {
+  /*
+   * 手绘图（WORK-051）。图是内联 SVG：宽度跟栏宽走，高度由 viewBox 决定。
+   * `min-height` 只为"字体与 roughjs 还没到手"那段空窗期留位，避免正文跳动一下。
+   */
+  .sketch-block {
+    display: block;
+    width: 100%;
+    height: auto;
+    min-height: 120px;
+    font-family: 'Paideia Sketch', ui-sans-serif, system-ui, sans-serif;
+  }
+
   /*
    * 卡片顶部那块"封面"。
    *

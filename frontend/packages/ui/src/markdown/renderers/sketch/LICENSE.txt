@@ -1,0 +1,13 @@
+Xiaolai.woff2 —— 小赖字体子集
+=============================
+
+本目录下的 `Xiaolai.woff2` 是「小赖字体」（Xiaolai）的子集，**仅**收录本仓库内容里
+出现过的字符，供 `sketch` 围栏块的手绘中文标签使用。由 `scripts/build-sketch-font.mjs` 生成。
+
+- 字体：小赖字体 Xiaolai-Regular
+- 上游下载地址：https://github.com/ChewKeanHo/visuals-fonts-xiaolai/releases/download/v1.0.0/Xiaolai-Regular.ttf
+- 授权：SIL Open Font License 1.1（https://openfontlicense.org/）
+  该字体派生自 濑户字体（SetoFont）、内海字体（Naikaifont）与 cjkFonts 全濑体，同样按 OFL 1.1 发布。
+
+按 OFL 1.1 的要求：本子集不是独立发行的字体商品，只作为本项目的静态资源随附；
+再分发时需保留本文件与许可声明。需要完整字形时请从上面的上游地址获取原字体。
