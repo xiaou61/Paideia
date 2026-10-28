@@ -371,6 +371,12 @@ export function SqlPracticePage() {
               />
             </Suspense>
 
+            {/* 补全是 CodeMirror 自带的能力，但**界面上不说就等于没有**（用户实测问"是不是没做"）。
+                一行提示的成本，换回一个没人知道的功能。 */}
+            <p className="text-muted-foreground mt-2 text-xs" data-testid="sql-editor-hint">
+              输入时会自动补全表名、列名与 SQL 关键字；也可以按 Ctrl + 空格 手动触发。
+            </p>
+
             <div className="flex flex-wrap items-center gap-3">
               <Button
                 type="button"
