@@ -33,7 +33,7 @@ public interface EntryMapper {
 
     @Select("""
             <script>
-            SELECT id, category_id, title, status, published_at, updated_at,
+            SELECT id, category_id, sort_order, title, status, published_at, updated_at,
                    LEFT(body, 200) AS excerpt
             FROM knowledge_entries
             WHERE status = 'published'
