@@ -5,8 +5,10 @@ import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
 import io.github.xiaou61.platform.SearchQuery;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -63,10 +65,15 @@ public class MemoryStore {
     public static final String SOURCE_MANUAL = "manual";
     public static final String SOURCE_AUTO = "auto";
 
-    private final MemoryMapper mapper;
+    /** 一次淘汰删多少行。与 {@code TelemetryRetentionPurger} 同一档，运维只需要记一组数字。 */
+    private static final int PURGE_BATCH = 500;
 
-    MemoryStore(MemoryMapper mapper) {
+    private final MemoryMapper mapper;
+    private final MemoryProperties properties;
+
+    MemoryStore(MemoryMapper mapper, MemoryProperties properties) {
         this.mapper = mapper;
+        this.properties = properties;
     }
 
     /**
@@ -123,6 +130,10 @@ public class MemoryStore {
                              long conversationId, long refMessageId, String reason) {
         String trimmed = requireLength(content, "记忆内容",
                 source == MemoryItem.Source.STRUCTURED ? MAX_STRUCTURED_CHARS : MAX_TEXT_CHARS);
+        if (SensitiveContent.find(trimmed).isPresent()) {
+            log.info("ai.memory.filtered store={} id={} phase=update", source, id);
+            return false;
+        }
         MemoryRow row = new MemoryRow();
         row.setId(id);
         row.setUserId(userId);
@@ -144,21 +155,83 @@ public class MemoryStore {
      * 这是**已经踩过一次**的坑（知识库检索那里），所以这里直接用同一份判定而不是重写一遍。
      */
     public List<MemoryItem> recall(long userId, String keyword) {
-        List<MemoryItem> items = new ArrayList<>();
-        for (MemoryRow row : mapper.selectStructuredRecent(userId, RECALL_LIMIT, 0)) {
-            items.add(toItem(MemoryItem.Source.STRUCTURED, row));
-        }
-
+        Instant now = Instant.now();
         String normalized = SearchQuery.normalize(keyword);
         boolean fulltext = SearchQuery.usesFulltext(normalized);
+        String like = normalized != null && !fulltext ? SearchQuery.likePattern(normalized) : null;
+
+        List<MemoryItem> items = new ArrayList<>();
+        List<Long> structuredIds = new ArrayList<>();
+        for (MemoryRow row : mapper.selectStructuredRelevant(userId, normalized, like, fulltext,
+                now, RECALL_LIMIT)) {
+            items.add(toItem(MemoryItem.Source.STRUCTURED, row));
+            structuredIds.add(row.getId());
+        }
+
+        List<Long> textIds = new ArrayList<>();
         List<MemoryRow> textRows = normalized == null
                 ? mapper.selectTextRecent(userId, RECALL_LIMIT, 0)
-                : mapper.searchText(userId, normalized,
-                        fulltext ? null : SearchQuery.likePattern(normalized), fulltext, RECALL_LIMIT);
+                : mapper.searchText(userId, normalized, like, fulltext, now, RECALL_LIMIT);
         for (MemoryRow row : textRows) {
             items.add(toItem(MemoryItem.Source.TEXT, row));
+            textIds.add(row.getId());
         }
+
+        touch(userId, structuredIds, textIds, now);
         return items;
+    }
+
+    /**
+     * 刷新"最近一次被召回"（WORK-050 REQ-005）。**失败只记日志**：这是记账，不是业务——
+     * 为了它让一次回答失败，代价与收益完全不成比例。下一次召回会再写一遍。
+     */
+    public void touch(long userId, List<Long> structuredIds, List<Long> textIds) {
+        touch(userId, structuredIds, textIds, Instant.now());
+    }
+
+    private void touch(long userId, List<Long> structuredIds, List<Long> textIds, Instant now) {
+        try {
+            if (!structuredIds.isEmpty()) {
+                mapper.touchStructured(userId, structuredIds, now);
+            }
+            if (!textIds.isEmpty()) {
+                mapper.touchText(userId, textIds, now);
+            }
+        } catch (RuntimeException failure) {
+            log.warn("ai.memory.touch_failed userId={} reason={}", userId, failure.getMessage());
+        }
+    }
+
+    /**
+     * 按时间淘汰（WORK-050 REQ-004）。
+     *
+     * <p>判据是 {@code COALESCE(last_used_at, created_at)}：被持续召回的记忆不会被删，哪怕它很旧；
+     * "记了但从来没被用上"的才过期。分档来自 {@link MemoryProperties}，按 kind 各删各的。
+     *
+     * @return 本次删掉的总行数
+     */
+    @Transactional
+    public int purgeExpired(Instant now) {
+        int total = 0;
+        for (Map.Entry<String, Integer> entry : properties.getStructuredTtlDays().entrySet()) {
+            Instant before = now.minus(Math.max(entry.getValue(), 0), ChronoUnit.DAYS);
+            while (true) {
+                int deleted = mapper.purgeStructured(entry.getKey(), before, PURGE_BATCH);
+                total += deleted;
+                if (deleted < PURGE_BATCH) {
+                    break;
+                }
+            }
+        }
+        Instant textBefore = now.minus(Math.max(properties.getTextTtlDays(), 0), ChronoUnit.DAYS);
+        while (true) {
+            int deleted = mapper.purgeText(textBefore, PURGE_BATCH);
+            total += deleted;
+            if (deleted < PURGE_BATCH) {
+                break;
+            }
+        }
+        return total;
     }
 
     /**
@@ -287,6 +360,10 @@ public class MemoryStore {
         for (MemoryCandidate candidate : candidates) {
             switch (candidate.action()) {
                 case ADD -> {
+                    if (SensitiveContent.find(candidate.content()).isPresent()) {
+                        log.info("ai.memory.filtered store={} phase=add", candidate.store());
+                        continue;
+                    }
                     rememberAuto(userId, candidate.store() == MemoryCandidate.Store.STRUCTURED
                                     ? MemoryItem.Source.STRUCTURED : MemoryItem.Source.TEXT,
                             candidate.kind(), candidate.refId(), candidate.content(),
@@ -324,6 +401,34 @@ public class MemoryStore {
         return affected;
     }
 
+    /**
+     * 敏感信息闸（WORK-050 REQ-001）。**唯一一处真正拦写入的地方**——放在两个底层 insert 上，
+     * 手动、自动、外部工具三条路都过它。
+     *
+     * <p>命中就抛：手动写入要让用户看见"这条没记"；自动整理那条路在 {@link #applyAuto} 里
+     * 已经先逐条过滤过，不会走到这里的抛错。
+     */
+    private static String requireClean(String content) {
+        SensitiveContent.Category category = SensitiveContent.find(content).orElse(null);
+        if (category != null) {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT,
+                    "这条内容疑似包含" + categoryLabel(category) + "，未保存");
+        }
+        return content;
+    }
+
+    private static String categoryLabel(SensitiveContent.Category category) {
+        return switch (category) {
+            case PRIVATE_KEY -> "私钥";
+            case API_KEY -> "密钥";
+            case KEY_VALUE -> "口令或令牌";
+            case CONNECTION_STRING -> "带凭据的连接串";
+            case ID_CARD -> "身份证号";
+            case BANK_CARD -> "银行卡号";
+            case PHONE -> "手机号";
+        };
+    }
+
     private static MemoryItem.Source toItemSource(MemoryCandidate.Store store) {
         return store == MemoryCandidate.Store.STRUCTURED
                 ? MemoryItem.Source.STRUCTURED : MemoryItem.Source.TEXT;
@@ -335,7 +440,7 @@ public class MemoryStore {
         row.setUserId(userId);
         row.setKind(requireNonBlank(kind, "记忆种类", 32));
         row.setRefId(refId);
-        row.setContent(requireLength(content, "记忆内容", MAX_STRUCTURED_CHARS));
+        row.setContent(requireClean(requireLength(content, "记忆内容", MAX_STRUCTURED_CHARS)));
         row.setSource(source);
         row.setConversationId(conversationId);
         row.setRefMessageId(refMessageId);
@@ -348,7 +453,7 @@ public class MemoryStore {
                             Long conversationId, Long refMessageId, String reason) {
         MemoryRow row = new MemoryRow();
         row.setUserId(userId);
-        row.setContent(requireLength(content, "记忆内容", MAX_TEXT_CHARS));
+        row.setContent(requireClean(requireLength(content, "记忆内容", MAX_TEXT_CHARS)));
         row.setSource(source);
         row.setConversationId(conversationId);
         row.setRefMessageId(refMessageId);

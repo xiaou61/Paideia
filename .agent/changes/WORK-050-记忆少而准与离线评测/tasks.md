@@ -95,7 +95,7 @@ S1 的基线必须用**现状代码**跑出来，不能等改完再补。
   5. **用现状代码跑一遍，把数字写进 `.agent/changes/WORK-050-.../testing/baseline.md`**。
 - 验证：设 key 跑（数字进工件）；不设 key 再跑一次，断言 `Skipped` 与"未评测"输出
 
-### TASK-004 | pending | 敏感信息过滤
+### TASK-004 | done | 敏感信息过滤
 
 - 对应：`REQ-001`、`AC-001`
 - 依赖：无（与 S1 并行）
@@ -110,7 +110,7 @@ S1 的基线必须用**现状代码**跑出来，不能等改完再补。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-ai test -Dtest=SensitiveContentTest` 全绿；
   其中"反例不误伤"用例数与"正例命中"用例数各 ≥ 8
 
-### TASK-005 | pending | 召回相关性排序（两路）
+### TASK-005 | done | 召回相关性排序（两路）
 
 - 对应：`REQ-002`、`REQ-003`、`AC-002`
 - 依赖：TASK-007 的迁移（结构化那一路需要 ngram 索引；两个任务要约定同一个迁移文件，谁先落地谁合并）
@@ -124,7 +124,7 @@ S1 的基线必须用**现状代码**跑出来，不能等改完再补。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=MemoryRecallOrderTest` 全绿，
   且"旧但相关排在前"的用例通过
 
-### TASK-006 | pending | 召回后刷新使用时间
+### TASK-006 | done | 召回后刷新使用时间
 
 - 对应：`REQ-005`、`AC-004`
 - 依赖：TASK-005
@@ -137,7 +137,7 @@ S1 的基线必须用**现状代码**跑出来，不能等改完再补。
   4. **不写比已有值更早的时间**：`SET last_used_at = GREATEST(COALESCE(last_used_at, #{now}), #{now})`。
 - 验证：`-Dtest=MemoryStoreTest` 全绿，含 `touchNeverMovesBackwards`、`touchEmptyListIssuesNoSql`
 
-### TASK-007 | pending | 迁移、淘汰任务与级联
+### TASK-007 | done | 迁移、淘汰任务与级联
 
 - 对应：`REQ-004`、`REQ-011`、`AC-003`、`AC-004`、`AC-005`
 - 依赖：无（与 S2 并行；与 TASK-005 共用迁移文件）
