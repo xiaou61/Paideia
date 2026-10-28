@@ -19,6 +19,8 @@ import org.springframework.stereotype.Component;
 @Component
 class McpRateLimiter {
 
+    private static final Duration WINDOW = Duration.ofMinutes(1);
+
     private final int perMinute;
     private final Map<Long, Window> windows = new ConcurrentHashMap<>();
 
@@ -29,7 +31,7 @@ class McpRateLimiter {
     boolean allow(long tokenId) {
         Instant now = Instant.now();
         Window updated = windows.compute(tokenId, (key, existing) -> {
-            if (existing == null || existing.startedAt.plus(Duration.ofMinutes(1)).isBefore(now)) {
+            if (existing == null || existing.startedAt.plus(WINDOW).isBefore(now)) {
                 return new Window(now, 1);
             }
             return new Window(existing.startedAt, existing.count + 1);
@@ -38,9 +40,28 @@ class McpRateLimiter {
         // 真到几万个 token 时再加定时清理，现在每天清一次都不值得写。
         if (windows.size() > 5_000) {
             windows.entrySet().removeIf(entry ->
-                    entry.getValue().startedAt.plus(Duration.ofMinutes(1)).isBefore(now));
+                    entry.getValue().startedAt.plus(WINDOW).isBefore(now));
         }
         return updated.count <= perMinute;
+    }
+
+    /**
+     * 当前窗口还剩多少秒。
+     *
+     * <p>告诉客户端"等多久"而不是只说"过于频繁"：模型拿到秒数才知道该等待还是该放弃重试。
+     * 没有窗口（或已经过期但还没被 {@link #allow} 重置）时给 1 秒，避免回一个 0 让它立刻重试。
+     */
+    long secondsUntilReset(long tokenId) {
+        Window window = windows.get(tokenId);
+        if (window == null) {
+            return 0;
+        }
+        long left = Duration.between(Instant.now(), window.startedAt().plus(WINDOW)).toSeconds();
+        return Math.max(1, left);
+    }
+
+    int perMinute() {
+        return perMinute;
     }
 
     private record Window(Instant startedAt, int count) {

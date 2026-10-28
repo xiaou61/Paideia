@@ -53,10 +53,12 @@ public final class KnowledgeTools {
                 String keyword = stringOf(arguments, "keyword");
                 List<KnowledgeApi.EntryBrief> hits = knowledge.searchPublished(keyword, limitOf(arguments));
                 if (hits.isEmpty()) {
-                    // 明确说"没找到"而不是空串：空字符串会让模型以为工具坏了
+                    // 明确说"没找到"而不是空串：空字符串会让模型以为工具坏了。
+                    // 但只说"没找到"就停了，模型下一步只能换个词瞎试——所以给两条具体出路
                     return ToolResult.ok(keyword == null
                             ? "平台上还没有已发布的内容。"
-                            : "没有检索到与「" + keyword + "」相关的已发布内容。");
+                            : "没有检索到与「" + keyword + "」直接相关的内容。可以换个更短的关键词再试，"
+                                    + "或用 knowledge_list_categories 看看平台有哪些分类。");
                 }
                 return ToolResult.ok(join(hits.stream()
                         .map(hit -> "id=" + hit.id() + " 标题=" + hit.title())
