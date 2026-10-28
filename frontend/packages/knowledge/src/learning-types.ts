@@ -160,8 +160,7 @@ export interface TrackMap {
 }
 
 /** 到期复习（WORK-034 S1）。 */
-export interface ReviewDueItem {
-  entryId: number
+export interface ReviewDueItem {  entryId: number
   title: string
   conceptId: number | null
   conceptName: string | null
@@ -209,4 +208,29 @@ export interface ReviewSchedule {
 export interface ReviewSubmitResult {
   results: ReviewResult[]
   schedule: ReviewSchedule[]
+}
+
+/**
+ * AI 推荐的输入（WORK-047）。
+ *
+ * <p>**排序已经在前端算完了**，这里只是把 Top 3 交给服务端润色一句话。所以入参里
+ * 没有"全部轨道"——服务端不看全量，也就不可能替你重新排序。
+ */
+export interface AdvicePick {
+  slug: string
+  name: string
+  tier: string
+  passed: number
+  total: number
+}
+
+export interface AdviceRequest {
+  role: string
+  roleLabel: string
+  picks: AdvicePick[]
+}
+
+/** 服务端可能返回少于入参条数的理由（校验不过的会被丢弃），前端按 slug 有无回落。 */
+export interface AdviceResult {
+  reasons: { slug: string; reason: string }[]
 }

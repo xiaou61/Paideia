@@ -19,28 +19,41 @@ import sys
 
 TAG = re.compile(r'</?(?:script|if|choose|when|otherwise|foreach|where|set|trim|bind|include)\b')
 ENTITY = re.compile(r'&(?:lt|gt|amp|quot|apos|#\d+|#x[0-9a-fA-F]+);')
-# 一个 @Select/@Update/... 注解的字符串体（文本块或单行）
+# 一个 @Select/@Update/... 注解的字符串体（文本块）
 ANNOTATION = re.compile(r'@(?:Select|Update|Insert|Delete)\(\s*"""(.*?)"""', re.S)
+# 用 `"..." + "..."` 拼出来的注解体。ANNOTATION 只认文本块，看不见这种写法——
+# 2026-10-28 那条 `started_at &lt; #{to}` 正是长在拼接里，所以多一条规则。
+CONCAT = re.compile(
+    r'@(?:Select|Update|Insert|Delete)\(\s*((?!""")"(?:[^"\\]|\\.)*"(?:\s*\+\s*"(?:[^"\\]|\\.)*")*)\s*\)',
+    re.S)
 
 ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'backend')
+
+
+def annotation_bodies(text: str):
+    """所有注解体 + 它在源码里的起始偏移。文本块与拼接写法都要覆盖。"""
+    for m in ANNOTATION.finditer(text):
+        yield m.group(1), m.start(1)
+    for m in CONCAT.finditer(text):
+        yield m.group(1), m.start(1)
 
 
 def check_plain_blocks(path: str, text: str, bad: list) -> int:
     """不带 <script> 的注解块里出现实体转义就是错的：MyBatis 不会反转义它们。"""
     checked = 0
-    for m in ANNOTATION.finditer(text):
-        body = m.group(1)
+    for body, start in annotation_bodies(text):
         if '<script>' in body:
             continue
         checked += 1
         for offset, line in enumerate(body.splitlines()):
             if ENTITY.search(line) is None:
                 continue
-            # 排除注释里写到实体的情形（说明性文字，不进 SQL）
-            if line.strip().startswith('//') or line.strip().startswith('<!--'):
+            # 排除注释里写到实体的情形（说明性文字，不进 SQL）与 Java 里的字符串替换调用
+            stripped = line.strip()
+            if stripped.startswith('//') or stripped.startswith('<!--') or '.replace(' in stripped:
                 continue
-            lineno = text[: m.start(1)].count('\n') + 1 + offset
-            bad.append((path, lineno, line.strip(), 'plain-block-entity'))
+            lineno = text[:start].count('\n') + 1 + offset
+            bad.append((path, lineno, stripped, 'plain-block-entity'))
     return checked
 
 

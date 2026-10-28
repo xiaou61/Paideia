@@ -149,8 +149,10 @@ public interface TelemetrySummaryMapper {
             """)
     List<CountBy> distinctKinds(@Param("from") Instant from, @Param("to") Instant to);
 
+    // 这条**没有** <script> 包裹，必须写裸 `<`：写成 &lt; 会把字面量发给 MySQL，
+    // 整个筛选下拉接口 500（2026-10-28 由 ApiWalkthroughTest 抓到）。
     @Select("SELECT COALESCE(model, '(unknown)') AS name, COUNT(*) AS count FROM ai_runs "
-            + "WHERE started_at >= #{from} AND started_at &lt; #{to} AND model IS NOT NULL "
+            + "WHERE started_at >= #{from} AND started_at < #{to} AND model IS NOT NULL "
             + "GROUP BY model")
     List<CountBy> distinctModels(@Param("from") Instant from, @Param("to") Instant to);
 

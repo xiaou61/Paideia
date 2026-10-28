@@ -3,9 +3,11 @@
  * 课程导入脚本（WORK-020 TASK-005）。
  *
  * 走**已有的**管理端 API，不新增写接口：
- *   登录 → 取分类树 → 缺的分类就建（带 line_kind）→ 按「分类 + 标题」幂等建/更条目
- *   → 按 order 顺序发布（保证 published_at 单调，于是"上一篇/下一篇"与课号一致）
- *   → 建 prerequisite 关系。
+ *   登录 → 取分类树 → 缺的父分类就建（不带 line_kind）→ 缺的分类就建（带 line_kind）
+ *   → 按「分类 + 标题」幂等建/更条目 → 建 prerequisite 关系 → 登记学习轨道。
+ *
+ * 总览的 frontmatter 写了 `line_parent` 时，这条线会挂到该父分类下面（WORK-046 的书籍详解
+ * 就是靠它把多本书收在一个根分类下）。不写则和以前一样是根分类。
  *
  * 三条纪律：
  * 1. **只碰本脚本负责的分类**：不认识的分类绝不写入，也不删除任何条目——内容源被删掉时
@@ -49,6 +51,12 @@ function lineSpecOf(language, lessons) {
   if (mode === 'practice' && !meta.verify) {
     throw new Error(`${language}/ 是实战轨道，frontmatter 必须写 verify（sql / run / project）`)
   }
+  // 父分类（WORK-046）：书籍详解这类"多条线挂在一个根下"的形态。
+  // 只在总览里声明一次；没声明的目录保持现状，既有线一条都不用改。
+  const parent = meta.line_parent ?? null
+  if (parent === slug) {
+    throw new Error(`${language}/ 的 line_parent 不能等于自己的 category（${slug}）`)
+  }
   return {
     slug,
     name: meta.line_name ?? overview?.meta.title ?? slug,
@@ -56,6 +64,8 @@ function lineSpecOf(language, lessons) {
     summary: meta.line_summary ?? null,
     kind: meta.line_kind ?? 'course',
     sortOrder: Number(meta.line_sort ?? 100),
+    parent,
+    parentName: meta.line_parent_name ?? null,
     // 理论 / 实战（WORK-038）；缺省 theory，老内容不用改
     mode,
     // 实战轨道指向的理论轨道：只用于"建议先看 X"，不构成门禁
@@ -215,9 +225,48 @@ function findCategory(nodes, slug) {
   return null
 }
 
+/**
+ * 父分类（WORK-046）。只在 `line_parent` 声明时才有事做，返回要用的 parentId。
+ *
+ * <p>**绝不带 lineKind**：父分类只是一个分组容器，带了它就会变成一条没有正文的学习线
+ * 出现在 `/learn`（REQ-004）。
+ */
+async function ensureParent(client, tree, spec, options) {
+  if (spec.parent === null) {
+    return null
+  }
+  const existing = findCategory(tree, spec.parent)
+  if (existing) {
+    return existing.id
+  }
+  const name = spec.parentName ?? spec.parent
+  if (options.dryRun) {
+    console.log(`  [dry-run] 将创建父分类 ${name}（${spec.parent}）`)
+    return -1
+  }
+  const id = await client.post('/api/v1/knowledge/admin/categories', {
+    parentId: null,
+    name,
+    slug: spec.parent,
+    sortOrder: 0,
+    lineKind: null,
+  })
+  console.log(`  + 父分类 ${name}（id=${id}）`)
+  return id
+}
+
 async function ensureCategory(client, language, lessons, options) {
   const spec = lineSpecOf(language, lessons)
+  // 挂在父分类下的线（书籍详解）不是学习轨道：带了 lineKind 它就会以"一条线"的身份
+  // 出现在 /learn，而书只有阅读顺序、没有通关概念（WORK-046 REQ-004）。
+  if (spec.parent !== null && options.track !== false) {
+    throw new Error(
+      `${language}/ 声明了 line_parent=${spec.parent}，导入时必须加 --no-track（书籍不建学习轨道）`,
+    )
+  }
   const tree = await client.get('/api/v1/knowledge/admin/categories')
+  // 先建父分类再找自己：否则"分类手工建过、父分类没建"会留下一个游离的子分类
+  const parentId = await ensureParent(client, tree, spec, options)
   const existing = findCategory(tree, spec.slug)
   if (existing) {
     return existing
@@ -230,7 +279,7 @@ async function ensureCategory(client, language, lessons, options) {
     return { id: -1, slug: spec.slug, name: spec.name, children: [] }
   }
   const id = await client.post('/api/v1/knowledge/admin/categories', {
-    parentId: null,
+    parentId,
     name: spec.name,
     slug: spec.slug,
     sortOrder: spec.sortOrder,

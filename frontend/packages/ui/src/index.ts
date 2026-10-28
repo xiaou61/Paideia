@@ -94,8 +94,11 @@ export {
 } from './markdown/markdown'
 
 // 源码解读的五种块与页级上下文（WORK-014）：知识库正文与管理端预览共用
+// 练习册的抽取（WORK-048）：把 quiz 围栏从正文里摘出来，正文交给渲染器、题交给入口卡
+export { extractQuizzes, type ExtractResult } from './markdown/practice'
 export {
   documentRenderers,
+  QuizQuestionView,
   SourceReadingProvider,
   useSourceReading,
   parseCodeTour,
@@ -103,6 +106,9 @@ export {
   parseLearningPath,
   parseCodeChallenge,
   parseQuiz,
+  scoreQuiz,
+  type Quiz,
+  type QuizQuestion,
   permalinkOf,
   type DocumentContextValue,
   type EntryProgress,

@@ -110,6 +110,16 @@ export function SqlEditor({
   // 直接用闭包里的 value 会把用户已经输入的内容回退到上一次同步时的值。
   const valueRef = useRef(value)
   valueRef.current = value
+  /**
+   * schema 只在**内容**变化时才重建编辑器。
+   *
+   * <p>直接拿对象当依赖会被"每次渲染都是新引用"打中：调用方只要写一句
+   * `schema={toCompletionSchema(...)}`，打一个字就会重建一次编辑器、丢一次焦点
+   * （2026-10-28 线上就这么坏过）。用内容键做依赖，调用方 memo 不 memo 都不影响可用性。
+   */
+  const schemaRef = useRef(schema)
+  schemaRef.current = schema
+  const schemaKey = JSON.stringify(schema ?? {})
 
   useEffect(() => {
     if (host.current === null) {
@@ -128,7 +138,7 @@ export function SqlEditor({
       autocompletion(),
       highlightActiveLine(),
       keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, ...completionKeymap, indentWithTab]),
-      sql({ dialect: MySQL, schema: schema ?? {}, upperCaseKeywords: true }),
+      sql({ dialect: MySQL, schema: schemaRef.current ?? {}, upperCaseKeywords: true }),
       theme,
       syntaxHighlighting(highlightStyle),
       EditorView.updateListener.of((update) => {
@@ -153,9 +163,9 @@ export function SqlEditor({
       instance.destroy()
       view.current = null
     }
-    // schema / placeholder / readOnly 变化时重建：schema 进补全源后无法热替换
+    // schema 的**内容** / placeholder / readOnly 变化时重建：schema 进补全源后无法热替换
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [schema, placeholder, readOnly])
+  }, [schemaKey, placeholder, readOnly])
 
   // 外部改值（AI 填回、载入关卡题）时同步进编辑器。
   // 必须比对再写：无条件 dispatch 会在用户每次输入后把光标重置到末尾。
