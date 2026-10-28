@@ -35,7 +35,7 @@ live 金集用线上平台凭据跑过 4 轮（凭据只在测试进程环境变
 | AC-008 阈值两侧一致 | `node scripts/check-ops-thresholds.mjs` | 0 | 未验证 | 正向 exit 0；负向把 `DISK_USED_ERROR` 改成 1.5 后 exit 1（`✗ 必须在 0 与 1 之间`）。生产两侧一致待部署 |
 | AC-009 重启补诊断 | `... -Dtest=OpsDiagnosisServiceTest,OpsIncidentMapperTest ...` | 0 | 通过 | `catchUpPicksOpenWithoutDone`、`catchUpSkipsWhenUserMissing`、`catchUpCandidateIsSingleAndSkipsDone`（有 DONE 的事件被跳过） |
 | AC-010 金集 ≥20 条 prompt 模式 | `... -Dtest=OpsDiagnosisGoldenSetTest ...` | 0 | 通过 | 24 条：26 执行 / 0 失败 / **1 跳过（live）**；`goldenSetIsWideEnough` 阈值已改 20 |
-| AC-011 live 评测 | `PAIDEIA_OPS_EVAL=1 ... mvn -B -pl paideia-ai -am -Dtest=OpsDiagnosisGoldenSetTest test`（凭据取自线上配置，只进环境变量） | 1（有失败用例） | 通过 | 24 条全跑：v5 原始 20/24；按修正后的 token 重判**22/24**；残留 04/15 是模型未引用数值。报告与重判说明：`testing/evidence/live-eval-v5.md` |
+| AC-011 live 评测 | `PAIDEIA_OPS_EVAL=1 ... mvn -B -pl paideia-ai -am -Dtest=OpsDiagnosisGoldenSetTest test`（凭据取自线上配置，只进环境变量） | 1 | 通过 | 24 条全跑：v5 原始 20/24；按修正后的 token 重判**22/24**；残留 04/15 是模型未引用数值。报告与重判说明：`testing/evidence/live-eval-v5.md` |
 | AC-012 生产快烧演练 | 维护窗口人工步骤 | manual | 未验证 | 未部署，未申请窗口；步骤见 `testing/plan.md` 人工检查 |
 | AC-013 事件页 Grafana 深链 | `frontend/node_modules/.bin/tsc -p apps/admin/tsconfig.json`；`pnpm --filter @paideia/admin build` | 0 | 未验证 | 类型检查无输出、构建成功；未在浏览器点击（本地无完整服务） |
 | AC-014 日志单元可配置 | `... -Dtest=OpsEvidenceCollectorTest ...` | 0 | 通过 | `customUnitIsWhitelisted`：配置 `rustfs` 后查询用 `unit="rustfs.service"`，未知单元仍抛错 |
