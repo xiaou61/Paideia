@@ -4,7 +4,7 @@ work_id: WORK-051
 work: 手绘风配图（sketch 围栏块）
 status: passed
 evidence: required
-verified_commit: 1be235b
+verified_commit: d8626cd
 created: 2026-10-28
 updated: 2026-10-28
 ---
