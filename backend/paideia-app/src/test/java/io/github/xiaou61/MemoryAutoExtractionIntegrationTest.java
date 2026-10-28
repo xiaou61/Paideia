@@ -116,6 +116,7 @@ class MemoryAutoExtractionIntegrationTest {
         jdbcTemplate.update("DELETE FROM ai_memories_structured");
         jdbcTemplate.update("DELETE FROM ai_memories_text");
         jdbcTemplate.update("DELETE FROM ai_user_settings");
+        jdbcTemplate.update("DELETE FROM ai_memory_candidates");
         jdbcTemplate.update("DELETE FROM ai_credit_ledger");
         jdbcTemplate.update("DELETE FROM ai_credit_accounts");
     }
@@ -137,6 +138,25 @@ class MemoryAutoExtractionIntegrationTest {
         assertThat(item.origin()).isEqualTo(MemoryStore.SOURCE_AUTO);
         assertThat(item.reason()).isEqualTo("提到求职");
         assertThat(item.conversationId()).isEqualTo(conversationId);
+    }
+
+    @Test
+    @DisplayName("WORK-050 AC-006：PROPOSE 只进候选表，正式表一行不多")
+    void proposeWritesOnlyCandidates() {
+        long conversationId = newConversationWithTurns(ROUNDS);
+        when(extractor.extract(any(), any())).thenReturn(new MemoryExtractor.MemoryExtraction(
+                List.of(new MemoryCandidate(MemoryCandidate.Action.PROPOSE, MemoryCandidate.Store.TEXT, null,
+                        null, null, "他最近在翻 DDIA", "动机不明")),
+                new TokenUsage(900, 120, 1020)));
+
+        extraction.scheduleIfDue(user, conversationId);
+        awaitCandidateCount(1);
+
+        assertThat(memories.list(user, 0, 0)).as("提议不是事实，不能进正式表").isEmpty();
+        Integer pending = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ai_memory_candidates WHERE user_id = ? AND status = 'pending'",
+                Integer.class, user);
+        assertThat(pending).isEqualTo(1);
     }
 
     @Test
@@ -422,6 +442,19 @@ class MemoryAutoExtractionIntegrationTest {
             sleep();
         }
         assertThat(memories.list(user, 0, 0).stream().map(MemoryStore.MemoryItem::text)).contains(expected);
+    }
+
+    private void awaitCandidateCount(int expected) {
+        long deadline = System.currentTimeMillis() + 10_000;
+        while (System.currentTimeMillis() < deadline) {
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM ai_memory_candidates WHERE user_id = ?", Integer.class, user);
+            if (count != null && count >= expected) {
+                return;
+            }
+            sleep();
+        }
+        throw new AssertionError("等候选超时");
     }
 
     private void awaitLedgerKind(String kind) {

@@ -63,14 +63,29 @@ public class MemoryCandidateParser {
 
     private MemoryCandidate one(JsonNode node) {
         MemoryCandidate.Action action = action(text(node, "action"));
-        MemoryCandidate.Store store = store(text(node, "store"));
         String reason = text(node, "reason");
         Long refId = positiveId(text(node, "refId"));
 
+        // SKIP 与 PROPOSE **不强制 store**：两者都不写正式表，放哪一路是后话。
+        // 基线实测这条很现实——模型对灰区内容会给"没有 store"的对象，严格校验会把整次整理废掉。
         if (action == MemoryCandidate.Action.SKIP) {
-            // 跳过的不做任何校验：它的内容本来就不会落库
-            return new MemoryCandidate(action, store, null, null, null, null, reason);
+            return new MemoryCandidate(action, storeOrDefault(text(node, "store")), null, null, null, null, reason);
         }
+
+        if (action == MemoryCandidate.Action.PROPOSE) {
+            String proposed = text(node, "content");
+            if (proposed == null || proposed.isBlank()) {
+                throw failure("PROPOSE 的内容为空");
+            }
+            String trimmed = proposed.trim();
+            if (trimmed.length() > MAX_TEXT_CHARS) {
+                throw failure("PROPOSE 的内容超长");
+            }
+            return new MemoryCandidate(action, storeOrDefault(text(node, "store")), null,
+                    MemoryKinds.normalize(text(node, "kind")), refId, trimmed, reason);
+        }
+
+        MemoryCandidate.Store store = store(text(node, "store"));
 
         if (action == MemoryCandidate.Action.DELETE) {
             Long targetId = positiveId(text(node, "targetId"));
@@ -133,8 +148,13 @@ public class MemoryCandidateParser {
         try {
             return MemoryCandidate.Action.valueOf(raw.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
-            throw failure("action 不是四种动作之一");
+            throw failure("action 不是五种动作之一");
         }
+    }
+
+    /** 缺省按全文那一路：它是"他说过的话"，比"事实"更保守（不会污染结构化白名单）。 */
+    private static MemoryCandidate.Store storeOrDefault(String raw) {
+        return raw == null || raw.isBlank() ? MemoryCandidate.Store.TEXT : store(raw);
     }
 
     private static MemoryCandidate.Store store(String raw) {

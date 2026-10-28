@@ -20,7 +20,7 @@ public class MemoryProperties {
     private int roundsPerExtraction = 6;
 
     /** 一次整理自带的 token 上限（不含思考时的余量见类注释）。 */
-    private int maxTokens = 2048;
+    private int maxTokens = 3072;
 
     /** 判断类任务：低温度。 */
     private double temperature = 0.2;

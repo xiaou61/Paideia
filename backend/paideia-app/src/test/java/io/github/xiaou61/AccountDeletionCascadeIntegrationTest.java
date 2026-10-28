@@ -55,6 +55,8 @@ class AccountDeletionCascadeIntegrationTest {
             {"ai_messages", "conversation_id"}, // 单独按会话删，见断言处的说明
             {"ai_memories_structured", "user_id"},
             {"ai_memories_text", "user_id"},
+            // 待确认的候选（WORK-050）：提议也是这个人的数据，注销必须一并归零
+            {"ai_memory_candidates", "user_id"},
             {"ai_user_settings", "user_id"},
             // WORK-010：身份画像与面试评估也必须是"注销后逐表为 0"
             {"learner_profiles", "user_id"},
@@ -211,6 +213,11 @@ class AccountDeletionCascadeIntegrationTest {
                 conversationId);
         jdbcTemplate.update("INSERT INTO ai_memories_structured (user_id, kind, content) VALUES (?, 'k', '事实')", owner);
         jdbcTemplate.update("INSERT INTO ai_memories_text (user_id, content) VALUES (?, '说过的话')", owner);
+        jdbcTemplate.update("""
+                INSERT INTO ai_memory_candidates
+                    (user_id, store, content, content_bytes, source, status, created_at, expires_at)
+                VALUES (?, 'text', '待确认的提议', 18, 'auto', 'pending', ?, ?)
+                """, owner, Timestamp.from(Instant.now()), Timestamp.from(Instant.now().plusSeconds(3600)));
         jdbcTemplate.update("INSERT INTO ai_user_settings (user_id, updated_at) VALUES (?, UTC_TIMESTAMP(3))", owner);
         jdbcTemplate.update("INSERT INTO learner_profiles (user_id, identity, updated_at) VALUES (?, 'job_seeker', UTC_TIMESTAMP(3))", owner);
         jdbcTemplate.update("INSERT INTO ai_interview_evaluations (user_id, conversation_id, score_json, created_at) "

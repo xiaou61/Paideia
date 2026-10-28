@@ -154,7 +154,7 @@ S1 的基线必须用**现状代码**跑出来，不能等改完再补。
   4. 注销清单加 `ai_memory_candidates`。
 - 验证：`-Dtest=MemoryPurgeTest` 全绿；迁移在零数据新库上能跑（`scripts/test-db.sh` 自动给独占库）
 
-### TASK-008 | pending | PROPOSE 动作与提示词 v2
+### TASK-008 | done | PROPOSE 动作与提示词 v2
 
 - 对应：`REQ-006`、`AC-006`
 - 依赖：TASK-001（金集用来判断提议得对不对）
@@ -167,7 +167,7 @@ S1 的基线必须用**现状代码**跑出来，不能等改完再补。
   3. 用 TASK-001 的 6 条"应 PROPOSE"用例跑一次，检查提议率不是 0 也不是 100%。
 - 验证：`-Dtest=MemoryCandidateParserTest` 全绿；真连跑一次记录提议率进工件
 
-### TASK-009 | pending | 候选表与整理分流
+### TASK-009 | done | 候选表与整理分流
 
 - 对应：`REQ-006`、`REQ-007`、`AC-006`、`AC-007`、`AC-008`
 - 依赖：TASK-007（候选表）、TASK-008（新动作）
@@ -183,7 +183,7 @@ S1 的基线必须用**现状代码**跑出来，不能等改完再补。
 - 验证：`-Dtest='MemoryCandidate*Test,MemoryExtractionServiceTest'` 全绿，含 `filteredCandidateStoresNoContent`、
   `concurrentAcceptCreatesOne`、`proposeWritesOnlyCandidates`
 
-### TASK-010 | pending | 候选端点、注销与总开关
+### TASK-010 | done | 候选端点、注销与总开关
 
 - 对应：`REQ-008`、`REQ-011`、`REQ-012`、`AC-009`、`AC-012`、`AC-013`
 - 依赖：TASK-009

@@ -27,13 +27,16 @@ public class MemoryRetentionPurger {
     private static final Logger log = LoggerFactory.getLogger(MemoryRetentionPurger.class);
 
     private final MemoryStore memories;
+    private final MemoryCandidateService candidates;
     private final MemoryProperties properties;
     /** 可空：测试切片与局部启动里没有这个 bean。 */
     private final ObjectProvider<ScheduledTaskRecorder> recorder;
 
-    MemoryRetentionPurger(MemoryStore memories, MemoryProperties properties,
+    MemoryRetentionPurger(MemoryStore memories, MemoryCandidateService candidates,
+                          MemoryProperties properties,
                           ObjectProvider<ScheduledTaskRecorder> recorder) {
         this.memories = memories;
+        this.candidates = candidates;
         this.properties = properties;
         this.recorder = recorder;
     }
@@ -45,9 +48,14 @@ public class MemoryRetentionPurger {
         }
         long startedAt = System.nanoTime();
         try {
-            int deleted = memories.purgeExpired(Instant.now());
+            Instant now = Instant.now();
+            int deleted = memories.purgeExpired(now);
             if (deleted > 0) {
                 log.info("ai.memory.purged rows={}", deleted);
+            }
+            int dropped = candidates.dropExpired(now, 500);
+            if (dropped > 0) {
+                log.info("ai.memory.candidates_dropped rows={}", dropped);
             }
             record(startedAt, null);
         } catch (RuntimeException failure) {

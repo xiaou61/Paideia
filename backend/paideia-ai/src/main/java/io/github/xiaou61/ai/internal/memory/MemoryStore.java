@@ -395,6 +395,9 @@ public class MemoryStore {
                 case SKIP -> {
                     // 什么都不做：这正是"看过但不值得记"的表达
                 }
+                // 正常路径上 PROPOSE 已被 MemoryExtractionService 分流到候选表；
+                // 走到这里说明调用方绕过了那条分流——不写正式表，只记一条日志。
+                case PROPOSE -> log.info("ai.memory.propose_bypassed userId={}", userId);
                 default -> throw new IllegalStateException("未处理的动作：" + candidate.action());
             }
         }

@@ -6,9 +6,9 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * 记忆自动整理的提示词（WORK-013）。
+ * 记忆自动整理的提示词（WORK-013，WORK-050 升 v2）。
  *
- * <p><b>{@link #VERSION} 单独一个</b>（不与 {@code assistant-chat-v1} 共用）：将来出现"同一段对话
+ * <p><b>{@link #VERSION} 单独一个</b>（不与 `assistant-chat-v1` 共用）：将来出现"同一段对话
  * 为什么整理得不一样"时，要能分辨是"聊天提示词改了"还是"整理提示词改了"。
  *
  * <p><b>要求模型只回一段 JSON，不走框架的结构化输出通道</b>：AgentScope 对 DeepSeek 的结构化输出
@@ -17,8 +17,9 @@ import java.util.Locale;
  * 校验——校验器本来就不可少（原生结构化输出也会字段漂移）。这一点与设计里写的
  * `response_format: json_object` 不同，属**有意偏离**，已记入更新历史。
  *
- * <p>四条约束是"不让它胡来"的核心：只能依据对话内容、宁少勿多、同一件事要 `UPDATE` 不要 `ADD`、
- * 没有值得记的就回空数组。
+ * <p><b>v2 只加了一件事：{@code PROPOSE}</b>（WORK-050）。基线实测（`testing/baseline.md`）
+ * 四种动作时，模型遇到"拿不准该不该记"的内容会吐出结构不完整的对象，2/40 条用例整次整理作废。
+ * 给它一个"我不确定"的表达方式，比让它硬选一个更接近真实需求，也正好服务"少而准"。
  *
  * <p>它必须是 {@code public}：调用方 {@code AgentScopeMemoryExtractor} 在
  * {@code internal.provider} 里（本模块内跨包，与 {@code GuardedHttpTransport} 同理）。
@@ -31,7 +32,7 @@ public final class MemoryExtractionPrompt {
      * <p>public 是为了让离线评测（`MemoryEvalTest`）在报告里写明"这份数字对应哪版提示词"——
      * 没有它，跨版本的指标差异永远无法归因。
      */
-    public static final String VERSION = "memory-extract-v1";
+    public static final String VERSION = "memory-extract-v2";
 
     private MemoryExtractionPrompt() {
     }
@@ -43,7 +44,7 @@ public final class MemoryExtractionPrompt {
                 并给出对记忆库的操作。
                 只输出一个 JSON 对象，不要解释、不要用 markdown 代码块包裹。
                 JSON 结构：
-                {"candidates":[{"action":"ADD|UPDATE|DELETE|SKIP","store":"structured|text",\
+                {"candidates":[{"action":"ADD|UPDATE|DELETE|SKIP|PROPOSE","store":"structured|text",\
                 "targetId":12,"kind":"weak_topic|goal|preference","refId":3,"content":"一句话",\
                 "reason":"为什么"}]}
 
@@ -52,12 +53,21 @@ public final class MemoryExtractionPrompt {
                   weak_topic（还不懂/卡住的知识点）、goal（学习目标）、preference（偏好）。
                 - text：他说过的**话**、习惯、背景（不需要 kind）。
 
-                四种动作（action）：
+                五种动作（action）：
                 - ADD：新增一条。
                 - UPDATE：**已有记忆里那条说法要改**（更准/更完整/已过期）。必须给 targetId，
                   以及该条所在的 store。同一件事的第二次说法**应该 UPDATE，不要 ADD**。
                 - DELETE：已有记忆**已经不成立**（例如他后来学会了、目标已变）。必须给 targetId。
-                - SKIP：看见了但不值得记。可以不给 content。
+                - SKIP：看见了但不值得记。可以不给 content 与 store。
+                - PROPOSE：**你拿不准该不该长期记**。给 content 与 reason，不必给 store 或 kind。
+                  它不会写进记忆，而是排队等用户点一下确认。
+
+                什么时候用 PROPOSE 而不是 ADD：
+                - 只有一次提问或一句抱怨，看不出是长期弱项还是随口一说；
+                - 从行为推测出的结论（"他连这个都不懂，基础可能很薄"）；
+                - 提到某件事但动机不明（"最近在翻某本书"、"有点想转某个方向"）；
+                - 可能只是一次性事件（"下周有个面试"）。
+                **拿不准时一律 PROPOSE，不要 ADD。** 宁可让用户多点一下，也不要把猜测写成事实。
 
                 规则：
                 1. 只依据给定对话，不要推测、不要补充对话里没有的事实。
@@ -65,6 +75,7 @@ public final class MemoryExtractionPrompt {
                 3. content 是一句提炼后的陈述，不超过 50 字，用第三人称（"他…"），不要照抄整段原话。
                 4. targetId 只能取自「已经记住的内容」里给出的编号，**不许自己编**。
                 5. 没有值得记的就回 {"candidates":[]}。
+                6. 不要复述手机号、口令、令牌、连接串这类内容——即使他说了，也不要写进 content。
                 """;
     }
 
