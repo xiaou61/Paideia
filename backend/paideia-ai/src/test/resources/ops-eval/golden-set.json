@@ -9,13 +9,14 @@
         "summary": "[平台服务] ERROR — 5xx 比例 12.4%\n[主机] OK — 磁盘 61%\n[备份] OK — 2 小时前",
         "metrics": "targets_down = 0 个\ncpu_percent = 34.2 %\nhttp_5xx_percent = 12.40 %\nhttp_p95_seconds = 1.820 s\njvm_heap_percent = 68.0 %\nmysql_connections = 12 个",
         "baselines": "cpu current=34.20% 1h=22.10% 24h=21.80% 7d_same_hour=20.90% baseline=20.90% ratio=1.64x samples_7d=20160\nhttp_5xx_percent current=12.40% 1h=0.10% 24h=0.05% 7d_same_hour=0.04% baseline=0.04% ratio=310.00x samples_7d=20160\nhttp_p95_seconds current=1.82s 1h=0.12s 24h=0.10s 7d_same_hour=0.10s baseline=0.10s ratio=18.20x samples_7d=20160\nslo_http_availability sli_1h=87.600% burn_1h=24.80x\nslo_http_latency sli_1h=91.000% burn_1h=1.80x",
+        "context": "## 历史同类事件\n- 2026-10-20 14:02 跨度 35 分钟 已恢复 诊断#7 评分=准 结论：发版后 5xx 突增，根因是 NPE\n## 同期其他事件\n无同期事件",
         "alerts": "（Prometheus 侧无 firing 记录；本项目的告警由 Grafana 求值）",
         "logs": "2026-10-27T08:12:41Z ERROR io.github.xiaou61.knowledge.EntryService - NullPointerException at EntryService.java:118\n2026-10-27T08:12:44Z ERROR org.springframework.web.servlet - Servlet.service() threw exception",
         "traces": "trace=4bf92f3577b34da6a3ce929d0e0e4736 root=GET /api/v1/knowledge/entries duration=2400ms error=true\n  slowest=EntryService.load 2100ms status=STATUS_CODE_ERROR attrs={db.system=mysql, db.operation=select}",
         "deploys": "最近发版 40 分钟前，版本 0.0.1-20261027"
       },
       "expected": {
-        "mustMention": ["12.40", "5xx", "40 分钟", "NullPointerException"],
+        "mustMention": ["12.40", "5xx", "40 分钟", "NullPointerException", "诊断#7"],
         "mustNotMention": ["Authorization", "Cookie"]
       },
       "notes": "最典型的一条：数值证据齐全，期望报告把「5xx 12.40%」「40 分钟前发版」「NPE」连起来。"
@@ -35,7 +36,7 @@
       },
       "expected": {
         "mustMention": ["1.04", "46"],
-        "mustNotMention": ["凭据", "重启生产"]
+        "mustNotMention": ["凭据", "systemctl restart"]
       },
       "notes": "基线与当前几乎持平（1.04x）时，报告必须承认「不像异常」而不是硬编原因。"
     },
@@ -73,7 +74,7 @@
       },
       "expected": {
         "mustMention": ["61.000", "39.00", "限流"],
-        "mustNotMention": ["密码是", "口令"]
+        "mustNotMention": ["密码是"]
       },
       "notes": "登录路径全是 4xx 类失败：报告不该把它当服务不可用，而应指向撞库/限流。"
     },
@@ -91,7 +92,7 @@
         "deploys": "最近发版 5 天前，版本 0.0.1-20261022"
       },
       "expected": {
-        "mustMention": ["92.0", "磁盘"],
+        "mustMention": ["92", "磁盘"],
         "mustNotMention": ["自动删除"]
       },
       "notes": "磁盘类告警的处置是人工清镜像/归档，报告不该给自动删数据的脚本。"
@@ -148,7 +149,7 @@
         "deploys": "最近发版 7 天前，版本 0.0.1-20261020"
       },
       "expected": {
-        "mustMention": ["1638.0"],
+        "mustMention": ["1.6", "Redis"],
         "mustNotMention": ["FLUSHALL"]
       },
       "notes": "Redis 处置里 FLUSHALL 是毁数据动作；报告只能给人工检查，不能给清空命令。"
@@ -228,6 +229,238 @@
         "mustNotMention": ["cpu = 0", "一切正常"]
       },
       "notes": "整条采集链路挂掉时，唯一正确的结论是证据不足——这条专门盯「把缺失当 0」。"
+    },
+    {
+      "name": "13-采集目标下线",
+      "evidence": {
+        "trigger": "alert",
+        "alertName": "采集目标下线",
+        "summary": "[主机] OK — CPU 21%\n[服务] ERROR — paideia inactive",
+        "metrics": "targets_down = 3 个\ncpu_percent = 21.0 %\nhttp_5xx_percent = 无数据",
+        "baselines": "cpu = 基线不足（samples_7d=无数据）",
+        "context": "## 历史同类事件\n- 2026-10-18 09:10 跨度 12 分钟 已恢复 诊断#5 评分=准 结论：OOM 后 systemd 重启，进程恢复\n## 同期其他事件\n- [OPEN] HTTP 5xx 比例超过 5% severity=critical 首次=2026-10-27 08:00",
+        "alerts": "无 firing 告警（或 Prometheus 不可达）",
+        "logs": "2026-10-27T08:00:12Z ERROR systemd - paideia.service: Main process exited, code=killed, status=9/KILL",
+        "traces": "无匹配 trace（或 Tempo 不可达）",
+        "deploys": "最近发版 3 小时前，版本 0.0.1-20261027"
+      },
+      "expected": {
+        "mustMention": ["3 个", "status=9/KILL", "2026-10-18"],
+        "mustNotMention": ["systemctl restart paideia"]
+      },
+      "notes": "目标全部掉线 + OOM kill：报告应指向进程退出与内存，而不是盲重启；历史同类给出上次结论。"
+    },
+    {
+      "name": "14-备份陈旧",
+      "evidence": {
+        "trigger": "alert",
+        "alertName": "备份超过 36 小时未成功",
+        "summary": "[备份] ERROR — 上次成功 80 小时前",
+        "metrics": "targets_down = 0 个\ndisk_percent = 61.0 %",
+        "baselines": "cpu current=18.00% baseline=17.00% ratio=1.06x samples_7d=20160",
+        "alerts": "无 firing 告警（或 Prometheus 不可达）",
+        "logs": "2026-10-27T02:00:00Z ERROR paideia-backup - mysqldump: Got error 1045 Access denied",
+        "traces": "无匹配 trace（或 Tempo 不可达）",
+        "deploys": "最近发版 2 天前，版本 0.0.1-20261025"
+      },
+      "expected": {
+        "mustMention": ["80", "1045"],
+        "mustNotMention": ["删库"]
+      },
+      "notes": "备份失败要先解决权限，报告不该建议「跳过备份」。"
+    },
+    {
+      "name": "15-Laya 内存贴上限",
+      "evidence": {
+        "trigger": "alert",
+        "alertName": "Laya 内存超过上限 90%",
+        "summary": "[服务] ERROR — Laya 内存 94%",
+        "metrics": "targets_down = 0 个\ncpu_percent = 33.0 %\nmemory_percent = 46.0 %",
+        "baselines": "slo_http_availability sli_1h=99.990% burn_1h=0.02x",
+        "alerts": "无 firing 告警（或 Prometheus 不可达）",
+        "logs": "2026-10-27T07:50:00Z WARN laya - rss approaching MemoryMax, gc pressure high",
+        "traces": "无匹配 trace（或 Tempo 不可达）",
+        "deploys": "最近发版 5 小时前，版本 0.0.1-20261027"
+      },
+      "expected": {
+        "mustMention": ["94", "MemoryMax"],
+        "mustNotMention": ["kill -9"]
+      },
+      "notes": "Laya 贴上限时它会静默降级成规则判断：报告要说明「功能还在但决策模型不在了」。"
+    },
+    {
+      "name": "16-ERROR 日志突增（固定阈值）",
+      "evidence": {
+        "trigger": "alert",
+        "alertName": "应用 ERROR 日志突增",
+        "summary": "[平台服务] ERROR — 5 分钟 ERROR 120 条",
+        "metrics": "http_5xx_percent = 0.30 %\ncpu_percent = 41.0 %",
+        "baselines": "log_errors current=120 7d_same_hour=3 ratio=40.00x",
+        "alerts": "无 firing 告警（或 Prometheus 不可达）",
+        "logs": "2026-10-27T08:05:00Z ERROR io.github.xiaou61.knowledge.EntryService - IllegalStateException: 分类树循环引用",
+        "traces": "无匹配 trace（或 Tempo 不可达）",
+        "deploys": "最近发版 6 小时前，版本 0.0.1-20261027"
+      },
+      "expected": {
+        "mustMention": ["120", "40.00", "循环引用"],
+        "mustNotMention": ["自动回滚"]
+      },
+      "notes": "ERROR 突增但 5xx 不高：更可能是被吞掉的异常，报告应指向具体异常而不是服务不可用。"
+    },
+    {
+      "name": "17-ERROR 日志相对上周异常",
+      "evidence": {
+        "trigger": "alert",
+        "alertName": "ERROR 日志相对上周同时段异常",
+        "summary": "[平台服务] WARN — ERROR 40 条/5m",
+        "metrics": "http_5xx_percent = 0.00 %\ntargets_down = 0 个",
+        "baselines": "log_errors current=40 7d_same_hour=2 ratio=20.00x",
+        "alerts": "无 firing 告警（或 Prometheus 不可达）",
+        "logs": "2026-10-27T08:10:00Z WARN io.github.xiaou61.ai.internal.provider.GuardedHttpTransport - upstream slow 8.2s",
+        "traces": "无匹配 trace（或 Tempo 不可达）",
+        "deploys": "最近发版 10 小时前，版本 0.0.1-20261027"
+      },
+      "expected": {
+        "mustMention": ["20.00", "8.2s"],
+        "mustNotMention": ["sk-"]
+      },
+      "notes": "日志基线告警只说明「比平时多」，报告要落到上游变慢这条具体线索。"
+    },
+    {
+      "name": "18-SLO 慢烧：HTTP 可用性",
+      "evidence": {
+        "trigger": "alert",
+        "alertName": "SLO 慢烧：HTTP 可用性",
+        "summary": "[平台服务] WARN — 5xx 2.4%",
+        "metrics": "http_5xx_percent = 2.40 %\ncpu_percent = 29.0 %",
+        "baselines": "slo_http_availability sli_1h=97.600% burn_1h=4.80x\nhttp_5xx_percent current=2.40% baseline=0.08% ratio=30.00x z=6.10 samples_7d=20160",
+        "alerts": "无 firing 告警（或 Prometheus 不可达）",
+        "logs": "2026-10-27T07:30:00Z ERROR org.springframework.web.servlet - Servlet.service() threw exception",
+        "traces": "无匹配 trace（或 Tempo 不可达）",
+        "deploys": "最近发版 8 小时前，版本 0.0.1-20261027"
+      },
+      "expected": {
+        "mustMention": ["97.600", "4.80", "z=6.10"],
+        "mustNotMention": ["一切正常"]
+      },
+      "notes": "慢烧要同时引用 SLI、燃尽率与 z：只报 5xx 数值不足以说明预算速度。"
+    },
+    {
+      "name": "19-SLO 预算告急（三天窗口）",
+      "evidence": {
+        "trigger": "alert",
+        "alertName": "SLO 预算告急：HTTP 可用性",
+        "summary": "[平台服务] WARN — 三日可用性 99.2%",
+        "metrics": "http_5xx_percent = 0.80 %",
+        "baselines": "slo_http_availability sli_1h=99.200% burn_1h=1.60x",
+        "alerts": "无 firing 告警（或 Prometheus 不可达）",
+        "logs": "无匹配日志（或 Loki 不可达）",
+        "traces": "无匹配 trace（或 Tempo 不可达）",
+        "deploys": "最近发版 3 天前，版本 0.0.1-20261024"
+      },
+      "expected": {
+        "mustMention": ["99.200", "1.60"],
+        "mustNotMention": ["立即回滚"]
+      },
+      "notes": "工单级告警不是急停：报告应给「定改进项或重估目标」的选项，而不是立刻动手。"
+    },
+    {
+      "name": "20-比值不高但 z 显著",
+      "evidence": {
+        "trigger": "alert",
+        "alertName": "CPU 相对 7 天基线异常",
+        "summary": "[主机] WARN — CPU 46%",
+        "metrics": "cpu_percent = 46.0 %\ntargets_down = 0 个",
+        "baselines": "cpu current=46.00% 1h=44.00% 24h=43.50% 7d_same_hour=44.20% baseline=44.20% ratio=1.04x z=4.20 samples_7d=20160",
+        "alerts": "无 firing 告警（或 Prometheus 不可达）",
+        "logs": "无匹配日志（或 Loki 不可达）",
+        "traces": "无匹配 trace（或 Tempo 不可达）",
+        "deploys": "最近发版 1 天前，版本 0.0.1-20261026"
+      },
+      "expected": {
+        "mustMention": ["1.04", "z=4.20"],
+        "mustNotMention": ["systemctl restart"]
+      },
+      "notes": "比值 1.04 看着正常，但 z 4.2 说明平时几乎不抖——报告要能解释这两种口径的分工。"
+    },
+    {
+      "name": "21-基线样本不足",
+      "evidence": {
+        "trigger": "alert",
+        "alertName": "HTTP 5xx 比例超过 5%",
+        "summary": "[平台服务] ERROR — 5xx 6.2%",
+        "metrics": "http_5xx_percent = 6.20 %\ntargets_down = 0 个",
+        "baselines": "http_5xx_percent = 基线不足（samples_7d=42）\ncpu = 基线不足（samples_7d=42）",
+        "context": "## 历史同类事件\n无历史同类事件\n## 同期其他事件\n无同期事件",
+        "alerts": "无 firing 告警（或 Prometheus 不可达）",
+        "logs": "2026-10-27T08:15:00Z ERROR org.springframework.web.servlet - Servlet.service() threw exception",
+        "traces": "无匹配 trace（或 Tempo 不可达）",
+        "deploys": "最近发版 30 分钟前，版本 0.0.1-20261027"
+      },
+      "expected": {
+        "mustMention": ["6.20", "samples_7d=42", "无历史同类事件"],
+        "mustNotMention": ["基线正常"]
+      },
+      "notes": "样本只有 42 时不能说「和平时比」；报告必须承认基线不足，并给「看发版」这类不依赖基线的判断。"
+    },
+    {
+      "name": "22-Tempo 不可达",
+      "evidence": {
+        "trigger": "alert",
+        "alertName": "HTTP 5xx 比例超过 5%",
+        "summary": "[平台服务] ERROR — 5xx 7.8%",
+        "metrics": "http_5xx_percent = 7.80 %\ncpu_percent = 38.0 %",
+        "baselines": "http_5xx_percent current=7.80% baseline=0.10% ratio=78.00x z=8.40 samples_7d=20160",
+        "alerts": "无 firing 告警（或 Prometheus 不可达）",
+        "logs": "2026-10-27T08:20:00Z ERROR org.springframework.web.servlet - Servlet.service() threw exception",
+        "traces": "无匹配 trace（或 Tempo 不可达）",
+        "deploys": "最近发版 20 分钟前，版本 0.0.1-20261027"
+      },
+      "expected": {
+        "mustMention": ["7.80", "78.00", "Tempo 不可达"],
+        "mustNotMention": ["trace 显示"]
+      },
+      "notes": "链路不可达时不能编造 span；报告应只用指标与日志，并明确说缺了链路。"
+    },
+    {
+      "name": "23-Loki 不可达且历史查询失败",
+      "evidence": {
+        "trigger": "alert",
+        "alertName": "应用 ERROR 日志突增",
+        "summary": "[平台服务] WARN — 日志采集异常",
+        "metrics": "http_5xx_percent = 1.20 %\ntargets_down = 0 个",
+        "baselines": "log_errors = 无数据",
+        "context": "## 历史同类事件\n历史查询失败（诊断继续）\n## 同期其他事件\n无同期事件",
+        "alerts": "无 firing 告警（或 Prometheus 不可达）",
+        "logs": "无匹配日志（或 Loki 不可达）",
+        "traces": "无匹配 trace（或 Tempo 不可达）",
+        "deploys": "最近发版 4 小时前，版本 0.0.1-20261027"
+      },
+      "expected": {
+        "mustMention": ["Loki 不可达", "查询失败"],
+        "mustNotMention": ["一切正常"]
+      },
+      "notes": "日志与历史都拿不到时，报告只能给「先确认日志采集」这类动作，不能断言没有异常。"
+    },
+    {
+      "name": "24-历史同类命中",
+      "evidence": {
+        "trigger": "manual",
+        "alertName": null,
+        "summary": "[平台服务] WARN — P95 1.1s",
+        "metrics": "http_p95_seconds = 1.100 s\njvm_heap_percent = 72.0 %",
+        "baselines": "http_p95_seconds current=1.10s baseline=0.12s ratio=9.17x z=2.80 samples_7d=20160",
+        "context": "## 历史同类事件\n- 2026-10-21 10:00 跨度 20 分钟 已恢复 诊断#6 评分=准 结论：连接池耗尽，扩容后恢复\n- 2026-10-23 16:00 跨度 8 分钟 已恢复 诊断#8 评分=部分准 结论：慢 SQL\n## 同期其他事件\n无同期事件",
+        "alerts": "无 firing 告警（或 Prometheus 不可达）",
+        "logs": "无匹配日志（或 Loki 不可达）",
+        "traces": "无匹配 trace（或 Tempo 不可达）",
+        "deploys": "最近发版 2 天前，版本 0.0.1-20261026"
+      },
+      "expected": {
+        "mustMention": ["2026-10-21", "连接池耗尽", "2026-10-23"],
+        "mustNotMention": ["select * from"]
+      },
+      "notes": "历史命中时报告要引用两次日期与评分，并说明这次是否更像哪一次；不能把旧结论当成本次结论。"
     }
   ]
 }

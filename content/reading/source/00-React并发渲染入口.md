@@ -1,6 +1,7 @@
 ---
 title: React 的一次并发渲染是怎么开始的
 category: source-reading
+line_summary: 从一次 React 渲染入口追下去，学会读框架源码时先找它决定"什么时候做事"。
 line_name: 源码解读
 line_kind: reading
 line_sort: 30

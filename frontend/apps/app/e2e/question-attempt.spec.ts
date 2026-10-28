@@ -19,7 +19,12 @@ test.describe('逐题作答上报', () => {
   test('答第一题会带着块 id 与题号上报', async ({ page }) => {
     await signIn(page)
     await page.goto('/#/knowledge/entries/10')
-    await expect(page.getByTestId('quiz')).toBeVisible({ timeout: 20_000 })
+    // WORK-048 起题目不再内联：正文末尾有「测一测」入口，点开才是作答面板
+    await expect(page.getByTestId('practice-entry')).toBeVisible({ timeout: 20_000 })
+    // AC-001：题目不再内联渲染——正文里必须看不到题卡
+    await expect(page.getByTestId('quiz')).toHaveCount(0)
+    await page.getByTestId('practice-open').click()
+    await expect(page.getByTestId('practice-dialog')).toBeVisible()
 
     const responsePromise = page.waitForResponse(
       (response) =>

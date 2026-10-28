@@ -50,7 +50,7 @@ groups:
 
       # 磁盘可用低于 15%
       - uid: paideia-disk-low
-        title: 磁盘可用低于 15%
+        title: 磁盘可用低于 __DISK_FREE_PERCENT__%
         condition: A
         for: 5m
         data:
@@ -64,7 +64,7 @@ groups:
               maxDataPoints: 1
               expr: >-
                 (node_filesystem_avail_bytes{mountpoint="/"}
-                 / node_filesystem_size_bytes{mountpoint="/"}) < bool 0.15
+                 / node_filesystem_size_bytes{mountpoint="/"}) < bool __DISK_FREE_RATIO__
         noDataState: NoData
         execErrState: Error
         # **必须显式指定收件人**：Grafana 13 的 provisioned 规则不指定时，
@@ -74,12 +74,12 @@ groups:
         notification_settings:
           receiver: paideia-ops
         annotations:
-          summary: 磁盘可用不足 15%
+          summary: 磁盘可用不足 __DISK_FREE_PERCENT__%
           description: 现在最可能吃掉磁盘的是 Docker 镜像（8.35G 中 6.18G 可回收）。
 
       # 备份超过 36 小时没成功，或最近一次就是失败
       - uid: paideia-backup-stale
-        title: 备份超过 36 小时未成功
+        title: 备份超过 __BACKUP_STALE_HOURS__ 小时未成功
         condition: A
         for: 10m
         data:
@@ -93,7 +93,7 @@ groups:
               maxDataPoints: 1
               # 两个条件取并集：太陈旧 或 上次失败。两者都用 bool，保证恒有值。
               expr: >-
-                (paideia_backup_age_seconds > bool (36 * 3600))
+                (paideia_backup_age_seconds > bool (__BACKUP_STALE_HOURS__ * 3600))
                 or (paideia_backup_success < bool 1)
         noDataState: NoData
         execErrState: Error
@@ -109,7 +109,7 @@ groups:
 
       # Laya 内存超过上限 90%（OOM 后静默降级成规则判断）
       - uid: paideia-laya-memory
-        title: Laya 内存超过上限 90%
+        title: Laya 内存超过上限 __UNIT_MEMORY_PERCENT__%
         condition: A
         for: 5m
         data:
@@ -123,7 +123,7 @@ groups:
               maxDataPoints: 1
               expr: >-
                 (paideia_unit_memory_bytes{unit="laya"}
-                 / paideia_unit_memory_max_bytes{unit="laya"}) > bool 0.9
+                 / paideia_unit_memory_max_bytes{unit="laya"}) > bool __UNIT_MEMORY_RATIO__
         noDataState: NoData
         execErrState: Error
         # **必须显式指定收件人**：Grafana 13 的 provisioned 规则不指定时，
@@ -208,15 +208,16 @@ groups:
               maxDataPoints: 1
               expr: >-
                 (paideia:baseline_cpu:current > bool 70)
-                * (paideia:baseline_cpu:ratio > bool 2)
                 * (paideia:baseline_cpu:samples7d > bool 100)
+                * (((paideia:baseline_cpu:ratio > bool 2)
+                    + ((paideia:baseline_cpu:z or vector(0)) > bool 3)) > bool 0)
         noDataState: OK
         execErrState: Error
         notification_settings:
           receiver: paideia-ops
         annotations:
-          summary: CPU 高于 70% 且超过 7 天同时段基线 2 倍
-          description: 打开运维页的 AI 诊断；诊断证据会带当前值、1h/24h/7d 基线与样本数。
+          summary: CPU 高于 70% 且（超过 7 天同时段基线 2 倍或 z 大于 3）
+          description: 打开运维页的 AI 诊断；诊断证据会带当前值、1h/24h/7d 基线、比值、z 与样本数。
 
       - uid: paideia-baseline-5xx
         title: 5xx 相对 7 天基线异常
@@ -233,14 +234,15 @@ groups:
               maxDataPoints: 1
               expr: >-
                 (paideia:baseline_5xx:current > bool 1)
-                * (paideia:baseline_5xx:ratio > bool 3)
                 * (paideia:baseline_5xx:samples7d > bool 100)
+                * (((paideia:baseline_5xx:ratio > bool 3)
+                    + ((paideia:baseline_5xx:z or vector(0)) > bool 3)) > bool 0)
         noDataState: OK
         execErrState: Error
         notification_settings:
           receiver: paideia-ops
         annotations:
-          summary: 5xx 高于 1% 且超过 7 天同时段基线 3 倍
+          summary: 5xx 高于 1% 且（超过 7 天同时段基线 3 倍或 z 大于 3）
           description: 先用运维页 AI 诊断确认是否与最近发版有关；基线样本不足时不会触发。
 
       - uid: paideia-baseline-p95
@@ -258,14 +260,15 @@ groups:
               maxDataPoints: 1
               expr: >-
                 (paideia:baseline_p95:current > bool 1)
-                * (paideia:baseline_p95:ratio > bool 2)
                 * (paideia:baseline_p95:samples7d > bool 100)
+                * (((paideia:baseline_p95:ratio > bool 2)
+                    + ((paideia:baseline_p95:z or vector(0)) > bool 3)) > bool 0)
         noDataState: OK
         execErrState: Error
         notification_settings:
           receiver: paideia-ops
         annotations:
-          summary: P95 高于 1 秒且超过 7 天同时段基线 2 倍
+          summary: P95 高于 1 秒且（超过 7 天同时段基线 2 倍或 z 大于 3）
           description: 打开运维页 AI 诊断；有链路后报告会带最慢 span。
 
       # 日志量基线：当前 5 分钟 ERROR 数 vs 上周同时段。B 无数据时 NoData=OK，

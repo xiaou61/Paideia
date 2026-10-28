@@ -2,6 +2,8 @@ import { RequireAuth } from '@paideia/auth'
 import { createHashRouter } from 'react-router'
 
 import { HomePage } from './pages/HomePage'
+import { BooksPage } from './pages/BooksPage'
+import { BookChaptersPage } from './pages/BookChaptersPage'
 import { GraphPage } from './pages/GraphPage'
 import { ReviewPage } from './pages/ReviewPage'
 import { KnowledgeEntryPage } from './pages/KnowledgeEntryPage'
@@ -88,6 +90,25 @@ export const router = createHashRouter([
     element: (
       <RequireAuth>
         <TrackMapPage />
+      </RequireAuth>
+    ),
+  },
+
+  // 书籍详解（WORK-046）：按书读的独立入口。地址用固定路径 + slug，
+  // **不用分类的数字 id**——id 换库就变，slug 由内容源决定。
+  {
+    path: '/books',
+    element: (
+      <RequireAuth>
+        <BooksPage />
+      </RequireAuth>
+    ),
+  },
+  {
+    path: '/books/:slug',
+    element: (
+      <RequireAuth>
+        <BookChaptersPage />
       </RequireAuth>
     ),
   },

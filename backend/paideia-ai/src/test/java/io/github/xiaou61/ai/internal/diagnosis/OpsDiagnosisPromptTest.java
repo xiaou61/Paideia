@@ -38,7 +38,7 @@ class OpsDiagnosisPromptTest {
         String user = OpsDiagnosisPrompt.user(new OpsDiagnoser.Evidence(
                 "alert", "HTTP 5xx 比例超过 5%", null,
                 "服务状态：OK", "cpu = 12%", "cpu current=12% ratio=1.0x",
-                "无 firing 告警", null, null, null));
+                "## 历史同类事件\n无历史同类事件", "无 firing 告警", null, null, null));
 
         assertThat(user)
                 .contains("<trigger>alert</trigger>")
@@ -46,6 +46,7 @@ class OpsDiagnosisPromptTest {
                 .contains("<summary>")
                 .contains("<metrics>")
                 .contains("<baselines>")
+                .contains("<context>")
                 .contains("<logs>（不可达或无数据）</logs>")
                 .contains("<traces>（不可达或无数据）</traces>")
                 .contains("<deploys>（不可达或无数据）</deploys>");
@@ -56,7 +57,7 @@ class OpsDiagnosisPromptTest {
     void questionIsTruncated() {
         String question = "问".repeat(OpsDiagnosisPrompt.MAX_QUESTION_CHARS + 50);
         String user = OpsDiagnosisPrompt.user(new OpsDiagnoser.Evidence(
-                "manual", null, question, null, null, null, null, null, null, null));
+                "manual", null, question, null, null, null, null, null, null, null, null));
 
         assertThat(user).contains("<question>");
         assertThat(user).doesNotContain(question);

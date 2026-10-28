@@ -1,5 +1,6 @@
 package io.github.xiaou61.ops;
 
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -178,6 +179,15 @@ public class OpsProperties {
 
         private int listLimit = 20;
 
+        /** 同实例复用窗口（WORK-049）：窗口内已有 DONE 诊断就不再新开；0 关闭。 */
+        private long relatedWindowSeconds = 600;
+
+        /** 应用重启后是否补一次漏掉的诊断（WORK-049）。 */
+        private boolean catchUpEnabled = true;
+
+        /** 日志单元白名单（WORK-049）：配置本身就是白名单，未知单元仍然报错。 */
+        private List<String> units = List.of("paideia", "laya");
+
         public boolean isEnabled() {
             return enabled;
         }
@@ -224,6 +234,30 @@ public class OpsProperties {
 
         public void setListLimit(int listLimit) {
             this.listLimit = listLimit;
+        }
+
+        public long getRelatedWindowSeconds() {
+            return relatedWindowSeconds;
+        }
+
+        public void setRelatedWindowSeconds(long relatedWindowSeconds) {
+            this.relatedWindowSeconds = relatedWindowSeconds;
+        }
+
+        public boolean isCatchUpEnabled() {
+            return catchUpEnabled;
+        }
+
+        public void setCatchUpEnabled(boolean catchUpEnabled) {
+            this.catchUpEnabled = catchUpEnabled;
+        }
+
+        public List<String> getUnits() {
+            return units;
+        }
+
+        public void setUnits(List<String> units) {
+            this.units = units == null ? List.of() : units;
         }
     }
 

@@ -51,7 +51,7 @@ approver_role: CTO
 
 ## 任务
 
-### TASK-001 | pending | resolved 投递（REQ-001）
+### TASK-001 | done | resolved 投递（REQ-001）
 
 - 对应：`REQ-001`、`AC-001`
 - 依赖：无
@@ -64,7 +64,7 @@ approver_role: CTO
   3. 增加 `resolvedTwiceAppendsOneEvent`：连续两次 resolved，时间线只多一条 RESOLVED。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=OpsHookIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test` → 期望 0 failed
 
-### TASK-002 | pending | 手动关闭事件（REQ-002）
+### TASK-002 | done | 手动关闭事件（REQ-002）
 
 - 对应：`REQ-002`、`AC-002`
 - 依赖：无
@@ -83,7 +83,7 @@ approver_role: CTO
   5. 加控制器端点；前端详情在 OPEN 时显示「关闭事件」，成功后刷新 detail 与列表；`KIND_LABEL` 加 `CLOSED`。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest='OpsIncident*Test' -Dsurefire.failIfNoSpecifiedTests=false test` → 0 failed；`pnpm --filter @paideia/admin typecheck` → 无输出
 
-### TASK-003 | pending | 事件列表分页与时间筛选（REQ-003）
+### TASK-003 | done | 事件列表分页与时间筛选（REQ-003）
 
 - 对应：`REQ-003`、`AC-003`
 - 依赖：TASK-002（同文件改动，避免冲突）
@@ -100,7 +100,7 @@ approver_role: CTO
   4. 前端改 `useInfiniteQuery`；加「全部 / 24 小时 / 7 天」筛选与「加载更多」。
 - 验证：同上 + typecheck
 
-### TASK-004 | pending | 证据上下文：历史同类 + 同期事件（REQ-004/005）
+### TASK-004 | done | 证据上下文：历史同类 + 同期事件（REQ-004/005）
 
 - 对应：`REQ-004`、`REQ-005`、`AC-004`、`AC-005`
 - 依赖：无
@@ -121,7 +121,7 @@ approver_role: CTO
   5. 金集测试的证据标签增加 `<context>`。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest='OpsEvidenceCollectorTest,OpsIncidentContextTest' -Dsurefire.failIfNoSpecifiedTests=false test` → 0 failed；`scripts/test-db.sh mvn -B -pl paideia-ai -am -Dtest='OpsDiagnosisPromptTest,OpsDiagnosisGoldenSetTest' -Dsurefire.failIfNoSpecifiedTests=false test` → 0 failed
 
-### TASK-005 | pending | 同实例复用窗口（REQ-006）
+### TASK-005 | done | 同实例复用窗口（REQ-006）
 
 - 对应：`REQ-006`、`AC-006`
 - 依赖：TASK-004（Evidence 与测试基建）
@@ -138,7 +138,7 @@ approver_role: CTO
   3. 在 `start` 中接在事件冷却之后、插入诊断之前。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=OpsDiagnosisServiceTest -Dsurefire.failIfNoSpecifiedTests=false test` → 0 failed
 
-### TASK-006 | pending | z-score 基线（REQ-007）
+### TASK-006 | done | z-score 基线（REQ-007）
 
 - 对应：`REQ-007`、`AC-007`
 - 依赖：TASK-004（证据格式化）
@@ -152,7 +152,7 @@ approver_role: CTO
   4. Grafana 三条基线告警并联 z 条件（保留绝对值门槛）。
 - 验证：`scp deploy/ops/prometheus-rules*.yml codenest-online:/tmp/ && ssh codenest-online 'cd /tmp && promtool test rules prometheus-rules.test.yml'` → SUCCESS
 
-### TASK-007 | pending | 阈值单一来源（REQ-008）
+### TASK-007 | done | 阈值单一来源（REQ-008）
 
 - 对应：`REQ-008`、`AC-008`
 - 依赖：无
@@ -166,7 +166,7 @@ approver_role: CTO
   3. 负向验证：把 `DISK_USED_ERROR` 改成 `1.5` → 脚本非 0。
 - 验证：`node scripts/check-ops-thresholds.mjs` → exit 0；负向见步骤 3
 
-### TASK-008 | pending | 重启补诊断（REQ-009）
+### TASK-008 | done | 重启补诊断（REQ-009）
 
 - 对应：`REQ-009`、`AC-009`
 - 依赖：TASK-005（同服务文件）
@@ -181,7 +181,7 @@ approver_role: CTO
   3. 时间线写「重启补诊断」。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=OpsDiagnosisServiceTest -Dsurefire.failIfNoSpecifiedTests=false test` → 0 failed
 
-### TASK-009 | pending | 金集扩到 24 条（REQ-010/011）
+### TASK-009 | done | 金集扩到 24 条（REQ-010/011）
 
 - 对应：`REQ-010`、`REQ-011`、`AC-010`、`AC-011`
 - 依赖：TASK-004（context 字段）
@@ -194,7 +194,7 @@ approver_role: CTO
   3. 跑 prompt 模式全绿；live 模式在有 Key 的环境跑一次并把报告路径写进收口报告。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-ai -am -Dtest=OpsDiagnosisGoldenSetTest -Dsurefire.failIfNoSpecifiedTests=false test` → 0 failed（live 跳过属预期，除非显式开启）
 
-### TASK-010 | pending | 事件页 Grafana 深链（REQ-013）
+### TASK-010 | done | 事件页 Grafana 深链（REQ-013）
 
 - 对应：`REQ-013`、`AC-013`
 - 依赖：无
@@ -207,7 +207,7 @@ approver_role: CTO
   2. 事件详情头部加入两个 `a` 链接，新窗口打开。
 - 验证：`pnpm --filter @paideia/admin typecheck`；若可用则 `pnpm --filter @paideia/admin test` → 0 failed
 
-### TASK-011 | pending | 日志单元可配置（REQ-014）
+### TASK-011 | done | 日志单元可配置（REQ-014）
 
 - 对应：`REQ-014`、`AC-014`
 - 依赖：无

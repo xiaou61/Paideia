@@ -7,6 +7,7 @@ class OpsIncidentEvent {
 
     static final String KIND_FIRED = "FIRED";
     static final String KIND_RESOLVED = "RESOLVED";
+    static final String KIND_CLOSED = "CLOSED";
     static final String KIND_DIAGNOSIS_STARTED = "DIAGNOSIS_STARTED";
     static final String KIND_DIAGNOSIS_DONE = "DIAGNOSIS_DONE";
     static final String KIND_DIAGNOSIS_FAILED = "DIAGNOSIS_FAILED";

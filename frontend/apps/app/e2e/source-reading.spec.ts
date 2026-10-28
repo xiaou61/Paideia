@@ -71,12 +71,15 @@ test('练习与测验：判定与得分都给出明确反馈', async ({ page }) 
   await bug.getByTestId('challenge-check').click()
   await expect(bug.getByTestId('challenge-result')).toContainText('全对')
 
-  // 小测：三题全对
-  const quiz = page.getByTestId('quiz')
+  // 小测（WORK-048 起在「测一测」面板里）：三题全对
+  await page.getByTestId('practice-open').click()
+  const dialog = page.getByTestId('practice-dialog')
+  await expect(dialog).toBeVisible()
   for (const index of [0, 1, 2]) {
-    await quiz.getByTestId(`quiz-option-${index}-0`).click()
+    await dialog.getByTestId(`quiz-option-${index}-0`).click()
   }
-  await expect(quiz.getByTestId('quiz-score')).toContainText('答对 3 / 3')
+  await expect(dialog.getByTestId('quiz-score')).toContainText('答对 3 / 3')
+  await page.getByTestId('practice-close').click()
 })
 
 test('进度：刷新后回到上次那一步，练习成绩保留', async ({ page }) => {
@@ -189,6 +192,6 @@ test('沙箱未开启：运行题不显示按钮，并说明原因', async ({ pa
   await expect(runBlock.getByTestId('challenge-run')).toHaveCount(0)
   await expect(runBlock).toContainText('没有启用「运行」')
 
-  // 其它题型不受影响
-  await expect(page.getByTestId('quiz')).toBeVisible()
+  // 其它题型不受影响：小测仍在，只是搬到了正文末尾的入口卡后面
+  await expect(page.getByTestId('practice-entry')).toBeVisible()
 })
