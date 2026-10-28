@@ -7645,3 +7645,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
+
+## 2026-10-28 16:40:00 +0800 · WORK-051 · WORK-051 合入 master，合并后复验通过
+
+- 类型：implementation
+- 变更：两次合入 master（其间别的会话又推进 3 个提交）；sketch 种子从 V956 改名 V958 避开书籍线的 V956；补回被合并丢掉的 pnpm-lock 里 roughjs importer 条目
+- 决策：遇到 V956 撞号按「先到先用」让路：master 的书籍线保留 956，本项的改 958；合并后必须重建后端 jar 并在合并后的树上重跑 e2e，不拿合并前的绿当证据
+- 依据：Flyway 'Found more than one migration with version 956'；app jar 里嵌的是 ~/.m2 的旧 platform（30012 vs 29637）导致 NoClassDefFoundError: RoleLookup
+- 验证：合并后：typecheck 0；@paideia/ui 全量 235 passed / 1 failed（既有 AnalyticsPage 硬编码颜色）；e2e sketch 1 passed（独占库）
+- 本地提交：c57c598 + 合并提交
+- 远端推送：未执行
