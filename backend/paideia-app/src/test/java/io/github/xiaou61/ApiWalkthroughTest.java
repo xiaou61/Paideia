@@ -291,6 +291,9 @@ class ApiWalkthroughTest {
 
         // ---- 学习线与学习记录（WORK-020）----
         call("学习线清单", "GET", "/api/v1/learning/lines", bearer, null);
+        // 推荐理由（WORK-047）：它只做润色，失败也要 200 + 空理由。这里打一次不带 body 的请求让
+        // 端点被覆盖到——那种情况是 400（参数非法），所以交给 bestEffort。
+        bestEffort("POST", "/api/v1/learning/advice", bearer);
         call("我的学习记录", "GET", "/api/v1/learning/progress", bearer, null);
         call("单站记录", "GET", "/api/v1/learning/entries/" + entryId, bearer, null);
         call("上报得分", "PUT", "/api/v1/learning/entries/" + entryId, bearer,
