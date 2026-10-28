@@ -34,7 +34,7 @@ updated: 2026-10-28
 | AC-007 双主题对比度 ≥ 4.5:1 | 令牌值直接计算 WCAG 比值（人工核对脚本） | 人工 | passed | 浅色 14.3–15.0:1、深色 10.2–11.7:1，副标题最差 5.0:1；另见两张截图 |
 | AC-008 roughjs 与字体不在入口 chunk，增量 ≤ 5 kB | `pnpm build`（撤下改动跑一次基线 + 实施后再跑一次） | 0 | passed | 基线 gzip 291.21 kB → 实施后 293.63 kB（**+2.42 kB**）；字体是独立资源 `Xiaolai-Cs1btv19.woff2`，`roughjs` 在异步 chunk |
 | AC-009 单测覆盖解析/布局/降级 | `pnpm --filter @paideia/ui test sketch` | 0 | passed | 4 个测试文件 18 条全绿 |
-| AC-010 样例条目与 e2e | 同 AC-001 | 0 | passed | devdata `V956__seed_sketch_block.sql`（条目 61），e2e 1 passed |
+| AC-010 样例条目与 e2e | 同 AC-001 | 0 | passed | devdata `V958__seed_sketch_block.sql`（条目 61），e2e 1 passed |
 
 类型检查：`pnpm --filter @paideia/ui typecheck` → 退出码 0，无输出。
 

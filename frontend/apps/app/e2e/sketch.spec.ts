@@ -6,7 +6,7 @@ import { signIn } from './session'
 /**
  * 手绘图围栏块（WORK-051）。
  *
- * <p>内容来自 `db/devdata/V956__seed_sketch_block.sql`（条目 61）。**只在本地的种子库上跑**：
+ * <p>内容来自 `db/devdata/V958__seed_sketch_block.sql`（条目 61）。**只在本地的种子库上跑**：
  * 部署实例里没有这篇。
  *
  * <p>这里验三件只有真浏览器才能验的事：SVG 真的画出来了、手写字体真的加载了、
