@@ -222,4 +222,21 @@ test.describe('SQL 自由练习', () => {
 
     expect(writes, '自由练习不允许写 learning_progress').toEqual([])
   })
+  /**
+   * 回归（2026-10-28 用户实测报上来）：编辑器打一个字母就失焦。
+   *
+   * <p>根因不是编辑器本身，是调用方每次渲染都传一个新的 schema 对象，而编辑器的 effect
+   * 依赖它——于是每输入一个字符就销毁重建一次。这条用例必须"连续输入"，只输入一个字符
+   * 是抓不到这个 bug 的（第一个字符总是打得进去）。
+   */
+  test('能连续输入：每输一个字符不该丢焦点', async ({ page }) => {
+    await page.goto('/#/practice/sql')
+    const editor = page.getByTestId('sql-practice-editor')
+    await expect(editor).toBeVisible({ timeout: 20_000 })
+    await editor.click()
+    await page.keyboard.type('SELECT 1')
+    await expect(editor).toContainText('SELECT 1')
+    // 焦点还在编辑区：丢了的话后面的字符会打到 body 上，而内容刚好停在第一个字母
+    expect(await editor.evaluate((node) => node.contains(document.activeElement))).toBe(true)
+  })
 })

@@ -16,7 +16,7 @@ import {
 } from '@paideia/ui'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Play, Search } from 'lucide-react'
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
@@ -115,8 +115,13 @@ export function SqlPracticePage() {
     // 快照是构建期生成的静态内容，不会在会话中变——没必要反复拉
     staleTime: Infinity,
   })
-  const schema = parseSchema(schemaQuery.data)
-  const completionSchema = toCompletionSchema(schema)
+  /**
+   * **必须 memo**：这两个函数每次都返回新对象，而 `SqlEditor` 的 effect 依赖 `schema`。
+   * 不 memo 的后果是——打一个字 → 页面重渲染 → schema 新引用 → 编辑器被销毁重建 → **每输一个字母丢一次焦点**。
+   * （2026-10-28 用户实测报上来，编辑器里打不了第二个字符。）
+   */
+  const schema = useMemo(() => parseSchema(schemaQuery.data), [schemaQuery.data])
+  const completionSchema = useMemo(() => toCompletionSchema(schema), [schema])
   const [showEr, setShowEr] = useState(false)
   const [showChart, setShowChart] = useState(false)
   /** AI 现场出的题（WORK-035 T-12）。期望结果集来自真跑参考解，判题在客户端。 */
