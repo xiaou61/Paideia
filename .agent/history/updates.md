@@ -1,1117 +1,3 @@
-## 记录
-
-## 2026-10-10 · WORK-003 · 真实 SMTP 发信实测通过，报告转 passed
-- 类型：verification
-- 变更：用户提供 QQ 邮箱发信凭据（授权码与账号），凭据**只写入被忽略的** `backend/config/application-local.yml`（`git check-ignore` 与 `git ls-files` 双重确认未被跟踪），并在该文件的既有 `paideia:` 段下新增 `paideia.mail.*`。为支持 QQ 常用的 465 端口，代码侧补了隐式 TLS：`MailProperties` 新增 `ssl`、`SmtpMailPort` 相应设置 `mail.smtp.ssl.enable`、`MailConfiguration` 打印实际使用的加密方式并在既没开 ssl 也没开 start-tls 时告警。证据写入 `testing/logs/smtp-real-send.txt`，`testing/report.md` 中"真实 SMTP 发信"一条从 `not-run` 改为 `passed`，报告状态由 `partial` 改为 `passed`。
-- 决策：① 两种加密方式都支持（465 隐式 TLS / 587 STARTTLS），因为各家服务商默认端口不同，只支持一种就会在换服务商时踩坑；② 发信失败的异常消息里带上主机与端口（不含凭据），便于区分配置问题与网络问题；③ 证据文件里对邮箱地址做掩码——本仓库是公开仓库，真实地址属于个人信息，不应写入被跟踪文件。
-- 依据：`.agent/changes/WORK-003-账号与认证/testing/{report.md,logs/smtp-real-send.txt}`；`.agent/rules/always.md`
-- 验证：启动日志出现 `邮件发送使用 SMTP：smtp.qq.com:465（隐式 TLS）`（对照：未配置时会打印"未配置 SMTP…验证码将写进日志"）。随后走完整链路：`POST /api/v1/auth/captcha` 取图（PNG 3009 字节）→ 解码为人眼可识别的图片并读出 4 位字符 → `POST /api/v1/auth/email-code` 返回 `{"code":0,"message":"ok"}`，后端日志无 `发送验证码邮件失败` 或 `MessagingException`。顺带用同一个 `captchaId` 再提交一次得到 `40000 图形验证码已过期`，证明图形验证码确实是一次性的。
-  - **边界如实记录**：本机证明的是"SMTP 认证成功、邮件被服务器接受"，**收件箱实际收到需收件人确认**，报告里明确不把它写成本机验证过的结论。
-  - `project-lifecycle.ps1 validate` 结果：`valid: true`；WORK-001 / WORK-002 / WORK-003 均 0 error，WORK-003 为 `completed/complete`。
-- 本地提交：待用户授权/未提交
-- 远端推送：未执行
-
-## 2026-10-10 · WORK-003 · 收件人确认收到验证码邮件，验证无未验证项
-- 类型：verification
-- 变更：用户 2026-10-10 确认已在收件箱收到那封「Paideia 注册验证码」邮件。`testing/report.md` 据此更新："真实 SMTP"一条从"服务器接受（待收件人确认）"改为"达成（含收件人确认收到）"，「失败与未验证项」一节改为**无未验证项**，只保留一条"未做计时断言"的方法学说明。
-- 决策：把两类证据分开记录——"SMTP 认证成功、邮件被服务器接受"是本机可验证的；"投递到收件箱"只能由收件人确认。两者都留在证据表里，不合并成一句"发信已验证"，这样后来的人能看出这条结论由谁、凭什么得出。
-- 依据：`.agent/changes/WORK-003-账号与认证/testing/{report.md,logs/smtp-real-send.txt}`
-- 验证：`project-lifecycle.ps1 validate` 为 `valid: true`；WORK-001 / WORK-002 / WORK-003 均 0 error，WORK-003 为 `completed/complete`，12 个任务全部 `done`。
-- 本地提交：待用户授权/未提交
-- 远端推送：未执行
-
-## 2026-10-10 · maintenance · 重做登录与注册页的观感，并修掉一个静默失效的扫描路径缺陷
-- 类型：implementation
-- 变更：用户反馈登录界面不好看，要求参考其他网站的登录页改。改动：① 新增 `packages/auth/src/auth-layout.tsx`——认证页的"裸页面"布局，**刻意不用 `AppShell`**（外壳的应用横条与页脚让登录页读起来像设置页，且未登录时那些导航本不可用）；通行做法是空白页 + 内容垂直居中 + 品牌在上、卡片在下；主题切换移到右上角（不再占一条横条）。② 学习者端的登录页与注册页改用它（注册页字段多，卡片宽一档），次要动作（"还没有账号？立即注册"）移到卡片下方居中。③ 管理端的未登录与加载状态也改用它，其余状态仍用 `AppShell`。④ 表单本身放大一档：输入框与主按钮 `h-10`（原 32px→40px）、字段间距 `space-y-5`、主按钮整宽。
-- 决策：① 不再在认证页顶部放"Paideia 登录"这类标题，改为品牌名（`h1`）+ 一行说明——避免"Paideia / 登录 / 账号登录"三行标题叠在一起；② 尺寸覆盖只通过 `className` 传入（`cn` 用 tailwind-merge 消解冲突），**不改设计系统的默认档位**，避免为了一个页面把全站按钮变大。
-- 依据：`.agent/rules/always.md`（Tailwind 扫描路径纪律）；`testing/evidence/auth-login-{before,after}.png`、`auth-register-after.png`、`auth-admin-login-after.png`
-- 验证：`pnpm -r typecheck` 9 个工程通过；`pnpm -r test` 42 条通过；三套 e2e 共 15 条通过（学习者端 5、管理端 5、展览页 5）；四个应用构建通过。截图前后对比见 evidence 目录。
-  - **过程中修掉一个真缺陷，而且它是 WORK-003 带进来的**：`packages/auth` **不在 `globals.css` 的 `@source` 列表里**，因此只在认证包里出现的 Tailwind 类名从未被生成。发现方式是"主题切换按钮跑到了左上角"——探针查出容器的 `justify-content` 计算值是 `normal`（`justify-end` 类在 class 列表里但没有对应 CSS 规则）；而 `dialog.tsx` 里用的是 `sm:justify-end`，生成的是 `.sm\:justify-end`，**裸的 `.justify-end` 从未存在**。也就是说 WORK-003 交付的登录/注册页有一批类名（`justify-end`、`pb-20` 等）一直没生效，只是恰好多数类名在别处也用过，所以看起来"基本正常"。修法：补 `@source '../../../../packages/auth/src'`，并新增 `packages/ui/src/styles/source-coverage.test.ts` —— 枚举所有含 `.tsx` 的 workspace 源码目录，断言每一个都被某个 `@source` 覆盖；已用"临时删掉 auth 那行"复核过它会失败。`always.md` 的对应纪律也从"新增应用"扩写为"新增应用或任何含 `.tsx` 的包"。
-- 本地提交：待用户授权/未提交
-- 远端推送：未执行
-
-## 2026-10-10 · maintenance · 修正 access 存活期默认值：2 小时 → 15 分钟
-- 类型：implementation
-- 变更：查代码回答"鉴权策略"时发现一处**实现与已批准设计不一致**：WORK-003 的 `design.md` 定的是 access **15 分钟**，但代码用的是 `AuthProperties` 里 WORK-001 时代的默认值 **2 小时**——我实施时漏改了默认值，只有测试 profile 显式设了 30m，本地与被忽略的配置都没覆盖。已把 `AuthProperties` 的默认改为 15 分钟（提成常量 `DEFAULT_TOKEN_TTL` 并写明"改这个值等于改登出后令牌还能用多久的窗口"），同时把 `JwtAuthServiceTest.appliesDefaults` 的断言从 2 小时改为 15 分钟并注明理由（要改必须是有意识的决定）。未改测试 profile 的 30m（测试期避免过期导致用例不稳）。
-- 决策：**按已批准的设计对齐，而不是把文档改成 2 小时**。理由是 access 无状态、签出后无法撤销，它的寿命就是"登出后令牌仍可用的窗口"——2 小时与"短 access + refresh 轮换"的定位冲突，也正是这个方案想压小的暴露面。需要更长可在配置里显式设 `paideia.auth.token-ttl`（这条一直可用）。
-- 依据：`.agent/changes/WORK-003-账号与认证/design.md`（"access 15 分钟、refresh 14 天，均可配"）；`.agent/changes/WORK-003-账号与认证/testing/report.md` 与本文件引用的 `≤15 分钟` 窗口
-- 验证：`cd backend && PAIDEIA_TEST_DB_PASSWORD=<本地读入> mvn -B verify` → **BUILD SUCCESS，63 条测试全过**（含改后的默认值断言）。修完后报告与 `always.md` 里写的"登出后 access 剩余寿命 ≤15 分钟"由错变对。
-- 本地提交：待用户授权/未提交
-- 远端推送：未执行
-
-## 2026-10-20 · WORK-025 · 需求首次起草：八股文专区（未实施）
-- 类型：requirements
-- 变更：新建 `.agent/changes/WORK-025-八股文专区/requirements.md`（draft）；四件工件只此一件，未写代码、未建迁移
-- 决策：用户四项决定（独立专区 / 每日抓牛客 Java 八股文 / AI 详细解析 / 本期只做 Java）已记入 D-01..D-04；另记 5 条实现选择，其中「正文由 AI 重写释义不逐字转载」与「抓取收在可替换端口后」两条待用户点头
-- 编号：状态脚本 `next_work_id` 报 `WORK-024`，但工作区在飞的「学习轨道」已把该号写进 `V22__create_learning_tracks.sql` 注释且尚未登记工件；本项取 `WORK-025` 以避免撞号
-- 依据：实抓 `nowcoder.com/robots.txt`（未禁止题库/讨论路径）、本机 curl（`/exam/interview` 200、`/discuss/experience` 301）；全仓 grep 确认**后端无任何第三方网页抓取代码**
-- 验证：`project-lifecycle.ps1 validate` 通过（0 错误，仅既有历史警告）
-- 本地提交：未提交
-- 远端推送：未推送
-### 2026-10-20 追加 · WORK-025 · 牛客可抓性实测（改写了原假设）
-- 类型：research
-- 变更：`requirements.md` 的事实表补 4 行实测；「假设」中被推翻的那条就地标注；新增「方案取舍（Q0 的三条出路）」一节
-- 决策：**原假设「存在每天有新增的 Java 八股文流」被实测削弱**，不据此继续推进；新增 Q0 为阻断项
-- 依据：实抓解析 `discuss/experience?tagId=639` 的 `window.__INITIAL_STATE__.app.165.ssrInitList`（20 条，含「最近一个月面试总结」「北京小厂Java一面」等信息帖）；实抓 `/discuss/2928416` 得 `contentData={"showMessage":{"message":"内容不存在!"}}`，正文需前端渲染；猜的两个 API 端点分别返回首页 HTML 与 404
-- 验证：本机 curl，探针文件已删除、未进版本库
-- 本地提交：未提交
-- 远端推送：未推送
-### 2026-10-20 追加 · WORK-025 · 用户裁定 A/B/C 全要并分两个分类
-- 类型：requirements
-- 变更：`requirements.md` 记 D-05；新增「两个分类的划分」一节；重写实现选择（I-02 改为"只取题目清单、解析全自己写"，I-05 去重改单键，I-06/I-07 新增）；REQ-001..007、AC-001..006 重写；待确认问题收敛为 Q1/Q3-Q7，并新增「已答复的问题」留痕
-- 决策：A（题库）+ C（半自动）合并为「面经真题」（标来源链接），B（平台自生成）单列为「平台精讲」（不标来源）。A 与 C 不单开第三个分类，因为两者拿到的都是"只有标题、没有别人答案"
-- 依据：第二轮实测。`/exam/interview` 服务端渲染出集合列表（「Java基础-牛客面经八股」paperId=61536918 / 25 题、「Spring-牛客面经八股」61536922 / 15 题，带结构化字段）；`/exam/paper/61536918` 是 404 骨架只给 1 题；`/questionTerminal/89adb20f44cd433f902cc114155b17aa` 服务端渲染出标题、题型、收藏/浏览数，`answer-brief` 仅摘要（样例一个词 `redo`）⇒ **题面即标题，别人的答案本来也拿不到，正合"解析自己写"**
-- 验证：`project-lifecycle.ps1 validate` 通过，WORK-025 无错误；探针文件已清理未入库
-- 本地提交：未提交
-- 远端推送：未推送
-### 2026-10-20 追加 · WORK-025 · 抓取通路全量实测（四条路，核心通路打通）
-- 类型：research
-- 变更：`requirements.md` 事实表重写为「抓取通路实测」12 行；结论行改为"A/B/C 全可行但路径与设想不同"；I-02 与 I-05 按实测改写，新增 I-08/I-09；REQ-001/002/008 重写，质量要求加抓取频率与失败处理；AC-003/007 调整；假设两条从"未验证"升级为"已实测"；待确认问题删 Q1（已解决）、新增 Q8
-- 决策：**A 档改走面经列表 API 而非合集题目清单**。原判断「只能拿到标题」被推翻——列表接口直接带完整正文
-- 依据（全部实测，探针文件已清理未入库）：
-  - **核心通路**：`POST gw-c.nowcoder.com/api/sparta/job-experience/experience/job/list`，body `{"page":1,"pageSize":20,"jobId":639}`；返回 total=2000 / totalPage=100
-  - **列表直接带正文**：`momentData.content` 是完整正文（样例 1136 字）、`momentData.createdAt` 毫秒时间戳；**无需逐条抓详情**
-  - **pageSize 上限 20**（50/100/200 一律 `系统未知错误`）；**不限流**（6 次连发全 200）；**无需登录态**
-  - **日增量 3–7 条**（page1 覆盖 10-19~10-17、page2 10-17~10-15、page3 10-15~10-13）；剔除 contentType=250 后约 3-5 条/天
-  - **技术密度混合**：同日 14 条里技术词≥8 的仅 5 条，其余是纯信息帖
-  - **生产可达**：`codenest-online` 上 POST 返回 200 / 0.375s
-  - **不通的路**：合集题目清单枚举不到（`/exam/paper/<id>` 404 骨架、`/exam/test/<id>/detail` 调 `test/summary?paperId=0` 返回空、卡片点击不跳转、JS 包无 API 字符串）；`/exam/intelligent` 是算法练习不是八股
-  - **兜底通路**：`/feed/main/detail/<uuid>` SEO 版服务端完整渲染（样例 5599 字）；`sitemap1.txt` 有 12732 条该形态 URL
-  - 用的工具：curl + Playwright 抓包（复用 frontend 已装的 playwright@1.64.0）
-- 验证：`project-lifecycle.ps1 validate` 通过，WORK-025 无错误；探针文件全部清理，`git status` 无残留
-- 本地提交：未提交
-- 远端推送：未推送
-### 2026-10-20 追加 · WORK-025 · Q3/Q8 裁决落定 + 实测细节搬进 research.md
-- 类型：requirements
-- 变更：
-  - `requirements.md`：记 D-06（只解析技术词密度高的）、D-07（不按技术栈细分，全算 Java 八股）；新增 I-10（密度判定规则）、REQ-009/REQ-010、AC-008/AC-009；待确认问题从 6 条收敛为 4 条（Q4/Q5/Q6/Q7）
-  - 新建 `research.md`：把 17 行抓取实测细节、六步弯路、面试帖样例、未测事项搬过去；`requirements.md` 只留 9 行结论表（20795 → 18889 bytes，消除 20000 bytes 警告）
-- 决策：
-  - **D-06 密度阈值规则**：按**去重后的不同技术词种类数** ≥ 3 判定（不是按出现次数），阈值放配置。理由：按词频判会被"一条帖子反复提 Java 十几次但其实没讲题"骗过；阈值没跑过真实数据，默认 3 是待调起点
-  - **D-07 分类到此为止**：Java 基础/JVM/Spring/Redis/MySQL 全落「面经真题」一个分类。理由：专区用法是刷题，靠检索和标题找，不靠浏览分类树；将来真题量大了再拆，那时只改 `category_id`
-- 依据：用户 2026-10-20 答复「Q3 成本 只解析技术词密度高的，Q8 这都算Java八股」
-- 验证：`project-lifecycle.ps1 validate` 通过，WORK-025 无错误、无体积警告
-- 本地提交：未提交
-- 远端推送：未推送
-
-## 2026-10-20 · WORK-026 · 决策模型 Laya 接入（代码已落地，工件仅 requirements）
-- 类型：implementation
-- 变更：新增 `ai` 模块 `ContentClassifier`/`ContentClassification` 端口与 `internal/decision/`（`LayaContentClassifier`、`TechEssayFilter`、`DecisionProperties`、`DecisionConfiguration`）；`application.yml` 加 `paideia.ai.decision.*`（**默认关闭**）；新增 2 个测试类（6 条单测 + 2 条真连测试，后者默认跳过）
-- 决策：
-  - **只接一个用途**：面经帖技术内容过滤（服务 WORK-025）。内容审核/提示注入防护不接——官方 `docs/guardrail-limitations.md` 自己承认在文档型输入上失效
-  - **规则在前、模型在后**：规则零延迟零成本，只在边界地带（命中 1~4 种技术词）才花 200ms 问模型
-  - **判定用 `choice` 不用 `noul`**（实测倒逼的修正）：同一段面经用 noul，结尾多三个字「有哪些」概率从 0.243 → 0.675 → 0.644，漂移让阈值不可用；换三分类 choice 后 7 条判对 6 条，P(tech) 稳定 0.95~0.98
-  - **端口失败返回 empty 不抛异常**：判定是"可以没有"的能力，判不了就退回规则，不该丢内容
-  - **默认关闭**：与沙箱同纪律，外部进程不在时不该让每次判定等超时
-  - **服务只绑 127.0.0.1**：除 api-key 外无鉴权
-- 依据：
-  - 官方数据核实：基础检查点 typed-decisions **0.362** vs 随机 0.318 vs **多数类 0.461**——官方原话"a fast base to specialize, not a zero-shot decision engine"；流传的 **0.766 是微调后**且在自己训练集上
-  - 中文 ECE：multilingual 0.219（概率偏乐观）
-  - 服务器实测：4核16G 无 GPU，内存 1.7G、冷启 16~22s、热态 147~260ms、模型 647MB、torch-cpu 903MB
-  - 端到端 7 条中文样例（复刻 Java 类请求体）：技术面经 P(tech)=0.957~0.980 全中；纯求职帖落到 career 侧（0.002/0.231）；**已知 1 条判错**「如何提高工程能力」被判 technical(0.953)，但规则层命中 0 种技术词、不会走到模型，实际不会误收
-- 踩到的坑（部署侧，记下来避免重走）：① `pip install laya` 默认拉 CUDA 版 torch（553MB cudnn + 2.5G 依赖），纯 CPU 机器必须先装 `--index-url https://download.pytorch.org/whl/cpu torch`；② HF 的 Xet 传输被墙（`401 cas-server.xethub.hf.co`），要 `HF_HUB_DISABLE_XET=1`；③ 清华 PyPI 镜像没有 laya 包；④ Python 客户端下模型仅 20MB/分钟，curl 直连 hf-mirror 可达 5.6MB/s，然后 `Router(models={"multilingual":"/本地路径"})` 指过去；⑤ `pkill -f 'pip install'` 会杀掉自己的 SSH 命令（命令行含同样字符串），要用 `[p]ip` 括号技巧
-- 验证：`mvn -pl paideia-ai -am test -Dtest=TechEssayFilterTest` **6 条运行 / 0 失败 / 0 跳过**；真连测试按 `@EnabledIfSystemProperty` 默认跳过；端到端 7 条样例命中 6/7；`project-lifecycle.ps1 validate` 通过
-- 本地提交：未提交
-- 远端推送：未推送
-- **未完成**：① 只有 requirements 一件工件，proposal/design/tasks 缺失（严格模式要求）；② 没有 systemd / 开机自启，重启后服务消失；③ 未接入 WORK-022 遥测
-
-## 2026-10-20 · 撤销「先原型再设计」规范并移除 figcraft MCP
-- 类型：docs
-- 变更：`AGENTS.md` 删除「设计流程：先原型，再设计」整节（原 25–35 行，含 FigCraft 母版路径、两段流程、令牌来源四条附注）；`~/.zcode/cli/config.json` 的 `mcp.servers.figcraft` 整条移除
-- 决策：用户不再使用 FigCraft，界面改动恢复为直接实现；`docs/design/` 下已有的 `.figcraft` 母版与九张 PNG 未删除（未被 Git 跟踪），是否保留由用户决定
-- 依据：用户「现做设计，后实现，这个我们去掉这个规范吧，我不用那个mcp了，顺便给我把那个mcp给删掉」
-- 验证：`node -e "require('./config.json')"` 解析通过，剩余 MCP 服务 8 个（codegraph/context7/drawio/bep-mcp-prod/firecrawl/paideia/github/deepseek-search），figcraft 已不在其中
-- 本地提交：未提交
-- 远端推送：未推送
-
-## 2026-10-20 · WORK-027 每日技术速递 · 建项与数据源实测
-- 类型：requirements
-- 变更：新建 `.agent/changes/WORK-027-每日技术速递/`，含 `requirements.md`（draft，10 REQ / 9 AC / 6 待确认问题 / 8 条扩展点候选）与 `research.md`（AIHOT 形态核对 + 18 个候选源实测）
-- 决策：
-  - 形态**参考** AIHOT 的六步流水线，但**不套壳它的接口**（其 terms 明确对外商业用途需授权，且用户要的是自己做一个）
-  - 不学它的「两次独立打分」与「跨源聚簇」——一天一次 AI 调用是硬约束，那两步会让成本翻倍
-  - 学它的日报成刊与「同一来源只算一次」的热度纪律
-  - 存储**不进 `knowledge_entries`**：新闻是会过期的流，塞进去会让全文检索被每日新闻淹没
-  - 放进 `paideia-ai/internal/digest`，不新建 Maven 模块——WORK-025 已在同模块跑通「抓取 + 定时 + AI + 写库」全套
-- 实测结论（本机 + codenest-online 双端）：
-  - **可用**：HN Algolia（字段全）、arXiv API（200/9476B 双端）、量子位 RSS（10 条但无正文）、IT 之家 RSS（60 条）、InfoQ（20 条带正文）、掘金、开源中国、OpenRouter models（470 个含 pricing）
-  - **可用但不稳**：`github.com/trending` 本机三次连接被拒、生产 200/593KB 且 12 行可解析 ⇒ **必须有 Search API 兜底**
-  - **不可用**：HF daily_papers（双端超时）、arXiv RSS（892B 空壳）、机器之心（302 到数据页）、Solidot（403）、LMArena（超时）、Product Hunt（TLS 吊销检查失败）
-  - GitHub 匿名限额实测：search 10/分、core 60/时
-  - 热榜解析陷阱：`href="/([^"]+)"` 会先撞赞助商链接，**必须先定位 `<h2>` 块**
-- 成本估算：三组源约 40–60 条候选，**单日一次调用约 1.2 万 token**；照面经「每条一次」的形态会贵约 30 倍
-- 验证：`project-lifecycle.ps1 validate` → WORK-027 无错误、无警告
-- 本地提交：未提交
-- 远端推送：未推送
-- **仍未做**：需求未签署；proposal/design/tasks 未起草；Q-01..Q-06 与扩展点取舍待用户裁
-
-## 2026-10-20 追加 · WORK-027 · 用户裁决四项 + GitHub token
-- 类型：requirements
-- 变更：`requirements.md` 从「6 个待确认问题」收敛为「2 个仍待确认」；新增 D-05..D-11、I-12..I-14、REQ-011、AC-010/011；扩展点表移入 `research.md` 第六节（工件超 20000 字节软阈值的分诊）
-- 用户裁决：
-  - **D-05 首批三组源**（「可以对」）：前沿新闻（量子位 + IT 之家 + InfoQ）+ GitHub 每日热榜 + HN 前 10；arXiv 与 OpenRouter 二期
-  - **D-06 入口放导航栏**（「入口可以新增导航栏」）
-  - **D-07 内容直出**（「内容直出吧」）⇒ 配套新增 I-12 + REQ-011 + AC-010：**管理端按日期查看并删除单条**，否则一条脏数据只能进数据库删
-  - **D-08 硬依赖 WORK-025**（「肯定是 要等 25 做完的对吧」）⇒ frontmatter 由 `related_to` 改为 `depends_on: [WORK-025]`
-  - **D-09 要配 GitHub token**（「其实可以配置我的啊，你看看 gh 是有的，你给我放进去就可以了吧」）
-  - D-10 不做今日综述、D-11 历史永久保留：用户未反对默认值
-- 决策：
-  - **GitHub token 是可选增强，不是硬依赖**（I-13/AC-011）：未配置时退回匿名（60/时），功能不降级
-  - **有 token 时主通路改为 Search API，页面解析降为兜底**（I-14）：限额 5000/时后没必要依赖会随改版坏掉的解析器
-- 已核实并告知用户的事实（`gh auth status` + `gh api rate_limit` + 匿名对照）：
-  - 本机 `gh` token 类型 **`gho_`**，scopes = `gist, read:org, repo, user, workflow` ⇒ **对名下全部仓库有写权限**
-  - 限额对比：带 token **core 5000/时、search 30/分**；匿名 **core 60/时、search 10/分**
-  - 已建议改用 fine-grained token（Public repositories read-only、权限全空），**限额完全相同**，差别只在泄露后的影响面；用户尚未回复这一条（Q-07）
-- 验证：`project-lifecycle.ps1 validate` → WORK-027 只剩一条**预期内的硬依赖门**（WORK-025 未完成），无其它错误与警告；`requirements.md` 从 22677 → **19934 字节**
-- 本地提交：未提交
-- 远端推送：未推送
-- **仍未做**：需求未签署；proposal/design/tasks 未起草；Q-02（扩展点取舍）与 Q-07（token 形态）待用户答；WORK-025 前端入口未补，本项不得开工
-
-## 2026-10-20 · WORK-028 运维监控面板 · 建项
-- 类型：requirements
-- 变更：新建 `.agent/changes/WORK-028-运维监控面板/requirements.md`（draft，21 REQ / 8 AC / 13 条扩展点候选 / 8 个待确认问题）
-- 决策：
-  - 落点是**管理端一页**，不是独立监控站；C 方案（Prometheus+Grafana）与 B 方案（Spring Boot Admin）各自覆盖不到用户点名的 MySQL/Redis/Laya/Docker/systemd，推荐 A（自建只读采集 + 一页）
-  - **只读是硬约束**：不提供任何重启/停止/清理动作。明文 HTTP 下后台口令是唯一门槛，一个误点就是全站宕机
-  - 取不到数据必须显示「未知」，不许画成 0 或「正常」；每项异常给一句人话原因
-  - 不重做 WORK-022 的 AI 统计，运维页只放跳转
-- 线上只读实测（codenest-online，2026-10-20）：
-  - 六个 systemd 单元 + 七个 Docker 容器全部 active；`paideia` 以 **root** 运行（unit 无 `User=`），JVM RSS 435MB
-  - **Laya 内存 2.55G / 上限 3G（85%）**，离 OOM 只剩 0.45G，OOM 后静默降级成规则判断
-  - **Redis 装着、开着、`DBSIZE`=0、后端 pom/yml 零引用**——这是个没人用的服务
-  - **MySQL `slow_query_log` = OFF**，慢查询今天无法观测
-  - Docker 镜像 8.346GB / **6.176GB（74%）可回收**，无人可见
-  - **零备份**：`crontab -l` 为空、`/etc/cron.d/` 无备份任务、`scripts/` 无备份脚本，库仅 2.2MB
-  - `/actuator/health` 200 UP；`/actuator/metrics` 401（metrics 已 include 但被 Security 挡住）
-  - 库总大小 2.2MB，最大表 `refresh_tokens` 0.3MB/731 行 ⇒ 加一张每分钟采样的时序表压力可忽略
-- 依据：用户「我想在我的后台加一个运维的功能，你感觉可以吗，你可以新开一个 work 然后这个运维 就是各种服务监控指标，然后包括说我们中间件的，比如说 mysql redis 然后还有我们部署的那个 laya 是不是也需要呢。，还有什么呢可以想想」
-- 验证：`project-lifecycle.ps1 validate .` → WORK-028 无错误、无警告（同次运行里 WORK-027 → WORK-025 的硬依赖错误为既有问题，非本项引入）
-- 本地提交：未提交
-- 远端推送：未推送
-- **仍未做**：需求未签署；proposal/design/tasks 未起草；Q-01（技术路线）、Q-02（是否存时序）、Q-05（备份是否单独立项）待用户裁
-
-## 2026-10-20 追加 · WORK-027 · 四条扩展点入一期 + 四件工件齐备
-- 类型：design
-- 用户裁决（本轮）：
-  - **X-04 社区热帖 / X-05 周报 / X-06 按身份筛源 / X-08 转笔记 四项全加**（原话「这几个加上呗」）⇒ D-12..D-15、REQ-012..REQ-015、AC-012..016
-  - **Q-07 token 形态选 A**（原话「A. 用现在 gh 里那个，我从 gh 取出来，写进服务器的 application-local.yml」）⇒ D-16
-- 变更：
-  - `requirements.md` 重写：11 REQ → **15 REQ**、9 AC → **16 AC**；`mode_reason` 补「两张新表」；决策表扩到 D-16；实现选择扩到 I-16
-  - `research.md` 新增第五节「决策痕迹」（九个问题的答复原文 + Q-07 选 A 的风险留档）、第六节改为「扩展点裁决结果」（8 条逐条标已选/未选 + 四条落地要点）
-  - **新起草 `proposal.md` / `design.md` / `tasks.md`**（均 `status: draft`）
-- 设计要点（新增四项的落地方式）：
-  - **X-05 周报必须单独建表** `digest_weeklies`（I-03）：周报是不可从条目行推导的一段叙述；与「日报不建表」不矛盾
-  - **X-06 放前端**（I-15）：加 `identity` 配置项 `digestGroups`；后端不感知身份。**AC-014 明确写「数据一条不少地存在于库中，只是展示不同」**，防止将来被误实现成服务端过滤
-  - **X-08 纯前端**（I-16）：带参跳到 `/notes/new` 预填，不需要新后端接口，本项不依赖笔记模块
-  - **X-04 独立成第四组**，不与门户新闻合并：两者调性与量级不同
-  - 数据模型定为两张表；`digest_items.fingerprint` 建**全局唯一**（新闻的重复是跨源而非同分类）
-  - 一次 AI 调用改**按指纹回填**而非顺序对齐——模型可能少返回条目，顺序对齐会静默错位
-- 风险留档：Q-07 选 A 后，带 `repo` 写权限的 `gho_` token 将落到 codenest-online 的 `application-local.yml`。已在 research.md 写明「用户已明确选择，不再重复询问」，并记下「若进日志/提交立即轮换」
-- 验证：`project-lifecycle.ps1 validate` → WORK-027 报两条**预期内**的门：① 硬依赖 WORK-025 未完成 ② 需求未签署但已存在下游工件（proposal/design/tasks 均为 draft）
-- 本地提交：见本轮 commit
-- 远端推送：未推送
-- **仍未做**：四件工件全部未签署（签署只能由 `approve` 命令写入，Agent 不得代签）；WORK-025 前端入口未补，本项不得开工
-
-## 2026-10-20 · WORK-025 · 八股文专区实施（抓取→过滤→抽题→入库全链路）
-- 类型：implementation
-- 变更：
-  - **迁移 V24**：`knowledge_entries` 加 `source_url` / `fingerprint` 两列 + `(category_id, fingerprint)` 索引；幂等插入 `essay-java` 分类
-  - **knowledge 模块**：`Entry` 加两字段；`EntryMapper.insert` 带新列、新增 `findIdByFingerprint`；`KnowledgeApi.createCollected`（default 实现抛 UnsupportedOperationException）；`CategoryNode` 加 `slug`（供按稳定标识定位分类）；`EntryDetail` 加 `sourceUrl`
-  - **ai 模块 `internal/essay/`**：`EssaySource` 端口 + `NowcoderEssaySource`（实测通路）、`EssayExtractionPrompt`、`EssayQuestionParser`、`EssayExtractor`、`EssayCollectionService`（编排）、`EssayCollectionJob`（`@Scheduled` fixedDelay 24h）、`EssayProperties`、`EssayConfiguration`（条件装配）
-  - **前端**：`EntryDetail.sourceUrl` 可选字段；条目详情页加「题目来源：原帖」外链（`rel="noreferrer noopener"`）
-  - **测试**：`EssayQuestionParserTest`(8) + `EssayFingerprintTest`(4) + `EssayCollectionIntegrationTest`(3)
-- 决策：
-  - **编排放 `ai` 模块而不是 `knowledge`**：依赖方向是 `ai → knowledge`，反过来会成环。写入走 `KnowledgeApi.createCollected`，等价于"knowledge 提供写入能力、ai 负责编排"
-  - **Q4 先进草稿**（`publish-directly: false`）：无人值守自动入库，先让人过一眼更稳
-  - **Q5 挂知识库分类**而非独立 `/essays` 入口：零成本复用全部渲染与自检
-  - **Q6 不额外接掌握度**：`learning_progress` 按 entry_id 记，抓来的条目天然可自评
-  - **Q7 不建「平台精讲」分类**：没有内容来源，空分类出现在导航里比没有更糟
-  - **不扣用户积分**：抓取解析是平台行为、无 userId 归属，走 `CredentialService.access()` 直接调用。代价是这部分成本不在产品积分面板里可见
-  - **按题目指纹去重而非按帖子**：同一道题会在不同面经反复出现
-- **实测倒逼的关键修正（提示词与 token 预算）**：
-  - 原提示词"抽出所有题目、每篇解析 200~600 字"→ **4096 tokens 输出被截断**（`Unterminated string`），提到 8192 **同样被吃满**
-  - 根因：deepseek-flash 默认思考，思考 token 与正文共用 `max_tokens`
-  - 修法：**提示词压到"只挑 1 道题、解析 150~300 字"** + `MAX_TOKENS=16384` 留余量
-  - 修正后实测：**4.1s / 输出 665 tokens / finish=stop / 抽出 1 题 / 解析 466 字**，JSON 合法
-- 端到端实测（codenest-online）：
-  - 牛客接口重启后仍通（200 / 0.54s / total 2000），当日有 4 条新帖
-  - 抓 14 篇 → 规则直判技术帖 2 篇（得物长沙后端一面 hits=8、拼多多服务端 hits=5）
-  - 决策模型对首条 P(tech)=0.829（technical）
-  - AI 抽题成功并产出可发布内容
-- 验证：
-  - `mvn -pl paideia-ai,paideia-knowledge -am test`：**148 运行 / 0 失败 / 3 跳过**（跳过的是 `LayaContentClassifierLiveTest`）
-  - `EssayCollectionIntegrationTest` **3/3 通过**（V24 两列可写、指纹去重生效、分类 slug 可定位）
-  - `@paideia/knowledge` 类型检查通过
-  - **注意**：`@paideia/app` 的 typecheck 因 `HomePage.tsx` 报语法错而失败——那是**别的会话在飞的改动**（`M` 状态），与本次无关
-- 本地提交：未提交
-- 远端推送：未推送
-- **仍未做**：① 定时任务未在生产启用（`enabled: false`）；② 未做 e2e 覆盖「从专区点进去看到条目」；③ 「平台精讲」未建
-
-## 2026-10-20 · 修复 /learn 与知识图谱，并给线上补齐真实数据
-- 类型：fix + data
-- 变更：
-  - `scripts/import-course.mjs`：更新已有条目时**按 frontmatter 的 status 写回**，并删掉"先草稿、后统一发布"的两段式。原逻辑在更新路径上一律写 `draft`，而补发循环只发布"本次新建"的条目，于是改一次内容就让那一关从学习者端消失
-  - `content/courses/python/*.md`：补 `chapter` / `level` / `line_summary`（新增 `scripts/add-python-chapters.py`）；重新导入后 Python 与两条阅读线登记成学习轨道
-  - `GraphCanvas2D`：节点初值改用 `circularLayout` 散开（力导向在所有点重合时不推位置，只是把 (0,0) 原样留下）；布局缩放到固定跨度 1000（sigma 按包围盒自动适配，布局越紧凑屏幕上越放大，一颗节点能铺满画布）；`labelRenderedSizeThreshold` 0 → 6（未接触档半径为 6，阈值 6 会把它们全部隐去标签）
-  - `loadPositions`：全部重合的旧存档当作没有存档（否则修好算法后仍会读到坏的零坐标）
-  - `InterviewPage`：接上 `GET /api/v1/ai/interviews/evaluations`（接口从 WORK-010 就在，前端方法也有，一直没有页面调用）
-  - `LearnPage`：加「继续上次」条；卡片网格 `md:2 / xl:3`
-  - `HomePage`：hero 左栏补三格进度数字（待复习 / 学到一半 / 还不懂），数据全部来自已有接口
-  - `GraphPage`：空状态补三张卡说明"这里将来会有什么"；画布高度 `lg:h-[calc(100vh-18rem)]`
-  - 新增 `scripts/seed-demo-data.py`：概念 14 个、关系 12 条、自评 13 条、学习进度 15 条、笔记 3 条
-- 决策：轨道集合以 `learning_tracks` 表为准而非 `/learning/lines`（后者是 WORK-020 的分类标记，两条数据源分叉正是 bug 的表现）；不用 `release.ps1` 发版，改为**只替换 `/opt/paideia-app/web`**——工作区里有别的会话在飞的改动（WORK-026/028、essay 采集、V24），`release.ps1` 从工作区构建 jar 会把它们一起带上线
-- 实测数据：`/learn` 现在 4 条轨道（Python 13 关 / Java 24 关 / 源码解读 1 关 / 计算机网络 2 关）；图谱 14 概念 / 12 边 / 接触 8 / 掌握 3；课程条目草稿从 10 条降到 0（剩余 5 条草稿属于面经采集，与本项无关）
-- 验证：`pnpm --filter @paideia/knowledge test` 44/0；`tsc -p tsconfig.json` 通过；学习者端 e2e 打线上 **61 passed / 2 failed / 21 skipped**——两条失败与本项无关：① `home.spec「每个请求都带上追踪标识」` 请求 `/actuator/health`，服务器上的 `application.yml` 缺 `management.endpoints.web.exposure.include` 故返回 404（环境配置差异）；② `assistant.spec「记忆面板」` 断言"还没有任何记忆"，而线上 admin 已有记忆（写死种子数据的旧问题）
-- 本地提交：39064e2
-- 远端推送：未推送
-- 未处理：`/graph` 节点标签在密集区域仍会互相压住（`labelDensity` 调优属视觉细节）；Python 课程只有 2 关有进度记录，因为脚本里的进度是按标题手写的
-### 2026-10-20 追加 · WORK-025 · 部署上线 + 实测定出「按标题去重」这个设计缺陷
-- 类型：implementation
-- 变更：
-  - 提交 `7cf1ec7`（八股文专区主体）与 `554a87f`（去重修复），部署到 codenest-online
-  - 线上 `/opt/paideia-app/application.yml` 加 `paideia.ai.essay` 段并 `enabled: true`（备份 `application.yml.bak-*`）
-  - **去重从「按题目标题」改为「按来源帖子 externalId」**：`fingerprint(title)` → `fingerprintOfPost(post)`
-- 决策：
-  - **原设计是错的，线上才暴露**：按标题算指纹，理由是"同一道题会在不同面经里反复出现"。但模型每次复述措辞会变：
-    第一次「线程池中如何可靠地传递 ThreadLocal 上下文？」、第二次「在线程池中如何可靠地把父线程的 ThreadLocal 上下文传给子线程？」——意思相同、文本不同 ⇒ 每次运行都新增。**模型复述的措辞不该被当身份标识**
-  - 改为按 `externalId`（上游给定、不漂移）+ 来源前缀（`nowcoder:`）。代价是同一题出现在两篇面经里会存两份，当前一篇只抽一道题、量小，可接受
-- 实测（全部在线上 codenest-online）：
-  - V24 迁移成功应用（`flyway_schema_history` v24 success=1）；`source_url`/`fingerprint` 两列已加；`essay-java` 分类 id=20
-  - 第一次运行 15:57：抓 7 篇 / 跳过非技术 3 / 抽出 4 / 新建 4 / 失败 0
-  - 第二次运行 16:13（重启触发）：**新建 4、重复 0 ⇒ 库里 4 变 8，暴露缺陷**
-  - 修复部署后 16:25：抓 8 / 跳过 3 / 抽出 5 / 新建 5
-  - 修复后第二次 16:32：**新建 0 / 重复 5 ⇒ 库里稳定 5 条**，去重生效
-  - 内容抽查（id=10076 Redis 哨兵）：结论先行 + 机理 + 处理建议，**无公司名/薪资**，带来源链接
-  - 全文检索可命中（`MATCH ... AGAINST('ThreadLocal')`）
-  - Paideia 健康 200、`/` 与 `/admin/` 均 200
-- 踩到的坑：
-  - **`@SpringBootTest` 嵌套类会各建一个上下文并重复跑迁移**（V951 seed 失败），所以抓取任务的装配验证没做成自动化测试，改为线上日志比对
-  - `EssaySchedulingWiringTest` 因 `EssayCollectionJob` 是包私有类而无法跨模块引用，已删除该测试
-  - 线上 e2e 需要 `E2E_LEARNER_PASSWORD`，仓库里没有（刻意设计），因此**未跑线上 e2e**
-- 验证：单测 18 条（指纹 4 + 解析 8 + 过滤 6）全过；`project-lifecycle.ps1 validate` 中 WORK-025 无错误（报错来自 WORK-027，别人的项）
-- 本地提交：`7cf1ec7`、`554a87f`
-- 远端推送：**未推送**
-### 2026-10-20 追加 · 推送核对（WORK-025 及前序提交）
-- 类型：maintenance
-- 变更：`git push origin master`，`2943480..e175df2`
-- 依据：HTTPS 直连 200、SSH 认证通过；推送前暂存区为空、密钥扫描无命中
-- 验证：`git ls-remote origin refs/heads/master` = `e175df2d...`，与本地 HEAD 一致；`git rev-list --count origin/master..HEAD` = **0**
-- 推送范围：19 笔。其中属于本次会话的是 `7cf1ec7`（八股文专区）、`554a87f`（去重修复）、`e175df2`（部署记录）；其余为**其他并发会话**的学习轨道（WORK-024）、WORK-027 建项与遥测修复等提交——它们此前也一直只在本地
-- 远端推送：已完成
-
-## 2026-10-20 · WORK-028 运维监控面板 · 实施、首轮上线与四件工件
-- 类型：implementation
-- 变更：
-  - 应用：`/actuator/prometheus`（版本由 Boot BOM 管）、`/api/v1/ops/admin/summary`（七类摘要、四态判定）、`/api/v1/ops/grafana/**`（Grafana 反代）、`ScheduledTaskRecorder` 端口 + 两个定时任务埋点、`ScheduledTaskMetrics`
-  - 服务器：prometheus / grafana / node / mysqld / redis / blackbox 六个 exporter 型单元 + `ops-textfile.timer` + `paideia-backup.timer`，全部只绑 127.0.0.1；`deploy/ops/` 一次装齐（安装脚本幂等）
-  - 管理端：「运维」页（七张四态卡片 + iframe 完整面板）
-- 决策：
-  - **不另开管理端口**：六处依赖 8081 的 `/actuator/health`，改在 Security 里按来源 IP 白名单（`LocalOnlyAuthorizationManager`）放行 `/actuator/metrics/**` 与 `/actuator/prometheus`
-  - **不建 MySQL 时序表**：历史交给 Prometheus TSDB（15s 抓取、保留 3 天），本项零迁移
-  - **不装 cAdvisor**：容器与 systemd 由 60 秒一次的 textfile 脚本采集，少一个吃数百 MB 的常驻进程
-  - **面板鉴权落在 Grafana 自己的会话**：实测三条路（应用 ADMIN / 查询串 ticket / 只放行 public）都被 iframe 子请求打穿；根因是项目无 Cookie 纯 Bearer 而 Grafana 是 SPA
-- 实测暴露并修掉的七个缺陷：告警不发信（缺 `notification_settings.receiver` → `empty` 收件人）、四条规则三条 `nodata`（比较表达式需 `bool` 修饰符）、运维页白屏（`api.request` vs `requestEnvelope`）、iframe 被 `X-Frame-Options: DENY` 拒、反代剥前缀导致 301 死循环、iframe 全 401、服务组把"没设上限"显示成"未知"
-- 验证：
-  - 后端 `mvn -B test` 216 运行，3 失败——**两处均为本分支起点 4a071f4 既有红**（`ApiWalkthroughTest` 缺 40+ 端点覆盖、`MigrationChecksumTest` V22/V23 未登记），已在独立 worktree 复现
-  - 运维相关：`OpsStatusTest` 3、`ScheduledTaskMetricsTest` 4、`OpsGrafanaProxyTargetTest` 5、`OpsSummaryIntegrationTest` 5、`ApiContractTest` 9、`ApiSurfaceTest` 6、`AuthorizationIsolationTest` 9，全 0 失败
-  - 管理端 e2e 打线上：**22 passed**
-  - 恢复演练：表 37/37、`knowledge_entries` 58/58、`users` 2/2、`ai_messages` 51/51
-  - 浏览器实测：七张卡片 + 9 个面板真实渲染
-  - 资源实测：六进程合计 335MB；Prometheus 2 小时 7.7MB（推 3 天约 280MB）
-- 依据：见 `.agent/changes/WORK-028-运维监控面板/testing/report.md`（AC-001..013 逐条证据表）
-- 本地提交：9 笔（`151958d` `970c8d9` `27b58e6` `c1a41ee` `25bebf8` 及其后续）
-- 远端推送：未推送
-- **仍未做**：管理端运维页的 e2e 用例；AC-005 的真实并发压满；慢查询日志开启；异地备份
-
-## 2026-10-21 · WORK-028 并入 master，并修掉 master 上的 V24 种子冲突
-- 类型：maintenance
-- 变更：把 `feat/ops-monitor` 的 11 笔提交并入 master（`24c639b`）；功能此前只在分支上，但**已经部署到生产**，代码与线上不一致了一晚
-- 合并冲突与处理：
-  - `application.yml`：master 上已被别的会话把「actuator 搬到 8082」这个**后来放弃的方案**提交并推送（在 `7cf1ec7` 里被 `git add -A` 卷进去）。取分支版本——不搬端口，改为 Security 里按来源 IP 白名单放行。远端已有该提交，不改历史，向前修正
-  - `updates.md`：两侧都是历史记录，按时间顺序全部保留
-- **一并修掉 master 上的真回归**（与 WORK-028 无关，但会让所有测试红）：
-  - 现象：合并后 `mvn test` **201 个错误**，全部发生在 Spring 上下文启动阶段
-  - 根因：`V24`（八股文，WORK-025）用 `INSERT ... SELECT` 建 essay-java 分类时不指定 id，**全新库上整表是空的，它自增拿到 id=1**，与 `V951` 种子里硬编码的 `id=1`（后端基础）主键冲突
-  - 修法：新增 `db/devdata/V949__shift_essay_category_id.sql`（**生产迁移目录没有它，不影响线上**），把该分类挪到 id 900 并同步条目引用（外键是 NO ACTION，顺序：建新行→改子表→删旧行→正名）。编号取 949 是因为必须**早于 V951** 执行
-  - 顺带补登记 `V22/V23/V24/V949` 的校验和——`MigrationChecksumTest` 此前一直因此红着
-- 验证：后端 **220 运行 / 1 失败 / 4 跳过**（此前 220 / 3 失败 / 4 跳过，其中 201 个是上下文错误）；唯一剩余失败是 `ApiWalkthroughTest` 的「40+ 端点未被走到」，该测试在合并前就已红（已在独立 worktree 上复现过）
-- 线上复检：`health=200`，`paideia` / `grafana` / `prometheus` 全 active
-- 本地提交：`24c639b`
-- 远端推送：未推送
-
-## 2026-10-21 · 工作树回收规矩与 D-08 迁移工具复核
-- 类型：decision
-- 变更：
-  - `AGENTS.md` 新增两条：①工作树合并后必须删（附实测占用与清理命令）；②生产迁移不得写业务数据，种子一律放 `db/devdata`
-  - `.agent/notes/dev-workflow.md` 新增两节：「工作树与磁盘」（实测 5MB / +100MB / +814MB / 近 1GB）与「迁移与种子的分工」（V24 事故全过程）
-  - 新增 `MigrationSeedOverlapTest`：生产迁移向种子表插行却不指定 id → 构建失败
-  - `always.md`：D-08 标注「2026-10-21 复核后维持 Flyway」，并补一条「生产迁移不得写业务数据」的纪律
-- 决策：
-  - **保留 Flyway，不换工具**。用户问「Flyway 太容易出问题，有没有别的方案」，核对四次踩坑后归因：V24 撞种子与 Boot 4 拆包**不是 Flyway 的责任**；夹具 900+ 的乱序与校验和才是。换 Liquibase / MyBatis Migrations / jOOQ DDL 差分都挡不住前两类，而切换要重写 25 个迁移 + 基线化，且是单向门
-  - **工作树清理定规矩**（用户选「写成明文规定」）：不是占内存是占磁盘，一棵用起来的树接近 1GB
-- 依据：用户「我们现在一个 work 就是在一个 worktree 里面做的吗，这个是规定吗…做完后会不会删掉呢，不然是不是很占内存呢」「Flyway 太容易出现这种问题了吧，有没有什么其他的方案呢，我不打算用这个了」；用户选择「先修真问题，暂不换工具」+「写成明文规定」
-- 验证：
-  - `MigrationSeedOverlapTest` 3 条通过；**反向验证**：临时造 `V999__probe_violation.sql`（往种子表插行不给 id），测试精确点名它，随后删除探针并确认 V24 未被改动
-  - 后端全量：**223 运行 / 1 失败 / 4 跳过**（新增 3 条守卫）；唯一失败仍是 `ApiWalkthroughTest` 的端点覆盖欠账，与本项无关
-  - 顺手清掉 2026-10-20 遗留的 `probe-base` 工作树（4.7MB）与已完全合并的旧工作树
-- 本地提交：`44ddb49`
-- 远端推送：未推送
-- **仍未做**：`feat/ops-monitor` 分支未删（已完全合并，等确认）；`docs/design/` 与 `output/` 两个未跟踪目录仍未决定是否入库
-
-## 2026-10-21 · 补八股文专区入口（WORK-025 AC-004 缺口）并批准 WORK-027 需求
-- 类型：implementation
-- 变更：
-  - `HomePage`：快捷卡之后新增「八股文专区」卡片，指向 `/knowledge/categories/{id}`
-  - **按 slug 找分类，不写死 id**：生产库是 20，全新测试库是 900（V949 为避开种子冲突挪过）
-  - `home.spec.ts` 新增一条 e2e：从首页卡片点进去，断言落到该分类页
-- 决策：
-  - **先补 025 入口再开工 WORK-027**（用户裁决）。proposal 的 D-08 本来就把它设成开工前提，核实后发现该前提不成立：学习者端 `NAV` 里没有八股文，`home.spec.ts` 也从未点过这条路
-  - **GitHub token 沿用现有 `gh` token**（用户裁决，维持 D-16）。已提醒该 token 带 `repo` 写权限、只为读热榜权限给大了，用户选择沿用
-- 核实到的事实（修正 proposal 的两处说法）：
-  - 「点不进去」**不准确**：分类树里 `八股文 · 面经真题` 是顶级分类，知识库卡片里本来就点得进去。真正缺的是**首页/导航入口**——学习者得先想到去知识库找
-  - 「定时任务未在生产启用」**已过期**：线上 `paideia.ai.essay.enabled=true`，已产出 5 条
-  - 但点进去显示「共 0 条」：5 条全是 `draft`（`publish-directly: false` 是设计如此），需管理端过目后发布。管理端条目页能改 status，路径是通的
-- 验证：
-  - `pnpm --filter @paideia/app typecheck` 通过；`build` 通过
-  - e2e 打线上：`home.spec.ts` **8 passed**（含新增那条）
-  - 浏览器实测：卡片文案「八股文专区 / 每天从面经里抽题，AI 逐题解析，面试前刷一遍。」→ 点击 → `#/knowledge/categories/20`
-- 本地提交：`a512ee1`、`5a6f322`
-- 远端推送：未推送（WORK-027 批准记录 + 本次改动）
-- **仍未做**：5 条草稿未发布（等你过目）；WORK-027 proposal/design/tasks 仍是 draft，等签署
-
-## 2026-10-21 · 迁移版本号改时间戳（多会话撞号）
-- 类型：decision
-- 变更：
-  - 新增 `MigrationVersionFormatTest`：新迁移必须是 `V<14位时间戳>__描述.sql`；历史 `V1..V24` 白名单冻结；同秒重复也挡
-  - `AGENTS.md` / `always.md` / `dev-workflow.md` 记下规则、实测数据与它治不了的两类情形
-  - `always.md` 的 D-08 二次复核结论：**维持 Flyway**
-- 决策（用户选「时间戳 + 守卫」）：
-  - **不换工具**。用户提出"多 agent 并行时版本号必然重复，Flyway 太容易出问题，能不能换"。用项目自己的 **Flyway 13.10 在独占探针库上做了四个实测**：
-    | 场景 | 结果 |
-    | --- | --- |
-    | 两分支都写 `V25` | `Found more than one migration with version 25`，**应用整体起不来** |
-    | 时间戳 `V20261021103045` 接在 `V24` 后 | 正常应用、幂等、可继续追加 |
-    | 已用时间戳后又有人写 `V25`（生产配置） | `Validate failed: Detected resolved migration not applied: 25` |
-    | 两个文件同一秒 | 与第一条同样的 `Found more than one migration` |
-  - 结论：**时间戳治「必然撞」（A），不治「同一秒」（D）**；Liquibase / MyBatis Migrations 同样要唯一起名与校验和，等于换个名字的同一问题；**jOOQ DDL 差分是唯一真正消灭命名空间争抢的方案**，但代价是引依赖 + 学习成本 + MySQL DDL 解析边界，用户选择不付这个代价
-  - **明确记录它治不了什么**：两个会话改同一张表的不同列、版本号不冲突的语义冲突，任何迁移工具都查不出来，只能合并前协调（`git log --all --oneline -- <迁移目录>`）
-- 验证：
-  - `MigrationVersionFormatTest` 3 条通过
-  - **反向验证**：造 `V25__probe_numeric.sql` 与两个 `V20261021120000__probe_*.sql`，守卫分别精确点名；随后删除探针
-  - 后端全量（`mvn clean test`）：**226 运行 / 1 失败 / 4 跳过**（新增 3 条守卫）；唯一失败仍是 `ApiWalkthroughTest` 的端点覆盖欠账
-- **过程中我自己踩了记录在案的老坑**：删掉探针 SQL 后没清 `target/classes`，Flyway 仍扫到它们 → 201 个错误。`always.md` 早有这条（"删掉资源文件后必须 `mvn clean`"），这次由我本人复现了一遍
-- 本地提交：`e4cd5bd`
-- 远端推送：未推送
-
-## 2026-10-21 · WORK-027 四件工件齐签，design/tasks 六处修正
-- 类型：requirements
-- 变更：
-  - `design.md` 修正 4 处 + 补 2 处：
-    1. **管理端路径** `/api/v1/admin/digest` → `/api/v1/digest/admin/**`（前者没有任何规则匹配，会落到 `anyRequest().authenticated()`，**任何登录用户都能删条目**）
-    2. **`preferredNav` 改动点从"加类型联合"扩成六处表**：类型 + 四个身份配置 + `HomePage` 的 `QUICK_LINKS`
-    3. **`GuardedHttpTransport` 用不上**：它是 AgentScope 的 `HttpTransport`，拦的是出站模型请求；抓 RSS 用 JDK `HttpClient`（照抄 WORK-025）
-    4. **RSS 解析必须自己防 XXE**（原 design 漏了）：外部 XML 与用户上传 docx 同一风险面，补四条 `DocumentBuilderFactory` 开关 + 单测喂恶意 DOCTYPE
-  - 另修两处：编排里"分类缺失就跳过"是 WORK-025 的残留（速递不进知识库、没有分类概念）；`RunKind` 现值核对为 7 个，明确新增 `digest` / `digest_weekly`
-  - `tasks.md` 三处：TASK-001 迁移改 14 位时间戳（原写 `V25__`，正是新规矩要禁的）、TASK-003 补 XXE 与 HTTP 边界要求及第四份恶意夹具、TASK-011 路径订正、TASK-012 验收改为"配置结构齐备"（原要求"不同身份取不同值"，与 design 的"一期值相同"矛盾）
-- 决策：四件工件全部签署（requirements 09:48、proposal 10:01、design 10:26、tasks 10:26），进入实现阶段
-- 依据：用户「先推送，然后再处理 design」「可以的修正一下吧」
-- 验证：`project-lifecycle.ps1 validate` → WORK-027 **零错误、零警告**；`brief` 显示 phase=implementation
-- 本地提交：未提交
-- 远端推送：未推送
-- **下一步**：按 tasks.md TASK-001..013 实施（13 个任务，尚未开始）
-
-## 2026-10-21 · WORK-027 撤销「按身份筛源」
-- 类型：requirements
-- 变更：
-  - `requirements.md` 退回 `draft`：删除 REQ-013、AC-014；D-14 与 I-15 标为撤销；非目标里补一条撤销说明与恢复条件；约束里删掉「依赖 WORK-010 身份配置结构」
-  - `proposal.md` / `design.md` / `tasks.md` 全部标 `stale`，并把「身份筛源」那节标为撤销（proposal 的第 4 处取舍、design 的「按身份分组」段、tasks 的 TASK-012 改写为「导航入口与转笔记」）
-- 决策（用户）：「算了暂时不切换了，我们暂时不考虑这个，因为我们目前就一个身份，对吧」
-- 核实（前提成立，且比"只有一个身份"更硬）：后端 `Identity.selectable()` **只对 `job_seeker` 返回 true**，`Identity.java` 的注释写明「其余三个是留位，只在枚举里存在，界面上不出现」。前端 `ProfilePage` 渲染四个选项但另外三个 `disabled`。也就是说 **AC-014「切换身份后分组顺序随之变化」原本就无法执行**——已签的需求里躺着一条不可能通过的验收标准
-- 我上一轮的处置是错的：TASK-012 原写「单测：`configFor()` 对不同身份返回不同 `digestGroups`」，我为与 design 对齐把它改成「配置结构齐备」——那是在任务层面自行消化了一个 requirements 与 design 的冲突，正是规程禁止的做法。这次回到最早工件（requirements）撤销，并让三件下游失效
-- 撤销后仍保留：`preferredNav` 加 `'digest'`（那是**导航顺序**，与速递分组无关），四处身份配置 + 类型联合 + `HomePage` 的 `QUICK_LINKS` 共六处
-- 验证：`project-lifecycle.ps1 validate` → WORK-027 只剩「需求尚未形成但存在下游工件」，即**预期的待重签状态**；其余无错误
-- 本地提交：见下一笔
-- 远端推送：未推送
-- **下一步**：需求需重新签署；签完后 proposal/design/tasks 三件 stale 也要一并复核签署（改动集中在身份那一节，其余未变）
-
-## 2026-10-21 · 修掉长期红的 ApiWalkthroughTest（真因是正则匹配，不是端点欠账）+ 五项未验证功能线上复核
-- 类型：verification
-- 变更：
-  - `ApiSurfaceTest` 新增 `matches()`（Spring `AntPathMatcher`）与 `bySpecificity()`（`{` 与 `*` 都计入通配数），`ApiWalkthroughTest` 的 `canonicalPath` / `noteTouched` 两处改用它
-  - 自查补上四个此前没走到的端点：`POST /knowledge/admin/tracks`、`GET /learn/tracks`、`GET /learn/tracks/{slug}`、`POST /ops/grafana/**`
-  - `api-shape.json` 随之更新（新增 4 个端点；`knowledge/categories` 变两级嵌套；`entries/{id}` 多 `sourceUrl`）
-  - 中断分支补 `printStackTrace()`
-  - 新增单测 `patternMatchingHandlesWildcardsAndSpecificity`（3 条断言）
-- 决策：
-  - **真因不是"40+ 端点覆盖欠账"**。WORK-028 引入的 `/api/v1/ops/grafana/**` 被当成正则喂给 `bare.matches()`，`**` 抛 `PatternSyntaxException` → 第一个请求就中断 → 111 条端点全被记成"没打到"。之前两次判断成欠账都错了
-  - **为什么长期被掩盖**：`assertFullCoverage()` 排在 `assertFailures()` 之前，覆盖率断言先红，真实异常（记录在 `steps` 里）根本没机会被看到
-  - 用 Spring 自带的 `AntPathMatcher` 而不是继续手写正则：`{id}` 与 `**` 都是它原生写法，零新依赖
-- 验证：
-  - `ApiSurfaceTest` **7 运行 / 0 失败**、`ApiWalkthroughTest` **1 运行 / 0 失败**（同一独占库连跑两遍，快照不抖）
-  - **反向验证两条**：把 `matches` 退回 `path.matches(pattern)` → `PatternSyntaxException` 当场红；把具体度退回只数 `{` → `/a/{b}` 断言红。恢复后全绿
-  - 后端全量（`scripts/test-db.sh mvn -B test`）：**227 运行 / 0 失败 / 4 跳过，BUILD SUCCESS**——持续多日的唯一红消失
-- 线上复核（`http://36.212.5.130:8081`，账号走被忽略的 `application-local.yml`）：
-  | 项 | 结果 |
-  | --- | --- |
-  | WORK-011 会话与历史 | `GET /ai/conversations` → 17 条；任一会话 `GET /messages` → 200、2 条消息 |
-  | WORK-013 记忆 | 列表 0 条 → 写入 → 列表 1 条（来源/理由/时间都对）→ 按 `text/1` 删除 → 列表回 0 |
-  | WORK-013 三个开关 | `PUT /ai/settings` 关掉总闸后 `POST /ai/memories` 返回 **409 / 40910**「个性化记忆已关闭」，第二道闸生效；已恢复为原值（全开） |
-  | WORK-020 学习线 | `GET /learning/lines` → 4 条（Python 13 / Java 28 / 源码解读 1 / 计算机网络 2） |
-  | WORK-021 知识图谱 | `GET /learning/graph` → 14 个概念、5 个已触碰、0 已掌握 |
-  | WORK-024 学习轨道 | `GET /learn/tracks` → 4 条（Java 24 关） |
-  | WORK-026 Laya | 服务 `layaUp=1`（运维摘要），**但应用层 `paideia.ai.decision.enabled=false`** |
-  | WORK-025 八股文 | 首页入口 e2e 通过；`essay` 开关=开 |
-  | 学习者端 e2e 打线上 | **64 passed / 0 failed / 21 skipped** |
-  | 管理端 e2e 打线上 | **22 passed / 0 failed** |
-- 实测发现（如实登记，未擅改线上配置）：
-  - **WORK-026 在线上是"装了但没接"**：`laya` 服务 active、`/health` ok，但 `paideia.ai.decision.enabled=false`，所以 `TechEssayFilter` 永远走规则判断、一次也不调 Laya。design 写的是"部署时显式打开"，线上没打开。**关掉时功能可降级，不是故障**，但 WORK-026 的收益目前为零
-  - `services` 组报 WARN：`laya 85%` 且其余四个服务均未设内存上限——不是崩溃，是容量信号
-  - `WORK-027` 的 `GET /api/v1/digest` 在线上返回 404（未实现，与"本项一行代码没写"一致）
-  - 记忆写入用中文会返回 `400 请求体无法解析`，**是 Windows shell 传参编码问题不是产品缺陷**：同样的中文经界面（e2e 覆盖）正常，纯 ASCII 直连 curl 正常
-- 顺手发现的流程缺口（未处理）：
-  - **WORK-024 没有工件目录**：代码（V22/V23、`LearnTrackController`、关卡地图）已上线且有更新历史，但 `.agent/changes/` 下从来没有 `WORK-024-*`。原因是当时状态脚本报 `WORK-024` 而工作区已被占用，本项取了 025；后来学习轨道那一路直接用 024 落了代码却没补工件
-  - 该次提交（`0a4171e`）是并发会话在我做反向验证的**中途**提交了工作区——里面 `bySpecificity` 停在"只数 `{`"的临时状态，而 `/a/{b}` 断言已在，等于 HEAD 上必红。已用 `e47196e` 补回
-- 本地提交：`e47196e`
-- 远端推送：未推送
-
-## 2026-10-21 · 后端测试耗时实测与内环规矩
-- 类型：maintenance
-- 变更：
-  - `dev-workflow.md`「实测基线」整节重写：旧数据「257 条 / 1 分 31 秒」作废，新基线 **543 条 / 4 分 01 秒（热）**
-  - `AGENTS.md` 节奏段新增一条：**后端内环不要跑全量**
-- 实测（2026-10-21，四次全量对照）：
-  | 跑法 | 墙钟 | 用例 |
-  | --- | --- | --- |
-  | `mvn -B test` 冷 | 4:17 | 543 |
-  | `mvn -B test` 热 | 4:01 | 543 |
-  | `mvn -B -T 1C test` | **3:30** | 543 |
-  | `mvn -B -T 1C -pl '!paideia-app' test` | **1:12** | 148 |
-- 归因：
-  - **变慢的主因是用例数翻倍**（257 → 543），不是某处退化
-  - **`paideia-app` 一个模块占 2 分 15 秒（55%）**：227 条集成用例要起 **14 次 Spring 上下文**（累计约 79 秒）
-  - **`ModularityTest`（ArchUnit）单类 19.5 秒**
-  - 分层：纯单测约 317 条 / 约 20 秒；集成约 226 条 / 约 220 秒
-  - **Flyway 不是瓶颈**：32 个迁移 62 毫秒
-- 决策（用户选「只写规矩」）：只改文档与调用习惯，**不改任何测试代码**
-  - 内环默认 `-pl '!paideia-app'`；全量一律 `-T 1C`；只在提交/交接/改跨模块契约时跑全量
-  - 明确排除：不合并那 14 个 Spring 上下文（31 个 `@SpringBootTest` 类只产生 14 个，缓存已在工作，差异是必需装配）；不引入 mvnd；不给 ModularityTest 加跳过开关
-- 验证：按文档命令实跑 `-T 1C -pl '!paideia-app'` → **148 运行 / 0 失败 / 3 跳过 / BUILD SUCCESS**，与记录的 1 分 12 秒一致
-- 本地提交：见下一笔
-- 远端推送：未推送
-
-## 2026-10-21 · WORK-026 线上接通（开 Laya 开关）+ 修超时 + 补 WORK-024 工件
-- 类型：implementation
-- 变更：
-  - 服务器 `/opt/paideia-app/application.yml` 新增 `paideia.ai.decision` 段：`enabled: true`、`base-url: http://127.0.0.1:8091`、`api-key`（从 `/etc/laya/laya.env` 的 `LAYA_API_KEY` 原样取，40 位，未回显）、`timeout-ms: 8000`、`min-confidence: 0.7`、`max-text-chars: 4000`。改前已备份为 `application.yml.bak-20261021110651`
-  - **`timeout-ms` 默认值 5000 → 8000**（`DecisionProperties` 与 `application.yml` 同步），注释换成实测依据
-  - 补 `WORK-024` 四件工件 + `testing/report.md`（反向记录已上线功能）
-- 决策：
-  - **先确认"没接上"到底是哪种没接上**再动手。核实结果：代码**早就接好了**——`EssayCollectionService:115` 就在调 `TechEssayFilter.isTechnical()`，而 `TechEssayFilter` 会调 `ContentClassifier`。真正缺的只有一件事：服务器配置里**根本没有 `decision` 段**，于是走代码默认 `false`，打开它就行，不需要改代码
-  - **超时是这次接通才暴露的真缺陷**。5 秒是 WORK-026 当时按"热态单条 147~260ms、并发 16 p95 2965ms"标的，但那是**短文本**下的数。实测延迟随输入长度线性涨：810 字 1.1s / 1620 字 2.9s / 3240 字 3.8s / 4000 字 4.0s。`maxTextChars` 就是 4000，5 秒只留不到 1 秒余量
-- 验证：
-  - Laya 侧带 key 直连 `/v1/systemone`：技术面经判 `technical` 概率 0.9744（与部署前记录一致）
-  - 重启后运维摘要 `switches` 组：`decision | 开`；启动日志 0 ERROR
-  - **第一次跑批（5 秒超时）**：`八股文抓取完成：抓 12 篇，跳过非技术 1 篇，抽出 8 题，新建 2 条，重复 6 条，失败 1 篇`，但日志里有 **2 次** `LayaContentClassifier : 决策模型判定失败，退回规则判断：HttpTimeoutException`
-  - **改 8 秒后第二次跑批**：同样抓 12 篇、跳过 1 篇、抽出 8 题（重复 8 条），**`LayaContentClassifier` WARN 计数 = 0**；Laya 端收到 6 次 `POST /v1/systemone 200 OK`
-  - 前后对比表：
-    | 项 | 5 秒 | 8 秒 |
-    | --- | --- | --- |
-    | 抓取/跳过/抽题 | 12 / 1 / 8 | 12 / 1 / 8 |
-    | Laya 超时降级 | **2 次** | **0 次** |
-  - `TechEssayFilterTest` 6 运行 / 0 失败
-  - 另一条失败 `面经抽题失败（2929211）：上游模型服务暂时不可用` **不是 Laya 的问题**，是 DeepSeek 上游那一次没返回；两轮都在同一篇上失败，与决策模型无关
-- WORK-024 补账：
-  - 现状：代码（`V22`/`V23` 迁移、`TrackMapper`/`TrackService`/`LearnTrackController`、`LearnPage`/`TrackMapPage`、24 篇 Java 课程、`verify_course.py`）早已上线且有更新历史，但 `.agent/changes/` 下**从来没有 `WORK-024-*`**。原因是当时状态脚本报 `WORK-024` 而工作区已被在飞的八股文占用，本项取了 `WORK-025`；后来学习轨道那一路直接用 024 落了代码却没补工件
-  - 后果：`validate` 对这项**完全静默**——代码在跑、治理上看不见，也没人知道它改过什么
-  - 补了 `requirements/proposal/design/tasks` 四件 + `testing/report.md`，全部按已实现行为反向记录，**不改一行代码**。`mode: strict`（新增两张表与三个端点）
-  - 线上实测：4 条轨道（Python 0/13、Java 0/24、源码解读 0/1、计算机网络 0/2）；`GET /knowledge/categories` 已无 `lineKind` 非空项（AC-005 生效）
-- 本地提交：`3ed6ab7`（超时）、`2d036a7`（WORK-024 工件）
-- 远端推送：未推送
-- **仍未做**：WORK-024 与 WORK-027 的需求都需要用户重新签署（`validate` 各报一条「需求尚未形成，但已经存在下游工件」）
-
-## 2026-10-21 · 线上界面导入 FigCraft 可编辑稿 + 恢复 figcraft MCP
-- 类型：tooling
-- 变更：
-  - 装 FigCraft 0.8.0（Windows x64 便携版）到 `C:\Users\Lenovo\AppData\Local\FigCraft\app`，含 `figcraft.exe`（桌面）与 `figcraft-cli.exe`（含 `mcp` 子命令），桌面建了快捷方式
-  - `~/.zcode/cli/config.json` 的 `mcp.servers` 重新加回 `figcraft`（stdio，工作区限定在 `F:/Paideia`），原配置备份为 `config.json.bak-figcraft-*`
-  - 新增 `docs/design/paideia-live-2026-10-21.figcraft`：14 页（1 索引 + 13 个线上页面）、1557 节点，全部是真图层
-  - 流水线脚本放 `output/fc/`（未入库）：`capture*.mjs` 抓线上 DOM、`absolutize.py` + `build-icons.py` 转矢量图标、`build_figcraft.py` 合成
-- 决策：
-  - **不用截图位图**：每个元素落成 FRAME / TEXT / VECTOR，文字可改、框可挪；只有 1 张裁图（无法矢量化的一处）
-  - **图标走真矢量**：SVG path 先归一成绝对坐标，再由 `figcraft-cli` 转成它自己的 `network`。LC 的自带解析器读不了相对命令与 arc 紧凑写法，直接喂原始 path 会画出半截箭头
-  - FigCraft 只是查看/编辑工具，**不改变「界面改动直接实现」这条既有约定**（2026-10-20 撤销过「先原型再设计」）
-- 依据：用户「figcraft有一个mcp 和cli之类的你给我看看，给我下载上，然后把当前线上的最新的设计图给我导入到这个里面，可编辑的那种哦」
-- 验证：
-  - `figcraft-cli info` 读回 14 页 / 1557 节点 / `repairs` 为空
-  - `node.set` 改文字、字号、颜色后 `file.save` 回写成功（`editcheck.figcraft`）
-  - 逐页 `render` 与线上截图比对：首页、知识库分类、知识库条目、简历、身份与目标、我的自评、学习地图、管理端总览/条目/分类/积分 均一致
-  - MCP 握手通过：`initialize` 返回 `FigCraft 0.8.0`，`tools/list` 给出 19 个工具
-- 已知限制：Tailwind 的 `box-shadow`、`backdrop-filter`、CSS 灰阶以外的渐变角度未完整还原；响应式断点只抓了 1440 宽
-- 本地提交：未提交（`docs/design/` 与 `output/` 均未被 Git 跟踪，是否入库待定）
-- 远端推送：未推送
-
-## 2026-10-21 · 移除 figcraft MCP（用户否决）
-- 类型：tooling
-- 变更：`~/.zcode/cli/config.json` 的 `mcp.servers.figcraft` 整条移除，剩余 8 个（codegraph/context7/drawio/bep-mcp-prod/firecrawl/paideia/github/deepseek-search）
-- 决策：用户「算了，删掉这个mcp吧，你弄的太丑了」——判定这份自动生成的界面稿质量不达标，工具链撤回
-- 依据：同上的用户原话
-- 验证：`json.load` 解析通过，`figcraft` 不在 `mcp.servers` 中
-- 保留：`docs/design/paideia-live-2026-10-21.figcraft` 与 `output/fc/` 脚本未删除（均未被 Git 跟踪），是否清理由用户决定
-- 本地提交：未提交
-- 远端推送：未推送
-
-## 2026-10-21 · 前端测试实测：修掉一个会静默跳过 73 条的假失败
-- 类型：fix
-- 变更：
-  - `frontend/packages/ui/vitest.config.ts` 加 `testTimeout: 60_000` 与 `hookTimeout: 60_000`
-  - `frontend/packages/ui/src/markdown/markdown.test.tsx` 的 `beforeAll` 注释改为指向配置（不重复给数字）
-  - `dev-workflow.md` 的「在线上跑 e2e」一节订正两处过期说法
-- 实测（2026-10-21）：
-  | 项 | 数字 |
-  | --- | --- |
-  | 前端单测 `pnpm -r test` | **284 条 / 33–54 秒**（旧记录「176 条 / 11.5 秒」已过期） |
-  | 学习者端 e2e 打线上 | **61 条 / 2 分 36 秒**（`workers: 1`，后端有状态所以串行） |
-  | 管理端 e2e 打线上 | 22 条（此前实测） |
-  | e2e 单条均值 | **2.30 秒**；最慢 6.1 秒（分享链接）——没有哪一条是瓶颈，是 61 条叠加 |
-- **修掉的真缺陷（flaky，最危险的形态）**：`packages/ui` 的 `markdown.test.tsx` 在
-  `pnpm -r test` 并发（5 个 vitest 进程）时会踩两个默认超时：
-  ① `beforeAll` 现场 `import('streamdown')` 超过 10 秒 hook 上限；
-  ② 语料用例 `headings-deep` 回放 1658 个增量超过 5 秒 test 上限。
-  **后果不是报一条错，而是整个文件失败后 73 条用例静默不跑**，输出看着像「81 passed / 73 skipped」那样绿着。
-  连跑 4 次复现：一次 154 全过、一次 1 条超时、一次 beforeAll 打穿导致 73 条被跳过。
-  修后**连续 4 次全部 154/154**。
-- 订正的文档错误：
-  - 「学习者端 e2e 仍走本地那条」**已过期**——实测学习者端能打线上（61 条）
-  - 新增：**三组凭据缺一不可**。`graph.spec.ts` 单独硬编码 `seed-admin` 作默认，线上没有这个账号
-    → 4 条报「管理员登录失败：夹具没法造」，补 `E2E_ADMIN_*` 后 6 条全过。**全仓只有它需要管理员身份**
-- 未做（用户选择）：e2e 并行化。`workers: 1` 的理由（后端有状态、多 worker 抢端口与数据）是对的，
-  改成并行需要每个 worker 独立数据隔离，属实质工程量。2 分 36 秒按 61 条串行叠加，不是某处浪费。
-- 依据：用户「前端是不是也要优化一下，尤其是 e2e 太慢了」
-- 验证：`pnpm -r test` 连续 4 次全绿（154/154 ui、总 284 条）；`graph.spec.ts` 补凭据后 6 passed
-- 本地提交：见下一笔
-- 远端推送：未推送
-
-## 2026-10-21 · e2e 改为文件级选择性运行（实测省 65–92%）
-- 类型：maintenance
-- 变更：
-  - `AGENTS.md`：e2e 规矩从「按端跑」细化为「先选文件，不要默认全量」，附 13 个 spec 与页面的对应关系
-  - `dev-workflow.md`：加一张选择性跑法的实测成本表
-- 依据：用户「为什么修改后要跑全部的呢，既然说没办法优化时间了，那不能说选择性的跑吗」——这个问题指出我漏了 Playwright 原生的选择能力（`--grep` / 文件 / `--last-failed` / `--shard`），一直默认跑 `test:e2e`
-- 实测（2026-10-21，全部打线上）：
-  | 跑法 | 实测 |
-  | --- | --- |
-  | 全量 61 条 | **2 分 36 秒** |
-  | 单文件 2 条（`identity.spec.ts`） | **27 秒** |
-  | 单文件 6 条（`notes.spec.ts`） | **54 秒** |
-  | `--grep "八股文"` 1 条 | **13 秒** |
-- 归因：**固定启动约 20 秒，单条边际约 2.4 秒**。所以"全量慢"的本质是 61 条叠加，而不是某处浪费；
-  这也解释了为什么"优化单条"无效、而"少跑几条"立刻见效（省 65–92%）
-- 建立对应关系（改哪里跑哪个）：`HomePage`→`home`、知识库→`knowledge`、笔记→`notes`、图谱→`graph`、
-  助手→`assistant`、markdown 渲染→`markdown-render`、简历→`resume`、身份/导航→`identity`、
-  MCP→`mcp-tokens`、源码解读→`source-reading`、移动端布局→`layout.mobile`、课程关卡→`learn`、PWA→`pwa`
-- 全量保留在两种场合：改了共享包（`@paideia/ui`/`core`/`auth`/`knowledge`）、发版前
-- 验证：三种跑法都实跑过（27s / 54s / 13s），结果与用例数一致
-- 本地提交：见下一笔
-- 远端推送：未推送
-
-## 2026-10-21 · WORK-027 每日技术速递 · 实施完成（工作在 `.worktrees/work-027`，分支 `feat/work-027-digest`）
-- 类型：implementation
-- 分支：`feat/work-027-digest`（5 笔提交）
-- 变更：
-  - 迁移 `V20261021134700__create_digest_tables.sql`：`digest_items`（指纹全局唯一）+ `digest_weeklies`（周唯一）
-  - `paideia-ai/internal/digest/`：端口与源（`DigestSource`/`FetchedItem`/`DigestHttp`/`FeedXml`/`RssDigestSource`/`GithubTrendingSource`/`HackerNewsSource`）、指纹、AI 压缩（`DigestSummarizer`/`DigestPrompt`）、编排（`DigestCollectionService`/`DigestWeeklyService`）、调度、配置、`DigestMapper`、`web/{DigestController,DigestAdminController}`
-  - `RunKind` 加 `DIGEST`/`DIGEST_WEEKLY`；`SecurityConfiguration` 加两条规则（管理端在前）
-  - 前端：`@paideia/knowledge` 的 `digest-client`/`digest-types`；`DigestPage`；路由 `/digest`；导航与首页入口；`preferredNav` 六处；`NoteNewPage` 读 query 预填
-- **实跑暴露并修掉的四个真缺陷**（每个都有单测或实测钉住）：
-  1. **`github.com/trending` 已改成 SPA**：真实 HTML 里 `<article>`/`Box-row`/`stars today` 各 0 次、仓库链接 0 个，仓库行由 JS 注入。原设计"无 token 走页面解析为主"等于每天拿空结果 → **主次反转**：Search API 为主，页面解析降为补充
-  2. **Search API 查询串含 `>` 是 URI 非法字符**：`URI.create` 抛异常被 catch 吞成"空结果"。同一串用 curl 手打返回 261 个结果——**只有应用真跑才暴露**。`URLEncoder` 编码后 GitHub 从 0 条变 15 条
-  3. **成本闸按前缀截断让单个源垄断**：实跑 60 条全是 IT 之家，另三组为 0。改为按分组轮转取（`takeByGroup` + 4 条单测）
-  4. **`GuardedHttpTransport` 的 OkHttp 读超时是默认 10 秒**（AgentScope 自己默认 5 分钟）：12 条候选跑约 20 秒，卡在 10 秒抛 `Failed to read response body: timeout`，整批静默降级。既有调用都是单条几秒所以一直没撞到。改为读 5min / 写 1min / call 6min
-  5. 另修提示词：原写"可以挑掉不重要的条目"，真连实测 5 条只返回 3 条，而编排把全部候选都入库 → 被挑掉的显示"这条还没写好摘要"，等于三分之二卡片看起来是坏的。改为"每一条都要写"后 5/5
-- 验证：
-  - 七个源实测 200：量子位 10 / IT之家 60 / InfoQ 20 / 掘金 20 / 开源中国 50 / HN 10 / GitHub 15
-  - **真跑完整日报（配真实 DeepSeek 凭据）**：`候选 35 条，入库 12 条（降级 0 条），失败源 0 个`；分组 `news 4 / github 4 / hackernews 4`（轮转生效）
-  - **`ai_runs` 复验**：`kind=digest userId=0 status=ok in=1266 out=3405`，当轮恰好 1 条（AC-008）
-  - 摘要真连：5/5 条 9.0 秒 2320 tokens；英文标题正确译为中文（"Introducing the new reasoning model" → 「介绍全新推理模型」）
-  - 周报真连：558 字三段 markdown、9.9 秒
-  - 后端全量：**596 运行 / 0 失败**
-  - 学习者端 e2e（digest.spec.ts）：4 passed / 1 skipped / 0 failed
-- 仍未做：**未部署**（`application.yml` 默认 `enabled: false`，上线需配 GitHub token 并打开开关）
-- 本地提交：`feat/work-027-digest` 分支 5 笔
-
-## 2026-10-21 · 工程规范 · 切片提交不再跑后端全量，改跑两段组合
-- 类型：docs
-- 变更：
-  - `AGENTS.md` 第 28 行「提交、交接、改跨模块契约时跑全量」改为「**切片提交不跑全量**」，给出两段命令：
-    `-pl '!paideia-app'`（88 秒 / 410 条）+ 四个守卫类 `-pl paideia-app -am -Dtest=...`（46 秒 / 9 条）
-  - `.agent/notes/dev-workflow.md` 测试节奏表拆成三行（内环 / 外环=提交前 / 全量），
-    「实测基线」表按实测/未实测分开标注，「三条结论」补第 4 条（多会话撞 MySQL 连接上限）
-- 决策：**全量里真正属于"提交该管"的只有四个守卫类**（模块边界、迁移命名、迁移校验和、迁移不污染种子表），
-  它们单独跑只要 46 秒；`paideia-app` 那 257 条集成用例要 2 分 15 秒且只在改端点/契约时相关，
-  不该被每次切片提交拖着跑。全量触发条件收窄为：交接、改跨模块契约、改 schema 或迁移、发版带 `-WithTests`
-- 依据：用户：「每次提交前不应该是只跑他修改的模块吗？」并在下一轮确认「切片提交是肯定的」
-- 验证：
-  - `-pl '!paideia-app'` 实测 **88 秒 / 410 条 / 0 失败**（各模块：platform 27、web 11、persistence 4、
-    security 11、account 16、knowledge 62、note 6、ai 242、sandbox 6、mcp 25）
-  - 四个守卫类实测 **46 秒 / 9 条 / 0 失败**（`ModularityTest` 1 条 14.8 秒、三类迁移守卫 8 条）
-  - 用例总数按 surefire 报告汇总为 **667**（`paideia-app` 257）
-- 更正：文档里 `mvn -pl paideia-ai test` 的用例数原写 **148**，实际 `paideia-ai` 是 **242**——
-  148 是"非 app 全模块"的旧数被抄错了行
-- 踩坑（本轮实测，已写进 notes 第 4 条）：**两个会话同时跑后端测试会撞 MySQL 连接上限**
-  （`max_connections=151`，实测 `Max_used_connections` 已 152）。撞上时 `paideia-app` 一批集成类
-  集体报 `Too many connections`，看起来像十几个测试同时坏了，实际零产品缺陷。
-  另一轮 232 条全错的原因则是**别的会话正在主树里改迁移**（`V20261021134700` 改名 `V20261021161000`
-  并跑 `-Dmigration.checksums.update=true`），Flyway 报 failed migration、上下文起不来。
-  `test-db.sh` 只隔离库名，**不隔离连接数、也不隔离工作树里正在改的迁移**
-- 未完成：全量在用例涨到 667 后**没有在干净树上重测**，文档里 3:30 已标注为"543 条时的实测"
-- 本地提交：待用户授权
-- 远端推送：未执行
-
-## 2026-10-21 · AI 可观测性 · 补接 prompt_version 与终态归类（cancelled/timeout）
-- 变更：
-  - **11 条 AI 入口全部接上提示词版本**，写进 `ai_runs.prompt_version`：对话主链路
-    （`HarnessPrompts.version(harness)`，`AssistantConversationController.runFor`）、面试点评
-    （`ReviewPrompt.VERSION`）、记忆整理（`MemoryExtractionPrompt.VERSION`）、外部问答
-    （`HarnessPrompts.version(ASSISTANT)`）、简历解析（`ResumePrompts.PARSE_VERSION`）、
-    简历分析与提案（`ANALYZE_VERSION` / `PROPOSE_VERSION`）、训练营出卷与复测
-    （`CampPrompts.GENERATE_VERSION` / `RETEST_VERSION`）、日报（新增 `DigestPrompt.VERSION`）、
-    周报（新增 `DigestWeeklyService.PROMPT_VERSION`）
-  - `HarnessPrompts` 由包私有改 `public`（跨包调用：`internal.web`、`internal.tools`）；
-    `ReviewPrompt.VERSION` 同步放开到 `public`。两者原本就写着"进日志/回归用"，只是没人用
-  - 对话一轮的终态不再把所有失败压成 `failed`：新增 `ClientGoneException`（专用子类，
-    不靠错误码或文案判断）→ `RunOutcome.CANCELLED` / `error_type=client_gone`，
-    `TimeoutException` 沿 cause 链 → `RunOutcome.TIMEOUT` / `error_type=upstream_timeout`
-- 决策：**用专用异常子类而不是字符串匹配**。上游报错文本完全可能包含"连接已断开"这几个字
-  且会被包进 cause 链，按消息认会把上游故障记成用户放弃——测试 `messageSubstringAloneDoesNotCancel`
-  就守这一条。`RunOutcome.CANCELLED/TIMEOUT` 两个常量早就定义、全仓零调用方，这次才第一次用上
-- 依据：用户给了一篇讲 Agent 效果归因的文章（TRAIL + Snowflake Agent GPA），问本项目有没有类似能力、
-  要不要做优化。核实结论：文章两项论文的 95%/86% 数字真实，但那 86% 来自 6 个专精 judge + claude-4-sonnet
-  高推理 + GEPA 刷提示词 + meta-judge 复核；TRAIL 原文写明最好的 Gemini-2.5-pro 在"指出错在哪一步"上只有 11%。
-  我们的 `ai_runs`/`ai_run_spans` 已覆盖"节点化"那根杠杆，不值得照搬 judge 体系；真正缺的是
-  prompt_version 没接线（**已跑过的行永远补不回来**）与 CANCELLED/TIMEOUT 无人使用。用户：「简单你直接给我做了吧」
-- 未做（明确不做）：LLM-as-judge 打分、checkpoint 回放、条件边、节点级看板扩展。判据是
-  "稳定真实流量 + 出现'知道变差了但说不清哪一步'的实际困扰"两条同时成立才值得做，现在都不满足
-- 验证：
-  - `-pl '!paideia-app'` **250 条 / 0 失败 / 11 跳过**（跳过的是四个 `*LiveTest` 联网探针 + 一条 FileStorage 契约用例，均为既有设计）
-  - 四个守卫类 **9 条 / 0 失败**（模块边界、迁移命名、迁移校验和、迁移不污染种子表）
-  - `AssistantConversationIntegrationTest` **14 条 / 0 失败**（真 MySQL），含新增的
-    `recordsPromptVersion` 断言 `ai_runs.prompt_version = assistant-chat-v1`
-  - **反向验证**：临时注释掉 `withPromptVersion` 后 `recordsPromptVersion` 变红（`but was: null`），恢复后转绿
-  - 新增 `AssistantConversationOutcomeTest` 4 条（取消 / 超时 / 其余失败 / 文案子串不误判）
-- 踩坑：本轮两次 `mvn compile` 撞 `insufficient memory for the Java Runtime Environment`——
-  机器上有别的会话在跑，`MAVEN_OPTS=-Xmx1200m` 后正常。另 `mvn -pl paideia-ai` 必须从
-  `backend/` 跑（根目录无 pom），`scripts/test-db.sh` 也要带 `-f backend/pom.xml`
-- 本地提交：待用户授权
-- 远端推送：未执行
-
-## 2026-10-21 · WORK-027 · 推送 master 并部署上线（含一次线上事故）
-- 类型：deployment
-- 变更：
-  - 合并 `feat/work-027-digest` 进 master 并推送（与 WORK-029 的三处冲突按"两边都保留"处理）
-  - 线上 `/opt/paideia-app/application.yml` 新增 `paideia.ai.digest` 段（`enabled: true`、GitHub token、5 个 RSS 源）
-  - 迁移重命名 `V20261021134700` → `V20261021161000__create_digest_tables.sql`（避开与 camp 的版本倒挂）
-  - `maxTokens` 8192 → 16384 + 按 24 条分批；`aiTimeoutSeconds` 180（整轮）→ 120（每批）
-- **事故：迁移版本倒挂，线上服务挂了约 20 分钟**
-  - 现象：部署后 `health=000`、5 次重启循环，日志 `Validate failed: Migrations have failed validation`
-  - 根因：本项的迁移时间戳（`…134700`）比另一会话的 camp 迁移（`…135406`）**早**，但 camp 先部署，
-    我的成了"更早但未应用"。`application-test.yml` 开了 `out-of-order: true`，生产刻意没开——**所以本地永远绿**
-  - 修复过程中又踩两次：① `mvn package` 不 clean 时旧迁移残留在 `target/classes`，jar 里打两个版本；
-    ② 从工作树构建缺对方会话的文件 → `applied migration not resolved locally`
-  - 最终从主树 `mvn clean package`，用 `unzip -l` 确认 jar 里只有两个正确迁移才部署成功
-  - 已把这条与处理步骤写进 `.agent/rules/always.md`
-- **满批 AI 调用两层缺陷（都是线上才暴露）**：
-  1. 60 条一次性调用，8192 maxTokens 被思考吃满 → 上游静默返回空 → 60 条全降级。
-     5 条 / 12 条都够用，**问题只在满批**
-  2. 改分批后，超时按"整轮 180 秒"算，第 1 批用完预算 → 第 2、3 批 `InterruptedException`。
-     改为按批 120 秒
-- 线上结果（16:52 那轮）：
-  ```
-  速递完成：候选 159 条，已存在 0 条，入库 60 条（其中降级 0 条），失败源 0 个
-  ```
-  分组 news 18 / community 18 / github 15 / hackernews 9，**0 条降级**；
-  `ai_runs`：`kind=digest userId=0 status=ok input=7493 output=7523`
-  线上 `GET /api/v1/digest` 返回 60 条四组齐全；学习者端 e2e 打线上 4 passed / 1 skipped
-- **仍未做**：周报没在生产触发（`initialDelay=10min`，本轮窗口没等到；提示词已在本机真连验证）；
-  管理端删除的 e2e 未跑
-- 本地提交：`7bdd748`（及合并前的 5 笔）
-- 远端推送：**已完成**（`2309acb..7bdd748`）
-
-## 2026-10-21 · 内容 · 计算机网络线补齐 7 篇 + 新开 MySQL 从零开始
-- 类型：content
-- 变更：
-  - `content/reading/network/` 新增 02–08 七篇（四层模型、域名解析、三次握手、关闭与 TIME_WAIT、
-    HTTP 报文、连接复用与 QUIC、抓包验证），总览里早就排好的 8 站清单到此全部有正文
-  - 新增 `content/courses/mysql/`：总览 + 12 课，七节结构与 Python/Java 线一致
-  - `scripts/verify_course.py` 增加 ```sql 可运行示例：在**一次性库**（`paideia_course_<pid>`）里执行，
-    用完即删，不碰 `paideia_test`；缺凭据时跳过而非报错
-  - `content/courses/java/*.md` 的 22 条 `prerequisite` 补上课号前缀（`集合与泛型` → `08 · 集合与泛型`）
-  - 三条线补 `level`（阅读线原先没有，导入时被 `levelOfChapter` 兜底成 advanced）；
-    Java 与 MySQL 总览的 `line_summary` 站数改为与实际关卡数一致
-- 决策：
-  - 计算机网络线保留"阅读线"形态（普通 markdown，不强制七节与可运行代码），
-    因为它讲的是排障路径而不是手写代码；难度用 `level` 显式声明而不是靠章节名推
-  - MySQL 示例全部真跑：课程的"可运行"承诺对 SQL 也成立，不是贴一段没验证过的语句
-- 依据：`python scripts/verify_course.py --dir content/courses` → 50 个文件含代码执行全通过
-- 验证：
-  - 内容门禁 50/50 通过（Python 13 + Java 24 + MySQL 13）
-  - 线上导入后 API 复核：`GET /learn/tracks` 五条轨道，MySQL 13 关、网络 9 关；
-    网络线关卡难度按课分配 beginner/intermediate/advanced
-  - 前置关系：MySQL 11 条、Java 27 条（修复前 Java 只有 5 条，22 个标题对不上）
-  - 打线上的 `e2e/learn.spec.ts` 6 passed
-- 已知缺口：
-  - 阅读线的 quiz 块不走课程门禁（七节结构是课程专用），只做了 JSON 合法性校验
-  - 中文正文的 ```sql 高亮依赖 shiki 的 sql 语法包，未在浏览器里目视确认
-- 本地提交：见下一笔提交
-- 远端推送：未执行
-
-## 2026-10-21 · 建项 WORK-032 · MySQL 实训沙箱与题库（draft）
-- 类型：decision
-- 变更：新建 `.agent/changes/WORK-032-MySQL实训沙箱与题库/`，四件工件全部起草（requirements / proposal / design / tasks），
-  均 `status: draft`；`project-lifecycle approve` 由用户执行，模型未代签
-- 决策依据：
-  - 用户要求「新开一个」，且明确「题目设计很重要」——因此 `mode: strict`、`workflow: full`，
-    排序原则是"题目可信度优先于题量"
-  - 不改 WORK-015 的范围：它是已实施的代码执行沙箱，本项扩展其语言与结果契约
-- 实测基线（服务器真跑，写进 design.md）：
-  - `mysqld --initialize` **17.89 秒**、datadir **180MB** ⇒ 必须预初始化，不能每次初始化
-  - 预初始化后启动到可 ping **4.36 / 4.45 / 4.61 / 4.71 秒**（4 次）
-  - 常驻内存 **348MB**（512m 上限下），500 行负载后几乎不变
-  - `secure_file_priv` 指向**不存在**的目录会让 mysqld **直接 Aborting**（第一次测试就踩到）
-  - 复用同一 datadir 起两次，第二次 `CREATE DATABASE` 报 **1007 已存在** ⇒ 每次运行必须拷干净副本
-  - `max_execution_time=300` 时 0.56 秒报 3024；**设为 0 时九表笛卡尔积跑了 259.5 秒** ⇒ 必须有容器级硬杀
-- 验证：`project-lifecycle validate` 对 WORK-032 报"需求尚未形成，但已经存在下游工件"——
-  这是生命周期对"需求未批准先有下游"的纪律，**批准后自动消失**；其余为既有项告警
-- 本地提交：未提交（待用户确认需求）
-- 远端推送：未执行
-
-## 2026-10-21 · WORK-030 阶段 B 部署上线（首次失败，已修复）
-- 类型：implementation
-- 变更：部署 jar（含新迁移 V20261021181500 建 ai_run_payloads）+ 重建前端
-- 决策：生产库 flyway_schema_history 里把 20261021134700 的版本号对齐为 20261021161000
-- 依据：用户「给我推送部署一下吧」
-- 验证：health 200、学习者端与管理端各 200、线上 e2e 21 条全过
-  （users 3 + admin 6 + ai-runs + layout.mobile 12）；新表 9 列已建；
-  真实调 /api/v1/account/admin/users 返回 2 个账号、九列齐全、无 password_hash
-- 本地提交：ed35cc6
-- 远端推送：已推送 origin/master
-**事故经过**：部署后服务起不来，health 000，整站不可用约 3 分钟。
-根因是 Flyway 校验失败：「Detected applied migration not resolved locally: 20261021134700」——
-另一个会话把 digest 迁移从 V20261021134700 改名成 V20261021161000，但那次改名从未部署，
-生产库里登记的仍是旧版本号。
-**为什么可以安全地改版本号**：两个文件的校验和完全一致（2043838451），
-只是文件名变了、SQL 内容一个字节没动。所以 UPDATE flyway_schema_history 只对齐元数据，
-不碰任何表结构。**如果校验和不同就不能这么做**——那意味着内容真的变了，
-必须走 repair 或新增迁移。
-**教训**：release.ps1 的健康检查只等 60 秒，而这次失败是**启动即崩**
-（Flyway 校验在建表前就抛），不是慢。60 秒等待掩盖了"服务根本没起来"这件事——
-日志里 status=exited code=1 与 systemd 反复重启才是判据。以后部署失败要先看
-systemctl is-active 与 journalctl 尾部，不要只看超时。
-
-## 2026-10-21 · WORK-032 TASK-001~004 实施（判题口径 + SQL 执行能力）
-- 类型：implementation
-- 变更：
-  - TASK-001：`backend/paideia-sandbox/images/mysql/{Dockerfile,build.sh}`，构建期 `--initialize-insecure`，
-    datadir 180MB 打进镜像并 `chmod -R a-w`；镜像 digest `sha256:e2eafb6e…` 写进 `application.yml`
-  - TASK-002：`SandboxProperties` 加 sqlImage/sqlMemory/sqlCpus/sqlPidsLimit/sqlTimeoutMs/sqlDailyLimit
-    与按语言取值的方法；`languages()` 改为**按镜像是否配置过筛**（空值 = 该语言不出现）
-  - `DockerCommand.SQL_SCRIPT`：拷 datadir 到 tmpfs + chmod u+w、建库 practice、灌数据集、
-    `mysql practice --xml` 执行用户 SQL
-  - TASK-003：`SqlResultCodec`（XML 解析，xsi:nil → NULL 标记）+ `CodeRun.Table` + `Status.OVER_LIMIT`
-  - TASK-004：`tests/sql-judge/corpus.json`（24 条）+ TS `sql-judge.ts` + Python `sql_judge.py`
-    + `check_sql_judge_parity.py` 两侧对照
-- 决策：
-  - **SQL 输出用 `--xml` 而不是 `--batch --raw`**。原设计是插标记查询切结果集，实测证明不可行：
-    标记行是"单列表头 m + 一行标记值"，与真实数据行无法区分，`--raw` 又不能转义。
-    两条测试当场抓到切错。`--xml` 自带 `<resultset>` 边界、`xsi:nil`、DECIMAL 尾零
-  - **删掉 `SqlStatementSplitter` 与标记注入**：XML 给了边界就不需要自己切语句，
-    少一个只处理教学 SQL 的分词器（它的 shortcut 是"不认存储过程"）
-- 验证：
-  - `mvn -B -pl paideia-sandbox test` → 17 通过（DockerCommandTest 10 / SqlResultCodecTest 7）
-  - `python scripts/sql_judge.py --self-check` → 24 条 0 失败
-  - `python scripts/check_sql_judge_parity.py` → 两侧 24 条 0 不一致
-  - `vitest sql-judge.test.ts` → 39 passed
-  - **反向验证**：改坏 Python 的尾零归一 → 6 条红；改坏 TS 的负号归一 → 3 条红。
-    第一次改负号时**没有红**，因为语料缺负数用例——补了两条负整数用例后才红
-  - **服务器真跑**：镜像启动到可查询 3267 ms；容器内灌数据集 + 两条语句 → 两个结果集正确切开；
-    `BEGIN; UPDATE 999; SELECT; ROLLBACK; SELECT` → 999.00 变回 100.00（事务语义真实生效）
-- 实施中踩到并修掉的三个真缺陷：
-  1. 镜像里 datadir 是 `a-w`，`cp -a` 保留只读权限 → mysqld 报 `ibdata1 must be writable`
-  2. `secure_file_priv` 指向不存在的路径 → mysqld 直接 Aborting（所以脚本里先 mkdir）
-  3. 未建库/未指定库 → `ERROR 1046 No database selected`（脚本里 `CREATE DATABASE practice` + `--database`）
-- 本地提交：见下一笔
-- 远端推送：未执行
-
-## 2026-10-21 · WORK-032 TASK-005/007 题目质量门禁与先行 3 题
-- 类型：implementation
-- 变更：
-  - `scripts/sql_cases.py`：题目门禁。四条断言 —— reference 能跑、alternatives 全部与它相同、
-    antiPatterns 至少在一处不同、至少 2 个数据集；外加 goal/trap 非空且 trap 必须能在本课
-    「常见误区」里找到（防超纲）
-  - `content/courses/mysql/datasets/`：`orders-public`（3 客户/3 单/4 明细）与 `orders-hidden-a`
-    （4 客户/4 单/6 明细，含非整除小数与不同行数）
-  - `content/courses/mysql/cases/pilot.json`：3 道先行题（01 填空、03 排序写查询、05 LEFT JOIN 修错）
-  - `--write-hashes` 回写 `expectHash`；默认只校验不写盘
-- 决策：
-  - 期望结果**由参考解真跑得出**，不手写。手写必然与数据集脱节且无人发现
-  - trap 比对时去掉反引号与空白：要求作者在两处敲出一样的反引号只会制造无意义报错
-- 验证（全部真跑）：
-  - `python scripts/sql_cases.py --check` → 3 道通过；`--write-hashes` 回写后二次运行仍通过（幂等）
-  - **反向验证四条**（每条都是故意注入坏数据，确认门禁真的会红）：
-    ① antiPattern 换成 reference 本身 → 报"没有区分度，任何写法都能过"
-    ② alternatives 换成错写法 → 报"判题口径太窄，会误杀正确写法"（两个数据集各一条）
-    ③ 硬编码 `487.50` 当等价写法 → 被隐藏集判不同
-    ④ 只留一个数据集 → 报"否则硬编码答案也能过"
-- 已知缺口：
-  - 没有数据库凭据时门禁**跳过执行校验并明确打印"未验证"**，不当作通过
-  - 自动断言挡得住"坏题"，挡不住"平庸的题"——TASK-008 之后仍需一次人工题目评审
-- 本地提交：见下一笔
-- 远端推送：未执行
-
-## 2026-10-21 · WORK-032 TASK-006 能力探测与分档配额接线
-- 类型：implementation
-- 变更：
-  - `SqlDatasets`：数据集白名单，内容放 `paideia-sandbox/src/main/resources/sandbox/datasets/`。
-    **客户端只传 key，不传数据**——否则隐藏数据集必然随题面下发，"硬编码答案"就防不住
-  - `SandboxController`：`/status` 返回 `sqlDailyLimit` / `sqlUsedToday` / `datasets`（分开给，
-    不合成一个"剩余次数"）；`/run` 对 sql 用数据集 key 解析 stdin、未知 key 400；
-    配额改调 `requireQuota(userId, language)`
-  - `RunView` 加 `tables`（`statementIndex` + 列名 + 行值），`RunRequest` 加 `dataset`
-- 验证：
-  - `mvn -pl paideia-sandbox test` → 17 通过
-  - `mvn -pl paideia-app -Dtest=SandboxIntegrationTest test` → **8 通过**
-    （含新增断言：`sqlDailyLimit=20`、`datasets` 含两个 key）
-  - 首次跑集成测试时报 `PathNotFound: sqlDailyLimit`——原因是 `paideia-app` 从 ~/.m2 取
-    **旧的 sandbox jar**，不是代码错误。`mvn -pl paideia-sandbox install` 后通过
-- 本地提交：见下一笔
-- 远端推送：未执行
-
-## 2026-10-21 · WORK-032 TASK-010（部分）SQL 题型渲染与前端契约
-- 类型：implementation
-- 变更：
-  - `schema.ts`：新增 `SqlChallenge`（`sql-write` / `sql-fix`），解析 `starter` / `dataset` /
-    `normalize` / `expectHash`；类型只允许 string/int/decimal/datetime——**float 被明确拒绝**
-  - `sql-judge.ts`：修 `noUncheckedIndexedAccess` 下的索引类型（补 `typeOf()`，去掉悬空引用）
-  - `context.tsx`：`RunOutput.tables`、`SandboxPort.run` 的 `dataset` 参数
-  - `sql-challenge.tsx`：编辑器 + 运行 + 多结果集表格 + 逐数据集判定；期望值比 **SHA-256 规范串**，
-    题面不含答案
-  - `code-challenge.tsx`：接入两种新题型
-- 验证：
-  - `tsc --noEmit`（ui 包）→ 无错误
-  - `vitest src/markdown/renderers/` → **96 passed / 4 files**
-  - `vitest` 全量 → 191 passed / **2 failed**，两条都是既有失败、与本次无关：
-    ① `AdminUsersPage.tsx` 出现 `bg-black/40`（WORK-030 的改动）
-    ② `packages/camp/src` 未在 `globals.css` 的 `@source` 登记（camp 包的改动）
-    已核对：这两个文件都不在本次改动里
-- 本地提交：见下一笔
-- 远端推送：未执行
-
-## 2026-10-21 · WORK-032 TASK-008 十二关题目与课时接入
-- 类型：content
-- 变更：
-  - `cases/lessons.json`：新增 9 道题，12 关各 1 道（01 填空 + 11 道可执行）
-  - 每题都带 `goal`（考什么认知）与 `trap`（对应本课哪条误区），门禁强制核对
-  - 题目插入各课正文的「## 动手」节；**题面只带 expectHash，不带 reference/alternatives/antiPatterns**
-  - 数据集加 `customers.note` 可空列：公开集 3 行分别是 `'VIP'` / `''` / `NULL`。
-    **原数据集里根本没有 NULL，第 02 课讲 NULL 却考不出区别**——这条是被门禁逼出来的
-  - 删掉各课原有的「找 bug」动手题（每关 1 道精做题的裁决），并把「## 动手」移回
-    「## 检查一下」之前（课程固定七节顺序）
-- 决策：
-  - 门禁遇到反模式报错时**不崩**，把"跑不通"也算作"与参考解不同"——`SELECT city FROM orders`
-    这种写法根本执行不了，正是那题要抓的东西
-- 验证：
-  - `python scripts/verify_course.py --dir content/courses` → 50 个文件含代码执行全通过
-  - `python scripts/sql_cases.py --check` → 12 道题通过
-  - `python scripts/check_sql_judge_parity.py` → 24 条两侧无差异
-  - 题面与源文件 `expectHash` 逐题比对一致，且**无一处泄漏 reference/antiPatterns**
-- 门禁抓出的三个真实题目设计问题（都已修）：
-  1. 第 02 课的反模式 `= NULL` 与参考解结果相同 → 说明数据集里没有 NULL，题目无区分度
-  2. 第 10 课的 alternatives 按订单粒度分组，与按客户汇总的参考解**本来就不是同一个查询**
-     （我写错了，不是判题口径问题）
-  3. 第 12 课的 alternatives 用标量子查询会把无订单客户带成 NULL 行，与 INNER JOIN 语义不同
-- 本地提交：见下一笔
-- 远端推送：未执行
-
-## 2026-10-21 · WORK-032 部署上线与线上真验
-- 类型：deployment
-- 变更：
-  - 线上 `/opt/paideia-app/application.yml` 新增 `sql-image` / `sql-memory` / `sql-cpus` /
-    `sql-pids-limit` / `sql-timeout-ms` / `sql-daily-limit`（备份为 `application.yml.bak-wp032`）
-  - 服务器已构建 `paideia-sandbox-mysql:8.0@sha256:e2eafb6e…`（datadir 构建期初始化）
-  - 部署 3 次：首次（全量）、`--SkipWeb`（只读根修复）、全量（哈希修复）
-- **线上真验（每条都是实测，不是推断）**：
-  - `/api/v1/sandbox/status` → `languages` 含 `sql`、`sqlDailyLimit=20`、`datasets` 两个 key
-  - 跑一条 SQL：**2.8 秒**返回，`NULL` 与空串正确区分（`ann=VIP` / `bob=""` / `cid=NULL`）
-  - 多语句事务：`BEGIN` 内读到 `1.00`，`ROLLBACK` 后回到 `199.00` —— 事务语义真实生效（AC-016）
-  - 判题闭环：参考解两数据集"一致"、等价写法也"一致"、两个反模式都"不同"
-  - 关卡内做题（第 02 关）：正确 SQL → 两个数据集都"通过"并上报进度；
-    反模式 `= NULL` → 两个数据集都"结果与期望不一致"
-  - e2e（打线上）：`sql-practice` + `learn` + `knowledge` → **16 passed / 1 skipped**
-- **部署后才暴露的两个真缺陷（都已修 + 加回归测试）**：
-  1. **SQL 容器在只读根下静默卡死**：mysqld 默认往 `/var/run/mysqld` 写 pid 与 mysqlx socket，
-     `--read-only` 下写不了时它**不报错也不退出**，只是初始化完 InnoDB 就挂住。线上表现是
-     "每次 20 秒超时"，日志只有两行。修法：`--pid-file` / `--log-error` 指到 tmpfs + `--mysqlx=0`。
-     **之前的本地测试全没暴露它，因为那些测试都没加 `--read-only`**
-  2. **`crypto.subtle` 在 http 下不可用**：本项目明确不配 HTTPS，而 `crypto.subtle` 只在安全上下文
-     存在，判题直接抛 `Cannot read properties of undefined (reading 'digest')`。
-     本地测不出来——dev server 跑在 localhost 上，那是安全上下文。
-     修法：换成纯 TS 的 SHA-256，并用 Node `createHash` 逐条对照（13 个样本含多字节与边界长度）
-- 另修：e2e 的 AC-011 从"查进度条数"改为**监视写请求**——纯 Bearer 应用下测试进程拿不到访问令牌，
-  两种取令牌的路都实测 401
-- 本地提交：master 上 5 笔（含两次 merge）
-- 远端推送：**未执行**（需用户授权）
-
-## 2026-10-22 · WORK-032 TASK-010 收尾 + 两处遗留红测
-- 类型：implementation
-- 变更：
-  - TASK-010 的验收落到渲染层：`blocks.test.tsx` 新增三条 SQL 题用例（通过写 1 分 /
-    不一致写 0 分 / 沙箱不可用不渲染按钮），注入假 sandbox，不依赖真沙箱。
-    哈希用 `canonicalSha256` 现算而不是写死常量——格式变了该红的是语料那条。
-  - `tokens.test.ts` 红：`AdminUsersPage.tsx` 的弹窗底色 `bg-black/40` 改成已有的
-    `bg-overlay` 令牌（`AdminShell` 与 `ui/dialog.tsx` 都在用它）。WORK-030 遗留。
-  - `source-coverage.test.ts` 红：`globals.css` 补 `@source '../../../../packages/camp/src'`。
-    WORK-029 遗留，**是静默缺陷**——camp 包独有的 Tailwind 类名一直没生成。
-- 验证：
-  - `vitest run`（ui 包全量）→ **209 passed / 12 files**，无失败
-  - `blocks.test.tsx` 单跑 → 30 passed（原 27 + 新增 3）
-  - `tokens.test.ts` + `source-coverage.test.ts` 单跑 → 3 passed
-- 未做：TASK-010 的 e2e 级验收（关卡正文要真沙箱才有结果集），已在 tasks.md 写明
-- 本地提交：见下一笔
-- 远端推送：未执行
-
-## 2026-10-22 · WORK-032 验证报告入库（status: partial）
-- 类型：verification
-- 变更：
-  - 新增 `testing/report.md`：16 条 AC 逐条映射到命令/退出码/结果/证据五列。
-    **14 条有实测证据，2 条只有结构保证**（AC-002 跨次隔离、AC-007 硬编码判错），
-    故 status 写 `partial` 而非 `passed`。
-  - 补跑并记录真实数字：后端内环 **261 / 0 失败 / 13 跳过**（61 秒）、模块边界与迁移
-    **9 / 0**（27 秒）、`SandboxIntegrationTest` **9 / 0**（22 秒）、ui 包 **209 passed**。
-  - 13 条跳过逐条核过，全部是「未配置真实上游凭据就跳过」的既有设计。
-  - 发现 AC-013 原本只有结构保证，**补成真断言** `sqlRunAuditsWithoutSource` 并做反向验证。
-- 决策：
-  - **AC-002 / AC-007 不补**：两条都要真跑沙箱，而本机 `docker: command not found`，
-    只能在服务器上跑。它们现在是"结构正确、断言缺失"，已在报告里登记为后续改动的前置阅读项。
-- 验证：
-  - `SandboxIntegrationTest` 反向验证：断言改成 `java` → 红（`expected: "java" but was: "sql"`），
-    恢复后 9/9 转绿
-  - `project_status.py --work WORK-032` → 结构化证据校验通过（不再报"证据不完整"）
-- 本地提交：`661e322`（AC-013 测试）+ 本笔（报告）
-- 远端推送：未执行
-
-## 2026-10-22 · WORK-032 AC-002 / AC-007 在真实沙箱上验证通过
-- 类型：verification
-- 变更：
-  - 新增 `scripts/verify_sql_live.py`：对着已部署实例真跑两条本地验不了的验收标准。
-  - AC-002（跨次隔离）：第一次 `CREATE TABLE probe_zz` + 插入 42 → 读到 `[["42"]]`；
-    第二次查同一张表 → `ERROR 1146 … Table 'practice.probe_zz' doesn't exist`。
-  - AC-007（硬编码判错）：把参考解在公开集的真实结果（ann=2 / bob=1 / cid=0）写成
-    `UNION ALL` 字面量，在隐藏集上算出的哈希与 `expectHash` 不一致。
-  - 报告 status 由 `partial` 改为 `passed`，16 条 AC 全部有实测证据。
-- 决策：
-  - 脚本**不放进常规测试**：它要凭据、且要求沙箱开着。改容器生命周期、数据集内容或判题口径
-    的人必须手动重跑（已写进报告「剩余风险」第 1 条）。
-- 验证：
-  - `python scripts/verify_sql_live.py` → 退出码 0，两条均通过（真容器，非桩）
-  - 反向验证：把 AC-007 的目标数据集改成 `orders-public` → 脚本报
-    「硬编码在隐藏数据集上竟然判对了——隐藏集没有起作用」，恢复后转绿
-- 本地提交：见下一笔
-- 远端推送：未执行
-
-## 2026-10-23 · 新增「智能体」阅读线（content/reading/agents）
-- 类型：content
-- 变更：
-  - 新增 `content/reading/agents/`：1 篇总览 + 5 篇正文（Agent 是什么 / ReAct 与规划 /
-    工具与 MCP / 记忆与上下文 / 评测与上线），`line_kind=reading`、`line_sort=90`，
-    分类 slug `agents`，导入后自动登记为 6 关学习轨道。
-- 决策：
-  - **不按 hello-agents 原文改写**。该仓库许可证为 **CC BY-NC-SA 4.0**（非 MIT），
-    且 `content/reading/README.md` 已立规：不得以第三方文章为底稿做改写/缩写/换词/调序
-    （演绎作品仍需授权，本项目公开仓库 + 公开站点等于二次发布）。
-  - 借用的是**选题与章节顺序**（主题清单属思想，不受版权保护），正文独立撰写；
-    每篇末尾给一条「延伸阅读」指向原仓库，保留导流。
-  - 刻意与原文的详略取舍不同：hello-agents 偏完整教学（16 章，含低代码平台、框架实现、
-    Agentic RL、多智能体案例），本线只留「接功能前必须先想清楚」的部分，5 篇。
-- 验证：
-  - frontmatter 字段齐全、`status=published`、quiz 块 JSON 可解析且各 3 题（脚本校验 ALL OK）。
-  - `node scripts/import-course.mjs --dir content/reading/agents`：**created 6 / updated 0**；
-    重跑 **created 0 / updated 0**（幂等）。
-  - 线上（`http://<服务器>:8081`）以学习者账号查 `/api/v1/learn/tracks`：
-    `agents`（智能体，stageCount 6）已出现；`/api/v1/learn/tracks/agents` 六关顺序与
-    难度正确；条目正文与 `quiz` 块正常返回。
-- 未做：未跑 e2e（纯内容新增，无代码改动）；未提交。
-- 本地提交：未提交
-- 远端推送：未推送
-
-## 2026-10-23 · 智能体线扩到 14 关 + 修复轨道关卡覆盖缺陷
-- 类型：content + bugfix
-- 变更：
-  - `content/reading/agents/` 从 6 篇扩到 14 篇：新增 系统提示词、检索与 RAG、上下文工程、
-    多智能体协作、框架选型、流式与交互、成本与限流、安全与护栏；原 5 篇按新顺序重编号
-    （ReAct→03、工具→04、记忆→05、评测→12）。
-  - **后端缺陷修复**：`KnowledgeAdminController.upsertTrack` 写关卡前先 `deleteStages`。
-- 决策：
-  - **不能只做 upsert**。`learning_track_stages` 的唯一键是 `(track_id, seq)`，重排时
-    新关卡按 seq 覆盖旧行、末尾那关被挤掉——实测 14 篇只落 13 关（缺「系统提示词」），
-    且「ReAct」的 level 被写成旧的 beginner。关卡是内容的投影不是用户数据：没有表引用
-    `stage.id`，学习进度按 `entry_id` 记，所以删了整体重建是安全的。
-  - 内容仍按「借用选题、正文自写」处理（原仓库 CC BY-NC-SA 4.0）。
-- 验证：
-  - 14 篇 frontmatter / order 连续 0–13 / quiz 各 3 题且 JSON 可解析。
-  - `paideia-knowledge` 模块 `mvn test`：**BUILD SUCCESS**，无失败无错误。
-  - 部署后端（`release.ps1 -SkipWeb`，135.3 秒）后重导：`created 0 / updated 0`；
-    线上 `/api/v1/learn/tracks/agents` **stageCount 14**，seq 0–13 连续、难度正确
-    （ReAct 已是 intermediate，安全与护栏 advanced）。
-- 未做：未跑前端 e2e（无前端改动）；未推送。
-- 本地提交：见下一笔
-- 远端推送：未推送
-
-## 2026-10-23 · 智能体线正文扩写（14 篇全量）
-- 类型：content
-- 变更：
-  - 14 篇正文全部扩写：总量 97.9 KB → 123.5 KB，每篇均 ~8.8 KB，与 `network` 线持平
-    （原 agents 线每篇 ~2.5 千字，比 network 的 ~3.2 千字薄三成）。线上合计约 5.3 万字。
-- 决策：
-  - **补的是信息密度，不是篇幅**。每篇新增的是可验证的机制细节、具体数字、可复制的代码/配置，
-    删掉了重复的过渡句；没有靠"多写几句"充数。
-  - 重点补充：01 的三次追问判据 + 22 倍成本账 + 最小循环代码；02 的提示词骨架与示例优先于规则；
-    03 的三种反馈对照表 + 沉没成本；04 的请求前后变化与归属校验反例；06 的 RRF 算法与召回率门槛；
-    07 的实测 token 占比；08 的成本倍率估算；11 的预扣结算状态机；13 的 SSRF 拦截清单。
-  - 各篇 `minutes` 同步上调（+2~4 分钟），与实际阅读量匹配。
-- 验证：
-  - 14 篇 frontmatter 齐全、order 0–13 连续、quiz 各 3 题且 JSON 可解析。
-  - 导入：`created 0 / updated 13`（总览正文未变，幂等跳过）。
-  - 线上 `/api/v1/learn/tracks/agents`：**stageCount 14**，逐关取正文确认已是新版本，
-    合计 53188 字。
-- 未做：未跑 e2e（纯内容）；未推送。
-- 本地提交：见下一笔
-- 远端推送：未推送
-
-## 2026-10-27 全站页面优化（impeccable 审计后落地）
-- 装了 impeccable 4.7.1 到 `~/.agents/skills/impeccable`（引擎 0.1.17，sha256 已核；
-  GitHub release 直连会截断，实际经 `ghfast.top` 镜像取完整文件）。
-- 用 Playwright 登录线上实例，41 页（学习者端 15 × 桌面/移动 + 管理端 11）全部截图
-  并抓渲染后几何事实。审计报告在 `docs/design/page-audit-2026-10-27.md`（该目录被忽略）。
-- 落地：3 个 P0（Tabs 方向写反、助手浮标遮挡、管理端首页假话）+ 设计层五项
-  （删 eyebrow ×19、字距收到 -0.04em、二级标题统一、首页去模板化、空态补动作）
-  + reduced-motion 与引用块侧边色条。
-- 顺带修 TelemetrySummaryMapper 的 5 个普通 `@Select` 误用 `&lt;`（管理端 AI 调用概览
-  整页 500，首现 09:05 早于本次部署）；`check_mapper_script_xml.py` 补反向检查并已反向验证。
-- 验证：学习者端 e2e 91/0、管理端 31/0、后端 314/0、前端单测全绿。
-- 本地提交 `6a1cdcb`。未 push（需单独授权）。
-- **未验证**：hover/focus/disabled/loading 状态、键盘 Tab 顺序、真机触屏手势、
-  管理端深色模式、性能（LCP/CLS）；约 10 个路由未进样本（含课程正文页 `/learn/:slug`）。
-### 2026-10-27 续：审计剩余项
-- 触控目标按 WCAG 2.5.8 补齐（digest 标题 / resume 名称 / 所有分类 / 全部→），
-  移动端四页 <24px 可点元素降为 0。
-- `/resume/new` 空态按钮归位 + 补 h1。
-- **实测发现服务器没开 gzip**：入口 chunk 942 KB 原样传输。开 `server.compression` 后
-  首页传输 1537 → 455 KB（-70%），FCP 544 → 408 ms。
-- 补 `PRODUCT.md` / `DESIGN.md`（impeccable init/document；PRODUCT.md 标注了推断项）。
-- 补审 9 个此前未进样本的路由；键盘 Tab 12 跳全部有焦点环；管理端深色模式 6 页 0 对比度失败。
-- 提交 `3b69632`。仍未 push。
-- **仍未做**：真机触屏手势、hover 状态逐元素截图核对、LCP（浏览器 API 取不到，
-  只测了 FCP/CLS）。
-
 ## 2026-10-09 09:13:52 +0800 · maintenance · 初始化 Paideia 项目工作区
 - 类型：maintenance
 - 变更：使用已安装的 project-lifecycle Skill 初始化 .agent 工作区并创建根 AGENTS.md；新增项目常驻规范草案 .agent/rules/always.md（status: draft, configured: false），记录项目定位与待确认清单。
@@ -2058,6 +944,45 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：`git push origin master` 退出码 **0**，输出 `acd47c2..00abf58  master -> master`；`git ls-remote origin master` 与 `git rev-parse HEAD` 同为 `00abf58b17c29654f39e46a74adb34744abe8604`。部署复验（公网）：`/actuator/health` = `UP`、`GET /admin/index.html` = 200、匿名管理接口 = 401。
 - 本地提交：00abf58
 - 远端推送：已验证；远端 HEAD=`00abf58b17c29654f39e46a74adb34744abe8604`
+
+## 2026-10-10 · WORK-003 · 真实 SMTP 发信实测通过，报告转 passed
+- 类型：verification
+- 变更：用户提供 QQ 邮箱发信凭据（授权码与账号），凭据**只写入被忽略的** `backend/config/application-local.yml`（`git check-ignore` 与 `git ls-files` 双重确认未被跟踪），并在该文件的既有 `paideia:` 段下新增 `paideia.mail.*`。为支持 QQ 常用的 465 端口，代码侧补了隐式 TLS：`MailProperties` 新增 `ssl`、`SmtpMailPort` 相应设置 `mail.smtp.ssl.enable`、`MailConfiguration` 打印实际使用的加密方式并在既没开 ssl 也没开 start-tls 时告警。证据写入 `testing/logs/smtp-real-send.txt`，`testing/report.md` 中"真实 SMTP 发信"一条从 `not-run` 改为 `passed`，报告状态由 `partial` 改为 `passed`。
+- 决策：① 两种加密方式都支持（465 隐式 TLS / 587 STARTTLS），因为各家服务商默认端口不同，只支持一种就会在换服务商时踩坑；② 发信失败的异常消息里带上主机与端口（不含凭据），便于区分配置问题与网络问题；③ 证据文件里对邮箱地址做掩码——本仓库是公开仓库，真实地址属于个人信息，不应写入被跟踪文件。
+- 依据：`.agent/changes/WORK-003-账号与认证/testing/{report.md,logs/smtp-real-send.txt}`；`.agent/rules/always.md`
+- 验证：启动日志出现 `邮件发送使用 SMTP：smtp.qq.com:465（隐式 TLS）`（对照：未配置时会打印"未配置 SMTP…验证码将写进日志"）。随后走完整链路：`POST /api/v1/auth/captcha` 取图（PNG 3009 字节）→ 解码为人眼可识别的图片并读出 4 位字符 → `POST /api/v1/auth/email-code` 返回 `{"code":0,"message":"ok"}`，后端日志无 `发送验证码邮件失败` 或 `MessagingException`。顺带用同一个 `captchaId` 再提交一次得到 `40000 图形验证码已过期`，证明图形验证码确实是一次性的。
+  - **边界如实记录**：本机证明的是"SMTP 认证成功、邮件被服务器接受"，**收件箱实际收到需收件人确认**，报告里明确不把它写成本机验证过的结论。
+  - `project-lifecycle.ps1 validate` 结果：`valid: true`；WORK-001 / WORK-002 / WORK-003 均 0 error，WORK-003 为 `completed/complete`。
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-10 · WORK-003 · 收件人确认收到验证码邮件，验证无未验证项
+- 类型：verification
+- 变更：用户 2026-10-10 确认已在收件箱收到那封「Paideia 注册验证码」邮件。`testing/report.md` 据此更新："真实 SMTP"一条从"服务器接受（待收件人确认）"改为"达成（含收件人确认收到）"，「失败与未验证项」一节改为**无未验证项**，只保留一条"未做计时断言"的方法学说明。
+- 决策：把两类证据分开记录——"SMTP 认证成功、邮件被服务器接受"是本机可验证的；"投递到收件箱"只能由收件人确认。两者都留在证据表里，不合并成一句"发信已验证"，这样后来的人能看出这条结论由谁、凭什么得出。
+- 依据：`.agent/changes/WORK-003-账号与认证/testing/{report.md,logs/smtp-real-send.txt}`
+- 验证：`project-lifecycle.ps1 validate` 为 `valid: true`；WORK-001 / WORK-002 / WORK-003 均 0 error，WORK-003 为 `completed/complete`，12 个任务全部 `done`。
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-10 · maintenance · 重做登录与注册页的观感，并修掉一个静默失效的扫描路径缺陷
+- 类型：implementation
+- 变更：用户反馈登录界面不好看，要求参考其他网站的登录页改。改动：① 新增 `packages/auth/src/auth-layout.tsx`——认证页的"裸页面"布局，**刻意不用 `AppShell`**（外壳的应用横条与页脚让登录页读起来像设置页，且未登录时那些导航本不可用）；通行做法是空白页 + 内容垂直居中 + 品牌在上、卡片在下；主题切换移到右上角（不再占一条横条）。② 学习者端的登录页与注册页改用它（注册页字段多，卡片宽一档），次要动作（"还没有账号？立即注册"）移到卡片下方居中。③ 管理端的未登录与加载状态也改用它，其余状态仍用 `AppShell`。④ 表单本身放大一档：输入框与主按钮 `h-10`（原 32px→40px）、字段间距 `space-y-5`、主按钮整宽。
+- 决策：① 不再在认证页顶部放"Paideia 登录"这类标题，改为品牌名（`h1`）+ 一行说明——避免"Paideia / 登录 / 账号登录"三行标题叠在一起；② 尺寸覆盖只通过 `className` 传入（`cn` 用 tailwind-merge 消解冲突），**不改设计系统的默认档位**，避免为了一个页面把全站按钮变大。
+- 依据：`.agent/rules/always.md`（Tailwind 扫描路径纪律）；`testing/evidence/auth-login-{before,after}.png`、`auth-register-after.png`、`auth-admin-login-after.png`
+- 验证：`pnpm -r typecheck` 9 个工程通过；`pnpm -r test` 42 条通过；三套 e2e 共 15 条通过（学习者端 5、管理端 5、展览页 5）；四个应用构建通过。截图前后对比见 evidence 目录。
+  - **过程中修掉一个真缺陷，而且它是 WORK-003 带进来的**：`packages/auth` **不在 `globals.css` 的 `@source` 列表里**，因此只在认证包里出现的 Tailwind 类名从未被生成。发现方式是"主题切换按钮跑到了左上角"——探针查出容器的 `justify-content` 计算值是 `normal`（`justify-end` 类在 class 列表里但没有对应 CSS 规则）；而 `dialog.tsx` 里用的是 `sm:justify-end`，生成的是 `.sm\:justify-end`，**裸的 `.justify-end` 从未存在**。也就是说 WORK-003 交付的登录/注册页有一批类名（`justify-end`、`pb-20` 等）一直没生效，只是恰好多数类名在别处也用过，所以看起来"基本正常"。修法：补 `@source '../../../../packages/auth/src'`，并新增 `packages/ui/src/styles/source-coverage.test.ts` —— 枚举所有含 `.tsx` 的 workspace 源码目录，断言每一个都被某个 `@source` 覆盖；已用"临时删掉 auth 那行"复核过它会失败。`always.md` 的对应纪律也从"新增应用"扩写为"新增应用或任何含 `.tsx` 的包"。
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-10 · maintenance · 修正 access 存活期默认值：2 小时 → 15 分钟
+- 类型：implementation
+- 变更：查代码回答"鉴权策略"时发现一处**实现与已批准设计不一致**：WORK-003 的 `design.md` 定的是 access **15 分钟**，但代码用的是 `AuthProperties` 里 WORK-001 时代的默认值 **2 小时**——我实施时漏改了默认值，只有测试 profile 显式设了 30m，本地与被忽略的配置都没覆盖。已把 `AuthProperties` 的默认改为 15 分钟（提成常量 `DEFAULT_TOKEN_TTL` 并写明"改这个值等于改登出后令牌还能用多久的窗口"），同时把 `JwtAuthServiceTest.appliesDefaults` 的断言从 2 小时改为 15 分钟并注明理由（要改必须是有意识的决定）。未改测试 profile 的 30m（测试期避免过期导致用例不稳）。
+- 决策：**按已批准的设计对齐，而不是把文档改成 2 小时**。理由是 access 无状态、签出后无法撤销，它的寿命就是"登出后令牌仍可用的窗口"——2 小时与"短 access + refresh 轮换"的定位冲突，也正是这个方案想压小的暴露面。需要更长可在配置里显式设 `paideia.auth.token-ttl`（这条一直可用）。
+- 依据：`.agent/changes/WORK-003-账号与认证/design.md`（"access 15 分钟、refresh 14 天，均可配"）；`.agent/changes/WORK-003-账号与认证/testing/report.md` 与本文件引用的 `≤15 分钟` 窗口
+- 验证：`cd backend && PAIDEIA_TEST_DB_PASSWORD=<本地读入> mvn -B verify` → **BUILD SUCCESS，63 条测试全过**（含改后的默认值断言）。修完后报告与 `always.md` 里写的"登出后 access 剩余寿命 ≤15 分钟"由错变对。
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
 
 ## 2026-10-12 09:30:00 +0800 · 知识库拆成两个页面 + 父菜单子菜单 + e2e 可直打线上
 - 类型：change
@@ -4922,6 +3847,290 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
 
+## 2026-10-20 · WORK-025 · 需求首次起草：八股文专区（未实施）
+- 类型：requirements
+- 变更：新建 `.agent/changes/WORK-025-八股文专区/requirements.md`（draft）；四件工件只此一件，未写代码、未建迁移
+- 决策：用户四项决定（独立专区 / 每日抓牛客 Java 八股文 / AI 详细解析 / 本期只做 Java）已记入 D-01..D-04；另记 5 条实现选择，其中「正文由 AI 重写释义不逐字转载」与「抓取收在可替换端口后」两条待用户点头
+- 编号：状态脚本 `next_work_id` 报 `WORK-024`，但工作区在飞的「学习轨道」已把该号写进 `V22__create_learning_tracks.sql` 注释且尚未登记工件；本项取 `WORK-025` 以避免撞号
+- 依据：实抓 `nowcoder.com/robots.txt`（未禁止题库/讨论路径）、本机 curl（`/exam/interview` 200、`/discuss/experience` 301）；全仓 grep 确认**后端无任何第三方网页抓取代码**
+- 验证：`project-lifecycle.ps1 validate` 通过（0 错误，仅既有历史警告）
+- 本地提交：未提交
+- 远端推送：未推送
+### 2026-10-20 追加 · WORK-025 · 牛客可抓性实测（改写了原假设）
+- 类型：research
+- 变更：`requirements.md` 的事实表补 4 行实测；「假设」中被推翻的那条就地标注；新增「方案取舍（Q0 的三条出路）」一节
+- 决策：**原假设「存在每天有新增的 Java 八股文流」被实测削弱**，不据此继续推进；新增 Q0 为阻断项
+- 依据：实抓解析 `discuss/experience?tagId=639` 的 `window.__INITIAL_STATE__.app.165.ssrInitList`（20 条，含「最近一个月面试总结」「北京小厂Java一面」等信息帖）；实抓 `/discuss/2928416` 得 `contentData={"showMessage":{"message":"内容不存在!"}}`，正文需前端渲染；猜的两个 API 端点分别返回首页 HTML 与 404
+- 验证：本机 curl，探针文件已删除、未进版本库
+- 本地提交：未提交
+- 远端推送：未推送
+### 2026-10-20 追加 · WORK-025 · 用户裁定 A/B/C 全要并分两个分类
+- 类型：requirements
+- 变更：`requirements.md` 记 D-05；新增「两个分类的划分」一节；重写实现选择（I-02 改为"只取题目清单、解析全自己写"，I-05 去重改单键，I-06/I-07 新增）；REQ-001..007、AC-001..006 重写；待确认问题收敛为 Q1/Q3-Q7，并新增「已答复的问题」留痕
+- 决策：A（题库）+ C（半自动）合并为「面经真题」（标来源链接），B（平台自生成）单列为「平台精讲」（不标来源）。A 与 C 不单开第三个分类，因为两者拿到的都是"只有标题、没有别人答案"
+- 依据：第二轮实测。`/exam/interview` 服务端渲染出集合列表（「Java基础-牛客面经八股」paperId=61536918 / 25 题、「Spring-牛客面经八股」61536922 / 15 题，带结构化字段）；`/exam/paper/61536918` 是 404 骨架只给 1 题；`/questionTerminal/89adb20f44cd433f902cc114155b17aa` 服务端渲染出标题、题型、收藏/浏览数，`answer-brief` 仅摘要（样例一个词 `redo`）⇒ **题面即标题，别人的答案本来也拿不到，正合"解析自己写"**
+- 验证：`project-lifecycle.ps1 validate` 通过，WORK-025 无错误；探针文件已清理未入库
+- 本地提交：未提交
+- 远端推送：未推送
+### 2026-10-20 追加 · WORK-025 · 抓取通路全量实测（四条路，核心通路打通）
+- 类型：research
+- 变更：`requirements.md` 事实表重写为「抓取通路实测」12 行；结论行改为"A/B/C 全可行但路径与设想不同"；I-02 与 I-05 按实测改写，新增 I-08/I-09；REQ-001/002/008 重写，质量要求加抓取频率与失败处理；AC-003/007 调整；假设两条从"未验证"升级为"已实测"；待确认问题删 Q1（已解决）、新增 Q8
+- 决策：**A 档改走面经列表 API 而非合集题目清单**。原判断「只能拿到标题」被推翻——列表接口直接带完整正文
+- 依据（全部实测，探针文件已清理未入库）：
+  - **核心通路**：`POST gw-c.nowcoder.com/api/sparta/job-experience/experience/job/list`，body `{"page":1,"pageSize":20,"jobId":639}`；返回 total=2000 / totalPage=100
+  - **列表直接带正文**：`momentData.content` 是完整正文（样例 1136 字）、`momentData.createdAt` 毫秒时间戳；**无需逐条抓详情**
+  - **pageSize 上限 20**（50/100/200 一律 `系统未知错误`）；**不限流**（6 次连发全 200）；**无需登录态**
+  - **日增量 3–7 条**（page1 覆盖 10-19~10-17、page2 10-17~10-15、page3 10-15~10-13）；剔除 contentType=250 后约 3-5 条/天
+  - **技术密度混合**：同日 14 条里技术词≥8 的仅 5 条，其余是纯信息帖
+  - **生产可达**：`codenest-online` 上 POST 返回 200 / 0.375s
+  - **不通的路**：合集题目清单枚举不到（`/exam/paper/<id>` 404 骨架、`/exam/test/<id>/detail` 调 `test/summary?paperId=0` 返回空、卡片点击不跳转、JS 包无 API 字符串）；`/exam/intelligent` 是算法练习不是八股
+  - **兜底通路**：`/feed/main/detail/<uuid>` SEO 版服务端完整渲染（样例 5599 字）；`sitemap1.txt` 有 12732 条该形态 URL
+  - 用的工具：curl + Playwright 抓包（复用 frontend 已装的 playwright@1.64.0）
+- 验证：`project-lifecycle.ps1 validate` 通过，WORK-025 无错误；探针文件全部清理，`git status` 无残留
+- 本地提交：未提交
+- 远端推送：未推送
+### 2026-10-20 追加 · WORK-025 · Q3/Q8 裁决落定 + 实测细节搬进 research.md
+- 类型：requirements
+- 变更：
+  - `requirements.md`：记 D-06（只解析技术词密度高的）、D-07（不按技术栈细分，全算 Java 八股）；新增 I-10（密度判定规则）、REQ-009/REQ-010、AC-008/AC-009；待确认问题从 6 条收敛为 4 条（Q4/Q5/Q6/Q7）
+  - 新建 `research.md`：把 17 行抓取实测细节、六步弯路、面试帖样例、未测事项搬过去；`requirements.md` 只留 9 行结论表（20795 → 18889 bytes，消除 20000 bytes 警告）
+- 决策：
+  - **D-06 密度阈值规则**：按**去重后的不同技术词种类数** ≥ 3 判定（不是按出现次数），阈值放配置。理由：按词频判会被"一条帖子反复提 Java 十几次但其实没讲题"骗过；阈值没跑过真实数据，默认 3 是待调起点
+  - **D-07 分类到此为止**：Java 基础/JVM/Spring/Redis/MySQL 全落「面经真题」一个分类。理由：专区用法是刷题，靠检索和标题找，不靠浏览分类树；将来真题量大了再拆，那时只改 `category_id`
+- 依据：用户 2026-10-20 答复「Q3 成本 只解析技术词密度高的，Q8 这都算Java八股」
+- 验证：`project-lifecycle.ps1 validate` 通过，WORK-025 无错误、无体积警告
+- 本地提交：未提交
+- 远端推送：未推送
+
+## 2026-10-20 · WORK-026 · 决策模型 Laya 接入（代码已落地，工件仅 requirements）
+- 类型：implementation
+- 变更：新增 `ai` 模块 `ContentClassifier`/`ContentClassification` 端口与 `internal/decision/`（`LayaContentClassifier`、`TechEssayFilter`、`DecisionProperties`、`DecisionConfiguration`）；`application.yml` 加 `paideia.ai.decision.*`（**默认关闭**）；新增 2 个测试类（6 条单测 + 2 条真连测试，后者默认跳过）
+- 决策：
+  - **只接一个用途**：面经帖技术内容过滤（服务 WORK-025）。内容审核/提示注入防护不接——官方 `docs/guardrail-limitations.md` 自己承认在文档型输入上失效
+  - **规则在前、模型在后**：规则零延迟零成本，只在边界地带（命中 1~4 种技术词）才花 200ms 问模型
+  - **判定用 `choice` 不用 `noul`**（实测倒逼的修正）：同一段面经用 noul，结尾多三个字「有哪些」概率从 0.243 → 0.675 → 0.644，漂移让阈值不可用；换三分类 choice 后 7 条判对 6 条，P(tech) 稳定 0.95~0.98
+  - **端口失败返回 empty 不抛异常**：判定是"可以没有"的能力，判不了就退回规则，不该丢内容
+  - **默认关闭**：与沙箱同纪律，外部进程不在时不该让每次判定等超时
+  - **服务只绑 127.0.0.1**：除 api-key 外无鉴权
+- 依据：
+  - 官方数据核实：基础检查点 typed-decisions **0.362** vs 随机 0.318 vs **多数类 0.461**——官方原话"a fast base to specialize, not a zero-shot decision engine"；流传的 **0.766 是微调后**且在自己训练集上
+  - 中文 ECE：multilingual 0.219（概率偏乐观）
+  - 服务器实测：4核16G 无 GPU，内存 1.7G、冷启 16~22s、热态 147~260ms、模型 647MB、torch-cpu 903MB
+  - 端到端 7 条中文样例（复刻 Java 类请求体）：技术面经 P(tech)=0.957~0.980 全中；纯求职帖落到 career 侧（0.002/0.231）；**已知 1 条判错**「如何提高工程能力」被判 technical(0.953)，但规则层命中 0 种技术词、不会走到模型，实际不会误收
+- 踩到的坑（部署侧，记下来避免重走）：① `pip install laya` 默认拉 CUDA 版 torch（553MB cudnn + 2.5G 依赖），纯 CPU 机器必须先装 `--index-url https://download.pytorch.org/whl/cpu torch`；② HF 的 Xet 传输被墙（`401 cas-server.xethub.hf.co`），要 `HF_HUB_DISABLE_XET=1`；③ 清华 PyPI 镜像没有 laya 包；④ Python 客户端下模型仅 20MB/分钟，curl 直连 hf-mirror 可达 5.6MB/s，然后 `Router(models={"multilingual":"/本地路径"})` 指过去；⑤ `pkill -f 'pip install'` 会杀掉自己的 SSH 命令（命令行含同样字符串），要用 `[p]ip` 括号技巧
+- 验证：`mvn -pl paideia-ai -am test -Dtest=TechEssayFilterTest` **6 条运行 / 0 失败 / 0 跳过**；真连测试按 `@EnabledIfSystemProperty` 默认跳过；端到端 7 条样例命中 6/7；`project-lifecycle.ps1 validate` 通过
+- 本地提交：未提交
+- 远端推送：未推送
+- **未完成**：① 只有 requirements 一件工件，proposal/design/tasks 缺失（严格模式要求）；② 没有 systemd / 开机自启，重启后服务消失；③ 未接入 WORK-022 遥测
+
+## 2026-10-20 · WORK-027 每日技术速递 · 建项与数据源实测
+- 类型：requirements
+- 变更：新建 `.agent/changes/WORK-027-每日技术速递/`，含 `requirements.md`（draft，10 REQ / 9 AC / 6 待确认问题 / 8 条扩展点候选）与 `research.md`（AIHOT 形态核对 + 18 个候选源实测）
+- 决策：
+  - 形态**参考** AIHOT 的六步流水线，但**不套壳它的接口**（其 terms 明确对外商业用途需授权，且用户要的是自己做一个）
+  - 不学它的「两次独立打分」与「跨源聚簇」——一天一次 AI 调用是硬约束，那两步会让成本翻倍
+  - 学它的日报成刊与「同一来源只算一次」的热度纪律
+  - 存储**不进 `knowledge_entries`**：新闻是会过期的流，塞进去会让全文检索被每日新闻淹没
+  - 放进 `paideia-ai/internal/digest`，不新建 Maven 模块——WORK-025 已在同模块跑通「抓取 + 定时 + AI + 写库」全套
+- 实测结论（本机 + codenest-online 双端）：
+  - **可用**：HN Algolia（字段全）、arXiv API（200/9476B 双端）、量子位 RSS（10 条但无正文）、IT 之家 RSS（60 条）、InfoQ（20 条带正文）、掘金、开源中国、OpenRouter models（470 个含 pricing）
+  - **可用但不稳**：`github.com/trending` 本机三次连接被拒、生产 200/593KB 且 12 行可解析 ⇒ **必须有 Search API 兜底**
+  - **不可用**：HF daily_papers（双端超时）、arXiv RSS（892B 空壳）、机器之心（302 到数据页）、Solidot（403）、LMArena（超时）、Product Hunt（TLS 吊销检查失败）
+  - GitHub 匿名限额实测：search 10/分、core 60/时
+  - 热榜解析陷阱：`href="/([^"]+)"` 会先撞赞助商链接，**必须先定位 `<h2>` 块**
+- 成本估算：三组源约 40–60 条候选，**单日一次调用约 1.2 万 token**；照面经「每条一次」的形态会贵约 30 倍
+- 验证：`project-lifecycle.ps1 validate` → WORK-027 无错误、无警告
+- 本地提交：未提交
+- 远端推送：未推送
+- **仍未做**：需求未签署；proposal/design/tasks 未起草；Q-01..Q-06 与扩展点取舍待用户裁
+
+## 2026-10-20 · WORK-028 运维监控面板 · 建项
+- 类型：requirements
+- 变更：新建 `.agent/changes/WORK-028-运维监控面板/requirements.md`（draft，21 REQ / 8 AC / 13 条扩展点候选 / 8 个待确认问题）
+- 决策：
+  - 落点是**管理端一页**，不是独立监控站；C 方案（Prometheus+Grafana）与 B 方案（Spring Boot Admin）各自覆盖不到用户点名的 MySQL/Redis/Laya/Docker/systemd，推荐 A（自建只读采集 + 一页）
+  - **只读是硬约束**：不提供任何重启/停止/清理动作。明文 HTTP 下后台口令是唯一门槛，一个误点就是全站宕机
+  - 取不到数据必须显示「未知」，不许画成 0 或「正常」；每项异常给一句人话原因
+  - 不重做 WORK-022 的 AI 统计，运维页只放跳转
+- 线上只读实测（codenest-online，2026-10-20）：
+  - 六个 systemd 单元 + 七个 Docker 容器全部 active；`paideia` 以 **root** 运行（unit 无 `User=`），JVM RSS 435MB
+  - **Laya 内存 2.55G / 上限 3G（85%）**，离 OOM 只剩 0.45G，OOM 后静默降级成规则判断
+  - **Redis 装着、开着、`DBSIZE`=0、后端 pom/yml 零引用**——这是个没人用的服务
+  - **MySQL `slow_query_log` = OFF**，慢查询今天无法观测
+  - Docker 镜像 8.346GB / **6.176GB（74%）可回收**，无人可见
+  - **零备份**：`crontab -l` 为空、`/etc/cron.d/` 无备份任务、`scripts/` 无备份脚本，库仅 2.2MB
+  - `/actuator/health` 200 UP；`/actuator/metrics` 401（metrics 已 include 但被 Security 挡住）
+  - 库总大小 2.2MB，最大表 `refresh_tokens` 0.3MB/731 行 ⇒ 加一张每分钟采样的时序表压力可忽略
+- 依据：用户「我想在我的后台加一个运维的功能，你感觉可以吗，你可以新开一个 work 然后这个运维 就是各种服务监控指标，然后包括说我们中间件的，比如说 mysql redis 然后还有我们部署的那个 laya 是不是也需要呢。，还有什么呢可以想想」
+- 验证：`project-lifecycle.ps1 validate .` → WORK-028 无错误、无警告（同次运行里 WORK-027 → WORK-025 的硬依赖错误为既有问题，非本项引入）
+- 本地提交：未提交
+- 远端推送：未推送
+- **仍未做**：需求未签署；proposal/design/tasks 未起草；Q-01（技术路线）、Q-02（是否存时序）、Q-05（备份是否单独立项）待用户裁
+
+## 2026-10-20 · WORK-025 · 八股文专区实施（抓取→过滤→抽题→入库全链路）
+- 类型：implementation
+- 变更：
+  - **迁移 V24**：`knowledge_entries` 加 `source_url` / `fingerprint` 两列 + `(category_id, fingerprint)` 索引；幂等插入 `essay-java` 分类
+  - **knowledge 模块**：`Entry` 加两字段；`EntryMapper.insert` 带新列、新增 `findIdByFingerprint`；`KnowledgeApi.createCollected`（default 实现抛 UnsupportedOperationException）；`CategoryNode` 加 `slug`（供按稳定标识定位分类）；`EntryDetail` 加 `sourceUrl`
+  - **ai 模块 `internal/essay/`**：`EssaySource` 端口 + `NowcoderEssaySource`（实测通路）、`EssayExtractionPrompt`、`EssayQuestionParser`、`EssayExtractor`、`EssayCollectionService`（编排）、`EssayCollectionJob`（`@Scheduled` fixedDelay 24h）、`EssayProperties`、`EssayConfiguration`（条件装配）
+  - **前端**：`EntryDetail.sourceUrl` 可选字段；条目详情页加「题目来源：原帖」外链（`rel="noreferrer noopener"`）
+  - **测试**：`EssayQuestionParserTest`(8) + `EssayFingerprintTest`(4) + `EssayCollectionIntegrationTest`(3)
+- 决策：
+  - **编排放 `ai` 模块而不是 `knowledge`**：依赖方向是 `ai → knowledge`，反过来会成环。写入走 `KnowledgeApi.createCollected`，等价于"knowledge 提供写入能力、ai 负责编排"
+  - **Q4 先进草稿**（`publish-directly: false`）：无人值守自动入库，先让人过一眼更稳
+  - **Q5 挂知识库分类**而非独立 `/essays` 入口：零成本复用全部渲染与自检
+  - **Q6 不额外接掌握度**：`learning_progress` 按 entry_id 记，抓来的条目天然可自评
+  - **Q7 不建「平台精讲」分类**：没有内容来源，空分类出现在导航里比没有更糟
+  - **不扣用户积分**：抓取解析是平台行为、无 userId 归属，走 `CredentialService.access()` 直接调用。代价是这部分成本不在产品积分面板里可见
+  - **按题目指纹去重而非按帖子**：同一道题会在不同面经反复出现
+- **实测倒逼的关键修正（提示词与 token 预算）**：
+  - 原提示词"抽出所有题目、每篇解析 200~600 字"→ **4096 tokens 输出被截断**（`Unterminated string`），提到 8192 **同样被吃满**
+  - 根因：deepseek-flash 默认思考，思考 token 与正文共用 `max_tokens`
+  - 修法：**提示词压到"只挑 1 道题、解析 150~300 字"** + `MAX_TOKENS=16384` 留余量
+  - 修正后实测：**4.1s / 输出 665 tokens / finish=stop / 抽出 1 题 / 解析 466 字**，JSON 合法
+- 端到端实测（codenest-online）：
+  - 牛客接口重启后仍通（200 / 0.54s / total 2000），当日有 4 条新帖
+  - 抓 14 篇 → 规则直判技术帖 2 篇（得物长沙后端一面 hits=8、拼多多服务端 hits=5）
+  - 决策模型对首条 P(tech)=0.829（technical）
+  - AI 抽题成功并产出可发布内容
+- 验证：
+  - `mvn -pl paideia-ai,paideia-knowledge -am test`：**148 运行 / 0 失败 / 3 跳过**（跳过的是 `LayaContentClassifierLiveTest`）
+  - `EssayCollectionIntegrationTest` **3/3 通过**（V24 两列可写、指纹去重生效、分类 slug 可定位）
+  - `@paideia/knowledge` 类型检查通过
+  - **注意**：`@paideia/app` 的 typecheck 因 `HomePage.tsx` 报语法错而失败——那是**别的会话在飞的改动**（`M` 状态），与本次无关
+- 本地提交：未提交
+- 远端推送：未推送
+- **仍未做**：① 定时任务未在生产启用（`enabled: false`）；② 未做 e2e 覆盖「从专区点进去看到条目」；③ 「平台精讲」未建
+
+## 2026-10-20 · WORK-028 运维监控面板 · 实施、首轮上线与四件工件
+- 类型：implementation
+- 变更：
+  - 应用：`/actuator/prometheus`（版本由 Boot BOM 管）、`/api/v1/ops/admin/summary`（七类摘要、四态判定）、`/api/v1/ops/grafana/**`（Grafana 反代）、`ScheduledTaskRecorder` 端口 + 两个定时任务埋点、`ScheduledTaskMetrics`
+  - 服务器：prometheus / grafana / node / mysqld / redis / blackbox 六个 exporter 型单元 + `ops-textfile.timer` + `paideia-backup.timer`，全部只绑 127.0.0.1；`deploy/ops/` 一次装齐（安装脚本幂等）
+  - 管理端：「运维」页（七张四态卡片 + iframe 完整面板）
+- 决策：
+  - **不另开管理端口**：六处依赖 8081 的 `/actuator/health`，改在 Security 里按来源 IP 白名单（`LocalOnlyAuthorizationManager`）放行 `/actuator/metrics/**` 与 `/actuator/prometheus`
+  - **不建 MySQL 时序表**：历史交给 Prometheus TSDB（15s 抓取、保留 3 天），本项零迁移
+  - **不装 cAdvisor**：容器与 systemd 由 60 秒一次的 textfile 脚本采集，少一个吃数百 MB 的常驻进程
+  - **面板鉴权落在 Grafana 自己的会话**：实测三条路（应用 ADMIN / 查询串 ticket / 只放行 public）都被 iframe 子请求打穿；根因是项目无 Cookie 纯 Bearer 而 Grafana 是 SPA
+- 实测暴露并修掉的七个缺陷：告警不发信（缺 `notification_settings.receiver` → `empty` 收件人）、四条规则三条 `nodata`（比较表达式需 `bool` 修饰符）、运维页白屏（`api.request` vs `requestEnvelope`）、iframe 被 `X-Frame-Options: DENY` 拒、反代剥前缀导致 301 死循环、iframe 全 401、服务组把"没设上限"显示成"未知"
+- 验证：
+  - 后端 `mvn -B test` 216 运行，3 失败——**两处均为本分支起点 4a071f4 既有红**（`ApiWalkthroughTest` 缺 40+ 端点覆盖、`MigrationChecksumTest` V22/V23 未登记），已在独立 worktree 复现
+  - 运维相关：`OpsStatusTest` 3、`ScheduledTaskMetricsTest` 4、`OpsGrafanaProxyTargetTest` 5、`OpsSummaryIntegrationTest` 5、`ApiContractTest` 9、`ApiSurfaceTest` 6、`AuthorizationIsolationTest` 9，全 0 失败
+  - 管理端 e2e 打线上：**22 passed**
+  - 恢复演练：表 37/37、`knowledge_entries` 58/58、`users` 2/2、`ai_messages` 51/51
+  - 浏览器实测：七张卡片 + 9 个面板真实渲染
+  - 资源实测：六进程合计 335MB；Prometheus 2 小时 7.7MB（推 3 天约 280MB）
+- 依据：见 `.agent/changes/WORK-028-运维监控面板/testing/report.md`（AC-001..013 逐条证据表）
+- 本地提交：9 笔（`151958d` `970c8d9` `27b58e6` `c1a41ee` `25bebf8` 及其后续）
+- 远端推送：未推送
+- **仍未做**：管理端运维页的 e2e 用例；AC-005 的真实并发压满；慢查询日志开启；异地备份
+
+## 2026-10-20 · 修复 /learn 与知识图谱，并给线上补齐真实数据
+- 类型：fix + data
+- 变更：
+  - `scripts/import-course.mjs`：更新已有条目时**按 frontmatter 的 status 写回**，并删掉"先草稿、后统一发布"的两段式。原逻辑在更新路径上一律写 `draft`，而补发循环只发布"本次新建"的条目，于是改一次内容就让那一关从学习者端消失
+  - `content/courses/python/*.md`：补 `chapter` / `level` / `line_summary`（新增 `scripts/add-python-chapters.py`）；重新导入后 Python 与两条阅读线登记成学习轨道
+  - `GraphCanvas2D`：节点初值改用 `circularLayout` 散开（力导向在所有点重合时不推位置，只是把 (0,0) 原样留下）；布局缩放到固定跨度 1000（sigma 按包围盒自动适配，布局越紧凑屏幕上越放大，一颗节点能铺满画布）；`labelRenderedSizeThreshold` 0 → 6（未接触档半径为 6，阈值 6 会把它们全部隐去标签）
+  - `loadPositions`：全部重合的旧存档当作没有存档（否则修好算法后仍会读到坏的零坐标）
+  - `InterviewPage`：接上 `GET /api/v1/ai/interviews/evaluations`（接口从 WORK-010 就在，前端方法也有，一直没有页面调用）
+  - `LearnPage`：加「继续上次」条；卡片网格 `md:2 / xl:3`
+  - `HomePage`：hero 左栏补三格进度数字（待复习 / 学到一半 / 还不懂），数据全部来自已有接口
+  - `GraphPage`：空状态补三张卡说明"这里将来会有什么"；画布高度 `lg:h-[calc(100vh-18rem)]`
+  - 新增 `scripts/seed-demo-data.py`：概念 14 个、关系 12 条、自评 13 条、学习进度 15 条、笔记 3 条
+- 决策：轨道集合以 `learning_tracks` 表为准而非 `/learning/lines`（后者是 WORK-020 的分类标记，两条数据源分叉正是 bug 的表现）；不用 `release.ps1` 发版，改为**只替换 `/opt/paideia-app/web`**——工作区里有别的会话在飞的改动（WORK-026/028、essay 采集、V24），`release.ps1` 从工作区构建 jar 会把它们一起带上线
+- 实测数据：`/learn` 现在 4 条轨道（Python 13 关 / Java 24 关 / 源码解读 1 关 / 计算机网络 2 关）；图谱 14 概念 / 12 边 / 接触 8 / 掌握 3；课程条目草稿从 10 条降到 0（剩余 5 条草稿属于面经采集，与本项无关）
+- 验证：`pnpm --filter @paideia/knowledge test` 44/0；`tsc -p tsconfig.json` 通过；学习者端 e2e 打线上 **61 passed / 2 failed / 21 skipped**——两条失败与本项无关：① `home.spec「每个请求都带上追踪标识」` 请求 `/actuator/health`，服务器上的 `application.yml` 缺 `management.endpoints.web.exposure.include` 故返回 404（环境配置差异）；② `assistant.spec「记忆面板」` 断言"还没有任何记忆"，而线上 admin 已有记忆（写死种子数据的旧问题）
+- 本地提交：39064e2
+- 远端推送：未推送
+- 未处理：`/graph` 节点标签在密集区域仍会互相压住（`labelDensity` 调优属视觉细节）；Python 课程只有 2 关有进度记录，因为脚本里的进度是按标题手写的
+### 2026-10-20 追加 · WORK-025 · 部署上线 + 实测定出「按标题去重」这个设计缺陷
+- 类型：implementation
+- 变更：
+  - 提交 `7cf1ec7`（八股文专区主体）与 `554a87f`（去重修复），部署到 codenest-online
+  - 线上 `/opt/paideia-app/application.yml` 加 `paideia.ai.essay` 段并 `enabled: true`（备份 `application.yml.bak-*`）
+  - **去重从「按题目标题」改为「按来源帖子 externalId」**：`fingerprint(title)` → `fingerprintOfPost(post)`
+- 决策：
+  - **原设计是错的，线上才暴露**：按标题算指纹，理由是"同一道题会在不同面经里反复出现"。但模型每次复述措辞会变：
+    第一次「线程池中如何可靠地传递 ThreadLocal 上下文？」、第二次「在线程池中如何可靠地把父线程的 ThreadLocal 上下文传给子线程？」——意思相同、文本不同 ⇒ 每次运行都新增。**模型复述的措辞不该被当身份标识**
+  - 改为按 `externalId`（上游给定、不漂移）+ 来源前缀（`nowcoder:`）。代价是同一题出现在两篇面经里会存两份，当前一篇只抽一道题、量小，可接受
+- 实测（全部在线上 codenest-online）：
+  - V24 迁移成功应用（`flyway_schema_history` v24 success=1）；`source_url`/`fingerprint` 两列已加；`essay-java` 分类 id=20
+  - 第一次运行 15:57：抓 7 篇 / 跳过非技术 3 / 抽出 4 / 新建 4 / 失败 0
+  - 第二次运行 16:13（重启触发）：**新建 4、重复 0 ⇒ 库里 4 变 8，暴露缺陷**
+  - 修复部署后 16:25：抓 8 / 跳过 3 / 抽出 5 / 新建 5
+  - 修复后第二次 16:32：**新建 0 / 重复 5 ⇒ 库里稳定 5 条**，去重生效
+  - 内容抽查（id=10076 Redis 哨兵）：结论先行 + 机理 + 处理建议，**无公司名/薪资**，带来源链接
+  - 全文检索可命中（`MATCH ... AGAINST('ThreadLocal')`）
+  - Paideia 健康 200、`/` 与 `/admin/` 均 200
+- 踩到的坑：
+  - **`@SpringBootTest` 嵌套类会各建一个上下文并重复跑迁移**（V951 seed 失败），所以抓取任务的装配验证没做成自动化测试，改为线上日志比对
+  - `EssaySchedulingWiringTest` 因 `EssayCollectionJob` 是包私有类而无法跨模块引用，已删除该测试
+  - 线上 e2e 需要 `E2E_LEARNER_PASSWORD`，仓库里没有（刻意设计），因此**未跑线上 e2e**
+- 验证：单测 18 条（指纹 4 + 解析 8 + 过滤 6）全过；`project-lifecycle.ps1 validate` 中 WORK-025 无错误（报错来自 WORK-027，别人的项）
+- 本地提交：`7cf1ec7`、`554a87f`
+- 远端推送：**未推送**
+### 2026-10-20 追加 · 推送核对（WORK-025 及前序提交）
+- 类型：maintenance
+- 变更：`git push origin master`，`2943480..e175df2`
+- 依据：HTTPS 直连 200、SSH 认证通过；推送前暂存区为空、密钥扫描无命中
+- 验证：`git ls-remote origin refs/heads/master` = `e175df2d...`，与本地 HEAD 一致；`git rev-list --count origin/master..HEAD` = **0**
+- 推送范围：19 笔。其中属于本次会话的是 `7cf1ec7`（八股文专区）、`554a87f`（去重修复）、`e175df2`（部署记录）；其余为**其他并发会话**的学习轨道（WORK-024）、WORK-027 建项与遥测修复等提交——它们此前也一直只在本地
+- 远端推送：已完成
+
+## 2026-10-20 · 撤销「先原型再设计」规范并移除 figcraft MCP
+- 类型：docs
+- 变更：`AGENTS.md` 删除「设计流程：先原型，再设计」整节（原 25–35 行，含 FigCraft 母版路径、两段流程、令牌来源四条附注）；`~/.zcode/cli/config.json` 的 `mcp.servers.figcraft` 整条移除
+- 决策：用户不再使用 FigCraft，界面改动恢复为直接实现；`docs/design/` 下已有的 `.figcraft` 母版与九张 PNG 未删除（未被 Git 跟踪），是否保留由用户决定
+- 依据：用户「现做设计，后实现，这个我们去掉这个规范吧，我不用那个mcp了，顺便给我把那个mcp给删掉」
+- 验证：`node -e "require('./config.json')"` 解析通过，剩余 MCP 服务 8 个（codegraph/context7/drawio/bep-mcp-prod/firecrawl/paideia/github/deepseek-search），figcraft 已不在其中
+- 本地提交：未提交
+- 远端推送：未推送
+
+## 2026-10-20 追加 · WORK-027 · 用户裁决四项 + GitHub token
+- 类型：requirements
+- 变更：`requirements.md` 从「6 个待确认问题」收敛为「2 个仍待确认」；新增 D-05..D-11、I-12..I-14、REQ-011、AC-010/011；扩展点表移入 `research.md` 第六节（工件超 20000 字节软阈值的分诊）
+- 用户裁决：
+  - **D-05 首批三组源**（「可以对」）：前沿新闻（量子位 + IT 之家 + InfoQ）+ GitHub 每日热榜 + HN 前 10；arXiv 与 OpenRouter 二期
+  - **D-06 入口放导航栏**（「入口可以新增导航栏」）
+  - **D-07 内容直出**（「内容直出吧」）⇒ 配套新增 I-12 + REQ-011 + AC-010：**管理端按日期查看并删除单条**，否则一条脏数据只能进数据库删
+  - **D-08 硬依赖 WORK-025**（「肯定是 要等 25 做完的对吧」）⇒ frontmatter 由 `related_to` 改为 `depends_on: [WORK-025]`
+  - **D-09 要配 GitHub token**（「其实可以配置我的啊，你看看 gh 是有的，你给我放进去就可以了吧」）
+  - D-10 不做今日综述、D-11 历史永久保留：用户未反对默认值
+- 决策：
+  - **GitHub token 是可选增强，不是硬依赖**（I-13/AC-011）：未配置时退回匿名（60/时），功能不降级
+  - **有 token 时主通路改为 Search API，页面解析降为兜底**（I-14）：限额 5000/时后没必要依赖会随改版坏掉的解析器
+- 已核实并告知用户的事实（`gh auth status` + `gh api rate_limit` + 匿名对照）：
+  - 本机 `gh` token 类型 **`gho_`**，scopes = `gist, read:org, repo, user, workflow` ⇒ **对名下全部仓库有写权限**
+  - 限额对比：带 token **core 5000/时、search 30/分**；匿名 **core 60/时、search 10/分**
+  - 已建议改用 fine-grained token（Public repositories read-only、权限全空），**限额完全相同**，差别只在泄露后的影响面；用户尚未回复这一条（Q-07）
+- 验证：`project-lifecycle.ps1 validate` → WORK-027 只剩一条**预期内的硬依赖门**（WORK-025 未完成），无其它错误与警告；`requirements.md` 从 22677 → **19934 字节**
+- 本地提交：未提交
+- 远端推送：未推送
+- **仍未做**：需求未签署；proposal/design/tasks 未起草；Q-02（扩展点取舍）与 Q-07（token 形态）待用户答；WORK-025 前端入口未补，本项不得开工
+
+## 2026-10-20 追加 · WORK-027 · 四条扩展点入一期 + 四件工件齐备
+- 类型：design
+- 用户裁决（本轮）：
+  - **X-04 社区热帖 / X-05 周报 / X-06 按身份筛源 / X-08 转笔记 四项全加**（原话「这几个加上呗」）⇒ D-12..D-15、REQ-012..REQ-015、AC-012..016
+  - **Q-07 token 形态选 A**（原话「A. 用现在 gh 里那个，我从 gh 取出来，写进服务器的 application-local.yml」）⇒ D-16
+- 变更：
+  - `requirements.md` 重写：11 REQ → **15 REQ**、9 AC → **16 AC**；`mode_reason` 补「两张新表」；决策表扩到 D-16；实现选择扩到 I-16
+  - `research.md` 新增第五节「决策痕迹」（九个问题的答复原文 + Q-07 选 A 的风险留档）、第六节改为「扩展点裁决结果」（8 条逐条标已选/未选 + 四条落地要点）
+  - **新起草 `proposal.md` / `design.md` / `tasks.md`**（均 `status: draft`）
+- 设计要点（新增四项的落地方式）：
+  - **X-05 周报必须单独建表** `digest_weeklies`（I-03）：周报是不可从条目行推导的一段叙述；与「日报不建表」不矛盾
+  - **X-06 放前端**（I-15）：加 `identity` 配置项 `digestGroups`；后端不感知身份。**AC-014 明确写「数据一条不少地存在于库中，只是展示不同」**，防止将来被误实现成服务端过滤
+  - **X-08 纯前端**（I-16）：带参跳到 `/notes/new` 预填，不需要新后端接口，本项不依赖笔记模块
+  - **X-04 独立成第四组**，不与门户新闻合并：两者调性与量级不同
+  - 数据模型定为两张表；`digest_items.fingerprint` 建**全局唯一**（新闻的重复是跨源而非同分类）
+  - 一次 AI 调用改**按指纹回填**而非顺序对齐——模型可能少返回条目，顺序对齐会静默错位
+- 风险留档：Q-07 选 A 后，带 `repo` 写权限的 `gho_` token 将落到 codenest-online 的 `application-local.yml`。已在 research.md 写明「用户已明确选择，不再重复询问」，并记下「若进日志/提交立即轮换」
+- 验证：`project-lifecycle.ps1 validate` → WORK-027 报两条**预期内**的门：① 硬依赖 WORK-025 未完成 ② 需求未签署但已存在下游工件（proposal/design/tasks 均为 draft）
+- 本地提交：见本轮 commit
+- 远端推送：未推送
+- **仍未做**：四件工件全部未签署（签署只能由 `approve` 命令写入，Agent 不得代签）；WORK-025 前端入口未补，本项不得开工
+
 ## 2026-10-21 09:48:57 +0800 · WORK-027 · 签署 .agent/changes/WORK-027-每日技术速递/requirements.md
 - 类型：decision
 - 变更：.agent/changes/WORK-027-每日技术速递/requirements.md 由 xiaou61 签署为 approved
@@ -5201,6 +4410,643 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 本地提交：4353f2f 后端，6b09e86 前端
 - 远端推送：未推送
 
+## 2026-10-21 · AI 可观测性 · 补接 prompt_version 与终态归类（cancelled/timeout）
+- 变更：
+  - **11 条 AI 入口全部接上提示词版本**，写进 `ai_runs.prompt_version`：对话主链路
+    （`HarnessPrompts.version(harness)`，`AssistantConversationController.runFor`）、面试点评
+    （`ReviewPrompt.VERSION`）、记忆整理（`MemoryExtractionPrompt.VERSION`）、外部问答
+    （`HarnessPrompts.version(ASSISTANT)`）、简历解析（`ResumePrompts.PARSE_VERSION`）、
+    简历分析与提案（`ANALYZE_VERSION` / `PROPOSE_VERSION`）、训练营出卷与复测
+    （`CampPrompts.GENERATE_VERSION` / `RETEST_VERSION`）、日报（新增 `DigestPrompt.VERSION`）、
+    周报（新增 `DigestWeeklyService.PROMPT_VERSION`）
+  - `HarnessPrompts` 由包私有改 `public`（跨包调用：`internal.web`、`internal.tools`）；
+    `ReviewPrompt.VERSION` 同步放开到 `public`。两者原本就写着"进日志/回归用"，只是没人用
+  - 对话一轮的终态不再把所有失败压成 `failed`：新增 `ClientGoneException`（专用子类，
+    不靠错误码或文案判断）→ `RunOutcome.CANCELLED` / `error_type=client_gone`，
+    `TimeoutException` 沿 cause 链 → `RunOutcome.TIMEOUT` / `error_type=upstream_timeout`
+- 决策：**用专用异常子类而不是字符串匹配**。上游报错文本完全可能包含"连接已断开"这几个字
+  且会被包进 cause 链，按消息认会把上游故障记成用户放弃——测试 `messageSubstringAloneDoesNotCancel`
+  就守这一条。`RunOutcome.CANCELLED/TIMEOUT` 两个常量早就定义、全仓零调用方，这次才第一次用上
+- 依据：用户给了一篇讲 Agent 效果归因的文章（TRAIL + Snowflake Agent GPA），问本项目有没有类似能力、
+  要不要做优化。核实结论：文章两项论文的 95%/86% 数字真实，但那 86% 来自 6 个专精 judge + claude-4-sonnet
+  高推理 + GEPA 刷提示词 + meta-judge 复核；TRAIL 原文写明最好的 Gemini-2.5-pro 在"指出错在哪一步"上只有 11%。
+  我们的 `ai_runs`/`ai_run_spans` 已覆盖"节点化"那根杠杆，不值得照搬 judge 体系；真正缺的是
+  prompt_version 没接线（**已跑过的行永远补不回来**）与 CANCELLED/TIMEOUT 无人使用。用户：「简单你直接给我做了吧」
+- 未做（明确不做）：LLM-as-judge 打分、checkpoint 回放、条件边、节点级看板扩展。判据是
+  "稳定真实流量 + 出现'知道变差了但说不清哪一步'的实际困扰"两条同时成立才值得做，现在都不满足
+- 验证：
+  - `-pl '!paideia-app'` **250 条 / 0 失败 / 11 跳过**（跳过的是四个 `*LiveTest` 联网探针 + 一条 FileStorage 契约用例，均为既有设计）
+  - 四个守卫类 **9 条 / 0 失败**（模块边界、迁移命名、迁移校验和、迁移不污染种子表）
+  - `AssistantConversationIntegrationTest` **14 条 / 0 失败**（真 MySQL），含新增的
+    `recordsPromptVersion` 断言 `ai_runs.prompt_version = assistant-chat-v1`
+  - **反向验证**：临时注释掉 `withPromptVersion` 后 `recordsPromptVersion` 变红（`but was: null`），恢复后转绿
+  - 新增 `AssistantConversationOutcomeTest` 4 条（取消 / 超时 / 其余失败 / 文案子串不误判）
+- 踩坑：本轮两次 `mvn compile` 撞 `insufficient memory for the Java Runtime Environment`——
+  机器上有别的会话在跑，`MAVEN_OPTS=-Xmx1200m` 后正常。另 `mvn -pl paideia-ai` 必须从
+  `backend/` 跑（根目录无 pom），`scripts/test-db.sh` 也要带 `-f backend/pom.xml`
+- 本地提交：待用户授权
+- 远端推送：未执行
+
+## 2026-10-21 · WORK-028 并入 master，并修掉 master 上的 V24 种子冲突
+- 类型：maintenance
+- 变更：把 `feat/ops-monitor` 的 11 笔提交并入 master（`24c639b`）；功能此前只在分支上，但**已经部署到生产**，代码与线上不一致了一晚
+- 合并冲突与处理：
+  - `application.yml`：master 上已被别的会话把「actuator 搬到 8082」这个**后来放弃的方案**提交并推送（在 `7cf1ec7` 里被 `git add -A` 卷进去）。取分支版本——不搬端口，改为 Security 里按来源 IP 白名单放行。远端已有该提交，不改历史，向前修正
+  - `updates.md`：两侧都是历史记录，按时间顺序全部保留
+- **一并修掉 master 上的真回归**（与 WORK-028 无关，但会让所有测试红）：
+  - 现象：合并后 `mvn test` **201 个错误**，全部发生在 Spring 上下文启动阶段
+  - 根因：`V24`（八股文，WORK-025）用 `INSERT ... SELECT` 建 essay-java 分类时不指定 id，**全新库上整表是空的，它自增拿到 id=1**，与 `V951` 种子里硬编码的 `id=1`（后端基础）主键冲突
+  - 修法：新增 `db/devdata/V949__shift_essay_category_id.sql`（**生产迁移目录没有它，不影响线上**），把该分类挪到 id 900 并同步条目引用（外键是 NO ACTION，顺序：建新行→改子表→删旧行→正名）。编号取 949 是因为必须**早于 V951** 执行
+  - 顺带补登记 `V22/V23/V24/V949` 的校验和——`MigrationChecksumTest` 此前一直因此红着
+- 验证：后端 **220 运行 / 1 失败 / 4 跳过**（此前 220 / 3 失败 / 4 跳过，其中 201 个是上下文错误）；唯一剩余失败是 `ApiWalkthroughTest` 的「40+ 端点未被走到」，该测试在合并前就已红（已在独立 worktree 上复现过）
+- 线上复检：`health=200`，`paideia` / `grafana` / `prometheus` 全 active
+- 本地提交：`24c639b`
+- 远端推送：未推送
+
+## 2026-10-21 · WORK-027 四件工件齐签，design/tasks 六处修正
+- 类型：requirements
+- 变更：
+  - `design.md` 修正 4 处 + 补 2 处：
+    1. **管理端路径** `/api/v1/admin/digest` → `/api/v1/digest/admin/**`（前者没有任何规则匹配，会落到 `anyRequest().authenticated()`，**任何登录用户都能删条目**）
+    2. **`preferredNav` 改动点从"加类型联合"扩成六处表**：类型 + 四个身份配置 + `HomePage` 的 `QUICK_LINKS`
+    3. **`GuardedHttpTransport` 用不上**：它是 AgentScope 的 `HttpTransport`，拦的是出站模型请求；抓 RSS 用 JDK `HttpClient`（照抄 WORK-025）
+    4. **RSS 解析必须自己防 XXE**（原 design 漏了）：外部 XML 与用户上传 docx 同一风险面，补四条 `DocumentBuilderFactory` 开关 + 单测喂恶意 DOCTYPE
+  - 另修两处：编排里"分类缺失就跳过"是 WORK-025 的残留（速递不进知识库、没有分类概念）；`RunKind` 现值核对为 7 个，明确新增 `digest` / `digest_weekly`
+  - `tasks.md` 三处：TASK-001 迁移改 14 位时间戳（原写 `V25__`，正是新规矩要禁的）、TASK-003 补 XXE 与 HTTP 边界要求及第四份恶意夹具、TASK-011 路径订正、TASK-012 验收改为"配置结构齐备"（原要求"不同身份取不同值"，与 design 的"一期值相同"矛盾）
+- 决策：四件工件全部签署（requirements 09:48、proposal 10:01、design 10:26、tasks 10:26），进入实现阶段
+- 依据：用户「先推送，然后再处理 design」「可以的修正一下吧」
+- 验证：`project-lifecycle.ps1 validate` → WORK-027 **零错误、零警告**；`brief` 显示 phase=implementation
+- 本地提交：未提交
+- 远端推送：未推送
+- **下一步**：按 tasks.md TASK-001..013 实施（13 个任务，尚未开始）
+
+## 2026-10-21 · WORK-027 撤销「按身份筛源」
+- 类型：requirements
+- 变更：
+  - `requirements.md` 退回 `draft`：删除 REQ-013、AC-014；D-14 与 I-15 标为撤销；非目标里补一条撤销说明与恢复条件；约束里删掉「依赖 WORK-010 身份配置结构」
+  - `proposal.md` / `design.md` / `tasks.md` 全部标 `stale`，并把「身份筛源」那节标为撤销（proposal 的第 4 处取舍、design 的「按身份分组」段、tasks 的 TASK-012 改写为「导航入口与转笔记」）
+- 决策（用户）：「算了暂时不切换了，我们暂时不考虑这个，因为我们目前就一个身份，对吧」
+- 核实（前提成立，且比"只有一个身份"更硬）：后端 `Identity.selectable()` **只对 `job_seeker` 返回 true**，`Identity.java` 的注释写明「其余三个是留位，只在枚举里存在，界面上不出现」。前端 `ProfilePage` 渲染四个选项但另外三个 `disabled`。也就是说 **AC-014「切换身份后分组顺序随之变化」原本就无法执行**——已签的需求里躺着一条不可能通过的验收标准
+- 我上一轮的处置是错的：TASK-012 原写「单测：`configFor()` 对不同身份返回不同 `digestGroups`」，我为与 design 对齐把它改成「配置结构齐备」——那是在任务层面自行消化了一个 requirements 与 design 的冲突，正是规程禁止的做法。这次回到最早工件（requirements）撤销，并让三件下游失效
+- 撤销后仍保留：`preferredNav` 加 `'digest'`（那是**导航顺序**，与速递分组无关），四处身份配置 + 类型联合 + `HomePage` 的 `QUICK_LINKS` 共六处
+- 验证：`project-lifecycle.ps1 validate` → WORK-027 只剩「需求尚未形成但存在下游工件」，即**预期的待重签状态**；其余无错误
+- 本地提交：见下一笔
+- 远端推送：未推送
+- **下一步**：需求需重新签署；签完后 proposal/design/tasks 三件 stale 也要一并复核签署（改动集中在身份那一节，其余未变）
+
+## 2026-10-21 · WORK-026 线上接通（开 Laya 开关）+ 修超时 + 补 WORK-024 工件
+- 类型：implementation
+- 变更：
+  - 服务器 `/opt/paideia-app/application.yml` 新增 `paideia.ai.decision` 段：`enabled: true`、`base-url: http://127.0.0.1:8091`、`api-key`（从 `/etc/laya/laya.env` 的 `LAYA_API_KEY` 原样取，40 位，未回显）、`timeout-ms: 8000`、`min-confidence: 0.7`、`max-text-chars: 4000`。改前已备份为 `application.yml.bak-20261021110651`
+  - **`timeout-ms` 默认值 5000 → 8000**（`DecisionProperties` 与 `application.yml` 同步），注释换成实测依据
+  - 补 `WORK-024` 四件工件 + `testing/report.md`（反向记录已上线功能）
+- 决策：
+  - **先确认"没接上"到底是哪种没接上**再动手。核实结果：代码**早就接好了**——`EssayCollectionService:115` 就在调 `TechEssayFilter.isTechnical()`，而 `TechEssayFilter` 会调 `ContentClassifier`。真正缺的只有一件事：服务器配置里**根本没有 `decision` 段**，于是走代码默认 `false`，打开它就行，不需要改代码
+  - **超时是这次接通才暴露的真缺陷**。5 秒是 WORK-026 当时按"热态单条 147~260ms、并发 16 p95 2965ms"标的，但那是**短文本**下的数。实测延迟随输入长度线性涨：810 字 1.1s / 1620 字 2.9s / 3240 字 3.8s / 4000 字 4.0s。`maxTextChars` 就是 4000，5 秒只留不到 1 秒余量
+- 验证：
+  - Laya 侧带 key 直连 `/v1/systemone`：技术面经判 `technical` 概率 0.9744（与部署前记录一致）
+  - 重启后运维摘要 `switches` 组：`decision | 开`；启动日志 0 ERROR
+  - **第一次跑批（5 秒超时）**：`八股文抓取完成：抓 12 篇，跳过非技术 1 篇，抽出 8 题，新建 2 条，重复 6 条，失败 1 篇`，但日志里有 **2 次** `LayaContentClassifier : 决策模型判定失败，退回规则判断：HttpTimeoutException`
+  - **改 8 秒后第二次跑批**：同样抓 12 篇、跳过 1 篇、抽出 8 题（重复 8 条），**`LayaContentClassifier` WARN 计数 = 0**；Laya 端收到 6 次 `POST /v1/systemone 200 OK`
+  - 前后对比表：
+    | 项 | 5 秒 | 8 秒 |
+    | --- | --- | --- |
+    | 抓取/跳过/抽题 | 12 / 1 / 8 | 12 / 1 / 8 |
+    | Laya 超时降级 | **2 次** | **0 次** |
+  - `TechEssayFilterTest` 6 运行 / 0 失败
+  - 另一条失败 `面经抽题失败（2929211）：上游模型服务暂时不可用` **不是 Laya 的问题**，是 DeepSeek 上游那一次没返回；两轮都在同一篇上失败，与决策模型无关
+- WORK-024 补账：
+  - 现状：代码（`V22`/`V23` 迁移、`TrackMapper`/`TrackService`/`LearnTrackController`、`LearnPage`/`TrackMapPage`、24 篇 Java 课程、`verify_course.py`）早已上线且有更新历史，但 `.agent/changes/` 下**从来没有 `WORK-024-*`**。原因是当时状态脚本报 `WORK-024` 而工作区已被在飞的八股文占用，本项取了 `WORK-025`；后来学习轨道那一路直接用 024 落了代码却没补工件
+  - 后果：`validate` 对这项**完全静默**——代码在跑、治理上看不见，也没人知道它改过什么
+  - 补了 `requirements/proposal/design/tasks` 四件 + `testing/report.md`，全部按已实现行为反向记录，**不改一行代码**。`mode: strict`（新增两张表与三个端点）
+  - 线上实测：4 条轨道（Python 0/13、Java 0/24、源码解读 0/1、计算机网络 0/2）；`GET /knowledge/categories` 已无 `lineKind` 非空项（AC-005 生效）
+- 本地提交：`3ed6ab7`（超时）、`2d036a7`（WORK-024 工件）
+- 远端推送：未推送
+- **仍未做**：WORK-024 与 WORK-027 的需求都需要用户重新签署（`validate` 各报一条「需求尚未形成，但已经存在下游工件」）
+
+## 2026-10-21 · WORK-027 每日技术速递 · 实施完成（工作在 `.worktrees/work-027`，分支 `feat/work-027-digest`）
+- 类型：implementation
+- 分支：`feat/work-027-digest`（5 笔提交）
+- 变更：
+  - 迁移 `V20261021134700__create_digest_tables.sql`：`digest_items`（指纹全局唯一）+ `digest_weeklies`（周唯一）
+  - `paideia-ai/internal/digest/`：端口与源（`DigestSource`/`FetchedItem`/`DigestHttp`/`FeedXml`/`RssDigestSource`/`GithubTrendingSource`/`HackerNewsSource`）、指纹、AI 压缩（`DigestSummarizer`/`DigestPrompt`）、编排（`DigestCollectionService`/`DigestWeeklyService`）、调度、配置、`DigestMapper`、`web/{DigestController,DigestAdminController}`
+  - `RunKind` 加 `DIGEST`/`DIGEST_WEEKLY`；`SecurityConfiguration` 加两条规则（管理端在前）
+  - 前端：`@paideia/knowledge` 的 `digest-client`/`digest-types`；`DigestPage`；路由 `/digest`；导航与首页入口；`preferredNav` 六处；`NoteNewPage` 读 query 预填
+- **实跑暴露并修掉的四个真缺陷**（每个都有单测或实测钉住）：
+  1. **`github.com/trending` 已改成 SPA**：真实 HTML 里 `<article>`/`Box-row`/`stars today` 各 0 次、仓库链接 0 个，仓库行由 JS 注入。原设计"无 token 走页面解析为主"等于每天拿空结果 → **主次反转**：Search API 为主，页面解析降为补充
+  2. **Search API 查询串含 `>` 是 URI 非法字符**：`URI.create` 抛异常被 catch 吞成"空结果"。同一串用 curl 手打返回 261 个结果——**只有应用真跑才暴露**。`URLEncoder` 编码后 GitHub 从 0 条变 15 条
+  3. **成本闸按前缀截断让单个源垄断**：实跑 60 条全是 IT 之家，另三组为 0。改为按分组轮转取（`takeByGroup` + 4 条单测）
+  4. **`GuardedHttpTransport` 的 OkHttp 读超时是默认 10 秒**（AgentScope 自己默认 5 分钟）：12 条候选跑约 20 秒，卡在 10 秒抛 `Failed to read response body: timeout`，整批静默降级。既有调用都是单条几秒所以一直没撞到。改为读 5min / 写 1min / call 6min
+  5. 另修提示词：原写"可以挑掉不重要的条目"，真连实测 5 条只返回 3 条，而编排把全部候选都入库 → 被挑掉的显示"这条还没写好摘要"，等于三分之二卡片看起来是坏的。改为"每一条都要写"后 5/5
+- 验证：
+  - 七个源实测 200：量子位 10 / IT之家 60 / InfoQ 20 / 掘金 20 / 开源中国 50 / HN 10 / GitHub 15
+  - **真跑完整日报（配真实 DeepSeek 凭据）**：`候选 35 条，入库 12 条（降级 0 条），失败源 0 个`；分组 `news 4 / github 4 / hackernews 4`（轮转生效）
+  - **`ai_runs` 复验**：`kind=digest userId=0 status=ok in=1266 out=3405`，当轮恰好 1 条（AC-008）
+  - 摘要真连：5/5 条 9.0 秒 2320 tokens；英文标题正确译为中文（"Introducing the new reasoning model" → 「介绍全新推理模型」）
+  - 周报真连：558 字三段 markdown、9.9 秒
+  - 后端全量：**596 运行 / 0 失败**
+  - 学习者端 e2e（digest.spec.ts）：4 passed / 1 skipped / 0 failed
+- 仍未做：**未部署**（`application.yml` 默认 `enabled: false`，上线需配 GitHub token 并打开开关）
+- 本地提交：`feat/work-027-digest` 分支 5 笔
+
+## 2026-10-21 · WORK-027 · 推送 master 并部署上线（含一次线上事故）
+- 类型：deployment
+- 变更：
+  - 合并 `feat/work-027-digest` 进 master 并推送（与 WORK-029 的三处冲突按"两边都保留"处理）
+  - 线上 `/opt/paideia-app/application.yml` 新增 `paideia.ai.digest` 段（`enabled: true`、GitHub token、5 个 RSS 源）
+  - 迁移重命名 `V20261021134700` → `V20261021161000__create_digest_tables.sql`（避开与 camp 的版本倒挂）
+  - `maxTokens` 8192 → 16384 + 按 24 条分批；`aiTimeoutSeconds` 180（整轮）→ 120（每批）
+- **事故：迁移版本倒挂，线上服务挂了约 20 分钟**
+  - 现象：部署后 `health=000`、5 次重启循环，日志 `Validate failed: Migrations have failed validation`
+  - 根因：本项的迁移时间戳（`…134700`）比另一会话的 camp 迁移（`…135406`）**早**，但 camp 先部署，
+    我的成了"更早但未应用"。`application-test.yml` 开了 `out-of-order: true`，生产刻意没开——**所以本地永远绿**
+  - 修复过程中又踩两次：① `mvn package` 不 clean 时旧迁移残留在 `target/classes`，jar 里打两个版本；
+    ② 从工作树构建缺对方会话的文件 → `applied migration not resolved locally`
+  - 最终从主树 `mvn clean package`，用 `unzip -l` 确认 jar 里只有两个正确迁移才部署成功
+  - 已把这条与处理步骤写进 `.agent/rules/always.md`
+- **满批 AI 调用两层缺陷（都是线上才暴露）**：
+  1. 60 条一次性调用，8192 maxTokens 被思考吃满 → 上游静默返回空 → 60 条全降级。
+     5 条 / 12 条都够用，**问题只在满批**
+  2. 改分批后，超时按"整轮 180 秒"算，第 1 批用完预算 → 第 2、3 批 `InterruptedException`。
+     改为按批 120 秒
+- 线上结果（16:52 那轮）：
+  ```
+  速递完成：候选 159 条，已存在 0 条，入库 60 条（其中降级 0 条），失败源 0 个
+  ```
+  分组 news 18 / community 18 / github 15 / hackernews 9，**0 条降级**；
+  `ai_runs`：`kind=digest userId=0 status=ok input=7493 output=7523`
+  线上 `GET /api/v1/digest` 返回 60 条四组齐全；学习者端 e2e 打线上 4 passed / 1 skipped
+- **仍未做**：周报没在生产触发（`initialDelay=10min`，本轮窗口没等到；提示词已在本机真连验证）；
+  管理端删除的 e2e 未跑
+- 本地提交：`7bdd748`（及合并前的 5 笔）
+- 远端推送：**已完成**（`2309acb..7bdd748`）
+
+## 2026-10-21 · WORK-030 阶段 B 部署上线（首次失败，已修复）
+- 类型：implementation
+- 变更：部署 jar（含新迁移 V20261021181500 建 ai_run_payloads）+ 重建前端
+- 决策：生产库 flyway_schema_history 里把 20261021134700 的版本号对齐为 20261021161000
+- 依据：用户「给我推送部署一下吧」
+- 验证：health 200、学习者端与管理端各 200、线上 e2e 21 条全过
+  （users 3 + admin 6 + ai-runs + layout.mobile 12）；新表 9 列已建；
+  真实调 /api/v1/account/admin/users 返回 2 个账号、九列齐全、无 password_hash
+- 本地提交：ed35cc6
+- 远端推送：已推送 origin/master
+**事故经过**：部署后服务起不来，health 000，整站不可用约 3 分钟。
+根因是 Flyway 校验失败：「Detected applied migration not resolved locally: 20261021134700」——
+另一个会话把 digest 迁移从 V20261021134700 改名成 V20261021161000，但那次改名从未部署，
+生产库里登记的仍是旧版本号。
+**为什么可以安全地改版本号**：两个文件的校验和完全一致（2043838451），
+只是文件名变了、SQL 内容一个字节没动。所以 UPDATE flyway_schema_history 只对齐元数据，
+不碰任何表结构。**如果校验和不同就不能这么做**——那意味着内容真的变了，
+必须走 repair 或新增迁移。
+**教训**：release.ps1 的健康检查只等 60 秒，而这次失败是**启动即崩**
+（Flyway 校验在建表前就抛），不是慢。60 秒等待掩盖了"服务根本没起来"这件事——
+日志里 status=exited code=1 与 systemd 反复重启才是判据。以后部署失败要先看
+systemctl is-active 与 journalctl 尾部，不要只看超时。
+
+## 2026-10-21 · WORK-032 TASK-001~004 实施（判题口径 + SQL 执行能力）
+- 类型：implementation
+- 变更：
+  - TASK-001：`backend/paideia-sandbox/images/mysql/{Dockerfile,build.sh}`，构建期 `--initialize-insecure`，
+    datadir 180MB 打进镜像并 `chmod -R a-w`；镜像 digest `sha256:e2eafb6e…` 写进 `application.yml`
+  - TASK-002：`SandboxProperties` 加 sqlImage/sqlMemory/sqlCpus/sqlPidsLimit/sqlTimeoutMs/sqlDailyLimit
+    与按语言取值的方法；`languages()` 改为**按镜像是否配置过筛**（空值 = 该语言不出现）
+  - `DockerCommand.SQL_SCRIPT`：拷 datadir 到 tmpfs + chmod u+w、建库 practice、灌数据集、
+    `mysql practice --xml` 执行用户 SQL
+  - TASK-003：`SqlResultCodec`（XML 解析，xsi:nil → NULL 标记）+ `CodeRun.Table` + `Status.OVER_LIMIT`
+  - TASK-004：`tests/sql-judge/corpus.json`（24 条）+ TS `sql-judge.ts` + Python `sql_judge.py`
+    + `check_sql_judge_parity.py` 两侧对照
+- 决策：
+  - **SQL 输出用 `--xml` 而不是 `--batch --raw`**。原设计是插标记查询切结果集，实测证明不可行：
+    标记行是"单列表头 m + 一行标记值"，与真实数据行无法区分，`--raw` 又不能转义。
+    两条测试当场抓到切错。`--xml` 自带 `<resultset>` 边界、`xsi:nil`、DECIMAL 尾零
+  - **删掉 `SqlStatementSplitter` 与标记注入**：XML 给了边界就不需要自己切语句，
+    少一个只处理教学 SQL 的分词器（它的 shortcut 是"不认存储过程"）
+- 验证：
+  - `mvn -B -pl paideia-sandbox test` → 17 通过（DockerCommandTest 10 / SqlResultCodecTest 7）
+  - `python scripts/sql_judge.py --self-check` → 24 条 0 失败
+  - `python scripts/check_sql_judge_parity.py` → 两侧 24 条 0 不一致
+  - `vitest sql-judge.test.ts` → 39 passed
+  - **反向验证**：改坏 Python 的尾零归一 → 6 条红；改坏 TS 的负号归一 → 3 条红。
+    第一次改负号时**没有红**，因为语料缺负数用例——补了两条负整数用例后才红
+  - **服务器真跑**：镜像启动到可查询 3267 ms；容器内灌数据集 + 两条语句 → 两个结果集正确切开；
+    `BEGIN; UPDATE 999; SELECT; ROLLBACK; SELECT` → 999.00 变回 100.00（事务语义真实生效）
+- 实施中踩到并修掉的三个真缺陷：
+  1. 镜像里 datadir 是 `a-w`，`cp -a` 保留只读权限 → mysqld 报 `ibdata1 must be writable`
+  2. `secure_file_priv` 指向不存在的路径 → mysqld 直接 Aborting（所以脚本里先 mkdir）
+  3. 未建库/未指定库 → `ERROR 1046 No database selected`（脚本里 `CREATE DATABASE practice` + `--database`）
+- 本地提交：见下一笔
+- 远端推送：未执行
+
+## 2026-10-21 · WORK-032 TASK-005/007 题目质量门禁与先行 3 题
+- 类型：implementation
+- 变更：
+  - `scripts/sql_cases.py`：题目门禁。四条断言 —— reference 能跑、alternatives 全部与它相同、
+    antiPatterns 至少在一处不同、至少 2 个数据集；外加 goal/trap 非空且 trap 必须能在本课
+    「常见误区」里找到（防超纲）
+  - `content/courses/mysql/datasets/`：`orders-public`（3 客户/3 单/4 明细）与 `orders-hidden-a`
+    （4 客户/4 单/6 明细，含非整除小数与不同行数）
+  - `content/courses/mysql/cases/pilot.json`：3 道先行题（01 填空、03 排序写查询、05 LEFT JOIN 修错）
+  - `--write-hashes` 回写 `expectHash`；默认只校验不写盘
+- 决策：
+  - 期望结果**由参考解真跑得出**，不手写。手写必然与数据集脱节且无人发现
+  - trap 比对时去掉反引号与空白：要求作者在两处敲出一样的反引号只会制造无意义报错
+- 验证（全部真跑）：
+  - `python scripts/sql_cases.py --check` → 3 道通过；`--write-hashes` 回写后二次运行仍通过（幂等）
+  - **反向验证四条**（每条都是故意注入坏数据，确认门禁真的会红）：
+    ① antiPattern 换成 reference 本身 → 报"没有区分度，任何写法都能过"
+    ② alternatives 换成错写法 → 报"判题口径太窄，会误杀正确写法"（两个数据集各一条）
+    ③ 硬编码 `487.50` 当等价写法 → 被隐藏集判不同
+    ④ 只留一个数据集 → 报"否则硬编码答案也能过"
+- 已知缺口：
+  - 没有数据库凭据时门禁**跳过执行校验并明确打印"未验证"**，不当作通过
+  - 自动断言挡得住"坏题"，挡不住"平庸的题"——TASK-008 之后仍需一次人工题目评审
+- 本地提交：见下一笔
+- 远端推送：未执行
+
+## 2026-10-21 · WORK-032 TASK-006 能力探测与分档配额接线
+- 类型：implementation
+- 变更：
+  - `SqlDatasets`：数据集白名单，内容放 `paideia-sandbox/src/main/resources/sandbox/datasets/`。
+    **客户端只传 key，不传数据**——否则隐藏数据集必然随题面下发，"硬编码答案"就防不住
+  - `SandboxController`：`/status` 返回 `sqlDailyLimit` / `sqlUsedToday` / `datasets`（分开给，
+    不合成一个"剩余次数"）；`/run` 对 sql 用数据集 key 解析 stdin、未知 key 400；
+    配额改调 `requireQuota(userId, language)`
+  - `RunView` 加 `tables`（`statementIndex` + 列名 + 行值），`RunRequest` 加 `dataset`
+- 验证：
+  - `mvn -pl paideia-sandbox test` → 17 通过
+  - `mvn -pl paideia-app -Dtest=SandboxIntegrationTest test` → **8 通过**
+    （含新增断言：`sqlDailyLimit=20`、`datasets` 含两个 key）
+  - 首次跑集成测试时报 `PathNotFound: sqlDailyLimit`——原因是 `paideia-app` 从 ~/.m2 取
+    **旧的 sandbox jar**，不是代码错误。`mvn -pl paideia-sandbox install` 后通过
+- 本地提交：见下一笔
+- 远端推送：未执行
+
+## 2026-10-21 · WORK-032 TASK-010（部分）SQL 题型渲染与前端契约
+- 类型：implementation
+- 变更：
+  - `schema.ts`：新增 `SqlChallenge`（`sql-write` / `sql-fix`），解析 `starter` / `dataset` /
+    `normalize` / `expectHash`；类型只允许 string/int/decimal/datetime——**float 被明确拒绝**
+  - `sql-judge.ts`：修 `noUncheckedIndexedAccess` 下的索引类型（补 `typeOf()`，去掉悬空引用）
+  - `context.tsx`：`RunOutput.tables`、`SandboxPort.run` 的 `dataset` 参数
+  - `sql-challenge.tsx`：编辑器 + 运行 + 多结果集表格 + 逐数据集判定；期望值比 **SHA-256 规范串**，
+    题面不含答案
+  - `code-challenge.tsx`：接入两种新题型
+- 验证：
+  - `tsc --noEmit`（ui 包）→ 无错误
+  - `vitest src/markdown/renderers/` → **96 passed / 4 files**
+  - `vitest` 全量 → 191 passed / **2 failed**，两条都是既有失败、与本次无关：
+    ① `AdminUsersPage.tsx` 出现 `bg-black/40`（WORK-030 的改动）
+    ② `packages/camp/src` 未在 `globals.css` 的 `@source` 登记（camp 包的改动）
+    已核对：这两个文件都不在本次改动里
+- 本地提交：见下一笔
+- 远端推送：未执行
+
+## 2026-10-21 · WORK-032 TASK-008 十二关题目与课时接入
+- 类型：content
+- 变更：
+  - `cases/lessons.json`：新增 9 道题，12 关各 1 道（01 填空 + 11 道可执行）
+  - 每题都带 `goal`（考什么认知）与 `trap`（对应本课哪条误区），门禁强制核对
+  - 题目插入各课正文的「## 动手」节；**题面只带 expectHash，不带 reference/alternatives/antiPatterns**
+  - 数据集加 `customers.note` 可空列：公开集 3 行分别是 `'VIP'` / `''` / `NULL`。
+    **原数据集里根本没有 NULL，第 02 课讲 NULL 却考不出区别**——这条是被门禁逼出来的
+  - 删掉各课原有的「找 bug」动手题（每关 1 道精做题的裁决），并把「## 动手」移回
+    「## 检查一下」之前（课程固定七节顺序）
+- 决策：
+  - 门禁遇到反模式报错时**不崩**，把"跑不通"也算作"与参考解不同"——`SELECT city FROM orders`
+    这种写法根本执行不了，正是那题要抓的东西
+- 验证：
+  - `python scripts/verify_course.py --dir content/courses` → 50 个文件含代码执行全通过
+  - `python scripts/sql_cases.py --check` → 12 道题通过
+  - `python scripts/check_sql_judge_parity.py` → 24 条两侧无差异
+  - 题面与源文件 `expectHash` 逐题比对一致，且**无一处泄漏 reference/antiPatterns**
+- 门禁抓出的三个真实题目设计问题（都已修）：
+  1. 第 02 课的反模式 `= NULL` 与参考解结果相同 → 说明数据集里没有 NULL，题目无区分度
+  2. 第 10 课的 alternatives 按订单粒度分组，与按客户汇总的参考解**本来就不是同一个查询**
+     （我写错了，不是判题口径问题）
+  3. 第 12 课的 alternatives 用标量子查询会把无订单客户带成 NULL 行，与 INNER JOIN 语义不同
+- 本地提交：见下一笔
+- 远端推送：未执行
+
+## 2026-10-21 · WORK-032 部署上线与线上真验
+- 类型：deployment
+- 变更：
+  - 线上 `/opt/paideia-app/application.yml` 新增 `sql-image` / `sql-memory` / `sql-cpus` /
+    `sql-pids-limit` / `sql-timeout-ms` / `sql-daily-limit`（备份为 `application.yml.bak-wp032`）
+  - 服务器已构建 `paideia-sandbox-mysql:8.0@sha256:e2eafb6e…`（datadir 构建期初始化）
+  - 部署 3 次：首次（全量）、`--SkipWeb`（只读根修复）、全量（哈希修复）
+- **线上真验（每条都是实测，不是推断）**：
+  - `/api/v1/sandbox/status` → `languages` 含 `sql`、`sqlDailyLimit=20`、`datasets` 两个 key
+  - 跑一条 SQL：**2.8 秒**返回，`NULL` 与空串正确区分（`ann=VIP` / `bob=""` / `cid=NULL`）
+  - 多语句事务：`BEGIN` 内读到 `1.00`，`ROLLBACK` 后回到 `199.00` —— 事务语义真实生效（AC-016）
+  - 判题闭环：参考解两数据集"一致"、等价写法也"一致"、两个反模式都"不同"
+  - 关卡内做题（第 02 关）：正确 SQL → 两个数据集都"通过"并上报进度；
+    反模式 `= NULL` → 两个数据集都"结果与期望不一致"
+  - e2e（打线上）：`sql-practice` + `learn` + `knowledge` → **16 passed / 1 skipped**
+- **部署后才暴露的两个真缺陷（都已修 + 加回归测试）**：
+  1. **SQL 容器在只读根下静默卡死**：mysqld 默认往 `/var/run/mysqld` 写 pid 与 mysqlx socket，
+     `--read-only` 下写不了时它**不报错也不退出**，只是初始化完 InnoDB 就挂住。线上表现是
+     "每次 20 秒超时"，日志只有两行。修法：`--pid-file` / `--log-error` 指到 tmpfs + `--mysqlx=0`。
+     **之前的本地测试全没暴露它，因为那些测试都没加 `--read-only`**
+  2. **`crypto.subtle` 在 http 下不可用**：本项目明确不配 HTTPS，而 `crypto.subtle` 只在安全上下文
+     存在，判题直接抛 `Cannot read properties of undefined (reading 'digest')`。
+     本地测不出来——dev server 跑在 localhost 上，那是安全上下文。
+     修法：换成纯 TS 的 SHA-256，并用 Node `createHash` 逐条对照（13 个样本含多字节与边界长度）
+- 另修：e2e 的 AC-011 从"查进度条数"改为**监视写请求**——纯 Bearer 应用下测试进程拿不到访问令牌，
+  两种取令牌的路都实测 401
+- 本地提交：master 上 5 笔（含两次 merge）
+- 远端推送：**未执行**（需用户授权）
+
+## 2026-10-21 · e2e 改为文件级选择性运行（实测省 65–92%）
+- 类型：maintenance
+- 变更：
+  - `AGENTS.md`：e2e 规矩从「按端跑」细化为「先选文件，不要默认全量」，附 13 个 spec 与页面的对应关系
+  - `dev-workflow.md`：加一张选择性跑法的实测成本表
+- 依据：用户「为什么修改后要跑全部的呢，既然说没办法优化时间了，那不能说选择性的跑吗」——这个问题指出我漏了 Playwright 原生的选择能力（`--grep` / 文件 / `--last-failed` / `--shard`），一直默认跑 `test:e2e`
+- 实测（2026-10-21，全部打线上）：
+  | 跑法 | 实测 |
+  | --- | --- |
+  | 全量 61 条 | **2 分 36 秒** |
+  | 单文件 2 条（`identity.spec.ts`） | **27 秒** |
+  | 单文件 6 条（`notes.spec.ts`） | **54 秒** |
+  | `--grep "八股文"` 1 条 | **13 秒** |
+- 归因：**固定启动约 20 秒，单条边际约 2.4 秒**。所以"全量慢"的本质是 61 条叠加，而不是某处浪费；
+  这也解释了为什么"优化单条"无效、而"少跑几条"立刻见效（省 65–92%）
+- 建立对应关系（改哪里跑哪个）：`HomePage`→`home`、知识库→`knowledge`、笔记→`notes`、图谱→`graph`、
+  助手→`assistant`、markdown 渲染→`markdown-render`、简历→`resume`、身份/导航→`identity`、
+  MCP→`mcp-tokens`、源码解读→`source-reading`、移动端布局→`layout.mobile`、课程关卡→`learn`、PWA→`pwa`
+- 全量保留在两种场合：改了共享包（`@paideia/ui`/`core`/`auth`/`knowledge`）、发版前
+- 验证：三种跑法都实跑过（27s / 54s / 13s），结果与用例数一致
+- 本地提交：见下一笔
+- 远端推送：未推送
+
+## 2026-10-21 · 修掉长期红的 ApiWalkthroughTest（真因是正则匹配，不是端点欠账）+ 五项未验证功能线上复核
+- 类型：verification
+- 变更：
+  - `ApiSurfaceTest` 新增 `matches()`（Spring `AntPathMatcher`）与 `bySpecificity()`（`{` 与 `*` 都计入通配数），`ApiWalkthroughTest` 的 `canonicalPath` / `noteTouched` 两处改用它
+  - 自查补上四个此前没走到的端点：`POST /knowledge/admin/tracks`、`GET /learn/tracks`、`GET /learn/tracks/{slug}`、`POST /ops/grafana/**`
+  - `api-shape.json` 随之更新（新增 4 个端点；`knowledge/categories` 变两级嵌套；`entries/{id}` 多 `sourceUrl`）
+  - 中断分支补 `printStackTrace()`
+  - 新增单测 `patternMatchingHandlesWildcardsAndSpecificity`（3 条断言）
+- 决策：
+  - **真因不是"40+ 端点覆盖欠账"**。WORK-028 引入的 `/api/v1/ops/grafana/**` 被当成正则喂给 `bare.matches()`，`**` 抛 `PatternSyntaxException` → 第一个请求就中断 → 111 条端点全被记成"没打到"。之前两次判断成欠账都错了
+  - **为什么长期被掩盖**：`assertFullCoverage()` 排在 `assertFailures()` 之前，覆盖率断言先红，真实异常（记录在 `steps` 里）根本没机会被看到
+  - 用 Spring 自带的 `AntPathMatcher` 而不是继续手写正则：`{id}` 与 `**` 都是它原生写法，零新依赖
+- 验证：
+  - `ApiSurfaceTest` **7 运行 / 0 失败**、`ApiWalkthroughTest` **1 运行 / 0 失败**（同一独占库连跑两遍，快照不抖）
+  - **反向验证两条**：把 `matches` 退回 `path.matches(pattern)` → `PatternSyntaxException` 当场红；把具体度退回只数 `{` → `/a/{b}` 断言红。恢复后全绿
+  - 后端全量（`scripts/test-db.sh mvn -B test`）：**227 运行 / 0 失败 / 4 跳过，BUILD SUCCESS**——持续多日的唯一红消失
+- 线上复核（`http://36.212.5.130:8081`，账号走被忽略的 `application-local.yml`）：
+  | 项 | 结果 |
+  | --- | --- |
+  | WORK-011 会话与历史 | `GET /ai/conversations` → 17 条；任一会话 `GET /messages` → 200、2 条消息 |
+  | WORK-013 记忆 | 列表 0 条 → 写入 → 列表 1 条（来源/理由/时间都对）→ 按 `text/1` 删除 → 列表回 0 |
+  | WORK-013 三个开关 | `PUT /ai/settings` 关掉总闸后 `POST /ai/memories` 返回 **409 / 40910**「个性化记忆已关闭」，第二道闸生效；已恢复为原值（全开） |
+  | WORK-020 学习线 | `GET /learning/lines` → 4 条（Python 13 / Java 28 / 源码解读 1 / 计算机网络 2） |
+  | WORK-021 知识图谱 | `GET /learning/graph` → 14 个概念、5 个已触碰、0 已掌握 |
+  | WORK-024 学习轨道 | `GET /learn/tracks` → 4 条（Java 24 关） |
+  | WORK-026 Laya | 服务 `layaUp=1`（运维摘要），**但应用层 `paideia.ai.decision.enabled=false`** |
+  | WORK-025 八股文 | 首页入口 e2e 通过；`essay` 开关=开 |
+  | 学习者端 e2e 打线上 | **64 passed / 0 failed / 21 skipped** |
+  | 管理端 e2e 打线上 | **22 passed / 0 failed** |
+- 实测发现（如实登记，未擅改线上配置）：
+  - **WORK-026 在线上是"装了但没接"**：`laya` 服务 active、`/health` ok，但 `paideia.ai.decision.enabled=false`，所以 `TechEssayFilter` 永远走规则判断、一次也不调 Laya。design 写的是"部署时显式打开"，线上没打开。**关掉时功能可降级，不是故障**，但 WORK-026 的收益目前为零
+  - `services` 组报 WARN：`laya 85%` 且其余四个服务均未设内存上限——不是崩溃，是容量信号
+  - `WORK-027` 的 `GET /api/v1/digest` 在线上返回 404（未实现，与"本项一行代码没写"一致）
+  - 记忆写入用中文会返回 `400 请求体无法解析`，**是 Windows shell 传参编码问题不是产品缺陷**：同样的中文经界面（e2e 覆盖）正常，纯 ASCII 直连 curl 正常
+- 顺手发现的流程缺口（未处理）：
+  - **WORK-024 没有工件目录**：代码（V22/V23、`LearnTrackController`、关卡地图）已上线且有更新历史，但 `.agent/changes/` 下从来没有 `WORK-024-*`。原因是当时状态脚本报 `WORK-024` 而工作区已被占用，本项取了 025；后来学习轨道那一路直接用 024 落了代码却没补工件
+  - 该次提交（`0a4171e`）是并发会话在我做反向验证的**中途**提交了工作区——里面 `bySpecificity` 停在"只数 `{`"的临时状态，而 `/a/{b}` 断言已在，等于 HEAD 上必红。已用 `e47196e` 补回
+- 本地提交：`e47196e`
+- 远端推送：未推送
+
+## 2026-10-21 · 内容 · 计算机网络线补齐 7 篇 + 新开 MySQL 从零开始
+- 类型：content
+- 变更：
+  - `content/reading/network/` 新增 02–08 七篇（四层模型、域名解析、三次握手、关闭与 TIME_WAIT、
+    HTTP 报文、连接复用与 QUIC、抓包验证），总览里早就排好的 8 站清单到此全部有正文
+  - 新增 `content/courses/mysql/`：总览 + 12 课，七节结构与 Python/Java 线一致
+  - `scripts/verify_course.py` 增加 ```sql 可运行示例：在**一次性库**（`paideia_course_<pid>`）里执行，
+    用完即删，不碰 `paideia_test`；缺凭据时跳过而非报错
+  - `content/courses/java/*.md` 的 22 条 `prerequisite` 补上课号前缀（`集合与泛型` → `08 · 集合与泛型`）
+  - 三条线补 `level`（阅读线原先没有，导入时被 `levelOfChapter` 兜底成 advanced）；
+    Java 与 MySQL 总览的 `line_summary` 站数改为与实际关卡数一致
+- 决策：
+  - 计算机网络线保留"阅读线"形态（普通 markdown，不强制七节与可运行代码），
+    因为它讲的是排障路径而不是手写代码；难度用 `level` 显式声明而不是靠章节名推
+  - MySQL 示例全部真跑：课程的"可运行"承诺对 SQL 也成立，不是贴一段没验证过的语句
+- 依据：`python scripts/verify_course.py --dir content/courses` → 50 个文件含代码执行全通过
+- 验证：
+  - 内容门禁 50/50 通过（Python 13 + Java 24 + MySQL 13）
+  - 线上导入后 API 复核：`GET /learn/tracks` 五条轨道，MySQL 13 关、网络 9 关；
+    网络线关卡难度按课分配 beginner/intermediate/advanced
+  - 前置关系：MySQL 11 条、Java 27 条（修复前 Java 只有 5 条，22 个标题对不上）
+  - 打线上的 `e2e/learn.spec.ts` 6 passed
+- 已知缺口：
+  - 阅读线的 quiz 块不走课程门禁（七节结构是课程专用），只做了 JSON 合法性校验
+  - 中文正文的 ```sql 高亮依赖 shiki 的 sql 语法包，未在浏览器里目视确认
+- 本地提交：见下一笔提交
+- 远端推送：未执行
+
+## 2026-10-21 · 前端测试实测：修掉一个会静默跳过 73 条的假失败
+- 类型：fix
+- 变更：
+  - `frontend/packages/ui/vitest.config.ts` 加 `testTimeout: 60_000` 与 `hookTimeout: 60_000`
+  - `frontend/packages/ui/src/markdown/markdown.test.tsx` 的 `beforeAll` 注释改为指向配置（不重复给数字）
+  - `dev-workflow.md` 的「在线上跑 e2e」一节订正两处过期说法
+- 实测（2026-10-21）：
+  | 项 | 数字 |
+  | --- | --- |
+  | 前端单测 `pnpm -r test` | **284 条 / 33–54 秒**（旧记录「176 条 / 11.5 秒」已过期） |
+  | 学习者端 e2e 打线上 | **61 条 / 2 分 36 秒**（`workers: 1`，后端有状态所以串行） |
+  | 管理端 e2e 打线上 | 22 条（此前实测） |
+  | e2e 单条均值 | **2.30 秒**；最慢 6.1 秒（分享链接）——没有哪一条是瓶颈，是 61 条叠加 |
+- **修掉的真缺陷（flaky，最危险的形态）**：`packages/ui` 的 `markdown.test.tsx` 在
+  `pnpm -r test` 并发（5 个 vitest 进程）时会踩两个默认超时：
+  ① `beforeAll` 现场 `import('streamdown')` 超过 10 秒 hook 上限；
+  ② 语料用例 `headings-deep` 回放 1658 个增量超过 5 秒 test 上限。
+  **后果不是报一条错，而是整个文件失败后 73 条用例静默不跑**，输出看着像「81 passed / 73 skipped」那样绿着。
+  连跑 4 次复现：一次 154 全过、一次 1 条超时、一次 beforeAll 打穿导致 73 条被跳过。
+  修后**连续 4 次全部 154/154**。
+- 订正的文档错误：
+  - 「学习者端 e2e 仍走本地那条」**已过期**——实测学习者端能打线上（61 条）
+  - 新增：**三组凭据缺一不可**。`graph.spec.ts` 单独硬编码 `seed-admin` 作默认，线上没有这个账号
+    → 4 条报「管理员登录失败：夹具没法造」，补 `E2E_ADMIN_*` 后 6 条全过。**全仓只有它需要管理员身份**
+- 未做（用户选择）：e2e 并行化。`workers: 1` 的理由（后端有状态、多 worker 抢端口与数据）是对的，
+  改成并行需要每个 worker 独立数据隔离，属实质工程量。2 分 36 秒按 61 条串行叠加，不是某处浪费。
+- 依据：用户「前端是不是也要优化一下，尤其是 e2e 太慢了」
+- 验证：`pnpm -r test` 连续 4 次全绿（154/154 ui、总 284 条）；`graph.spec.ts` 补凭据后 6 passed
+- 本地提交：见下一笔
+- 远端推送：未推送
+
+## 2026-10-21 · 后端测试耗时实测与内环规矩
+- 类型：maintenance
+- 变更：
+  - `dev-workflow.md`「实测基线」整节重写：旧数据「257 条 / 1 分 31 秒」作废，新基线 **543 条 / 4 分 01 秒（热）**
+  - `AGENTS.md` 节奏段新增一条：**后端内环不要跑全量**
+- 实测（2026-10-21，四次全量对照）：
+  | 跑法 | 墙钟 | 用例 |
+  | --- | --- | --- |
+  | `mvn -B test` 冷 | 4:17 | 543 |
+  | `mvn -B test` 热 | 4:01 | 543 |
+  | `mvn -B -T 1C test` | **3:30** | 543 |
+  | `mvn -B -T 1C -pl '!paideia-app' test` | **1:12** | 148 |
+- 归因：
+  - **变慢的主因是用例数翻倍**（257 → 543），不是某处退化
+  - **`paideia-app` 一个模块占 2 分 15 秒（55%）**：227 条集成用例要起 **14 次 Spring 上下文**（累计约 79 秒）
+  - **`ModularityTest`（ArchUnit）单类 19.5 秒**
+  - 分层：纯单测约 317 条 / 约 20 秒；集成约 226 条 / 约 220 秒
+  - **Flyway 不是瓶颈**：32 个迁移 62 毫秒
+- 决策（用户选「只写规矩」）：只改文档与调用习惯，**不改任何测试代码**
+  - 内环默认 `-pl '!paideia-app'`；全量一律 `-T 1C`；只在提交/交接/改跨模块契约时跑全量
+  - 明确排除：不合并那 14 个 Spring 上下文（31 个 `@SpringBootTest` 类只产生 14 个，缓存已在工作，差异是必需装配）；不引入 mvnd；不给 ModularityTest 加跳过开关
+- 验证：按文档命令实跑 `-T 1C -pl '!paideia-app'` → **148 运行 / 0 失败 / 3 跳过 / BUILD SUCCESS**，与记录的 1 分 12 秒一致
+- 本地提交：见下一笔
+- 远端推送：未推送
+
+## 2026-10-21 · 工作树回收规矩与 D-08 迁移工具复核
+- 类型：decision
+- 变更：
+  - `AGENTS.md` 新增两条：①工作树合并后必须删（附实测占用与清理命令）；②生产迁移不得写业务数据，种子一律放 `db/devdata`
+  - `.agent/notes/dev-workflow.md` 新增两节：「工作树与磁盘」（实测 5MB / +100MB / +814MB / 近 1GB）与「迁移与种子的分工」（V24 事故全过程）
+  - 新增 `MigrationSeedOverlapTest`：生产迁移向种子表插行却不指定 id → 构建失败
+  - `always.md`：D-08 标注「2026-10-21 复核后维持 Flyway」，并补一条「生产迁移不得写业务数据」的纪律
+- 决策：
+  - **保留 Flyway，不换工具**。用户问「Flyway 太容易出问题，有没有别的方案」，核对四次踩坑后归因：V24 撞种子与 Boot 4 拆包**不是 Flyway 的责任**；夹具 900+ 的乱序与校验和才是。换 Liquibase / MyBatis Migrations / jOOQ DDL 差分都挡不住前两类，而切换要重写 25 个迁移 + 基线化，且是单向门
+  - **工作树清理定规矩**（用户选「写成明文规定」）：不是占内存是占磁盘，一棵用起来的树接近 1GB
+- 依据：用户「我们现在一个 work 就是在一个 worktree 里面做的吗，这个是规定吗…做完后会不会删掉呢，不然是不是很占内存呢」「Flyway 太容易出现这种问题了吧，有没有什么其他的方案呢，我不打算用这个了」；用户选择「先修真问题，暂不换工具」+「写成明文规定」
+- 验证：
+  - `MigrationSeedOverlapTest` 3 条通过；**反向验证**：临时造 `V999__probe_violation.sql`（往种子表插行不给 id），测试精确点名它，随后删除探针并确认 V24 未被改动
+  - 后端全量：**223 运行 / 1 失败 / 4 跳过**（新增 3 条守卫）；唯一失败仍是 `ApiWalkthroughTest` 的端点覆盖欠账，与本项无关
+  - 顺手清掉 2026-10-20 遗留的 `probe-base` 工作树（4.7MB）与已完全合并的旧工作树
+- 本地提交：`44ddb49`
+- 远端推送：未推送
+- **仍未做**：`feat/ops-monitor` 分支未删（已完全合并，等确认）；`docs/design/` 与 `output/` 两个未跟踪目录仍未决定是否入库
+
+## 2026-10-21 · 工程规范 · 切片提交不再跑后端全量，改跑两段组合
+- 类型：docs
+- 变更：
+  - `AGENTS.md` 第 28 行「提交、交接、改跨模块契约时跑全量」改为「**切片提交不跑全量**」，给出两段命令：
+    `-pl '!paideia-app'`（88 秒 / 410 条）+ 四个守卫类 `-pl paideia-app -am -Dtest=...`（46 秒 / 9 条）
+  - `.agent/notes/dev-workflow.md` 测试节奏表拆成三行（内环 / 外环=提交前 / 全量），
+    「实测基线」表按实测/未实测分开标注，「三条结论」补第 4 条（多会话撞 MySQL 连接上限）
+- 决策：**全量里真正属于"提交该管"的只有四个守卫类**（模块边界、迁移命名、迁移校验和、迁移不污染种子表），
+  它们单独跑只要 46 秒；`paideia-app` 那 257 条集成用例要 2 分 15 秒且只在改端点/契约时相关，
+  不该被每次切片提交拖着跑。全量触发条件收窄为：交接、改跨模块契约、改 schema 或迁移、发版带 `-WithTests`
+- 依据：用户：「每次提交前不应该是只跑他修改的模块吗？」并在下一轮确认「切片提交是肯定的」
+- 验证：
+  - `-pl '!paideia-app'` 实测 **88 秒 / 410 条 / 0 失败**（各模块：platform 27、web 11、persistence 4、
+    security 11、account 16、knowledge 62、note 6、ai 242、sandbox 6、mcp 25）
+  - 四个守卫类实测 **46 秒 / 9 条 / 0 失败**（`ModularityTest` 1 条 14.8 秒、三类迁移守卫 8 条）
+  - 用例总数按 surefire 报告汇总为 **667**（`paideia-app` 257）
+- 更正：文档里 `mvn -pl paideia-ai test` 的用例数原写 **148**，实际 `paideia-ai` 是 **242**——
+  148 是"非 app 全模块"的旧数被抄错了行
+- 踩坑（本轮实测，已写进 notes 第 4 条）：**两个会话同时跑后端测试会撞 MySQL 连接上限**
+  （`max_connections=151`，实测 `Max_used_connections` 已 152）。撞上时 `paideia-app` 一批集成类
+  集体报 `Too many connections`，看起来像十几个测试同时坏了，实际零产品缺陷。
+  另一轮 232 条全错的原因则是**别的会话正在主树里改迁移**（`V20261021134700` 改名 `V20261021161000`
+  并跑 `-Dmigration.checksums.update=true`），Flyway 报 failed migration、上下文起不来。
+  `test-db.sh` 只隔离库名，**不隔离连接数、也不隔离工作树里正在改的迁移**
+- 未完成：全量在用例涨到 667 后**没有在干净树上重测**，文档里 3:30 已标注为"543 条时的实测"
+- 本地提交：待用户授权
+- 远端推送：未执行
+
+## 2026-10-21 · 建项 WORK-032 · MySQL 实训沙箱与题库（draft）
+- 类型：decision
+- 变更：新建 `.agent/changes/WORK-032-MySQL实训沙箱与题库/`，四件工件全部起草（requirements / proposal / design / tasks），
+  均 `status: draft`；`project-lifecycle approve` 由用户执行，模型未代签
+- 决策依据：
+  - 用户要求「新开一个」，且明确「题目设计很重要」——因此 `mode: strict`、`workflow: full`，
+    排序原则是"题目可信度优先于题量"
+  - 不改 WORK-015 的范围：它是已实施的代码执行沙箱，本项扩展其语言与结果契约
+- 实测基线（服务器真跑，写进 design.md）：
+  - `mysqld --initialize` **17.89 秒**、datadir **180MB** ⇒ 必须预初始化，不能每次初始化
+  - 预初始化后启动到可 ping **4.36 / 4.45 / 4.61 / 4.71 秒**（4 次）
+  - 常驻内存 **348MB**（512m 上限下），500 行负载后几乎不变
+  - `secure_file_priv` 指向**不存在**的目录会让 mysqld **直接 Aborting**（第一次测试就踩到）
+  - 复用同一 datadir 起两次，第二次 `CREATE DATABASE` 报 **1007 已存在** ⇒ 每次运行必须拷干净副本
+  - `max_execution_time=300` 时 0.56 秒报 3024；**设为 0 时九表笛卡尔积跑了 259.5 秒** ⇒ 必须有容器级硬杀
+- 验证：`project-lifecycle validate` 对 WORK-032 报"需求尚未形成，但已经存在下游工件"——
+  这是生命周期对"需求未批准先有下游"的纪律，**批准后自动消失**；其余为既有项告警
+- 本地提交：未提交（待用户确认需求）
+- 远端推送：未执行
+
+## 2026-10-21 · 移除 figcraft MCP（用户否决）
+- 类型：tooling
+- 变更：`~/.zcode/cli/config.json` 的 `mcp.servers.figcraft` 整条移除，剩余 8 个（codegraph/context7/drawio/bep-mcp-prod/firecrawl/paideia/github/deepseek-search）
+- 决策：用户「算了，删掉这个mcp吧，你弄的太丑了」——判定这份自动生成的界面稿质量不达标，工具链撤回
+- 依据：同上的用户原话
+- 验证：`json.load` 解析通过，`figcraft` 不在 `mcp.servers` 中
+- 保留：`docs/design/paideia-live-2026-10-21.figcraft` 与 `output/fc/` 脚本未删除（均未被 Git 跟踪），是否清理由用户决定
+- 本地提交：未提交
+- 远端推送：未推送
+
+## 2026-10-21 · 线上界面导入 FigCraft 可编辑稿 + 恢复 figcraft MCP
+- 类型：tooling
+- 变更：
+  - 装 FigCraft 0.8.0（Windows x64 便携版）到 `C:\Users\Lenovo\AppData\Local\FigCraft\app`，含 `figcraft.exe`（桌面）与 `figcraft-cli.exe`（含 `mcp` 子命令），桌面建了快捷方式
+  - `~/.zcode/cli/config.json` 的 `mcp.servers` 重新加回 `figcraft`（stdio，工作区限定在 `F:/Paideia`），原配置备份为 `config.json.bak-figcraft-*`
+  - 新增 `docs/design/paideia-live-2026-10-21.figcraft`：14 页（1 索引 + 13 个线上页面）、1557 节点，全部是真图层
+  - 流水线脚本放 `output/fc/`（未入库）：`capture*.mjs` 抓线上 DOM、`absolutize.py` + `build-icons.py` 转矢量图标、`build_figcraft.py` 合成
+- 决策：
+  - **不用截图位图**：每个元素落成 FRAME / TEXT / VECTOR，文字可改、框可挪；只有 1 张裁图（无法矢量化的一处）
+  - **图标走真矢量**：SVG path 先归一成绝对坐标，再由 `figcraft-cli` 转成它自己的 `network`。LC 的自带解析器读不了相对命令与 arc 紧凑写法，直接喂原始 path 会画出半截箭头
+  - FigCraft 只是查看/编辑工具，**不改变「界面改动直接实现」这条既有约定**（2026-10-20 撤销过「先原型再设计」）
+- 依据：用户「figcraft有一个mcp 和cli之类的你给我看看，给我下载上，然后把当前线上的最新的设计图给我导入到这个里面，可编辑的那种哦」
+- 验证：
+  - `figcraft-cli info` 读回 14 页 / 1557 节点 / `repairs` 为空
+  - `node.set` 改文字、字号、颜色后 `file.save` 回写成功（`editcheck.figcraft`）
+  - 逐页 `render` 与线上截图比对：首页、知识库分类、知识库条目、简历、身份与目标、我的自评、学习地图、管理端总览/条目/分类/积分 均一致
+  - MCP 握手通过：`initialize` 返回 `FigCraft 0.8.0`，`tools/list` 给出 19 个工具
+- 已知限制：Tailwind 的 `box-shadow`、`backdrop-filter`、CSS 灰阶以外的渐变角度未完整还原；响应式断点只抓了 1440 宽
+- 本地提交：未提交（`docs/design/` 与 `output/` 均未被 Git 跟踪，是否入库待定）
+- 远端推送：未推送
+
+## 2026-10-21 · 补八股文专区入口（WORK-025 AC-004 缺口）并批准 WORK-027 需求
+- 类型：implementation
+- 变更：
+  - `HomePage`：快捷卡之后新增「八股文专区」卡片，指向 `/knowledge/categories/{id}`
+  - **按 slug 找分类，不写死 id**：生产库是 20，全新测试库是 900（V949 为避开种子冲突挪过）
+  - `home.spec.ts` 新增一条 e2e：从首页卡片点进去，断言落到该分类页
+- 决策：
+  - **先补 025 入口再开工 WORK-027**（用户裁决）。proposal 的 D-08 本来就把它设成开工前提，核实后发现该前提不成立：学习者端 `NAV` 里没有八股文，`home.spec.ts` 也从未点过这条路
+  - **GitHub token 沿用现有 `gh` token**（用户裁决，维持 D-16）。已提醒该 token 带 `repo` 写权限、只为读热榜权限给大了，用户选择沿用
+- 核实到的事实（修正 proposal 的两处说法）：
+  - 「点不进去」**不准确**：分类树里 `八股文 · 面经真题` 是顶级分类，知识库卡片里本来就点得进去。真正缺的是**首页/导航入口**——学习者得先想到去知识库找
+  - 「定时任务未在生产启用」**已过期**：线上 `paideia.ai.essay.enabled=true`，已产出 5 条
+  - 但点进去显示「共 0 条」：5 条全是 `draft`（`publish-directly: false` 是设计如此），需管理端过目后发布。管理端条目页能改 status，路径是通的
+- 验证：
+  - `pnpm --filter @paideia/app typecheck` 通过；`build` 通过
+  - e2e 打线上：`home.spec.ts` **8 passed**（含新增那条）
+  - 浏览器实测：卡片文案「八股文专区 / 每天从面经里抽题，AI 逐题解析，面试前刷一遍。」→ 点击 → `#/knowledge/categories/20`
+- 本地提交：`a512ee1`、`5a6f322`
+- 远端推送：未推送（WORK-027 批准记录 + 本次改动）
+- **仍未做**：5 条草稿未发布（等你过目）；WORK-027 proposal/design/tasks 仍是 draft，等签署
+
+## 2026-10-21 · 迁移版本号改时间戳（多会话撞号）
+- 类型：decision
+- 变更：
+  - 新增 `MigrationVersionFormatTest`：新迁移必须是 `V<14位时间戳>__描述.sql`；历史 `V1..V24` 白名单冻结；同秒重复也挡
+  - `AGENTS.md` / `always.md` / `dev-workflow.md` 记下规则、实测数据与它治不了的两类情形
+  - `always.md` 的 D-08 二次复核结论：**维持 Flyway**
+- 决策（用户选「时间戳 + 守卫」）：
+  - **不换工具**。用户提出"多 agent 并行时版本号必然重复，Flyway 太容易出问题，能不能换"。用项目自己的 **Flyway 13.10 在独占探针库上做了四个实测**：
+    | 场景 | 结果 |
+    | --- | --- |
+    | 两分支都写 `V25` | `Found more than one migration with version 25`，**应用整体起不来** |
+    | 时间戳 `V20261021103045` 接在 `V24` 后 | 正常应用、幂等、可继续追加 |
+    | 已用时间戳后又有人写 `V25`（生产配置） | `Validate failed: Detected resolved migration not applied: 25` |
+    | 两个文件同一秒 | 与第一条同样的 `Found more than one migration` |
+  - 结论：**时间戳治「必然撞」（A），不治「同一秒」（D）**；Liquibase / MyBatis Migrations 同样要唯一起名与校验和，等于换个名字的同一问题；**jOOQ DDL 差分是唯一真正消灭命名空间争抢的方案**，但代价是引依赖 + 学习成本 + MySQL DDL 解析边界，用户选择不付这个代价
+  - **明确记录它治不了什么**：两个会话改同一张表的不同列、版本号不冲突的语义冲突，任何迁移工具都查不出来，只能合并前协调（`git log --all --oneline -- <迁移目录>`）
+- 验证：
+  - `MigrationVersionFormatTest` 3 条通过
+  - **反向验证**：造 `V25__probe_numeric.sql` 与两个 `V20261021120000__probe_*.sql`，守卫分别精确点名；随后删除探针
+  - 后端全量（`mvn clean test`）：**226 运行 / 1 失败 / 4 跳过**（新增 3 条守卫）；唯一失败仍是 `ApiWalkthroughTest` 的端点覆盖欠账
+- **过程中我自己踩了记录在案的老坑**：删掉探针 SQL 后没清 `target/classes`，Flyway 仍扫到它们 → 201 个错误。`always.md` 早有这条（"删掉资源文件后必须 `mvn clean`"），这次由我本人复现了一遍
+- 本地提交：`e4cd5bd`
+- 远端推送：未推送
+
 ## 2026-10-22 14:26:48 +08:00 · WORK-027 验收证据收口（validate 转绿）
 - 类型：docs
 - 变更：
@@ -5466,6 +5312,63 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
   - 线上真验：部署后启动补跑入库 60 条（`edition_date=2026-10-22`），四组齐全
     （news 24 / github 2 / community 24 / hackernews 10）
   - e2e：学习者端 **82 passed / 0 failed**，管理端 **25 passed / 0 failed**（都打线上）
+- 本地提交：见下一笔
+- 远端推送：未执行
+
+## 2026-10-22 · WORK-032 TASK-010 收尾 + 两处遗留红测
+- 类型：implementation
+- 变更：
+  - TASK-010 的验收落到渲染层：`blocks.test.tsx` 新增三条 SQL 题用例（通过写 1 分 /
+    不一致写 0 分 / 沙箱不可用不渲染按钮），注入假 sandbox，不依赖真沙箱。
+    哈希用 `canonicalSha256` 现算而不是写死常量——格式变了该红的是语料那条。
+  - `tokens.test.ts` 红：`AdminUsersPage.tsx` 的弹窗底色 `bg-black/40` 改成已有的
+    `bg-overlay` 令牌（`AdminShell` 与 `ui/dialog.tsx` 都在用它）。WORK-030 遗留。
+  - `source-coverage.test.ts` 红：`globals.css` 补 `@source '../../../../packages/camp/src'`。
+    WORK-029 遗留，**是静默缺陷**——camp 包独有的 Tailwind 类名一直没生成。
+- 验证：
+  - `vitest run`（ui 包全量）→ **209 passed / 12 files**，无失败
+  - `blocks.test.tsx` 单跑 → 30 passed（原 27 + 新增 3）
+  - `tokens.test.ts` + `source-coverage.test.ts` 单跑 → 3 passed
+- 未做：TASK-010 的 e2e 级验收（关卡正文要真沙箱才有结果集），已在 tasks.md 写明
+- 本地提交：见下一笔
+- 远端推送：未执行
+
+## 2026-10-22 · WORK-032 验证报告入库（status: partial）
+- 类型：verification
+- 变更：
+  - 新增 `testing/report.md`：16 条 AC 逐条映射到命令/退出码/结果/证据五列。
+    **14 条有实测证据，2 条只有结构保证**（AC-002 跨次隔离、AC-007 硬编码判错），
+    故 status 写 `partial` 而非 `passed`。
+  - 补跑并记录真实数字：后端内环 **261 / 0 失败 / 13 跳过**（61 秒）、模块边界与迁移
+    **9 / 0**（27 秒）、`SandboxIntegrationTest` **9 / 0**（22 秒）、ui 包 **209 passed**。
+  - 13 条跳过逐条核过，全部是「未配置真实上游凭据就跳过」的既有设计。
+  - 发现 AC-013 原本只有结构保证，**补成真断言** `sqlRunAuditsWithoutSource` 并做反向验证。
+- 决策：
+  - **AC-002 / AC-007 不补**：两条都要真跑沙箱，而本机 `docker: command not found`，
+    只能在服务器上跑。它们现在是"结构正确、断言缺失"，已在报告里登记为后续改动的前置阅读项。
+- 验证：
+  - `SandboxIntegrationTest` 反向验证：断言改成 `java` → 红（`expected: "java" but was: "sql"`），
+    恢复后 9/9 转绿
+  - `project_status.py --work WORK-032` → 结构化证据校验通过（不再报"证据不完整"）
+- 本地提交：`661e322`（AC-013 测试）+ 本笔（报告）
+- 远端推送：未执行
+
+## 2026-10-22 · WORK-032 AC-002 / AC-007 在真实沙箱上验证通过
+- 类型：verification
+- 变更：
+  - 新增 `scripts/verify_sql_live.py`：对着已部署实例真跑两条本地验不了的验收标准。
+  - AC-002（跨次隔离）：第一次 `CREATE TABLE probe_zz` + 插入 42 → 读到 `[["42"]]`；
+    第二次查同一张表 → `ERROR 1146 … Table 'practice.probe_zz' doesn't exist`。
+  - AC-007（硬编码判错）：把参考解在公开集的真实结果（ann=2 / bob=1 / cid=0）写成
+    `UNION ALL` 字面量，在隐藏集上算出的哈希与 `expectHash` 不一致。
+  - 报告 status 由 `partial` 改为 `passed`，16 条 AC 全部有实测证据。
+- 决策：
+  - 脚本**不放进常规测试**：它要凭据、且要求沙箱开着。改容器生命周期、数据集内容或判题口径
+    的人必须手动重跑（已写进报告「剩余风险」第 1 条）。
+- 验证：
+  - `python scripts/verify_sql_live.py` → 退出码 0，两条均通过（真容器，非桩）
+  - 反向验证：把 AC-007 的目标数据集改成 `orders-public` → 脚本报
+    「硬编码在隐藏数据集上竟然判对了——隐藏集没有起作用」，恢复后转绿
 - 本地提交：见下一笔
 - 远端推送：未执行
 
@@ -6266,6 +6169,75 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
   线上全量 **89 passed / 0 failed**；线上 health=200，三条迁移 success=1。
 - 本地提交：`64621b4`；已推送 `72f8c65..64621b4`；已部署（73 秒）。
 
+## 2026-10-23 · 新增「智能体」阅读线（content/reading/agents）
+- 类型：content
+- 变更：
+  - 新增 `content/reading/agents/`：1 篇总览 + 5 篇正文（Agent 是什么 / ReAct 与规划 /
+    工具与 MCP / 记忆与上下文 / 评测与上线），`line_kind=reading`、`line_sort=90`，
+    分类 slug `agents`，导入后自动登记为 6 关学习轨道。
+- 决策：
+  - **不按 hello-agents 原文改写**。该仓库许可证为 **CC BY-NC-SA 4.0**（非 MIT），
+    且 `content/reading/README.md` 已立规：不得以第三方文章为底稿做改写/缩写/换词/调序
+    （演绎作品仍需授权，本项目公开仓库 + 公开站点等于二次发布）。
+  - 借用的是**选题与章节顺序**（主题清单属思想，不受版权保护），正文独立撰写；
+    每篇末尾给一条「延伸阅读」指向原仓库，保留导流。
+  - 刻意与原文的详略取舍不同：hello-agents 偏完整教学（16 章，含低代码平台、框架实现、
+    Agentic RL、多智能体案例），本线只留「接功能前必须先想清楚」的部分，5 篇。
+- 验证：
+  - frontmatter 字段齐全、`status=published`、quiz 块 JSON 可解析且各 3 题（脚本校验 ALL OK）。
+  - `node scripts/import-course.mjs --dir content/reading/agents`：**created 6 / updated 0**；
+    重跑 **created 0 / updated 0**（幂等）。
+  - 线上（`http://<服务器>:8081`）以学习者账号查 `/api/v1/learn/tracks`：
+    `agents`（智能体，stageCount 6）已出现；`/api/v1/learn/tracks/agents` 六关顺序与
+    难度正确；条目正文与 `quiz` 块正常返回。
+- 未做：未跑 e2e（纯内容新增，无代码改动）；未提交。
+- 本地提交：未提交
+- 远端推送：未推送
+
+## 2026-10-23 · 智能体线扩到 14 关 + 修复轨道关卡覆盖缺陷
+- 类型：content + bugfix
+- 变更：
+  - `content/reading/agents/` 从 6 篇扩到 14 篇：新增 系统提示词、检索与 RAG、上下文工程、
+    多智能体协作、框架选型、流式与交互、成本与限流、安全与护栏；原 5 篇按新顺序重编号
+    （ReAct→03、工具→04、记忆→05、评测→12）。
+  - **后端缺陷修复**：`KnowledgeAdminController.upsertTrack` 写关卡前先 `deleteStages`。
+- 决策：
+  - **不能只做 upsert**。`learning_track_stages` 的唯一键是 `(track_id, seq)`，重排时
+    新关卡按 seq 覆盖旧行、末尾那关被挤掉——实测 14 篇只落 13 关（缺「系统提示词」），
+    且「ReAct」的 level 被写成旧的 beginner。关卡是内容的投影不是用户数据：没有表引用
+    `stage.id`，学习进度按 `entry_id` 记，所以删了整体重建是安全的。
+  - 内容仍按「借用选题、正文自写」处理（原仓库 CC BY-NC-SA 4.0）。
+- 验证：
+  - 14 篇 frontmatter / order 连续 0–13 / quiz 各 3 题且 JSON 可解析。
+  - `paideia-knowledge` 模块 `mvn test`：**BUILD SUCCESS**，无失败无错误。
+  - 部署后端（`release.ps1 -SkipWeb`，135.3 秒）后重导：`created 0 / updated 0`；
+    线上 `/api/v1/learn/tracks/agents` **stageCount 14**，seq 0–13 连续、难度正确
+    （ReAct 已是 intermediate，安全与护栏 advanced）。
+- 未做：未跑前端 e2e（无前端改动）；未推送。
+- 本地提交：见下一笔
+- 远端推送：未推送
+
+## 2026-10-23 · 智能体线正文扩写（14 篇全量）
+- 类型：content
+- 变更：
+  - 14 篇正文全部扩写：总量 97.9 KB → 123.5 KB，每篇均 ~8.8 KB，与 `network` 线持平
+    （原 agents 线每篇 ~2.5 千字，比 network 的 ~3.2 千字薄三成）。线上合计约 5.3 万字。
+- 决策：
+  - **补的是信息密度，不是篇幅**。每篇新增的是可验证的机制细节、具体数字、可复制的代码/配置，
+    删掉了重复的过渡句；没有靠"多写几句"充数。
+  - 重点补充：01 的三次追问判据 + 22 倍成本账 + 最小循环代码；02 的提示词骨架与示例优先于规则；
+    03 的三种反馈对照表 + 沉没成本；04 的请求前后变化与归属校验反例；06 的 RRF 算法与召回率门槛；
+    07 的实测 token 占比；08 的成本倍率估算；11 的预扣结算状态机；13 的 SSRF 拦截清单。
+  - 各篇 `minutes` 同步上调（+2~4 分钟），与实际阅读量匹配。
+- 验证：
+  - 14 篇 frontmatter 齐全、order 0–13 连续、quiz 各 3 题且 JSON 可解析。
+  - 导入：`created 0 / updated 13`（总览正文未变，幂等跳过）。
+  - 线上 `/api/v1/learn/tracks/agents`：**stageCount 14**，逐关取正文确认已是新版本，
+    合计 53188 字。
+- 未做：未跑 e2e（纯内容）；未推送。
+- 本地提交：见下一笔
+- 远端推送：未推送
+
 ## 2026-10-26 10:27:08 +0800 · WORK-039 · 签署 .agent/changes/WORK-039-管理端MCP工具/requirements.md、.agent/changes/WORK-039-管理端MCP工具/proposal.md、.agent/changes/WORK-039-管理端MCP工具/design.md、.agent/changes/WORK-039-管理端MCP工具/tasks.md
 - 类型：decision
 - 变更：.agent/changes/WORK-039-管理端MCP工具/requirements.md、.agent/changes/WORK-039-管理端MCP工具/proposal.md、.agent/changes/WORK-039-管理端MCP工具/design.md、.agent/changes/WORK-039-管理端MCP工具/tasks.md 由 xiaou61 签署为 approved
@@ -7059,6 +7031,32 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 本地提交：本次提交（脚本 + 9 篇内容 + 四件工件 + 两份报告）
 - 远端推送：未执行
 
+## 2026-10-27 全站页面优化（impeccable 审计后落地）
+- 装了 impeccable 4.7.1 到 `~/.agents/skills/impeccable`（引擎 0.1.17，sha256 已核；
+  GitHub release 直连会截断，实际经 `ghfast.top` 镜像取完整文件）。
+- 用 Playwright 登录线上实例，41 页（学习者端 15 × 桌面/移动 + 管理端 11）全部截图
+  并抓渲染后几何事实。审计报告在 `docs/design/page-audit-2026-10-27.md`（该目录被忽略）。
+- 落地：3 个 P0（Tabs 方向写反、助手浮标遮挡、管理端首页假话）+ 设计层五项
+  （删 eyebrow ×19、字距收到 -0.04em、二级标题统一、首页去模板化、空态补动作）
+  + reduced-motion 与引用块侧边色条。
+- 顺带修 TelemetrySummaryMapper 的 5 个普通 `@Select` 误用 `&lt;`（管理端 AI 调用概览
+  整页 500，首现 09:05 早于本次部署）；`check_mapper_script_xml.py` 补反向检查并已反向验证。
+- 验证：学习者端 e2e 91/0、管理端 31/0、后端 314/0、前端单测全绿。
+- 本地提交 `6a1cdcb`。未 push（需单独授权）。
+- **未验证**：hover/focus/disabled/loading 状态、键盘 Tab 顺序、真机触屏手势、
+  管理端深色模式、性能（LCP/CLS）；约 10 个路由未进样本（含课程正文页 `/learn/:slug`）。
+### 2026-10-27 续：审计剩余项
+- 触控目标按 WCAG 2.5.8 补齐（digest 标题 / resume 名称 / 所有分类 / 全部→），
+  移动端四页 <24px 可点元素降为 0。
+- `/resume/new` 空态按钮归位 + 补 h1。
+- **实测发现服务器没开 gzip**：入口 chunk 942 KB 原样传输。开 `server.compression` 后
+  首页传输 1537 → 455 KB（-70%），FCP 544 → 408 ms。
+- 补 `PRODUCT.md` / `DESIGN.md`（impeccable init/document；PRODUCT.md 标注了推断项）。
+- 补审 9 个此前未进样本的路由；键盘 Tab 12 跳全部有焦点环；管理端深色模式 6 页 0 对比度失败。
+- 提交 `3b69632`。仍未 push。
+- **仍未做**：真机触屏手势、hover 状态逐元素截图核对、LCP（浏览器 API 取不到，
+  只测了 FCP/CLS）。
+
 ## 2026-10-28 09:48:56 +0800 · WORK-046 · 签署 .agent/changes/WORK-046-书籍详解专题/requirements.md
 - 类型：decision
 - 变更：.agent/changes/WORK-046-书籍详解专题/requirements.md 由 xiaou61 签署为 approved
@@ -7481,6 +7479,26 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
 
+## 2026-10-28 15:16:36 +0800 · WORK-051 · WORK-051 使用独立 worktree 实施
+
+- 类型：decision
+- 变更：在 .worktrees/WORK-051 新建分支 work/WORK-051（基于 62f37bb）；主树因有 76 个来源不明的改动按单写入方隔离
+- 决策：按 AGENTS.md 的并发会话约定，一个会话一个工作树；主树保持 master 只做 review/落库/部署
+- 依据：git worktree list 无同名分支与目录；.worktrees 已 gitignore；requirements.md 已先提交才能出现在新工作树
+- 验证：git worktree list 显示 F:/Paideia/.worktrees/WORK-051 62f37bb [work/WORK-051]
+- 本地提交：62f37bb（仅需求工件）
+- 远端推送：未执行
+
+## 2026-10-28 15:18:39 +0800 · WORK-051 · 签署 .agent/changes/WORK-051-手绘风配图围栏块/requirements.md、.agent/changes/WORK-051-手绘风配图围栏块/proposal.md、.agent/changes/WORK-051-手绘风配图围栏块/design.md、.agent/changes/WORK-051-手绘风配图围栏块/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-051-手绘风配图围栏块/requirements.md、.agent/changes/WORK-051-手绘风配图围栏块/proposal.md、.agent/changes/WORK-051-手绘风配图围栏块/design.md、.agent/changes/WORK-051-手绘风配图围栏块/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-051-手绘风配图围栏块/requirements.md、.agent/changes/WORK-051-手绘风配图围栏块/proposal.md、.agent/changes/WORK-051-手绘风配图围栏块/design.md、.agent/changes/WORK-051-手绘风配图围栏块/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
 ## 2026-10-28 15:20:00 +0800 · 已部署：内容线 + mermaid 渲染上线（两次发版）
 - 类型：deploy
 - 变更：
@@ -7496,6 +7514,25 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 本地提交：`cc62e26`（内容+接入）、`284adf4`（主题）；`updates.md` 与其它会话条目同文件，未提交
 - 远端推送：未执行
 
+## 2026-10-28 15:20:00 +0800 · WORK-050 实施：金集/评测、召回排序、时间淘汰、敏感过滤、半自动候选
+
+- 类型：implementation
+- 变更：
+  - 金集与评测器：`extraction-cases.json`（40 条）、`recall-cases.json`（30 条）、`MemoryEvalTest`（真上游，env 门）、`MemoryRecallEvalTest`（需库）
+  - `SensitiveContent` 七类形态过滤，接在 `MemoryStore` 两个底层 insert 上；自动整理逐条过滤
+  - 召回三层排序（关键词命中 → 全文相关度 → kind 权重×180 天衰减），召回后批量刷新 `last_used_at`（GREATEST）
+  - 迁移 `V20261028150000`：结构化补 ngram 全文索引、两表加 `last_used_at`、新建 `ai_memory_candidates`
+  - `MemoryRetentionPurger`（每小时、每批 500）按 kind 分档 TTL 淘汰 + 候选过期清理
+  - `PROPOSE` 动作与提示词 `memory-extract-v2`（maxTokens 2048→3072）、候选服务与三个端点、面板「待确认」区
+- 验证：
+  - 后端单测（除 paideia-app）359 run / 0 fail / 15 skipped；四个边界与迁移守卫 9 run / 0 fail
+  - 记忆相关集成 26 + 7 + 2 + 4 条全绿；前端 assistant 43 条、14 个包 typecheck 通过；面板 e2e 1 passed
+  - 召回金集首位命中率 0.267 → 1.000、MRR 0.622 → 1.000
+  - 提取复测（v2）：失败 1–3 → 0，precision 0.706 → 0.769，propose 0 → 0.833；**recall 0.857 → 0.714、错 UPDATE 0 → 0.111**
+- 阻塞：**AC-010 的「两次差异 ≤ 5 个百分点」实测不成立**（−5.9 / −7.1 pp；分母 14–17，一条翻转即 6–7 pp）。
+  需回到 requirements 改这条 AC（三次取均值 / 扩金集到 100+ / 放宽到 10 pp），report 因此停在 `draft`
+- 本地提交：4 笔（评测 / 排序淘汰过滤 / PROPOSE 候选 / 面板），分支 `work-050-memory`
+- 远端推送：未执行
 ## 2026-10-28 15:32:00 +0800 · WORK-049 · live 金集跑通（重判 22/24），提示词升 v5
 - 类型：verification
 - 变更：
@@ -7518,6 +7555,32 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 本地提交：本笔
 - 远端推送：已执行
 
+## 2026-10-28 15:49:27 +0800 · WORK-051 · sketch 围栏块实现完成，9/10 验收通过，AC-008 体积增量待裁决
+
+- 类型：implementation
+- 变更：新增 @paideia/ui 的 sketch 围栏块（契约/布局/绘制/组件/注册）、手写字体子集与生成脚本、主题配色令牌、devdata 样例条目 61、e2e/sketch.spec.ts；依赖 roughjs 4.6.6 与 subset-font（devDependency）
+- 决策：坐标不交给作者：框宽按文字实测、整行居中；抖动 seed 由节点 id 派生保证刷新一致；颜色走 CSS 变量，切主题无需 JS；roughjs 动态 import
+- 依据：frontend/packages/ui/src/markdown/renderers/sketch*.ts、scripts/build-sketch-font.mjs、db/devdata/V956__seed_sketch_block.sql
+- 验证：typecheck 0；ui 单测 18/18（全量 227 passed / 1 failed，失败为既有的 AnalyticsPage 硬编码颜色）；e2e 1 passed（独占库）；构建入口 chunk gzip 291.21→293.63 kB（+2.42，AC-008 未达标）；对比度浅色 14.3–15.0、深色 10.2–11.7
+- 本地提交：1be235b
+- 远端推送：未执行
+
+## 2026-10-28 15:52:00 +0800 · WORK-050 合并入 master 并部署
+
+- 类型：deployment
+- 变更：
+  - `work-050-memory` 合并入 master（先把它落后的一批 master 提交合进分支、在合并后的状态重跑关键测试）
+  - `powershell -File scripts/release.ps1` 发版，319.4 秒（前端重建 110.1s + 打包 70.1s + 上传 24.8s）
+- 验证：
+  - `/actuator/health` → `{"status":"UP"}`
+  - `GET /api/v1/ai/memories/candidates` 无凭证返回 **401**（端点已上线，不是 404）
+  - Flyway：`Migrating schema paideia to version "20261028150000 - memory relevance candidates and ttl"`，
+    `Successfully applied 1 migration … now at version v20261028150000 (execution time 00:05.002s)`
+  - 合并后重跑：后端单测 371 run / 0 fail / 15 skipped；记忆与边界 49 run / 0 fail；前端 15 个包 typecheck、assistant 43 条
+- 修掉一处测试隔离缺陷：`MemoryCandidateTest` 的 `@BeforeEach` 没清 `ai_user_settings`，
+  用例数一多就撞上"上一个用例关过记忆"的状态（合并后第一次跑红，补清后绿）
+- 本地提交：合并提交 + 日志提交，**未 push**
+- 工作树：`.worktrees/memory` 已删除，分支 `work-050-memory` 已删除
 ## 2026-10-28 15:55:00 +0800 · mermaid 跟随主题 + 去掉代码块外壳（已部署）
 - 类型：fix + deploy
 - 变更：
@@ -7537,105 +7600,6 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 本地提交：`37c136c`；`updates.md` 与其它会话条目同文件，未提交
 - 远端推送：未执行
 
-## 2026-10-28 17:20 +0800 · WORK-048 · 练习册与「测一测」入口实施
-- 类型：implementation
-- 变更：`quiz` 块不再在条目页内联渲染；新增 `extractQuizzes` 纯函数（行级三态状态机）把题从正文摘出来，正文末尾出现「测一测 · N 题」入口，点开是面板。单题渲染抽成 `QuizQuestionView` 由内联版与面板版共用。新增 `scripts/check_quiz_explain.py` 门禁。
-- 决策：不建题目表——题目身份已是 `(条目, 块, 题号) + 指纹`，`question_attempts` 一直按它记账；"练习册"只是集合视图。
-- 决策：门禁设为**严格**而非告警，因为实测 139 个块 / 412 道题**缺解析为 0**，存量干净。
-- 依据：`extractQuizzes` 必须用行级状态机而不是正则——代码示例里会出现 ```quiz 字样，正则会把示例误摘。有专门用例。
-- 验证：`practice.test.ts` 8 条；ui 216 条、knowledge 78 条；typecheck 三个包通过；e2e question-attempt 1 / source-reading 10 / markdown-render 3 全绿；门禁反向验证（把一题的 explain 改名会报红）。
-- 既有缺陷（未修，不属本项）：`tokens.test.ts` 报 `apps/admin/.../AnalyticsPage.tsx` 用了调色板颜色，违反令牌纪律。
-- 本地提交：本笔
-- 远端推送：随本笔
-## 2026-10-28 15:20:00 +0800 · WORK-050 实施：金集/评测、召回排序、时间淘汰、敏感过滤、半自动候选
-
-- 类型：implementation
-- 变更：
-  - 金集与评测器：`extraction-cases.json`（40 条）、`recall-cases.json`（30 条）、`MemoryEvalTest`（真上游，env 门）、`MemoryRecallEvalTest`（需库）
-  - `SensitiveContent` 七类形态过滤，接在 `MemoryStore` 两个底层 insert 上；自动整理逐条过滤
-  - 召回三层排序（关键词命中 → 全文相关度 → kind 权重×180 天衰减），召回后批量刷新 `last_used_at`（GREATEST）
-  - 迁移 `V20261028150000`：结构化补 ngram 全文索引、两表加 `last_used_at`、新建 `ai_memory_candidates`
-  - `MemoryRetentionPurger`（每小时、每批 500）按 kind 分档 TTL 淘汰 + 候选过期清理
-  - `PROPOSE` 动作与提示词 `memory-extract-v2`（maxTokens 2048→3072）、候选服务与三个端点、面板「待确认」区
-- 验证：
-  - 后端单测（除 paideia-app）359 run / 0 fail / 15 skipped；四个边界与迁移守卫 9 run / 0 fail
-  - 记忆相关集成 26 + 7 + 2 + 4 条全绿；前端 assistant 43 条、14 个包 typecheck 通过；面板 e2e 1 passed
-  - 召回金集首位命中率 0.267 → 1.000、MRR 0.622 → 1.000
-  - 提取复测（v2）：失败 1–3 → 0，precision 0.706 → 0.769，propose 0 → 0.833；**recall 0.857 → 0.714、错 UPDATE 0 → 0.111**
-- 阻塞：**AC-010 的「两次差异 ≤ 5 个百分点」实测不成立**（−5.9 / −7.1 pp；分母 14–17，一条翻转即 6–7 pp）。
-  需回到 requirements 改这条 AC（三次取均值 / 扩金集到 100+ / 放宽到 10 pp），report 因此停在 `draft`
-- 本地提交：4 笔（评测 / 排序淘汰过滤 / PROPOSE 候选 / 面板），分支 `work-050-memory`
-- 远端推送：未执行
-## 2026-10-28 14:35:00 +0800 · 管理端新增「AI 调用大屏」（24h / 7d 回放）
-- 类型：feature
-- 变更：
-  - 新页 `frontend/apps/admin/src/pages/AiRunsScreenPage.tsx`：时间轴（按小时/天分桶，可拖动换时段）→ 该时段的调用流（8 秒一轮自动轮播）→ 选中轮的瀑布图（按步骤真实偏移与耗时逐条长出）+ 本桶聚合
-  - `RequireAdmin` 增加 `bare` 属性：只去掉侧栏与顶栏，登录/角色/被拒三道判定一个不少
-  - 路由 `/ai-runs/screen` + 侧栏第四个子项「调用大屏」+ 面包屑
-  - e2e 增一条：侧栏入口存在、点进去不带侧栏、时间轴与调用流出得来、点一轮能看步骤
-- 决策：
-  - **回放不是直播**：采集器在轮次结束时才写 spans，进行中的步骤没有落库，所以只放已结束的轮次
-  - 只取最近 200 轮（分页上限）；本桶标签写"已加载 N 轮"，不冒充全量
-  - 24 小时为空时**自动退回 7 天一次**并明确标注；之后用户自己切回去不再被弹走
-  - 分位数与合计由前端按已加载的轮次算，与概览页的服务端口径不同——大屏要的是"这一桶现在长什么样"
-  - 动画用纯 CSS（delay 对偏移、duration 对耗时、关键帧把宽度推到 `--pw-w`）；换速度/重播靠换 key 重挂载
-- 验证：
-  - `npx tsc -p tsconfig.json` 通过；`pnpm --filter @paideia/admin build` 成功
-  - e2e 单条 `--grep "调用大屏"` 通过（3.8s 用例 / 34.9s 含启动）
-  - 视觉自查：用 Playwright 拦截详情接口喂一份真实形状的 spans（6 步含嵌套与失败），截图确认瀑布偏移、颜色、失败红条与逐条动画都对
-- 已知限制 / 未做：
-  - 瀑布图**没有 e2e 断言**：本机测试库里没有带 spans 的轮次，只能靠拦截数据的截图自查
-  - 真·实时（in-flight 进度）没做：要增量写 span，属采集器改动
-  - 时间轴拖动无 e2e 覆盖
-- 本地提交：本批单独提交
-- 远端推送：未执行
-
-## 2026-10-28 15:52:00 +0800 · WORK-050 合并入 master 并部署
-
-- 类型：deployment
-- 变更：
-  - `work-050-memory` 合并入 master（先把它落后的一批 master 提交合进分支、在合并后的状态重跑关键测试）
-  - `powershell -File scripts/release.ps1` 发版，319.4 秒（前端重建 110.1s + 打包 70.1s + 上传 24.8s）
-- 验证：
-  - `/actuator/health` → `{"status":"UP"}`
-  - `GET /api/v1/ai/memories/candidates` 无凭证返回 **401**（端点已上线，不是 404）
-  - Flyway：`Migrating schema paideia to version "20261028150000 - memory relevance candidates and ttl"`，
-    `Successfully applied 1 migration … now at version v20261028150000 (execution time 00:05.002s)`
-  - 合并后重跑：后端单测 371 run / 0 fail / 15 skipped；记忆与边界 49 run / 0 fail；前端 15 个包 typecheck、assistant 43 条
-- 修掉一处测试隔离缺陷：`MemoryCandidateTest` 的 `@BeforeEach` 没清 `ai_user_settings`，
-  用例数一多就撞上"上一个用例关过记忆"的状态（合并后第一次跑红，补清后绿）
-- 本地提交：合并提交 + 日志提交，**未 push**
-- 工作树：`.worktrees/memory` 已删除，分支 `work-050-memory` 已删除
-## 2026-10-28 15:16:36 +0800 · WORK-051 · WORK-051 使用独立 worktree 实施
-
-- 类型：decision
-- 变更：在 .worktrees/WORK-051 新建分支 work/WORK-051（基于 62f37bb）；主树因有 76 个来源不明的改动按单写入方隔离
-- 决策：按 AGENTS.md 的并发会话约定，一个会话一个工作树；主树保持 master 只做 review/落库/部署
-- 依据：git worktree list 无同名分支与目录；.worktrees 已 gitignore；requirements.md 已先提交才能出现在新工作树
-- 验证：git worktree list 显示 F:/Paideia/.worktrees/WORK-051 62f37bb [work/WORK-051]
-- 本地提交：62f37bb（仅需求工件）
-- 远端推送：未执行
-
-## 2026-10-28 15:18:39 +0800 · WORK-051 · 签署 .agent/changes/WORK-051-手绘风配图围栏块/requirements.md、.agent/changes/WORK-051-手绘风配图围栏块/proposal.md、.agent/changes/WORK-051-手绘风配图围栏块/design.md、.agent/changes/WORK-051-手绘风配图围栏块/tasks.md
-
-- 类型：decision
-- 变更：.agent/changes/WORK-051-手绘风配图围栏块/requirements.md、.agent/changes/WORK-051-手绘风配图围栏块/proposal.md、.agent/changes/WORK-051-手绘风配图围栏块/design.md、.agent/changes/WORK-051-手绘风配图围栏块/tasks.md 由 xiaou61 签署为 approved
-- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
-- 依据：.agent/changes/WORK-051-手绘风配图围栏块/requirements.md、.agent/changes/WORK-051-手绘风配图围栏块/proposal.md、.agent/changes/WORK-051-手绘风配图围栏块/design.md、.agent/changes/WORK-051-手绘风配图围栏块/tasks.md
-- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
-- 本地提交：待用户授权/未提交
-- 远端推送：未执行
-
-## 2026-10-28 15:49:27 +0800 · WORK-051 · sketch 围栏块实现完成，9/10 验收通过，AC-008 体积增量待裁决
-
-- 类型：implementation
-- 变更：新增 @paideia/ui 的 sketch 围栏块（契约/布局/绘制/组件/注册）、手写字体子集与生成脚本、主题配色令牌、devdata 样例条目 61、e2e/sketch.spec.ts；依赖 roughjs 4.6.6 与 subset-font（devDependency）
-- 决策：坐标不交给作者：框宽按文字实测、整行居中；抖动 seed 由节点 id 派生保证刷新一致；颜色走 CSS 变量，切主题无需 JS；roughjs 动态 import
-- 依据：frontend/packages/ui/src/markdown/renderers/sketch*.ts、scripts/build-sketch-font.mjs、db/devdata/V956__seed_sketch_block.sql
-- 验证：typecheck 0；ui 单测 18/18（全量 227 passed / 1 failed，失败为既有的 AnalyticsPage 硬编码颜色）；e2e 1 passed（独占库）；构建入口 chunk gzip 291.21→293.63 kB（+2.42，AC-008 未达标）；对比度浅色 14.3–15.0、深色 10.2–11.7
-- 本地提交：1be235b
-- 远端推送：未执行
-
 ## 2026-10-28 16:21:16 +0800 · WORK-051 · 签署 .agent/changes/WORK-051-手绘风配图围栏块/requirements.md、.agent/changes/WORK-051-手绘风配图围栏块/proposal.md、.agent/changes/WORK-051-手绘风配图围栏块/design.md、.agent/changes/WORK-051-手绘风配图围栏块/tasks.md
 
 - 类型：decision
@@ -7646,6 +7610,15 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
 
+## 2026-10-28 16:30:00 +0800 · WORK-049 · v5 发布上线，清理线上废弃 master-key
+
+- 类型：maintenance
+- 变更：
+  - 从干净工作树 `.worktrees/w49-deploy`（master `145ff27`）执行 `release.ps1 -WithWeb`，242.8 秒；核对嵌套 jar 里 `OpsDiagnosisPrompt.class` 含 `ops-diagnosis-v5`，健康检查 200
+  - 线上 `/opt/paideia-app/application.yml` 删除 WORK-009 后已无读取方的 `master-key` 行（备份 `/root/application.yml.bak-w49`），YAML 解析通过；未重启（死配置）
+- 依据：`unzip -p app.jar BOOT-INF/lib/paideia-ai-*.jar` → `ops-diagnosis-v5`；`/actuator/health=200`
+- 本地提交：`c1a9951`（报告）；未 push
+- 远端推送：未执行
 ## 2026-10-28 16:40:00 +0800 · WORK-051 · WORK-051 合入 master，合并后复验通过
 
 - 类型：implementation
@@ -7655,3 +7628,26 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：合并后：typecheck 0；@paideia/ui 全量 235 passed / 1 failed（既有 AnalyticsPage 硬编码颜色）；e2e sketch 1 passed（独占库）
 - 本地提交：c57c598 + 合并提交
 - 远端推送：未执行
+## 2026-10-28 17:20 +0800 · WORK-048 · 练习册与「测一测」入口实施
+- 类型：implementation
+- 变更：`quiz` 块不再在条目页内联渲染；新增 `extractQuizzes` 纯函数（行级三态状态机）把题从正文摘出来，正文末尾出现「测一测 · N 题」入口，点开是面板。单题渲染抽成 `QuizQuestionView` 由内联版与面板版共用。新增 `scripts/check_quiz_explain.py` 门禁。
+- 决策：不建题目表——题目身份已是 `(条目, 块, 题号) + 指纹`，`question_attempts` 一直按它记账；"练习册"只是集合视图。
+- 决策：门禁设为**严格**而非告警，因为实测 139 个块 / 412 道题**缺解析为 0**，存量干净。
+- 依据：`extractQuizzes` 必须用行级状态机而不是正则——代码示例里会出现 ```quiz 字样，正则会把示例误摘。有专门用例。
+- 验证：`practice.test.ts` 8 条；ui 216 条、knowledge 78 条；typecheck 三个包通过；e2e question-attempt 1 / source-reading 10 / markdown-render 3 全绿；门禁反向验证（把一题的 explain 改名会报红）。
+- 既有缺陷（未修，不属本项）：`tokens.test.ts` 报 `apps/admin/.../AnalyticsPage.tsx` 用了调色板颜色，违反令牌纪律。
+- 本地提交：本笔
+- 远端推送：随本笔
+## 记录
+
+
+## 2026-10-28 18:20 +0800 · WORK-049 · SQL 沙箱容器池上线
+
+- 类型：implementation + deployment
+- 变更：新增 `SqlContainerPool`（2 个常驻容器），SQL 执行先走池、不可用回落一次性容器。每次执行建独立库 + 独立受限账号，用完删库删号。`sqlMemory` 默认 512m→1g。
+- 实测：端到端 3.5–4.2s → **0.35–0.42s**；沙箱内 `durationMs` 3256ms → **226–290ms**；EXPLAIN 290ms。**AC-001 的 p50 ≤150ms 未达**，实际约 250ms，差的是账号管理那 100ms。
+- 修掉的三个真缺陷：① 512m 让 mysqld 被 OOM 静默杀掉（tmpfs 的 datadir 也计内存）；② 启动脚本拼出 `&;`（sh 语法错），容器秒退，表现为每次等满 30 秒再回落；③ 残留同名容器让 `docker run --name` 失败且输出被吞。
+- 决策：热路径不再做健康检查——`docker exec` 在负载高的机器上偶超 3 秒，会被误判成容器坏了。健康改由真正的执行判定。
+- 验证：单测 92 条（含 8 条池相关）；线上 20 次连续执行 20/0，容器数稳定、库里 0 残留库 0 残留账号；杀容器后自动重建；`SHOW DATABASES` 只看到自己的库。
+- 本地提交：三笔（池本体、&; 修复、重名与热路径修复）
+- 远端推送：已执行
