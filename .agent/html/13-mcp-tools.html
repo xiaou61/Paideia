@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>13 · MCP 工具面 — Paideia 架构导读</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="nav.js"></script>
+
+<main>
+  <p class="kicker">13 / 对外能力</p>
+  <h1>让外面的 AI 读你的数据</h1>
+  <p class="question"><strong>这张图回答：</strong>我在编辑器里问 AI「我这周学了什么」，它凭什么能拿到真实数据？它会不会顺手把我别人的数据也读走？</p>
+
+  <h2>先看一个具体场景</h2>
+  <p>你在自己的编辑器里接上了 Paideia 的 MCP 服务，问了一句「我这周学了什么」。AI 列了一下它能用的工具，挑了一个「查学习记录」的，拿到了真实数据，然后回答你。</p>
+  <p>整个过程中，<b>你从来没有在这个对话里输入过密码</b>——它用的是一串你亲手创建的访问令牌。这串令牌只属于你，也只会拿到你的数据。</p>
+
+  <figure>
+    <div class="d">
+      <div class="flow">
+        <div class="box box--you">你：在管理界面创建一串访问令牌<small>起个名字，随时可吊销</small></div>
+        <div class="link"></div>
+        <div class="box box--you">你：把它填进编辑器的 MCP 配置</div>
+        <div class="link"></div>
+        <div class="box box--ext">编辑器里的 AI：先问「你有哪些工具」</div>
+        <div class="link"></div>
+        <div class="box box--svc">Paideia：按这串令牌的权限，返回一个工具清单<small>不在清单里的，猜到名字也调不动</small></div>
+        <div class="link"></div>
+        <div class="box box--ext">AI：挑一个，带上参数调用</div>
+        <div class="link"></div>
+        <div class="box box--svc">Paideia：七步检查 → 执行 → 截断 → 记账</div>
+        <div class="link"></div>
+        <div class="box box--you">你看到：AI 回答了「你这周读了 7 篇，练了 12 道题」</div>
+      </div>
+    </div>
+    <figcaption><b>令牌是唯一的身份来源。</b>对话里没有任何「我是谁」的参数可以伪造。</figcaption>
+  </figure>
+
+  <h2>它内部是怎么做到的</h2>
+  <p>核心是<b>一份工具目录、两条出口</b>：应用内部的助手用同一份目录（它调工具走进程内），外面的客户端走 <code>/mcp</code>。两条路共用工具定义，但<b>登录方式与限流完全不同</b>——这是刻意的，因为外部客户端的威胁模型不一样。</p>
+
+  <figure>
+    <div class="d">
+      <div class="layer">
+        <div class="layer-name">一份目录</div>
+        <div class="layer-body">
+          <div class="box">ToolCatalog<small>每个工具：名字 / 说明 / 参数 schema / 权限域</small></div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">两条出口</div>
+        <div class="layer-body">
+          <div class="box box--svc">应用内助手<small>进程内调用，JWT 身份，走对话的积分</small></div>
+          <div class="box box--ext">外部客户端 <code>/mcp</code><small>PAT 身份，独立限流 + 独立配额</small></div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">三条护栏</div>
+        <div class="layer-body">
+          <div class="box">视图校验<small>工具必须在当前视图里</small></div>
+          <div class="box">限流 + 配额<small>内存防瞬时爆发，数据库防长期失控</small></div>
+          <div class="box">审计 + 计数 + 指标<small>同一处收尾，不留分叉</small></div>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>外面能做什么，由令牌与视图共同决定。</b>不是「有这个工具就能调」。</figcaption>
+  </figure>
+
+  <h3>一次外部调用，七步，顺序固定</h3>
+  <figure>
+    <div class="d">
+      <div class="steps">
+        <span class="from">请求</span><span class="arrow">→</span><span class="to">① 视图校验</span><span class="what">工具不在当前视图里 → 当作<b>未知工具</b><small>清单里没有的东西，不能因为猜到一个名字就调得动</small></span>
+        <span class="from">①</span><span class="arrow">→</span><span class="to">② 归属绑定</span><span class="what"><code>userId</code> 只来自令牌；参数里的 <code>userId</code> <b>一律删除</b><small>这是越权的唯一入口，删掉比校验更彻底</small></span>
+        <span class="from">②</span><span class="arrow">→</span><span class="to">③ 限流</span><span class="what">按令牌计数，超限不执行<small>内存固定窗口，默认 120 次/分钟</small></span>
+        <span class="from">③</span><span class="arrow">→</span><span class="to">④ 配额</span><span class="what">按令牌查当天累计，达到上限不执行<small>要查库，所以排在内存判定之后</small></span>
+        <span class="from">④</span><span class="arrow">→</span><span class="to">⑤ 执行</span><span class="what">调真正的业务服务</span>
+        <span class="from">⑤</span><span class="arrow">→</span><span class="to">⑥ 截断</span><span class="what">超长文本裁到上限并<b>明确标记</b><small>不标记的话，AI 会以为自己看到了全部</small></span>
+        <span class="from">⑥</span><span class="arrow">→</span><span class="to">⑦ 收尾</span><span class="what">审计 + 计数 + 指标在同一处完成</span>
+      </div>
+    </div>
+    <figcaption><b>便宜的判定在前。</b>限流是内存判断（几乎零成本），配额要查库——顺序反了，每次被限流的请求都会多一次数据库往返。</figcaption>
+  </figure>
+
+  <h3>三道护栏各自防什么</h3>
+  <div class="rules">
+    <div class="rule rule--key"><span class="n">1</span><span class="r">视图校验防「猜」</span><span class="r-why">工具清单是按令牌的权限域裁出来的。校验的是「你有没有被呈现过这个工具」，而不是「工具存不存在」。这样即使有人知道某个工具的名字，只要它不在你的视图里，就是未知工具。</span></div>
+    <div class="rule rule--key"><span class="n">2</span><span class="r">限流防「一次失控」</span><span class="r-why">记在内存里，是护栏不是计费依据。多实例部署时每个实例各算各的（总量会翻倍），<b>但代价是漏放几次，而不是错杀用户</b>——这个取舍写在代码注释里。</span></div>
+    <div class="rule rule--key"><span class="n">3</span><span class="r">配额防「长期失控」</span><span class="r-why">按令牌查当天累计次数，落库。它回答的是「这个令牌今天已经用了很多次」，而不是「刚才那一秒太快了」。</span></div>
+  </div>
+
+  <h3>PAT 是一条平行于登录态的通道</h3>
+  <p>外部客户端不在浏览器里，没有 JWT 可带。所以有一套独立的令牌：创建、命名、吊销、记录每次调用的用量。它和登录态<b>互不替代</b>——你在网页上登录用的是 JWT，你的编辑器用的是 PAT。</p>
+  <div class="warn">
+    <b>改工具清单时要同时想两件事：</b>「应用内助手能不能调它」和「这个外部令牌能不能调它」。这是两条独立的授权路径，只改一处会留下一个沉默的缺口。
+  </div>
+
+  <h2>设计取舍</h2>
+  <ul>
+    <li><b>为什么不做「把全部 API 都转成 MCP 工具」：</b>工具越多，模型挑错的概率越高，每次对话塞进去的 schema 也越贵。现在只挑「读自己的数据、做自己的事」这一层，写操作只保留明确安全的几个。真实数字是：全部工具的 schema 加起来还在安全区，但<b>没有理由为了完整性把选择成本也一起放大</b>。</li>
+    <li><b>为什么参数里的 <code>userId</code> 是「删除」而不是「校验」：</b>校验要穷尽所有别名与嵌套形式，删掉是确定性动作。归属只认令牌。</li>
+    <li><b>为什么截断要标记：</b>不标记的话，AI 会把「前 200 条」当成全部，然后给你一个自信的错答案。截断本身不是问题，<b>不告诉它才是</b>。</li>
+    <li><b>为什么两条出口共用目录：</b>工具定义只有一份，改一处两边同时生效。代价是两条路的鉴权与限流必须各自实现——那是必要的不对称。</li>
+  </ul>
+
+  <h2>读图要点</h2>
+  <div class="notes">
+    <ul>
+      <li><b>工具名只能用下划线。</b>上游模型对工具名的字符集有限制，带点或短横线会在某些模型上直接失败——这条在真连上游时才发现，桩测试看不出来。</li>
+      <li><b>工具结果必须逐条发回。</b>合并成一条，模型会漏读中间那几项。</li>
+      <li><b>审计与计数不能分叉。</b>二者在同一个收尾处写，否则会出现「日志记了但计数没记」的对不上账。</li>
+      <li><b>令牌泄露的处理只有吊销。</b>它是随机串，没有「改密码」——所以管理界面上要能一眼看到「最近用过的时间」。</li>
+    </ul>
+  </div>
+
+  <div class="notes">
+    <h2>代码在哪</h2>
+    <ul class="paths">
+      <li><code>backend/paideia-platform/…/ToolCatalog.java</code>、<code>PaideiaTool</code>、<code>ToolScope</code> — 目录与权限域</li>
+      <li><code>backend/paideia-mcp/…/McpToolInvoker.java</code> — 七步执行顺序</li>
+      <li><code>backend/paideia-mcp/…/McpViews.java</code>、<code>McpViewRegistry.java</code> — 视图裁剪</li>
+      <li><code>backend/paideia-mcp/…/McpRateLimiter.java</code> — 内存固定窗口</li>
+      <li><code>backend/paideia-mcp/…/security/PatAuthenticationFilter.java</code> — 令牌通道</li>
+      <li><code>backend/paideia-mcp/…/usage/</code> — 每次调用的用量与计数</li>
+    </ul>
+  </div>
+</main>
+
+</body>
+</html>

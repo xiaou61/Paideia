@@ -113,6 +113,23 @@
     <b>真缺陷长什么样：</b><code>/api/v1/sandbox/admin/**</code> 一度写在 <code>/api/v1/sandbox/**</code>（要求已登录）之后，于是<b>任何登录用户都能下架别人的数据集、看到全部举报</b>。它不报错，是合并时由 <code>ApiContractTest</code> 抓到的。
   </div>
 
+  <h3>注销：没有外键，所以有一份手写的表清单</h3>
+  <p>这是「信任边界」里最容易被忽略的一段：<b>数据删得干不干净</b>。全库几乎没有外键，级联删除不存在，所以注销靠各模块自己维护的表清单，一张一张删。</p>
+  <div class="d">
+    <div class="flow">
+      <div class="box box--you">你：点「注销账号」</div>
+      <div class="link"></div>
+      <div class="box">先确认是本人</div>
+      <div class="link"></div>
+      <div class="box box--svc">按清单逐张删：记忆、对话、笔记、答题、积分、简历、数据集……<small>清单分散在 <code>AccountDeletionService</code> 与各模块的注销监听器里</small></div>
+      <div class="link"></div>
+      <div class="box box--you">账号消失</div>
+      <div class="link link--dashed"></div>
+      <div class="box box--fail">清单漏一张：数据还在，没有报错，也没有测试会红</div>
+    </div>
+  </div>
+  <p><b>新增一张带 <code>user_id</code> 的表，必须同时把它加进清单。</b>这条不能靠自动化发现——这正是「少外键」这个选择的真实代价。匿名化的部分（比如公开分享页）单独处理，不能一删了之。</p>
+
   <h2>设计取舍：UUID 即凭据，边界在哪</h2>
   <ul>
     <li><b>为什么不用登录：</b>分享的本意就是「发给没账号的人看」；附件是 <code>&lt;img&gt;</code> 请求，浏览器不会带令牌。要求登录等于这两个功能直接不可用。</li>

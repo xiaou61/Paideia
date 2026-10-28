@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>12 · 交互式内容与可视化调试 — Paideia 架构导读</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="nav.js"></script>
+
+<main>
+  <p class="kicker">12 / 内容即交互</p>
+  <h1>文章里的代码块，为什么能点</h1>
+  <p class="question"><strong>这张图回答：</strong>一篇 markdown 文章里怎么放进去「可逐步走读的代码」「当场能跑的 SQL」「逐行回放的执行过程」？作者写错了会怎样？</p>
+
+  <h2>先看一个具体场景</h2>
+  <p>你读一篇源码解读，正文里有一段 Java 代码。代码下面有三个按钮：「上一步 / 下一步 / 重置」。点「下一步」，某一行高亮，右边的变量表跟着变，下面出现一句解释——<b>这段讲解不在正文里，是块自己带的</b>。</p>
+  <p>再往下，一道 SQL 题，你写完点「提交」，当场告诉你对错和差异。你翻到文章的 markdown 源文件，看到的只是几个围栏块。</p>
+
+  <figure>
+    <div class="d">
+      <div class="flow">
+        <div class="box">作者：在 markdown 里写一个围栏块<small>语言名决定它变成什么组件</small></div>
+        <div class="link"></div>
+        <div class="box box--svc">渲染器：按语言名查注册表<small>没有登记的，就当普通代码块</small></div>
+        <div class="link"></div>
+        <div class="box">校验：JSON 过 schema<small>有上限、有必填字段</small></div>
+        <div class="link"></div>
+        <div class="box box--fail">校验失败：降级成「提示 + 原始文本」<small>绝不抛进渲染树——一段坏内容不该让整篇文章白屏</small></div>
+        <div class="link"></div>
+        <div class="box box--you">你：看到一个能点的交互块</div>
+      </div>
+    </div>
+    <figcaption><b>一条协议，而不是一堆特例。</b>新增一种块 = 写一个组件 + 在注册表登记语言名，主渲染器不动。</figcaption>
+  </figure>
+
+  <h2>六种块，各自解决一个具体问题</h2>
+  <table>
+    <thead><tr><th>块</th><th>你在页面上看到的</th><th>难点在哪</th></tr></thead>
+    <tbody>
+      <tr><td><code>code-tour</code></td><td>代码 + 分步骤高亮 + 每步一句讲解</td><td>步骤与行号绑定；代码改了行号就错位，所以要按内容锚定而不是写死行号</td></tr>
+      <tr><td><code>code-map</code></td><td>一张「文件 → 职责」的导览图</td><td>只做静态展示，不解析真实仓库——它是策展，不是索引</td></tr>
+      <tr><td><code>quiz</code></td><td>选择题，当场判对错</td><td>答案在正文里，判分要和服务端的题目身份（<code>entry_id + block_key + question_key</code>）对上</td></tr>
+      <tr><td><code>sql-challenge</code></td><td>代码编辑器 + 运行 + 结果对比</td><td><b>判定必须在服务端沙箱里真跑</b>，不能信客户端</td></tr>
+      <tr><td><code>run-challenge</code></td><td>写代码、执行、看输出</td><td>同样走沙箱；执行失败要区分「编译错」和「超时」</td></tr>
+      <tr><td><code>trace-player</code></td><td>逐行回放一次执行，变量表同步变</td><td>回放的数据来自服务端录制（见 <a href="07-sql-sandbox.html">07</a>），前端只负责播</td></tr>
+    </tbody>
+  </table>
+
+  <h3>上限是「内容侧天花板」，不是性能调优</h3>
+  <div class="rules">
+    <div class="rule rule--key"><span class="n">1</span><span class="r"><code>steps</code> ≤ 20、<code>codeLines</code> ≤ 200、<code>codeChars</code> ≤ 20 000</span><span class="r-why">块是作者手写的。超过上限通常意味着<b>这段应该拆成两篇</b>，而不是「渲染器要支持更大的块」。</span></div>
+    <div class="rule rule--key"><span class="n">2</span><span class="r">上限集中在 <code>schema.ts</code> 一处</span><span class="r-why">作者指南与报错文案共用同一份数字，否则「文档说 20、代码允许 40」这种漂移一定会发生。</span></div>
+    <div class="rule rule--key"><span class="n">3</span><span class="r">校验是纯函数，可单测</span><span class="r-why">不需要挂载 React 就能验证契约——这是「坏内容降级」这类逻辑唯一能被稳定测到的形态。</span></div>
+  </div>
+
+  <h3>可视化调试：录制在服务端，回放在前端</h3>
+  <figure>
+    <div class="d">
+      <div class="steps">
+        <span class="from">你</span><span class="arrow">→</span><span class="to">后端</span><span class="what">点「逐步运行」<small>走沙箱，占一次配额</small></span>
+        <span class="from">后端</span><span class="arrow">→</span><span class="to">容器</span><span class="what">注入录制器脚本，边执行边往 stderr 写 JSON 行</span>
+        <span class="from">容器</span><span class="arrow">→</span><span class="to">后端</span><span class="what">逐行解析成事件<small>超时被杀时最后一行常是半截 JSON → 丢掉那一行，不整批失败</small></span>
+        <span class="from">后端</span><span class="arrow">→</span><span class="to">前端</span><span class="what">≤ 300 步 / ≤ 256 KB<small>两边各写一次上限：录制器里是硬上限，服务端是兜底</small></span>
+        <span class="from">前端</span><span class="arrow">→</span><span class="to">你</span><span class="what"><code>trace-player</code> 回放：行高亮 + 变量表 + 调用栈</span>
+      </div>
+    </div>
+    <figcaption><b>录制与回放是两件事。</b>回放不重跑代码，所以用户可以来回拖，不会又花一次配额。</figcaption>
+  </figure>
+
+  <h3>编辑器为什么是懒加载的</h3>
+  <p>SQL / 代码挑战要用真正的编辑器（语法高亮、补全、快捷键），它实测 <b>137 kB gzip</b>——相当于整个主包的一大块。所以它只在<b>页面上真的有挑战块</b>时才去加载，门槛按 gzip 160 定。</p>
+  <div class="warn">
+    <b>懒加载这件事，写了守卫不等于守住了。</b>这个仓库里的懒加载守卫<b>自己被反向验证抓出过缺陷</b>：它检测的是「构建产物里有没有这个模块名」，而模块名被内联进另一个 chunk 时守卫会误判。教训是——<b>守卫必须做一次反向验证</b>：把懒加载去掉，守卫要变红；没变红就说明它守的不是你以为的东西。
+  </div>
+
+  <h2>设计取舍</h2>
+  <ul>
+    <li><b>为什么把校验集中在一个文件：</b>几种块都会被同一个渲染器加载，作者写错时的报错口径必须一致。分散到各组件里，用户会看到五种不同措辞的「你写错了」。</li>
+    <li><b>为什么校验失败是降级而不是抛错：</b>一段坏内容不该让整篇文章白屏。降级成「提示 + 原始文本」之后，作者能自己看见问题，读者至少还能读到别的段落。</li>
+    <li><b>为什么判定在服务端：</b>客户端的判分等于把答案和标准一起发给用户。SQL 与代码挑战必须在沙箱里真跑，参考结果来自真实执行。</li>
+    <li><b>为什么块里不写行号：</b>代码一改，行号就错。步骤要按「内容锚点」绑定，行号在渲染时算出来。</li>
+    <li><b>为什么不做「自动从仓库抓代码」：</b>那会把内容与某个 commit 绑死，代码一改文章就过期。这里是<b>策展</b>：作者选一段贴进来，并负责它仍然成立。</li>
+  </ul>
+
+  <h2>读图要点</h2>
+  <div class="notes">
+    <ul>
+      <li><b>新增一种块不用改主渲染器。</b>写组件 + 在注册表登记语言名即可；改主渲染器的 <code>if/else</code> 是把协议退化成特例。</li>
+      <li><b><code>trace-player</code> 的数据可能比界面上限大。</b>服务端会截断，前端仍要按「可能不完整」渲染——最后一步之后没有 <code>done</code> 是正常情况（超时被杀）。</li>
+      <li><b>移动端要降级。</b>编辑器和三栏布局在窄屏上不可用，退化成「先看题、再展开编辑」比硬挤更好。</li>
+      <li><b>块里的 JSON 是「内容」，不是「用户输入」。</b>它由作者写进仓库，随文章一起 review——但它仍然是不可信输入，校验不能省。</li>
+    </ul>
+  </div>
+
+  <div class="notes">
+    <h2>代码在哪</h2>
+    <ul class="paths">
+      <li><code>frontend/packages/ui/src/markdown/renderers/</code> — 六种块与注册表</li>
+      <li><code>frontend/packages/ui/src/markdown/renderers/schema.ts</code> — 数据契约与上限</li>
+      <li><code>frontend/packages/ui/src/markdown/renderers/trace-player.tsx</code> — 回放</li>
+      <li><code>frontend/packages/sql-workbench/</code> — 编辑器、结果表、执行计划树</li>
+      <li><code>backend/paideia-sandbox/…/trace/SandboxTraceService.java</code> — 录制与半截 JSON 处理</li>
+      <li><code>content/reading/</code>、<code>content/courses/</code> — 真正使用这些块的文章</li>
+    </ul>
+  </div>
+</main>
+
+</body>
+</html>

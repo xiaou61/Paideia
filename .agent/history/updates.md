@@ -7364,3 +7364,22 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：`node .agent/html/render-check.mjs --shots` → 15 页 × 1440/1280 / 0 失败（无 console 错、无图溢出、侧栏 15 条、除 nav.js 无外部脚本）
 - 本地提交：本轮单独提交
 - 远端推送：未执行
+
+## 2026-10-28 12:35:00 +0800 · 架构导读重构：撤数据模型页，补四个高复杂度子系统（18 页）
+
+- 类型：docs
+- 变更：
+  - **撤掉** `07-data-model.html`：用户裁决「数据库相关的没必要放进去」。其中唯一的非显然结论（没有外键 ⇒ 注销靠手写表清单，漏一张无人发现）移到 `10-trust-boundary.html` 的「注销」一节
+  - **新增** `07-sql-sandbox.html`（WORK-015/023/032/035）：容器参数即安全边界（无挂载、镜像来自配置、只读根 + 64MB tmpfs、内存按语言取值、不截断源码）、stdin 分帧协议、数据集上传三道检查与先试后存、语句白名单为何是白名单、EXPLAIN 整棵树在一个字段里且判定顺序有陷阱、配额与「被拒绝也写审计」
+  - **新增** `11-resume.html`（WORK-010/018）：九项体检不出分数、提案默认不采纳、定稿前的事实闸门四条检查（数字/重合度/身份字段/缺口词）、版本链不可变；附身份化四条边界（身份≠role、页面优先、记忆一份、不做硬门槛）
+  - **新增** `12-interactive-content.html`（WORK-014/016/023）：围栏块协议与六种块、上限是内容侧天花板、判定必须在服务端沙箱、录制与回放分家、CodeMirror 懒加载及其守卫被反向验证抓出缺陷
+  - **新增** `13-mcp-tools.html`（WORK-019/039/044）：一份目录两条出口、外部调用七步固定顺序、视图校验防「猜」、限流与配额分工、PAT 与 JWT 平行
+  - `05` 补训练营一节（WORK-029）；`09` 补运营视图一节（WORK-045）
+  - 工程规范四页后移为 `14`–`17`；`nav.js`/`index.html`/`render-check.mjs` 同步为 18 页（含总览）
+- 决策：
+  - 覆盖度复盘：45 个有效工作项（008 已作废）里 44 个在导读里有对应位置，只有 030（管理端观感优化）没有架构形状、不单独立页
+  - 每页的结构从「讲到」改成「讲到难在哪」：新增的四个专题都以「这里真正难的四件事 / 三道护栏」为主干，而不是罗列组件
+- 依据：`DockerCommand`/`SqlStatementGuard`/`SqlDatasetUploadService`/`SandboxTraceService`/`SandboxQuotaService`、`ResumeGate`/`ResumeCheckup`/`ResumeOptimizationService`、`McpToolInvoker`/`McpRateLimiter`、`explain.ts`、`renderers/schema.ts` 的实际注释与代码
+- 验证：`node .agent/html/render-check.mjs --shots` → 18 页 × 1440/1280 / 0 失败；内部链接全量存在性检查通过（无 `07-data-model.html` 残留）
+- 本地提交：本轮单独提交
+- 远端推送：未执行

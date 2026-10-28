@@ -13,19 +13,17 @@
   <p class="kicker">Paideia</p>
   <h1>架构导读</h1>
   <p class="lead">它是一个学编程的网站：看课程、做题、复习、问 AI、写笔记、改简历。这份导读不讲代码怎么写，只讲<b>你点下去之后，系统里发生了什么</b>。</p>
-  <p>十个专题讲「系统怎么跑」，另外四个讲「代码怎么写」。每页最前面是一张「<b>你做了什么 → 系统做了什么 → 你看到什么</b>」的图，不需要任何背景知识；往下是「它内部是怎么做到的」和「设计取舍」——后者才是这套系统为什么长成这样。</p>
+  <p>十七页，分两半：<b>13 页讲系统怎么跑</b>（每一块都讲到「真正难的是什么」），<b>4 页讲代码怎么写</b>（规则、测试、提交、决策）。每页最前面是一张「你做了什么 → 系统做了什么 → 你看到什么」的图，不需要背景知识。</p>
 
   <div class="stats">
     <div><b>11</b><span>后端 Maven 模块</span></div>
     <div><b>16</b><span>前端 workspace 包</span></div>
-    <div><b>58</b><span>在用的数据库表</span></div>
-    <div><b>178</b><span>HTTP 端点</span></div>
-    <div><b>46</b><span>已归档工作项</span></div>
+    <div><b>46</b><span>工作项</span></div>
+    <div><b>17</b><span>篇导读</span></div>
   </div>
 
   <h2>怎么读</h2>
-  <p>如果只有十分钟，按 <b>01 → 03 → 05 → 10</b> 读：系统由什么组成、AI 这条主干怎么跑、内容怎么变成学习行为、谁能碰什么。其余六页是按需查的细节。</p>
-  <p>如果你要动手改代码，<b>11 → 12 → 13</b> 请先读一遍：它们讲的是这个仓库里「什么算做完了」，以及为什么很多规矩看起来别扭。</p>
+  <p>如果只有十分钟，按 <b>01 → 03 → 05 → 10</b> 读：系统由什么组成、AI 这条主干怎么跑、内容怎么变成学习行为、谁能碰什么。其余十二页是按需查的细节。</p>
   <p>每页固定四段，从上到下越来越硬：</p>
   <ul>
     <li><b>先看一个具体场景</b>——只有「你」「系统」「你看到的」，不出现代码名词。</li>
@@ -38,7 +36,7 @@
     <b>图全部是手写的 HTML + CSS，没有用任何图表库。</b>打开即渲染、不联网、没有几 MB 的脚本要下载，也不会有「等图慢慢画出来」的卡顿。
   </div>
 
-  <h2>一、系统怎么跑（01–10）</h2>
+  <h2>一、系统怎么跑（01–13）</h2>
   <div class="cards">
     <a class="card" href="01-overview.html">
       <span class="n">01</span>
@@ -68,7 +66,7 @@
       <span class="n">05</span>
       <h3>学习闭环与掌握度</h3>
       <p>错了两道「索引」的题，之后推给你的题就变了。以及这个算法已知的缺陷。</p>
-      <span class="meta">WORK-004 / 020 / 021 / 024 / 032 / 033 / 034 / 035 / 038 / 045</span>
+      <span class="meta">WORK-004 / 020 / 021 / 024 / 029 / 032 / 033 / 034 / 035 / 038 / 045</span>
     </a>
     <a class="card" href="06-content-pipeline.html">
       <span class="n">06</span>
@@ -76,11 +74,11 @@
       <p>每天早上八点，它自己出去抓一遍新闻，只花一次 AI 的钱。</p>
       <span class="meta">WORK-014 / 025 / 027 / 040 / 041 / 046</span>
     </a>
-    <a class="card" href="07-data-model.html">
+    <a class="card" href="07-sql-sandbox.html">
       <span class="n">07</span>
-      <h3>数据模型：58 张表</h3>
-      <p>注销账号时，你的数据靠一张手写的清单逐张删掉——这就是没有外键的代价。</p>
-      <span class="meta">WORK-003 / 004 / 006 / 009 / 019 / 022 / 033</span>
+      <h3>SQL 工作台与代码沙箱</h3>
+      <p>在别人的服务器上跑你的代码：一次性容器、三道上传检查、执行计划整棵树在一个字段里。</p>
+      <span class="meta">WORK-015 / 023 / 032 / 035</span>
     </a>
     <a class="card" href="08-frontend.html">
       <span class="n">08</span>
@@ -92,39 +90,57 @@
       <span class="n">09</span>
       <h3>可观测与发版</h3>
       <p>凌晨开始报错，早上你看到一段人话结论。以及发版为什么是六十秒。</p>
-      <span class="meta">WORK-028 / 042 / 043</span>
+      <span class="meta">WORK-028 / 042 / 043 / 045</span>
     </a>
     <a class="card" href="10-trust-boundary.html">
       <span class="n">10</span>
       <h3>信任边界</h3>
-      <p>把分享链接改一个字符，立刻 404——这就是它的安全模型。</p>
+      <p>把分享链接改一个字符，立刻 404；以及注销时为什么需要一份手写的表清单。</p>
       <span class="meta">WORK-003 / 007 / 009 / 025 / 035</span>
+    </a>
+    <a class="card" href="11-resume.html">
+      <span class="n">11</span>
+      <h3>简历与求职</h3>
+      <p>AI 改简历，但不能让它编：三道检查拦下「参与改成主导」这类失真。</p>
+      <span class="meta">WORK-010 / 018</span>
+    </a>
+    <a class="card" href="12-interactive-content.html">
+      <span class="n">12</span>
+      <h3>交互式内容与可视化调试</h3>
+      <p>文章里的代码块为什么能点：一套围栏协议、六种块，录制与回放分家。</p>
+      <span class="meta">WORK-014 / 016 / 023</span>
+    </a>
+    <a class="card" href="13-mcp-tools.html">
+      <span class="n">13</span>
+      <h3>MCP 工具面</h3>
+      <p>外面的 AI 怎么读你的数据：一份目录两条出口，七步执行顺序。</p>
+      <span class="meta">WORK-019 / 039 / 044</span>
     </a>
   </div>
 
-  <h2>二、代码怎么写（11–14）</h2>
-  <p>前十条讲系统，这一组讲<b>规矩</b>。每页同样是「规则 → 为什么 → 违反了多久被发现」，不是照抄清单——规则的权威副本在 <code>AGENTS.md</code> 与 <code>.agent/rules/always.md</code>，这里只解释它们为什么存在。</p>
+  <h2>二、代码怎么写（14–17）</h2>
+  <p>前十三条讲系统，这四条讲<b>规矩</b>。每页同样是「规则 → 为什么 → 违反了多久被发现」，不是照抄清单——规则的权威副本在 <code>AGENTS.md</code> 与 <code>.agent/rules/always.md</code>，这里只解释它们为什么存在。</p>
   <div class="cards">
-    <a class="card" href="11-code-conventions.html">
-      <span class="n">11</span>
+    <a class="card" href="14-code-conventions.html">
+      <span class="n">14</span>
       <h3>代码规范</h3>
       <p>加一个接口要守哪些规矩；哪几条写错了<b>永远不会报错</b>，只会半年后咬人。</p>
       <span class="meta">SQL 只在 mapper · 时间只存 UTC · 模块边界</span>
     </a>
-    <a class="card" href="12-testing.html">
-      <span class="n">12</span>
+    <a class="card" href="15-testing.html">
+      <span class="n">15</span>
       <h3>测试规范</h3>
       <p>什么才算「跑过了」：三次环比预算、四条证据的定义、四道守卫。</p>
       <span class="meta">独占测试库 · 看 Skipped 列 · 反向验证</span>
     </a>
-    <a class="card" href="13-commit-review-release.html">
-      <span class="n">13</span>
+    <a class="card" href="16-commit-review-release.html">
+      <span class="n">16</span>
       <h3>提交、评审与发布</h3>
       <p>提交、推送、部署是三件授权不同的事；公开仓库提交前必须先扫一遍暂存区。</p>
       <span class="meta">按切片提交 · worktree · 增量发版</span>
     </a>
-    <a class="card" href="14-docs-and-decisions.html">
-      <span class="n">14</span>
+    <a class="card" href="17-docs-and-decisions.html">
+      <span class="n">17</span>
       <h3>文档与决策纪律</h3>
       <p>什么改动要建工作项；被推翻的决定也要记；文档为什么会过期、怎么让过期被发现。</p>
       <span class="meta">WORK 四件工件 · D-01…D-14 · 两类图</span>
@@ -134,17 +150,17 @@
   <h2>这份导读不画什么</h2>
   <p>写清楚是为了免得有人以为它完整：</p>
   <ul>
+    <li><b>不画数据库集中页。</b>表结构以迁移文件为准；只有解释一个设计时才提到表（比如「没有外键所以注销靠清单」）。</li>
     <li><b>不画组件级 C4。</b>在这个规模下，组件图会变成三十个框挤在一起，信息量低于直接读包结构。</li>
     <li><b>不画接口字段。</b>请求与响应的具体结构在代码和契约测试里；要自动生成得引 springdoc，那是另一个决定。</li>
     <li><b>不画前端路由表。</b>路由改得不频繁，一页一图的价值低于维护成本。</li>
-    <li><b>不硬造状态机。</b>会话与任务的状态都是枚举字段，没有真正的状态流转时画出来是假的。</li>
     <li><b>不含任何地址、端口映射到主机、凭据。</b>这是公开仓库，图里一律只写服务名。</li>
   </ul>
 
   <h2>怎么改</h2>
   <p>页面是手写 HTML，图是 <code>style.css</code> 里的一组图元拼出来的：<code>.flow</code>（竖排流程）、<code>.steps</code>（谁对谁做了什么）、<code>.layer</code>（分层）、<code>.rules</code>（判定顺序）。没有 JS 负责画图，所以改一个框就是改一行 HTML。</p>
-  <p>改完跑 <code>node .agent/html/render-check.mjs</code>：它用 chromium 真打开每个页面，检查控制台没有报错、没有任何图横向溢出、侧栏 11 条导航齐全。<code>--shots</code> 可以把每页截图存到系统临时目录。</p>
-  <p>页面里的数字（模块数、包数、表数、端点数）来自 <code>scripts/gen-arch-diagram.mjs</code> 对 <code>pom.xml</code> / <code>package.json</code> / 迁移文件 / 控制器的抽取，权威副本在 <code>docs/architecture/</code>。数字变了先跑生成脚本，再回来改页面。</p>
+  <p>改完跑 <code>node .agent/html/render-check.mjs</code>：它用 chromium 真打开每个页面，检查控制台没有报错、没有任何图横向溢出、侧栏 18 条导航齐全。<code>--shots</code> 可以把每页截图存到系统临时目录。</p>
+  <p>页面里的数字（模块数、包数、端点数）来自 <code>scripts/gen-arch-diagram.mjs</code> 对 <code>pom.xml</code> / <code>package.json</code> / 控制器的抽取，权威副本在 <code>docs/architecture/</code>。数字变了先跑生成脚本，再回来改页面。</p>
 
   <footer>
     Paideia · 架构导读 · 手写 HTML/CSS 图元 · 双击可开，无需联网、无需构建

@@ -97,6 +97,17 @@
     <b>这里有实测过的真缺陷，别当成理论。</b>用生产模型跑离线模拟：信息增益 <b>0.6303</b>，随机选题是 <b>0.7619</b>——<b>比随机低 17.3%</b>。根因是上面的回路：掌握度低 → 能力值低 → 挑简单题 → 答对 → 掌握度只微涨，于是系统长期在 50% 正确率附近震荡，爬不上去。这是一条<b>写成断言「当前是错的」的绿色测试</b>，不是漏测。
   </div>
 
+  <h3>训练营：把「学习计划」也做成一组成表的数据</h3>
+  <p>训练营不是课程的同义词，它是一份<b>带日期的计划</b>：若干任务、每个任务下若干题、你的每次尝试都留痕。所以它有自己的一套表（<code>camp_programs</code> / <code>camp_tasks</code> / <code>camp_items</code> / <code>camp_plans</code> / <code>camp_attempts</code>）和一套端点，而不是硬塞进课程结构里。</p>
+  <div class="d">
+    <div class="steps">
+      <span class="from">你</span><span class="arrow">→</span><span class="to">目标</span><span class="what">选一个方向与周期<small>计划由 AI 生成，一次调用、计 <code>CAMP</code> 流水</small></span>
+      <span class="from">计划</span><span class="arrow">→</span><span class="to">任务</span><span class="what">任务下挂题（来自题库，不另造题）</span>
+      <span class="from">你</span><span class="arrow">→</span><span class="to">尝试</span><span class="what">每次作答落 <code>camp_attempts</code><small>与题库的 <code>question_attempts</code> 是两条记录：一个记「学习行为」，一个记「题目统计」</small></span>
+    </div>
+  </div>
+  <p><b>为什么分成两条答题记录：</b>训练营关心「你今天做完了没」，题库关心「这道题的全站正确率」。合表会让两个统计互相污染——训练营重复做同一道题不该把题目的难度统计带偏。</p>
+
   <h2>设计取舍：为什么这么别扭</h2>
   <ul>
     <li><b>内容放仓库，是为了能 review。</b>一门课五十多篇，改动要能 diff、能回滚、能跟着代码一起发版。放后台纯手录，改一个字都没有审计。</li>
@@ -111,7 +122,7 @@
     <ul>
       <li><b>复习会话的答案绝不下发。</b><code>review_sessions.items_json</code> 里带着答案与解析，响应由服务端裁剪成 <code>itemId / 题干 / 选项</code>。把整行 JSON 直接返回是最容易犯的错。</li>
       <li><b>复习出题要花钱。</b>它走 AI 出题 + 积分预留结算，和对话同一条账务管线。</li>
-      <li><b>这些表没有外键。</b>删用户时靠 <code>KnowledgeUserDeletionListener</code> 的表清单级联，漏一张就是隐私事故（见 <a href="07-data-model.html">07</a>）。</li>
+      <li><b>这些表没有外键。</b>删用户时靠 <code>KnowledgeUserDeletionListener</code> 的表清单级联，漏一张就是隐私事故（见 <a href="10-trust-boundary.html">10</a> 的「注销」一节）。</li>
       <li><b>统计以「最后一次写入」为准。</b>并发作答时不做合并，这是简化，写在设计文档里。</li>
     </ul>
   </div>

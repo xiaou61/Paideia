@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>11 · 简历与求职 — Paideia 架构导读</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="nav.js"></script>
+
+<main>
+  <p class="kicker">11 / 求职者面</p>
+  <h1>让 AI 改简历，但不能让它编</h1>
+  <p class="question"><strong>这张图回答：</strong>上传一份 PDF 到产出一版新简历，中间有几道人工动作？模型写出来的东西凭什么能信？</p>
+
+  <h2>先看一个具体场景</h2>
+  <p>你把 PDF 简历传上去，立刻看到九条体检结论：「工作经历第 2 条没有量化结果」「项目里写了『精通』但没证据」——每条都指到具体位置，没有总分。</p>
+  <p>你点「优化」，它给出十二条改写提案，每条都是「原文 / 建议」并排。<b>默认一条都不采纳</b>，你勾了其中五条，点「定稿」。这时系统会拦下其中一条——因为它把「参与」改成了「主导」，那是<b>身份字段被升级</b>。</p>
+
+  <figure>
+    <div class="d">
+      <div class="flow">
+        <div class="box box--you">你：上传 PDF 简历</div>
+        <div class="link"></div>
+        <div class="box box--svc">解析：抽成结构化字段<small>计一笔消耗（<code>RESUME</code> 流水）</small></div>
+        <div class="link"></div>
+        <div class="box">体检：九项纯函数检查<small><b>不调用模型、不出分数</b></small></div>
+        <div class="link"></div>
+        <div class="box box--svc">分析：分类 + 给建议<small>第二笔消耗</small></div>
+        <div class="link"></div>
+        <div class="box box--svc">提案：逐条给「原文 / 建议」<small>第三笔消耗；<b>默认全部不采纳</b></small></div>
+        <div class="link"></div>
+        <div class="box box--you">你：勾选几条，点「定稿」</div>
+        <div class="link"></div>
+        <div class="box box--fail">事实闸门：四条检查<small>数字 / 重合度 / 身份字段 / 缺口词 → 越界的那条被挡下</small></div>
+        <div class="link"></div>
+        <div class="box box--data">落成新版本：旧版本保留</div>
+      </div>
+    </div>
+    <figcaption><b>三次 AI 调用、一道人工确认、一道自动闸门。</b>「改」和「写回」是两件分开的事。</figcaption>
+  </figure>
+
+  <h2>这里真正难的四件事</h2>
+
+  <h3>一、体检不出分数</h3>
+  <p>九项检查，每项只回答「通过 / 待改」，并给出位置。不调用模型、不出 0–100 分。</p>
+  <div class="warn">
+    <b>理由是校准：</b>0–100 分无法校准——没人能说清 72 分和 75 分差在哪。而一个<b>假精确的分数</b>会诱导用户把精力放在刷分上，而不是去修那几条具体的毛病。
+  </div>
+  <p>九项里每一项都写清了「什么样的简历该被判待改」，不写「建议优化」这种放之四海皆准的话。日期格式、联系方式是否可点、意向是否明确、经历是否有量化……都是可以直接判的。</p>
+
+  <h3>二、提案默认不采纳</h3>
+  <p>模型给的改写全部以 <code>accepted = false</code> 落库。用户主动勾选才进定稿。<b>这条不是交互偏好，是责任划分</b>：简历是求职者的对外材料，AI 只出建议，写不写进去必须由本人签字。</p>
+  <p>每条提案的结构是「原文 / 建议 / 变更类型 / 闸门状态 / 违规点」，不是一段整体替换——所以用户能<b>只采纳一半</b>，也能看到某个字段被拒的具体原因。</p>
+
+  <h3>三、事实闸门：在落库之前拦住「编」</h3>
+  <p>整个工作项里最重要的一段代码，在用户点「定稿」之后、落库之前。四条检查对应四类真实失真：</p>
+
+  <figure>
+    <div class="d">
+      <div class="rules">
+        <div class="rule rule--key"><span class="n">1</span><span class="r">数字</span><span class="r-why">原文没有的指标被编出来（「提升 30%」）。模型最擅长做这件事，因为它看起来更专业。</span></div>
+        <div class="rule rule--key"><span class="n">2</span><span class="r">重合度</span><span class="r-why">整段被换成与原文无关的内容——「这条经历被重写成另一件事」。用相似度阈值判，太低就是编造。</span></div>
+        <div class="rule rule--key"><span class="n">3</span><span class="r">身份字段</span><span class="r-why">职位名、公司名、时间被悄悄升级或改写。「参与」改成「主导」是最常见的一种。</span></div>
+        <div class="rule rule--key"><span class="n">4</span><span class="r">缺口词</span><span class="r-why">把用户不会的技能写进去。这类失真最危险：面试当场就露馅，而用户没意识到自己「被写了」。</span></div>
+      </div>
+    </div>
+    <figcaption><b>四类失真，四种拦法。</b>拦截结果会写进提案的 <code>gateViolations</code>，用户能看到是哪一条没过。</figcaption>
+  </figure>
+
+  <p>相似度阈值（0.35 那一类）没有理论依据，<b>只能靠夹具校准</b>。所以它被写成常量并在验证报告里记录实测——而不是散落在代码里的魔法数字，也不是拍一个「看起来很科学」的值。</p>
+
+  <h3>四、版本链：任何一次定稿都不覆盖旧版</h3>
+  <p><code>documents → versions → proposals</code> 三层：文档是身份，版本是不可变快照，提案挂在版本上。<code>resume_edit_history</code> 记人工改动。<b>不提供「删除中间版本」</b>——简历的价值恰恰在于能回退到「投上一家时用的那一版」。</p>
+
+  <h2>身份化：求职者是一个「面」，不是一种权限</h2>
+  <p>这个子系统承载了 WORK-010 的裁决：用户可以选择「求职者」身份，页面与推荐跟着变，但<b>身份不是权限</b>。</p>
+  <div class="rules">
+    <div class="rule"><span class="n">→</span><span class="r">身份 ≠ role，两个正交轴</span><span class="r-why">身份永远不写进 <code>role</code> 字段。role 决定「能不能做」，身份只决定「默认做什么、先给你看什么」。</span></div>
+    <div class="rule"><span class="n">→</span><span class="r">页面优先，身份当默认</span><span class="r-why">你在简历页，行为就是简历行为；身份只在没有场景时提供默认。所以「同一个面试官行为 × 你的记忆」才是个性化产生的地方。</span></div>
+    <div class="rule"><span class="n">→</span><span class="r">记忆一份全属于你</span><span class="r-why">不按身份切成两份——切换身份不该丢上下文，也不该出现「跨身份传记忆」这种新问题。</span></div>
+    <div class="rule"><span class="n">→</span><span class="r">一期不做硬门槛</span><span class="r-why">不做「求职者才能看简历页」这种限制。推荐可以偏，权限不能。</span></div>
+  </div>
+
+  <h2>设计取舍</h2>
+  <ul>
+    <li><b>为什么拆成三次调用而不是一次：</b>解析要输出结构化数据、分析要输出分类、提案要输出逐条改写——三种输出的形状和失败处理都不同。合并成一次，失败了就全废；分开之后，解析成功但分析失败时用户至少能看到结构化结果。</li>
+    <li><b>为什么三笔消耗分开记：</b>一次求职 = 解析 + 分析 + 提案。用户要能看出「改一份简历到底花了多少」，合成一类就永远算不清。</li>
+    <li><b>为什么闸门在「定稿」而不是「生成」时跑：</b>生成时拦，用户看不到提案被拒的理由；定稿时拦，用户可以看着违规点改那一句再提交。</li>
+    <li><b>为什么不做「一键全采纳」：</b>那等于把责任从用户手里拿走。现在的设计里，责任边界是一条清晰的线：<b>AI 出建议，人签字，机器只校验事实越界</b>。</li>
+  </ul>
+
+  <h2>读图要点</h2>
+  <div class="notes">
+    <ul>
+      <li><b>PDF 解析失败要有兜底。</b>扫描件（纯图片）抽不出文字时应当明确告诉用户「这份看不出来」，而不是给一份空结构化结果让他以为解析成功。</li>
+      <li><b>闸门不判断「写得好不好」。</b>它只判断「有没有超出原文的事实」。写得平淡但真实，可以通过；写得漂亮但编了数字，必须拦。</li>
+      <li><b>版本链不可变，但可以「从旧版本派生」。</b>回退不是覆盖，是再开一个新版本。</li>
+      <li><b>这个子系统的 AI 调用是「贵」的那一类</b>（要读整份简历），所以每一次都要预留-结算，和对话同一条账务管线。</li>
+    </ul>
+  </div>
+
+  <div class="notes">
+    <h2>代码在哪</h2>
+    <ul class="paths">
+      <li><code>backend/paideia-ai/…/resume/ResumeImportService.java</code> — PDF → 结构化</li>
+      <li><code>backend/paideia-ai/…/resume/ResumeCheckup.java</code> — 九项体检（纯函数、不出分）</li>
+      <li><code>backend/paideia-ai/…/resume/ResumeOptimizationService.java</code> — 提案、勾选、定稿</li>
+      <li><code>backend/paideia-ai/…/resume/ResumeGate.java</code> — 事实闸门四条检查</li>
+      <li><code>backend/paideia-ai/…/resume/ResumePrompts.java</code> — 三段提示词与版本</li>
+      <li><code>db/migration/V15__create_resume_tables.sql</code> — 文档 / 版本 / 提案 / 编辑历史</li>
+    </ul>
+  </div>
+</main>
+
+</body>
+</html>

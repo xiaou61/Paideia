@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>07 · SQL 工作台与代码沙箱 — Paideia 架构导读</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="nav.js"></script>
+
+<main>
+  <p class="kicker">07 / 执行沙箱</p>
+  <h1>在别人的服务器上跑你的代码</h1>
+  <p class="question"><strong>这张图回答：</strong>我写一句 <code>SELECT</code> 点运行，3 秒后拿到结果表和执行计划——中间到底启动了什么？别人上传的数据集为什么不会把我的会话搞坏？</p>
+
+  <h2>先看一个具体场景</h2>
+  <p>你在 SQL 练习页写了一句 <code>SELECT * FROM orders WHERE user_id = 7</code>，点「运行」。三秒后出现一个结果表，下面还有一棵「执行计划」树：它走的全表扫描，被标成了红字。</p>
+  <p>如果你写的是 <code>DROP TABLE</code>，会被当场拒绝；如果你跑了个死循环，会在超时后被杀掉，页面告诉你「执行超时」。<b>这背后没有任何一个「你自己的数据库」——每次运行都是一次性的。</b></p>
+
+  <figure>
+    <div class="d">
+      <div class="flow">
+        <div class="box box--you">你：写下 SQL，点「运行」</div>
+        <div class="link"></div>
+        <div class="box box--svc">后端：先看语句类型<small>只允许查询；DROP / TRIGGER 这类当场拒</small></div>
+        <div class="link"></div>
+        <div class="box">后端：占一个执行名额<small>每人同时只能跑一个；当天次数有上限</small></div>
+        <div class="link"></div>
+        <div class="box box--ext">docker：起一个一次性容器<small>只读根文件系统、无网络、无挂载、内存与 CPU 都限死</small></div>
+        <div class="link"></div>
+        <div class="box">容器：灌入数据集 → 执行你的语句 → 输出结果</div>
+        <div class="link"></div>
+        <div class="box box--data">后端：解析结果 + 执行计划，落审计</div>
+        <div class="link"></div>
+        <div class="box box--you">你看到：结果表 + 执行计划树 + 用时</div>
+      </div>
+    </div>
+    <figcaption><b>一次运行 = 一个一次性容器。</b>没有常驻的「你的数据库」，也就没有「上次留下的表」这种状态。</figcaption>
+  </figure>
+
+  <h2>这里真正难的四件事</h2>
+
+  <h3>一、容器参数就是安全边界，所以它被拆成一个纯函数</h3>
+  <p>启动容器的命令行是<b>纯字符串拼装</b>，单独一个类。理由写在代码注释里：<b>少写一个加固标志就等于没隔离，而这件事在本地根本测不出来</b>。所以每一条标志都被单元测试钉死。</p>
+
+  <div class="rules">
+    <div class="rule rule--key"><span class="n">1</span><span class="r">没有 <code>-v</code> / <code>--mount</code></span><span class="r-why">代码通过 stdin 进容器，宿主机文件系统不出现。挂载一次，整个沙箱就形同虚设。</span></div>
+    <div class="rule rule--key"><span class="n">2</span><span class="r">镜像来自配置，不来自请求</span><span class="r-why">用户输入永远进不了命令行。这是「命令注入」在这个子系统里的唯一入口。</span></div>
+    <div class="rule rule--key"><span class="n">3</span><span class="r"><code>--read-only</code> 之后仍要可写 <code>/tmp</code></span><span class="r-why"><code>javac</code> 要写 class 文件，所以给一个 64 MB 的 tmpfs——只读不等于什么都不能写。</span></div>
+    <div class="rule rule--key"><span class="n">4</span><span class="r">内存与 CPU 按语言取值</span><span class="r-why">SQL 容器的 <code>mysqld</code> 常驻约 348 MB，按 Java 的 256 MB 配会被直接 OOM 杀掉。</span></div>
+    <div class="rule rule--key"><span class="n">5</span><span class="r">不截断用户的源码</span><span class="r-why">截断后的代码编译不过，报错会指向一段用户看不懂的地方——比直接拒绝更糟。</span></div>
+  </div>
+
+  <h3>二、代码送进去的时候要分帧，否则会被拼进源码</h3>
+  <p>容器里的脚本是常量，不含用户内容。但它<b>不能</b>简单地 <code>cat &gt; Main.java</code> 把代码和 stdin 一起倒进去：<code>cat</code> 会一直读到 EOF，于是用户传入的程序输入会被追加进源码——变成莫名其妙的编译错误，而程序自己拿到的是 EOF。</p>
+  <p>解法是分帧：先读一行「源码字节数」，再 <code>dd</code> 恰好那么多字节作为源码，剩下的才是程序的标准输入。</p>
+
+  <h3>三、数据集上传：三道检查，顺序不能换</h3>
+  <figure>
+    <div class="d">
+      <div class="steps">
+        <span class="from">上传</span><span class="arrow">→</span><span class="to">① 大小</span><span class="what">最便宜，先挡掉明显过大的</span>
+        <span class="from">①</span><span class="arrow">→</span><span class="to">② 语句白名单</span><span class="what">纯字符串判断，不起容器<small>反过来会让一个 10 MB 的垃圾文件先烧掉一次容器启动</small></span>
+        <span class="from">②</span><span class="arrow">→</span><span class="to">③ 沙箱干跑</span><span class="what">真灌一遍 + 顺手查 <code>information_schema</code><small>3–5 秒 + 一次配额；干跑与抓结构在同一次运行里做完</small></span>
+        <span class="from">③</span><span class="arrow">→</span><span class="to">落库</span><span class="what">先试后存<small>先存后试失败要回滚两处（表 + 存储），回滚失败会留下「存在但不可用」的数据集</small></span>
+      </div>
+    </div>
+    <figcaption><b>必须干跑的理由：</b>不跑的话用户会拿到一个永远起不来的数据集，而发现时机是<b>别人用它做题的时候</b>——那时既不知道是谁传的，也不知道错在哪。</figcaption>
+  </figure>
+
+  <p>白名单本身就是一套设计判断：</p>
+  <ul>
+    <li><b>为什么自己解析而不交给 MySQL 拒：</b><code>LOAD DATA</code>、<code>CREATE TRIGGER</code>、<code>PROCEDURE</code>、<code>EVENT</code> 在 MySQL 里都是<b>合法语句</b>。而数据集会被<b>别人的运行反复执行</b>——里面藏一个 <code>TRIGGER</code>，它就在每次别人跑 SQL 时执行一次，等于把「一次性上传」变成「持续执行」。</li>
+    <li><b>为什么是白名单不是黑名单：</b>语句种类会随版本增加，黑名单永远会漏。白名单漏掉的后果是「某个合法写法被拒」，可以补；黑名单漏掉的后果是「任意逻辑被执行」。</li>
+    <li><b>只做词法层，不做完整解析：</b>一个完整 SQL 解析器是很大的依赖，而这里要挡的只是「语句类型」这一层。剩下的风险由「干跑 + 容器隔离」兜。</li>
+  </ul>
+
+  <h3>四、执行计划的坑：整棵树在一个字段里</h3>
+  <p>实测（真实镜像 + 生产加固参数）发现 <code>mysql --xml</code> 把整棵树塞进<b>一个字段值</b>，拿到的是「1 列 × 1 行」，多行之间是 <code>\n</code>。<b>结构信息不在结果集里，只能从文本还原。</b></p>
+  <p>还原出来还不够——判读是字符串匹配，而 MySQL 8 的 TREE 输出没有机器可读的「是否用索引」标记，只有 <code>Index lookup</code> / <code>Table scan</code> 这类文本。所以判读被收进一个纯函数并单测：<b>判错了用户会得到一条假的性能结论</b>。</p>
+  <div class="warn">
+    <b>判定顺序本身是个陷阱：</b><code>Index scan</code> 含 <code>scan</code>，<code>Table scan</code> 也含 <code>scan</code>——但前者走索引、后者全表扫。所以必须先判 <code>Table scan</code>，反过来会把全表扫描标成「走了索引」。<code>Filter</code> / <code>Sort</code> / <code>Aggregate</code> 也不参与判定，一律标 <code>other</code>，否则「Filter 在上、Table scan 在下」会被误读成「这行走了索引」。
+  </div>
+
+  <h2>配额与审计：被拒绝的也要留痕</h2>
+  <div class="rules">
+    <div class="rule rule--key"><span class="n">1</span><span class="r">每人同时只能跑一个</span><span class="r-why">执行很贵（一次容器启动 3–5 秒）；并发不设限等于让一个人把整机的容器名额占满。</span></div>
+    <div class="rule rule--key"><span class="n">2</span><span class="r">当天次数有上限（500）</span><span class="r-why">按 <b>UTC 日切</b>。不为「看起来像本地的一天」引入时区——那会让跨时区部署的计数不一致。</span></div>
+    <div class="rule rule--key"><span class="n">3</span><span class="r">被拒绝的也写审计，但不计入次数</span><span class="r-why">审计是为了回答「他为什么被挡」。只在成功时写，用户说「我明明没跑几次」时就无从对账。</span></div>
+  </div>
+
+  <h2>逐步录制：为什么只给「能读多少给多少」</h2>
+  <p>可视化调试要把一次执行录成一步一步的状态，再在页面上回放（见 <a href="12-interactive-content.html">12</a>）。录制这一侧有三条硬约束：</p>
+  <ul>
+    <li><b>上限 300 步、响应 256 KB</b>。录制器里有硬上限，服务端再兜一次——两边都写，是因为「录制器被换掉」比「服务端被绕过」更可能发生。</li>
+    <li><b>超时被杀时，最后一行常常只有半截 JSON。</b>那一行直接丢掉，而不是整批失败：用户要的是「被杀之前发生了什么」，我们要的是「能读多少给多少」。</li>
+    <li><b>不截断源码</b>（同上），但<b>截断输出</b>——stdout / stderr 各自截到固定字节数并明确标记。</li>
+  </ul>
+
+  <h2>设计取舍</h2>
+  <ul>
+    <li><b>为什么用容器而不是进程隔离 + 权限降级：</b>用户代码是任意代码，进程级隔离挡不住 <code>fork</code> 炸弹和文件系统探测。容器是这里唯一「便宜的强隔离」。代价是机器上必须有 Docker，没有时整个沙箱能力降级并明确报错。</li>
+    <li><b>为什么不做「一个用户的常驻数据库」：</b>那会引入状态、清理、配额和跨用户隔离四件事。每次重建数据集只要几秒，换来的是「永远干净」。</li>
+    <li><b>为什么 AI 造数据也要走上传同一条路：</b>它同样是不可信内容。参考解会被<b>真跑一次</b>取期望结果，再走同一套三道检查——不给 AI 开一条后门。</li>
+  </ul>
+
+  <h2>踩过的坑</h2>
+  <div class="notes">
+    <ul>
+      <li><b><code>ModularityTest</code> 拦住「跨模块引用 <code>internal</code> 包」。</b>沙箱要把附件交给别的模块读，正解是开一个公开契约接口、把端口移到包根，而不是放宽测试。</li>
+      <li><b><code>Clock</code> Bean 缺失只有真启动才报。</b>切片测试里注入 mock 全绿，整个应用起不来——这又一次说明「绿测试不等于能跑」。</li>
+      <li><b>懒加载守卫自己也有缺陷。</b>守卫必须反向验证：把懒加载去掉，守卫要变红。只写不舍得跑一次的守卫，等于没有守卫。</li>
+    </ul>
+  </div>
+
+  <div class="notes">
+    <h2>代码在哪</h2>
+    <ul class="paths">
+      <li><code>backend/paideia-sandbox/…/run/DockerCommand.java</code> — 容器命令行（纯函数）与分帧脚本</li>
+      <li><code>backend/paideia-sandbox/…/run/RunSlot.java</code> — 并发名额</li>
+      <li><code>backend/paideia-sandbox/…/dataset/SqlStatementGuard.java</code> — 语句白名单</li>
+      <li><code>backend/paideia-sandbox/…/dataset/SqlDatasetUploadService.java</code> — 三道检查与先试后存</li>
+      <li><code>backend/paideia-sandbox/…/trace/SandboxTraceService.java</code> — 逐步录制与半截 JSON 处理</li>
+      <li><code>backend/paideia-sandbox/…/audit/SandboxQuotaService.java</code> — 配额与审计</li>
+      <li><code>frontend/packages/sql-workbench/src/explain.ts</code> — 执行计划解析与判读（纯函数 + 单测）</li>
+    </ul>
+  </div>
+
+  <div class="warn">
+    <b>这个子系统的验证成本特别高。</b>容器、镜像、Docker 守护进程都不在单元测试里——「真容器干跑」与「真上游 AI 出题」这两条，在开发机没有 Docker 时只能靠结构保证。这属于「没有哨兵」，不是「功能坏了」，但每次改这里都要说清楚是哪一种。
+  </div>
+</main>
+
+</body>
+</html>

@@ -113,6 +113,14 @@
     <figcaption><b>增量发版。</b>不这么做的话，每次发版要传 82 MB、耗时约 20 分钟。</figcaption>
   </figure>
 
+  <h3>运营视图：从行为事件聚合，不从业务表实时算</h3>
+  <p>管理端有一个数据大屏（点击、搜索、速递打开率、学习完成量）。它不直接对业务表跑实时聚合，而是读<b>行为事件表</b>：<code>digest_item_clicks</code>、<code>knowledge_search_log</code> 这类「谁在什么时候做了什么」的记录。</p>
+  <div class="rules">
+    <div class="rule rule--key"><span class="n">1</span><span class="r">业务表只回答「现在的状态」，事件表才回答「发生过什么」</span><span class="r-why">「这周有多少人搜过 Redis」在业务表里没有答案——搜索日志是独立写入的。</span></div>
+    <div class="rule rule--key"><span class="n">2</span><span class="r">大屏只读，不写</span><span class="r-why">避免运营视图的查询压力反噬业务；也避免「在看板上一改，业务数据跟着变」这种事故。</span></div>
+    <div class="rule rule--key"><span class="n">3</span><span class="r">聚合口径写在查询里，不写在界面上</span><span class="r-why">同一个数字在两处算出不同结果，是最难解释的 bug。</span></div>
+  </div>
+
   <h2>设计取舍：四个看起来奇怪的决定</h2>
   <ul>
     <li><b>指标只允许本机读。</b><code>/actuator/prometheus</code> 会暴露 JVM 内部结构与业务维度标签，不能像 <code>health</code> 那样整体放行。<b>前提是进程前面没有反向代理</b>——一挂反代，远端地址都变成回环，这条白名单立刻失效，那时必须改成独立回环管理端口。</li>

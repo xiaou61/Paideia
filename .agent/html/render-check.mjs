@@ -65,7 +65,7 @@ for (const file of pages) {
     if (errors.length) problems.push(`[${width}px] ${errors.join(' | ')}`)
     if (overflow.length) problems.push(`[${width}px] ${overflow.length} 个图溢出：${overflow.join(', ')}`)
     if (libs.length) problems.push(`[${width}px] 引了外部脚本：${libs.join(', ')}`)
-    if (width === 1440 && nav !== 15) problems.push(`侧栏导航是 ${nav} 条，应为 15 条`)
+    if (width === 1440 && nav !== 18) problems.push(`侧栏导航是 ${nav} 条，应为 18 条（含总览）`)
     if (width === 1440 && SHOTS) {
       await page.screenshot({ path: join(shotDir, file.replace('.html', '.png')), fullPage: true })
     }
