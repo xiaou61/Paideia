@@ -6,7 +6,7 @@
 
 # 前端包依赖
 
-由 `frontend/` 的 15 个 workspace 包生成（`packages/*` 是库，`apps/*` 是可运行端）。
+由 `frontend/` 的 16 个 workspace 包生成（`packages/*` 是库，`apps/*` 是可运行端）。
 只画**包之间**的依赖，外部依赖（React、Vite 等）不画。箭头方向是**依赖方 → 被依赖方**。
 
 ```mermaid
@@ -21,6 +21,7 @@ flowchart TB
     platform_desktop["platform-desktop"]
     platform_web["platform-web"]
     resume["resume"]
+    sql_workbench["sql-workbench"]
     ui["ui"]
   end
   subgraph 可运行端 apps
@@ -42,6 +43,7 @@ flowchart TB
   platform_desktop --> core
   platform_web --> core
   resume --> core
+  sql_workbench --> ui
   admin --> auth
   admin --> core
   admin --> knowledge
@@ -56,6 +58,7 @@ flowchart TB
   app --> platform_desktop
   app --> platform_web
   app --> resume
+  app --> sql_workbench
   app --> ui
   public --> ui
   ui_kit --> platform_web
@@ -75,9 +78,10 @@ flowchart TB
 | `@paideia/platform-desktop` | `packages` | `@paideia/core` |
 | `@paideia/platform-web` | `packages` | `@paideia/core` |
 | `@paideia/resume` | `packages` | `@paideia/core` |
+| `@paideia/sql-workbench` | `packages` | `@paideia/ui` |
 | `@paideia/ui` | `packages` | （无） |
 | `@paideia/admin` | `apps` | `@paideia/auth`、`@paideia/core`、`@paideia/knowledge`、`@paideia/platform-web`、`@paideia/ui` |
-| `@paideia/app` | `apps` | `@paideia/assistant`、`@paideia/auth`、`@paideia/camp`、`@paideia/core`、`@paideia/identity`、`@paideia/knowledge`、`@paideia/platform-desktop`、`@paideia/platform-web`、`@paideia/resume`、`@paideia/ui` |
+| `@paideia/app` | `apps` | `@paideia/assistant`、`@paideia/auth`、`@paideia/camp`、`@paideia/core`、`@paideia/identity`、`@paideia/knowledge`、`@paideia/platform-desktop`、`@paideia/platform-web`、`@paideia/resume`、`@paideia/sql-workbench`、`@paideia/ui` |
 | `@paideia/desktop` | `apps` | （无） |
 | `@paideia/public` | `apps` | `@paideia/ui` |
 | `@paideia/ui-kit` | `apps` | `@paideia/platform-web`、`@paideia/ui` |

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>05 · 学习闭环与掌握度 — Paideia 架构导读</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="nav.js"></script>
+
+<main>
+  <p class="kicker">05 / 学习闭环</p>
+  <h1>内容怎么变成一次学习行为</h1>
+  <p class="question"><strong>这张图回答：</strong>一篇 markdown 文稿是怎么变成「关卡」「练习」「复习」的？「你哪块弱」这个判断是怎么算出来的，它准不准？</p>
+
+  <h2>先给结论</h2>
+  <p>内容全部来自仓库里的 markdown（<code>content/courses/</code>、<code>content/reading/</code>），由 <code>scripts/import-course.mjs</code> 走<b>管理端已有的写接口</b>幂等导入——不新增导入接口，也不在启动时读文件。第二次运行应当 <code>created 0 / updated 0</code>。</p>
+  <p>「学习线」不是一张表，而是<b>分类上的一个标记</b>：<code>knowledge_categories.line_kind</code> 非空即是一条线，线名、slug、顺序都来自分类自己，站就是它下面的<b>已发布条目</b>。所以新增一条线只需要建分类 + 写内容，不改代码、不加迁移。</p>
+  <p>题目也<b>没有表</b>：题干、选项、答案只存在于条目正文的围栏块里，那是唯一权威。数据库只存「身份 + 证据 + 状态」。</p>
+
+  <figure>
+    <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  MD["content/courses · content/reading<br/>markdown 文稿"] --> IMP["scripts/import-course.mjs<br/>走管理端 API，幂等"]
+  IMP --> CAT[("knowledge_categories<br/>line_kind 非空 = 一条线")]
+  IMP --> ENT[("knowledge_entries<br/>正文含 quiz 围栏")]
+  CAT --> LINE["LearningLineService<br/>站 = 该分类下已发布条目"]
+  LINE --> VIEW["学习者读一站"]
+  VIEW --> PROG[("learning_progress")]
+  ENT --> ATT[("question_attempts<br/>每次作答 + fingerprint")]
+  PROG --> ATT
+  ATT --> MAS["MasteryModel<br/>按概念更新"]
+  MAS --> STATE[("concept_mastery_state")]
+  STATE --> SEL["PracticeSelector<br/>选题 · 复习排期"]
+  SEL --> REV[("review_sessions<br/>AI 出题，答案不下发")]
+  REV --> ATT
+</pre>
+    </div>
+    <figcaption><b>闭环。</b>读、练、判、记、选，五步都有落库的地方，但「题」本身不在库里——它跟着正文走。</figcaption>
+  </figure>
+
+  <h2>掌握度与选题：一个已知有缺陷的算法</h2>
+  <figure>
+    <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  A["一次作答"] --> B["question_concepts<br/>映射到概念（可一题多概念）"]
+  B --> C["MasteryModel：BKT 顺序更新<br/>先验 + 答对/答错似然"]
+  C --> D[("concept_mastery_state")]
+  D --> E["ability（m） = 1200 + （m − 0.5）× 400"]
+  E --> F["选题：挑难度 ≈ 能力的题"]
+  F --> G[("question_difficulty<br/>Elo 跨会话累积")]
+  G --> F
+  F --> A
+</pre>
+    </div>
+    <figcaption><b>算法回路。</b>BKT 是顺序更新，所以必须把状态存下来；Elo 要跨会话累积，所以难度也存下来。两条都以「最后一次写入」为准。</figcaption>
+  </figure>
+
+  <div class="notes">
+    <h2>读图要点</h2>
+    <ul>
+      <li><b>题目的身份是四元组：</b><code>entry_id + block_key + question_key + fingerprint</code>。fingerprint 是「题干 + 选项 + 答案」的 SHA-256——内容一改，旧统计就不会套到新题上。这是这套设计里最关键的防污染机制。</li>
+      <li><b>判分有两种来源：</b><code>judged_by = server</code>（服务端按正文判定）和 <code>client</code>（代码挑战由客户端跑完上报）。后者是信任边界上的一个让步，只在沙箱题型上用。</li>
+      <li><b>全站默认解锁。</b>不要因为「要有学习路径」而重新引入前置门槛——那是被明确撤销过的方向，再加回来会挡掉一半用户。</li>
+      <li><b>复习会话的答案绝不下发。</b><code>review_sessions.items_json</code> 里带着答案与解析，响应由服务端裁剪成 <code>itemId / 题干 / 选项</code>。把整行 JSON 直接返回给前端是最容易犯的错。</li>
+      <li><b>实际效果有实测数据，而且不好看：</b>信息增益 <b>0.6303</b>，随机选题是 <b>0.7619</b>——比随机<b>低 17.3%</b>。根因是 <code>ability(mastery)</code> 的映射与「专挑难度≈能力」的规则合起来把难度锁死了，BKT 在 50% 正确率附近永远震荡、爬不上去。这是一条<b>写得像断言「当前是错的」的绿色测试</b>，不是漏测。</li>
+      <li><b>这些表没有外键。</b>删用户时靠 <code>KnowledgeUserDeletionListener</code> 里那张表清单级联，漏一张就是隐私事故（见 <a href="07-data-model.html">07</a>）。</li>
+    </ul>
+  </div>
+
+  <div class="notes">
+    <h2>代码在哪</h2>
+    <ul class="paths">
+      <li><code>scripts/import-course.mjs</code> — 内容导入；线的声明全部来自课程文件的 frontmatter，脚本里没有写死课名</li>
+      <li><code>backend/paideia-knowledge/…/learning/LearningLineService.java</code> — 线的投影与站序（服务端唯一真相）</li>
+      <li><code>backend/paideia-knowledge/…/learning/LearningProgressService.java</code> — 读完一站</li>
+      <li><code>backend/paideia-knowledge/…/question/MasteryModel.java</code> — BKT</li>
+      <li><code>backend/paideia-knowledge/…/question/PracticeSelector.java</code> — 选题</li>
+      <li><code>backend/paideia-knowledge/…/question/PrerequisiteDiagnosis.java</code>、<code>QuestionConceptSuggester.java</code></li>
+      <li><code>backend/paideia-ai/…/review/ReviewQuestionGenerator.java</code> — 复习出题（走积分）</li>
+    </ul>
+  </div>
+
+  <div class="warn">
+    <b>改内容前先看 <code>scripts/verify_course.py</code> 与 <code>check_seed_fences.py</code>。</b>题目在正文里，围栏格式错了不会报错，只会表现为「这道题永远不会被统计」——因为解析不到 question_key。改完务必跑一次导入脚本的 <code>--dry-run</code>。
+  </div>
+</main>
+
+<script src="vendor/mermaid.min.js"></script>
+<script src="diagram.js"></script>
+</body>
+</html>

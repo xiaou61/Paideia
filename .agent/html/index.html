@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paideia 架构导读</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="nav.js"></script>
+
+<main>
+  <p class="kicker">Paideia</p>
+  <h1>架构导读</h1>
+  <p class="lead">十个专题，把「这个系统怎么跑起来的」讲清楚。每页先回答一个具体问题，再给图，再给读图要点和代码位置。</p>
+
+  <div class="stats">
+    <div><b>11</b><span>后端 Maven 模块</span></div>
+    <div><b>16</b><span>前端 workspace 包</span></div>
+    <div><b>59</b><span>数据库表</span></div>
+    <div><b>178</b><span>HTTP 端点</span></div>
+    <div><b>46</b><span>已归档工作项</span></div>
+  </div>
+
+  <h2>怎么读</h2>
+  <p>如果只有十分钟，按 <b>01 → 03 → 05 → 10</b> 读。这四页覆盖了「系统由什么组成」「AI 这条主干怎么跑」「内容怎么变成学习行为」「谁能碰什么」。剩下的六页是按需查阅的细节。</p>
+  <p>每页的结构是固定的：</p>
+  <ul>
+    <li><b>问句</b>——这张图在回答什么。没有问句的图在这份导读里不收录。</li>
+    <li><b>图</b>——节点用代码里的真名（类名、表名、端点、迁移号），不用「业务层」「服务层」这种谁也指不出来的框。</li>
+    <li><b>读图要点</b>——正常路径之外，还会标出失败点、钱在哪一步动、权限在哪一步判。看懂等于知道边界，不是记住顺序。</li>
+    <li><b>代码在哪</b>——真要去改的时候从哪进。</li>
+  </ul>
+
+  <div class="warn">
+    <b>这份导读是第二手材料。</b>结构数字（模块、包、表、端点）来自 <code>scripts/gen-arch-diagram.mjs</code> 从 <code>pom.xml</code> / <code>package.json</code> / 迁移文件 / 控制器里抽出来的结果，权威副本在 <code>docs/architecture/</code>。这里如果和代码不一致，以代码为准，并跑一次生成脚本。
+  </div>
+
+  <h2>十个专题</h2>
+  <div class="cards">
+    <a class="card" href="01-overview.html">
+      <span class="n">01</span>
+      <h3>全景：它由什么拼成</h3>
+      <p>三端、一个 Java 进程、十一个模块，加四个外部依赖。为什么模块不是服务。</p>
+      <span class="meta">2 张图 · WORK-001 / 002 / 007 / 026</span>
+    </a>
+    <a class="card" href="02-request-lifecycle.html">
+      <span class="n">02</span>
+      <h3>一次请求的一生</h3>
+      <p>从浏览器到数据库经过哪几道闸；401、403、402、429 分别是谁拒绝的。</p>
+      <span class="meta">2 张图 · WORK-003 / 037</span>
+    </a>
+    <a class="card" href="03-ai-conversation.html">
+      <span class="n">03</span>
+      <h3>AI 对话与积分</h3>
+      <p>一句话到第一个字之间发生了什么；为什么钱必须「先预留后结算」；工具循环为什么会多花钱。</p>
+      <span class="meta">3 张图 · WORK-005 / 006 / 009 / 019 / 022 / 031 / 036 / 044</span>
+    </a>
+    <a class="card" href="04-memory.html">
+      <span class="n">04</span>
+      <h3>记忆：什么时候写、什么时候读</h3>
+      <p>三条写入路径、一条召回路径，以及关掉开关之后数据去了哪。</p>
+      <span class="meta">1 张图 · WORK-006 / 013</span>
+    </a>
+    <a class="card" href="05-learning-loop.html">
+      <span class="n">05</span>
+      <h3>学习闭环与掌握度</h3>
+      <p>内容怎么变成一次答题，「你哪块弱」是怎么算出来的，以及这个算法已知的缺陷。</p>
+      <span class="meta">2 张图 · WORK-004 / 020 / 021 / 024 / 032 / 033 / 034 / 035 / 038 / 045</span>
+    </a>
+    <a class="card" href="06-content-pipeline.html">
+      <span class="n">06</span>
+      <h3>内容生产线</h3>
+      <p>平台上哪些内容是人工的、哪些每天自己长出来；为什么一天只允许调一次 AI。</p>
+      <span class="meta">1 张图 · WORK-014 / 025 / 027 / 040 / 041 / 046</span>
+    </a>
+    <a class="card" href="07-data-model.html">
+      <span class="n">07</span>
+      <h3>数据模型：59 张表</h3>
+      <p>按域分家的九组表，以及为什么全库只有 14 条外键——它省了什么、又要求你手工补什么。</p>
+      <span class="meta">2 张图 · WORK-003 / 004 / 006 / 009 / 019 / 022 / 033</span>
+    </a>
+    <a class="card" href="08-frontend.html">
+      <span class="n">08</span>
+      <h3>前端与流式渲染</h3>
+      <p>一条 SSE 增量到达浏览器后，怎么变成屏幕上的字、代码块和可点的按钮。</p>
+      <span class="meta">2 张图 · WORK-002 / 011 / 012 / 014 / 016</span>
+    </a>
+    <a class="card" href="09-observability.html">
+      <span class="n">09</span>
+      <h3>可观测与发版</h3>
+      <p>系统怎么知道自己正在变坏；一次纯后端发版为什么是六十秒而不是二十分钟。</p>
+      <span class="meta">2 张图 · WORK-028 / 042 / 043</span>
+    </a>
+    <a class="card" href="10-trust-boundary.html">
+      <span class="n">10</span>
+      <h3>信任边界</h3>
+      <p>谁能不登录访问什么；为什么规则的书写顺序比规则本身更危险。</p>
+      <span class="meta">2 张图 · WORK-003 / 007 / 009 / 025 / 035</span>
+    </a>
+  </div>
+
+  <h2>这份导读不画什么</h2>
+  <p>写清楚是为了免得有人以为它完整：</p>
+  <ul>
+    <li><b>不画组件级 C4。</b>在这个规模下，组件图会变成三十个框挤在一起，信息量低于直接读包结构。</li>
+    <li><b>不画接口字段。</b>请求与响应的具体结构在代码和契约测试里；要自动生成得引 springdoc，那是另一个决定。</li>
+    <li><b>不画前端路由表。</b>路由改得不频繁，一页一图的价值低于维护成本。</li>
+    <li><b>不硬造状态机。</b>会话与任务的状态都是枚举字段，没有真正的状态流转时画出来是假的。</li>
+    <li><b>不含任何地址、端口映射到主机、凭据。</b>这是公开仓库，图里一律只写服务名。</li>
+  </ul>
+
+  <h2>怎么改</h2>
+  <p>页面是手写的 HTML，共用 <code>style.css</code>、<code>nav.js</code>、<code>diagram.js</code> 与本地 mermaid 副本，双击即可打开，不需要联网、不需要构建。改完跑一次 <code>node .agent/html/render-check.mjs</code>：它用 chromium 真打开每个页面，确认每张图都渲染出了 SVG、控制台没有报错。</p>
+  <p>结构性的数字如果有变化，先跑 <code>node scripts/gen-arch-diagram.mjs</code> 更新 <code>docs/architecture/</code>，再回来改这里的图与文字。</p>
+
+  <footer>
+    Paideia · 架构导读 · mermaid 12.2.0（本地副本，MIT）· 双击可开，无需联网
+  </footer>
+</main>
+
+<script src="vendor/mermaid.min.js"></script>
+<script src="diagram.js"></script>
+</body>
+</html>

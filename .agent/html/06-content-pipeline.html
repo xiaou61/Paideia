@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>06 · 内容生产线 — Paideia 架构导读</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="nav.js"></script>
+
+<main>
+  <p class="kicker">06 / 内容线</p>
+  <h1>内容生产线</h1>
+  <p class="question"><strong>这张图回答：</strong>平台上的内容从哪来？哪些是人写进去的，哪些每天自己长出来？为什么速递一天只允许调一次 AI？</p>
+
+  <h2>先给结论</h2>
+  <p>三条互不干扰的源：<b>人工文稿</b>（markdown，脚本导入）、<b>抓取</b>（面经，进草稿）、<b>聚合</b>（新闻 / GitHub，落速递表）。前两条最终都变成 <code>knowledge_entries</code>，第三条<b>不进知识库</b>——速递是独立的两张表，因为它每天过期、且不属于学习路径。</p>
+  <p>「一天只调一次 AI」是硬约束，不是优化：抓回来的几十条会被压缩成一次摘要调用，摘要、去重、0–100 重要度打分在同一轮里完成。这条约束决定了这套系统的成本上限是「每天几分钱」而不是「随流量线性增长」。</p>
+
+  <figure>
+    <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  subgraph 人工
+    MD["content/courses · content/reading<br/>markdown"] --> IMP["scripts/import-course.mjs"]
+  end
+  subgraph 抓取
+    NC["牛客面经列表"] --> ES["EssayCollectionService"]
+    ES --> EEX["EssayExtractor<br/>正文 → 可读题目"]
+    EEX --> LAYA["TechEssayFilter<br/>Laya 相关性重排"]
+    LAYA --> DRAFT["草稿条目"]
+  end
+  subgraph 聚合
+    HN["Hacker News"] --> DC["DigestCollectionService"]
+    RSS["RSS 源"] --> DC
+    GH["GitHub 趋势 + Star 历史"] --> DC
+    DC --> DS["DigestSummarizer<br/>一次 AI 调用：摘要 + 重要度"]
+  end
+  IMP --> ENT[("knowledge_entries")]
+  DRAFT --> ENT
+  DS --> DI[("digest_items")]
+  DW["DigestWeeklyService"] --> DI
+  DI --> PAGE["每日速递页"]
+  ENT --> PAGE2["知识库 / 学习线"]
+</pre>
+    </div>
+    <figcaption><b>三条源。</b>抓取默认落草稿、人工导入幂等、聚合每天一次。三条都不互相依赖，任何一条挂了不影响另外两条。</figcaption>
+  </figure>
+
+  <div class="notes">
+    <h2>读图要点</h2>
+    <ul>
+      <li><b>定时任务从不用「每 24 小时」。</b>速递用带时区的 cron（默认北京 08:00，可配），因为 <code>fixedDelay=24h</code> 的锚点是「上次跑完」，会随重启漂移。</li>
+      <li><b>异常必须吞掉并记录。</b><code>@Scheduled</code> 抛出的异常只会让 Spring 打一行错误，下一轮照旧——所以每个任务都自己记成功/失败，指标挂在 <code>ScheduledTaskMetrics</code> 上。没有这个指标，「昨晚跑没跑」只能靠猜。</li>
+      <li><b>重启后要能补当天内容。</b>换成 cron 之后重启不再自动补，所以额外的启动任务带着「今天已经有内容就跳过」的判断。少了这个判断，部署完就要等一整晚。</li>
+      <li><b>抓取永远先落草稿。</b>面经是外部文本，相关性判定也可能错；直接发布等于让抓取失败的垃圾内容上线。管理员复查后才进知识库。</li>
+      <li><b>GitHub 趋势页经常超时</b>（生产机访问不到时是常态），所以是「页面优先 + Search 兜底」，兜底条件是「最近 3 天、≥50 星、最多 30 条」。不要以为那是主路径。</li>
+      <li><b>抓来的正文是不可信输入。</b>它会被喂给模型做摘要——这是整条生产线唯一的安全风险面（提示注入）。读这一层时先看它对输入做了什么，而不是看它画得多漂亮。</li>
+      <li><b>速递的「今天」按北京时间算</b>，与库里的 UTC 存储是两个概念。跨时区显示的 bug 十次有九次出在这里。</li>
+    </ul>
+  </div>
+
+  <div class="notes">
+    <h2>代码在哪</h2>
+    <ul class="paths">
+      <li><code>backend/paideia-ai/…/digest/DigestJob.java</code> — 每日采集调度、启动补跑判断</li>
+      <li><code>backend/paideia-ai/…/digest/DigestCollectionService.java</code> — 三源汇总、去重、调用摘要</li>
+      <li><code>backend/paideia-ai/…/digest/GithubTrendingSource.java</code>、<code>GithubStarHistory.java</code> — 趋势页与兜底</li>
+      <li><code>backend/paideia-ai/…/essay/EssayCollectionJob.java</code>、<code>NowcoderEssaySource.java</code> — 面经抓取</li>
+      <li><code>backend/paideia-ai/…/decision/TechEssayFilter.java</code> — 判定服务调用</li>
+      <li><code>scripts/import-course.mjs</code> — 人工内容导入</li>
+      <li><code>backend/paideia-app/…/ops/ScheduledTaskMetrics.java</code> — 定时任务的成功/失败计数</li>
+    </ul>
+  </div>
+
+  <div class="warn">
+    <b>这条线上最贵的错误是「重复采集」。</b>每条内容都有一个指纹（标题+链接一类的哈希），靠唯一键覆盖。改采集逻辑时如果弄丢了指纹，第二天就会出现一堆标题相同的重复条目，而且是每天多一批。
+  </div>
+</main>
+
+<script src="vendor/mermaid.min.js"></script>
+<script src="diagram.js"></script>
+</body>
+</html>

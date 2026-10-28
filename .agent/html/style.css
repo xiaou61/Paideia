@@ -1,0 +1,193 @@
+/* Paideia 架构导读 —— 共用样式。同一个 HTML 里不写内联样式，改这里就是改全部。 */
+:root {
+  --bg: #fbfbf9;
+  --fg: #1b1b19;
+  --muted: #63635e;
+  --line: #e3e3dc;
+  --card: #ffffff;
+  --accent: #4f46e5;
+  --warn: #b45309;
+  --warn-bg: #fdf6e3;
+  --code-bg: #f2f2ee;
+  --radius: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15151a;
+    --fg: #e9e9e4;
+    --muted: #9b9b95;
+    --line: #2c2c33;
+    --card: #1c1c22;
+    --accent: #a5a3ff;
+    --warn: #f0b664;
+    --warn-bg: #2a2113;
+    --code-bg: #232329;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.75 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  display: grid;
+  grid-template-columns: 252px minmax(0, 1fr);
+  align-items: start;
+}
+
+/* ── 侧栏 ───────────────────────────────────────────── */
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 24px 16px 40px;
+  border-right: 1px solid var(--line);
+}
+.sidebar .brand {
+  display: block;
+  margin: 0 8px 20px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  color: var(--fg);
+  text-decoration: none;
+}
+.sidebar .brand small {
+  display: block;
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0;
+}
+.sidebar nav { display: flex; flex-direction: column; gap: 2px; }
+.sidebar a {
+  display: flex;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.sidebar a:hover { background: var(--card); color: var(--fg); }
+.sidebar a.on { background: var(--card); color: var(--fg); font-weight: 600; box-shadow: inset 2px 0 0 var(--accent); }
+.sidebar a .num { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 1.4em; }
+.sidebar a.on .num { color: var(--accent); }
+
+/* ── 正文 ───────────────────────────────────────────── */
+main { max-width: 1040px; padding: 44px 36px 140px; }
+.kicker { margin: 0 0 6px; font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+h1 { margin: 0 0 12px; font-size: 34px; line-height: 1.25; letter-spacing: -.01em; }
+h2 { margin: 44px 0 12px; font-size: 21px; line-height: 1.4; }
+h3 { margin: 28px 0 8px; font-size: 17px; }
+p { margin: 0 0 14px; }
+.lead { font-size: 17px; color: var(--muted); }
+.question {
+  margin: 0 0 28px;
+  padding: 14px 18px;
+  border-left: 3px solid var(--accent);
+  background: var(--card);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 16px;
+}
+.question strong { font-weight: 600; }
+a { color: var(--accent); }
+
+ul, ol { margin: 0 0 16px; padding-left: 22px; }
+li { margin: 6px 0; }
+li::marker { color: var(--muted); }
+
+code, kbd {
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+  font-size: .875em;
+  background: var(--code-bg);
+  padding: 1px 5px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+
+/* ── 图 ─────────────────────────────────────────────── */
+figure { margin: 22px 0 26px; }
+.diagram {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px;
+  overflow-x: auto;
+}
+.diagram svg { max-width: none; height: auto; display: block; margin: 0 auto; }
+/* 宽图不被压缩，改为横向滚动；滚动这件事必须说出来，否则右半截等于不存在。 */
+figure.scrollable figcaption::before { content: "← 可横向滚动 →   "; color: var(--accent); font-weight: 600; }
+figcaption { margin-top: 10px; font-size: 13.5px; color: var(--muted); }
+figcaption b { color: var(--fg); font-weight: 600; }
+
+/* ── 要点 / 注意 / 代码位置 ─────────────────────────── */
+.notes {
+  margin: 26px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  padding: 4px 20px 8px;
+}
+.notes h2 { margin: 18px 0 10px; font-size: 16px; letter-spacing: .02em; color: var(--muted); text-transform: uppercase; }
+.notes ul { margin-bottom: 10px; }
+
+.warn {
+  margin: 20px 0;
+  padding: 14px 18px;
+  background: var(--warn-bg);
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  border-radius: var(--radius);
+  font-size: 15px;
+}
+.warn b { color: var(--warn); }
+
+.paths { list-style: none; padding: 0; margin: 0 0 8px; }
+.paths li { margin: 0 0 6px; font-size: 14px; color: var(--muted); }
+.paths code { white-space: normal; word-break: break-all; }
+
+/* ── 表格 ───────────────────────────────────────────── */
+table { width: 100%; border-collapse: collapse; margin: 18px 0 26px; font-size: 14.5px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
+tbody tr:hover { background: var(--card); }
+
+/* ── 首页卡片 ───────────────────────────────────────── */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 14px; margin: 24px 0 8px; }
+.card {
+  display: block;
+  padding: 18px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color .12s;
+}
+.card:hover { border-color: var(--accent); }
+.card .n { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 700; letter-spacing: .06em; }
+.card h3 { margin: 6px 0 6px; font-size: 17px; }
+.card p { margin: 0 0 10px; font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+.card .meta { font-size: 12px; color: var(--muted); }
+
+.stats { display: flex; flex-wrap: wrap; gap: 28px; margin: 26px 0 8px; padding: 18px 22px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+.stats div { min-width: 96px; }
+.stats b { display: block; font-size: 24px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.stats span { font-size: 12.5px; color: var(--muted); }
+
+footer { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+@media (max-width: 900px) {
+  body { grid-template-columns: 1fr; }
+  .sidebar { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+  .sidebar nav { flex-direction: row; flex-wrap: wrap; }
+  .sidebar a { font-size: 12.5px; padding: 4px 8px; }
+  main { padding: 28px 20px 100px; }
+  h1 { font-size: 27px; }
+}

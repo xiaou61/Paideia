@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>08 · 前端与流式渲染 — Paideia 架构导读</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="nav.js"></script>
+
+<main>
+  <p class="kicker">08 / 前端</p>
+  <h1>一条增量怎么变成屏幕上的字</h1>
+  <p class="question"><strong>这张图回答：</strong>十六个前端包是怎么分工的？服务端推来的一段 SSE 文本，经过什么变成带代码块、带可点按钮的回答？</p>
+
+  <h2>先给结论</h2>
+  <p>结构是「两层叶子 + 一堆领域包 + 两个可运行端」。<code>@paideia/core</code>（请求、鉴权状态、工具函数）与 <code>@paideia/ui</code>（组件、令牌、markdown 渲染）<b>不依赖任何其它包</b>；领域包（助手、知识库、简历、训练营……）只依赖这两个；<code>apps/app</code> 把十一个包组装成学习者端，<code>apps/admin</code> 用五个包组装成管理端。</p>
+  <p>流式回答走的是<b>增量累加 + 逐前缀渲染</b>：客户端只负责把 <code>content</code> 事件的片段拼起来，渲染交给 <code>@paideia/ui</code> 的同一个 <code>MarkdownBody</code>——知识库条目、简历预览、助手回答用的是同一个渲染器，不是三套。</p>
+
+  <figure>
+    <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  subgraph 库 packages
+    assistant["assistant"]
+    auth["auth"]
+    camp["camp"]
+    core["core"]
+    identity["identity"]
+    knowledge["knowledge"]
+    platform_desktop["platform-desktop"]
+    platform_web["platform-web"]
+    resume["resume"]
+    sql_workbench["sql-workbench"]
+    ui["ui"]
+  end
+  subgraph 可运行端 apps
+    admin["admin"]
+    app["app"]
+    desktop["desktop"]
+    public["public"]
+    ui_kit["ui-kit"]
+  end
+  assistant --> core
+  assistant --> ui
+  auth --> core
+  auth --> ui
+  camp --> core
+  camp --> ui
+  identity --> core
+  knowledge --> core
+  knowledge --> ui
+  platform_desktop --> core
+  platform_web --> core
+  resume --> core
+  sql_workbench --> ui
+  admin --> auth
+  admin --> core
+  admin --> knowledge
+  admin --> platform_web
+  admin --> ui
+  app --> assistant
+  app --> auth
+  app --> camp
+  app --> core
+  app --> identity
+  app --> knowledge
+  app --> platform_desktop
+  app --> platform_web
+  app --> resume
+  app --> sql_workbench
+  app --> ui
+  public --> ui
+  ui_kit --> platform_web
+  ui_kit --> ui
+</pre>
+    </div>
+    <figcaption><b>包依赖。</b>由 16 个 <code>package.json</code> 生成（32 条依赖）。<code>core</code> 与 <code>ui</code> 没有任何出边，这是刻意的：谁都能依赖它们，它们不依赖业务。</figcaption>
+  </figure>
+
+  <h2>从字节到按钮</h2>
+  <figure>
+    <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  SSE["sse.ts<br/>解析 thinking / content / draft / done / error"] --> ST["session-store.ts<br/>累加增量 · 恢复会话"]
+  ST --> CP["conversation-panel.tsx"]
+  CP --> MB["MarkdownBody<br/>streamdown + remend"]
+  MB --> DONE["已完成的块<br/>零重复解析"]
+  MB --> TAIL["未完成的尾块<br/>降级为纯文本"]
+  MB --> REG["围栏渲染器注册表<br/>按语言名分发"]
+  REG --> R1["quiz · code-challenge"]
+  REG --> R2["code-tour · code-map"]
+  REG --> R3["sql-challenge · trace-player"]
+  REG --> R4["learning-path · run-challenge"]
+</pre>
+    </div>
+    <figcaption><b>渲染流水线。</b>围栏块里的 JSON 先过 <code>schema.ts</code> 校验，再交给注册表；校验失败时整块降级成代码块，而不是白屏。</figcaption>
+  </figure>
+
+  <div class="notes">
+    <h2>读图要点</h2>
+    <ul>
+      <li><b>流式渲染的口径是三条，缺一条都会「看着能用但会咬人」：</b>逐前缀等价（任意时刻的渲染结果等于对当前完整前缀的渲染）、已完成的块零解析（不重复高亮、不重复挂交互）、安全（不信任模型输出的 HTML）。</li>
+      <li><b>未完成的尾块要降级。</b>半截的 <code>```</code>、半截的表格、半截的链接都会让解析器吐出畸形结构。做法是切在最后一个完整 token 上、尾巴愈合为纯文本——别人（包括 opencode）也是这么做的，没有百分百优雅的解。</li>
+      <li><b>渲染器是数据驱动的。</b>新增一种交互块（比如新的题型）只需要：写一个组件 + 在注册表里登记语言名。不要改主渲染器的 if/else。</li>
+      <li><b>助手面板停靠右侧，宽度写进根变量 <code>--assistant-panel-w</code>。</b>主内容靠这个变量让位，而不是靠 margin 硬编码；窄屏退化成抽屉，<kbd>Ctrl</kbd>+<kbd>J</kbd> 开关。</li>
+      <li><b>主题令牌只有一份，在 <code>@paideia/ui</code>。</b>管理端与学习者端共用——这也是为什么改一次共享的 <code>Table</code> 能让整个管理端一起换代。</li>
+      <li><b>Tailwind 的 <code>@source</code> 指错目录会「静默缺样式」</b>：页面能开、类名没生效，构建不报错。真踩过。改多包结构后第一件事是确认它指向了全部包。</li>
+      <li><b>每一条用户可见路由都必须在导航栏或账号菜单里有入口。</b>首页快捷卡不算——那排卡片要往下滚才看得见。曾经有三个页面（学习、图谱、SQL 练习）能直达 URL、内容齐全，但导航里一个都没有，用户以为内容少了一大半。</li>
+    </ul>
+  </div>
+
+  <div class="notes">
+    <h2>代码在哪</h2>
+    <ul class="paths">
+      <li><code>frontend/packages/assistant/src/sse.ts</code> — 五种事件的客户端解析</li>
+      <li><code>frontend/packages/assistant/src/session-store.ts</code>、<code>conversation-panel.tsx</code> — 会话状态与面板</li>
+      <li><code>frontend/packages/ui/src/markdown/markdown.tsx</code> — <code>MarkdownBody</code></li>
+      <li><code>frontend/packages/ui/src/markdown/renderers/</code> — 围栏块组件与 <code>schema.ts</code> 校验</li>
+      <li><code>frontend/apps/app/src/router.tsx</code> — 学习者端路由；<code>LearnerHeader</code> 的 <code>NAV</code> 是导航入口清单</li>
+      <li><code>frontend/packages/identity</code> — <code>preferredNav</code> 的联合字面量类型，加了新入口必须同步改</li>
+    </ul>
+  </div>
+
+  <div class="warn">
+    <b>改了共享包就要跑三端 e2e。</b><code>@paideia/ui</code> / <code>core</code> / <code>auth</code> / <code>knowledge</code> 任何一处改动都可能同时影响学习者端、管理端与桌面壳。只改某一个应用时，按页面选一个 e2e 文件就够（十几秒到一分钟），别为了安心跑全量。
+  </div>
+</main>
+
+<script src="vendor/mermaid.min.js"></script>
+<script src="diagram.js"></script>
+</body>
+</html>

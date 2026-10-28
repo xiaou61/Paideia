@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>07 · 数据模型 — Paideia 架构导读</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="nav.js"></script>
+
+<main>
+  <p class="kicker">07 / 数据</p>
+  <h1>五十九张表怎么分家</h1>
+  <p class="question"><strong>这张图回答：</strong>这些表是按什么分组长的？为什么全库只有 14 条外键——它省下了什么，又要求你手工补什么？</p>
+
+  <h2>先给结论</h2>
+  <p>表按<b>模块</b>分域，因为模块之间本来就不许互相读表。全库 <b>59 张表、14 条真实外键</b>：外键只出现在「同一个域内、且关系不会跨模块」的地方（比如分类树的父子、条目到分类）。<b>跨模块的关联一律由应用层保证</b>——<code>ai_memories_text.user_id</code> 指向 <code>users.id</code> 这件事数据库不知道，只有删用户的代码知道。</p>
+  <p>这是刻意的取舍：外键会锁住迁移顺序与删除顺序。<b>代价是删用户变成一份手工维护的表清单</b>，漏一张就是隐私事故。</p>
+
+  <figure>
+    <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  U["账号与身份 · 4 张<br/>users · refresh_tokens<br/>user_identities · learner_profiles"]
+  K["内容与知识 · 12 张<br/>knowledge_* · learning_*"]
+  AI["AI 与积分 · 13 张<br/>ai_*"]
+  L["学习与题目 · 10 张<br/>question_* · concept_mastery_state<br/>camp_* · review_sessions"]
+  N["笔记与分享 · 3 张"]
+  S["沙箱与数据集 · 3 张"]
+  O["运维与速递 · 7 张"]
+  M["MCP · 2 张"]
+  R["简历 · 4 张"]
+  U -.->|"user_id — 应用层"| K
+  U -.-> AI
+  U -.-> L
+  U -.-> N
+  U -.-> S
+  U -.-> O
+  U -.-> M
+  U -.-> R
+  L -.->|"entry_id"| K
+  AI -.->|"entry_id / concept_id"| K
+</pre>
+    </div>
+    <figcaption><b>九个域。</b>虚线都是<b>没有外键约束</b>的逻辑关联。它们靠命名与代码保证，数据库不会帮你挡。</figcaption>
+  </figure>
+
+  <h2>真正有约束的那 14 条</h2>
+  <figure>
+    <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  knowledge_categories["knowledge_categories"]
+  knowledge_concept_edges["knowledge_concept_edges"]
+  knowledge_entries["knowledge_entries"]
+  knowledge_entry_concepts["knowledge_entry_concepts"]
+  knowledge_entry_relations["knowledge_entry_relations"]
+  knowledge_entry_views["knowledge_entry_views"]
+  knowledge_self_assessments["knowledge_self_assessments"]
+  learning_progress["learning_progress"]
+  learning_track_stages["learning_track_stages"]
+  refresh_tokens["refresh_tokens"]
+  user_identities["user_identities"]
+  learning_progress -->|entry_id| knowledge_entries
+  knowledge_entry_concepts -->|entry_id| knowledge_entries
+  knowledge_entry_concepts -->|concept_id| knowledge_concepts
+  knowledge_concept_edges -->|from_concept_id| knowledge_concepts
+  knowledge_concept_edges -->|to_concept_id| knowledge_concepts
+  knowledge_entry_views -->|entry_id| knowledge_entries
+  refresh_tokens -->|user_id| users
+  user_identities -->|user_id| users
+  learning_track_stages -->|entry_id| knowledge_entries
+  knowledge_categories -->|parent_id| knowledge_categories
+  knowledge_entries -->|category_id| knowledge_categories
+  knowledge_entry_relations -->|from_entry_id| knowledge_entries
+  knowledge_entry_relations -->|to_entry_id| knowledge_entries
+  knowledge_self_assessments -->|entry_id| knowledge_entries
+</pre>
+    </div>
+    <figcaption><b>全部外键。</b>由迁移文件生成。只有内容域与账号域内部有约束，其余八个域一条都没有。</figcaption>
+  </figure>
+
+  <div class="notes">
+    <h2>读图要点</h2>
+    <ul>
+      <li><b>看不到边 ≠ 没关系。</b>这份图只画数据库层面真实存在的约束。要找关联得读 mapper 与实体。</li>
+      <li><b>删用户是清单作业。</b><code>AccountDeletionService</code> 与各模块的注销监听器各管一段，表清单就是安全边界。新增一张带 <code>user_id</code> 的表，<b>必须同时</b>把它加进对应清单——否则用户注销后数据还在，而且没有任何测试会红。</li>
+      <li><b><code>ai_model_credentials</code> 是个陷阱。</b>生成图里能看到它，因为 <code>V4__create_ai_tables.sql</code> 确实建了它；但它已被 <code>V20261022180940__drop_ai_model_credentials.sql</code> 删除（平台凭据改造后不再落库）。看生成清单时不要把它当活表。</li>
+      <li><b>迁移文件名是 14 位时间戳，不是递增号。</b>递增号是并行会话共享的命名空间，实测两个分支都写 <code>V25</code> 会让整个应用起不来（<i>Found more than one migration with version 25</i>）。<code>MigrationVersionFormatTest</code> 同时挡纯数字号与同秒重复。</li>
+      <li><b>迁移只建结构，测试数据在 <code>db/devdata</code>。</b><code>MigrationSeedOverlapTest</code> 会把「生产迁移往种子表插行却不显式给 id ≥ 900」变成构建失败——这类 bug 只在零数据新库上出现，开发库和生产库永远看不出来。</li>
+      <li><b>时间列一律由应用写 UTC。</b>JDBC 上 <code>connectionTimeZone=UTC</code> 与 <code>forceConnectionTimeZoneToSession=true</code> <b>两个参数缺一不可</b>，只配一个会让时间再偏 8 小时。</li>
+      <li><b>改 schema 前先看有没有人在改同一张表：</b><code>git log --all --oneline -- backend/paideia-app/src/main/resources/db/migration</code>。时间戳解决了「版本号撞车」，解决不了「两个分支改同一张表的不同列」这种语义冲突。</li>
+    </ul>
+  </div>
+
+  <div class="notes">
+    <h2>代码在哪</h2>
+    <ul class="paths">
+      <li><code>backend/paideia-app/src/main/resources/db/migration/</code> — 42 个迁移，图的唯一事实源</li>
+      <li><code>backend/paideia-app/src/main/resources/db/devdata/</code> — 开发与测试数据</li>
+      <li><code>backend/paideia-account/…/user/AccountDeletionService.java</code> — 注销级联的入口</li>
+      <li><code>docs/architecture/05-database-tables.md</code> — 由脚本生成的完整表清单（含每张表出自哪个迁移）</li>
+      <li><code>scripts/test-db.sh</code> — 任何碰数据库的验证都从这走，别直接连共用的测试库</li>
+    </ul>
+  </div>
+
+  <div class="warn">
+    <b>本页的数字会过期，而且过期得很明显。</b>表数、外键数都来自迁移文件；加一个迁移就变。改完 <code>node scripts/gen-arch-diagram.mjs</code> 再回来对一遍本页的「59」与「14」。
+  </div>
+</main>
+
+<script src="vendor/mermaid.min.js"></script>
+<script src="diagram.js"></script>
+</body>
+</html>

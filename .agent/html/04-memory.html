@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>04 · 记忆：写与读 — Paideia 架构导读</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="nav.js"></script>
+
+<main>
+  <p class="kicker">04 / 记忆</p>
+  <h1>记忆：什么时候被写，什么时候被读</h1>
+  <p class="question"><strong>这张图回答：</strong>助手「记得你」这件事，是靠什么触发的？关掉记忆开关之后，已经写进去的数据去哪了？</p>
+
+  <h2>先给结论</h2>
+  <p>记忆不是「模型自己决定记什么」，而是<b>三条明确的写入路径</b>加一条<b>自动的读取路径</b>。读取一直是自动的（每一轮都用你这句话当关键词去找），只有写入需要触发条件。所以「加个开启个性化记忆的开关」这个需求如果按字面理解会做错——召回本来就在跑，缺的是写入的自动化程度。</p>
+  <p>两张表：<code>ai_memories_structured</code>（短结构，512 字符以内）与 <code>ai_memories_text</code>（长文本，1024 字符以内）。<b>两张都带 <code>user_id</code></b>——「记忆是全局的」指的是跨身份、跨页面都生效，不是所有人共享。这一条被误解过一次，值得写进图里。</p>
+
+  <figure>
+    <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  U["用户"] --> Q["这一轮的输入"]
+  Q --> RC["召回：用本轮输入当关键词检索<br/>最多 8 条进提示词"]
+  U --> M1["说「记住这条」"]
+  M1 --> W1["手动写入"]
+  U --> A1["聊满 6 轮"]
+  A1 --> W2["MemoryExtractionService<br/>异步批量提取<br/>条件 UPDATE 抢游标"]
+  U --> S1["修改知识点自评"]
+  S1 --> W3["SelfAssessmentMemoryBridge<br/>写一条结构化记忆"]
+  W1 --> T1[("ai_memories_structured")]
+  W1 --> T2[("ai_memories_text")]
+  W2 --> T1
+  W2 --> T2
+  W3 --> T1
+  RC --> T1
+  RC --> T2
+  SW["ai_user_settings<br/>记忆开关 · 引用记忆 · 引用历史"] -.-> RC
+  SW -.-> W2
+</pre>
+    </div>
+    <figcaption><b>一读三写。</b>实线是数据流，虚线是开关对路径的影响。关掉开关只让写入停止、召回跳过，<b>不删已有数据</b>。</figcaption>
+  </figure>
+
+  <div class="notes">
+    <h2>读图要点</h2>
+    <ul>
+      <li><b>写入路径一：手动。</b>用户说「记住这条」，明确意图，直接落库。可带结构（键值式的短记忆）或长文本。</li>
+      <li><b>写入路径二：每满 6 轮自动提取（异步）。</b>不阻塞对话；用一条带条件的 UPDATE 抢游标（<code>extracted_upto</code> 一类的列配 <code>&lt;=&gt;</code> 比较），并发或重复触发都不会重复提取同一段。判重不靠检索，而是<b>把最近 40 条结构化记忆全喂给模型</b>，让它判断「这条已有」还是「这条是新的」——重复时用覆盖，不追加。</li>
+      <li><b>写入路径三：自评变化。</b>改一次知识点自评就写一条结构化记忆。这是「你哪块弱」能进脑子而不只是进表的唯一桥；没有它，助手只能在你问的时候临时去查自评表。</li>
+      <li><b>读取：每轮都跑，最多 8 条。</b>全文索引可用时走全文检索，否则退化成 LIKE。召回结果<b>不重新打分排序</b>——这是已知限制，不是设计意图。</li>
+      <li><b>开关是三个，不是一个：</b>总开关、引用已存记忆、引用对话历史。清空并关闭是<b>一个端点</b>，避免「先删后关」中间被打断导致数据又被写回来。</li>
+      <li><b>提取本身要花钱</b>（虽然不贵），所以走独立的 <code>MEMORY_EXTRACT</code> 流水。用户在积分面板上能看出「没聊几次为什么花了钱」。</li>
+      <li><b>已知缺口：写入前没有 PII / 密钥过滤。</b>用户把 token 粘进对话，提取路径可能把它写成一条记忆。这是这份导读里唯一一处「读代码就知道该补、但确实还没补」的地方。</li>
+    </ul>
+  </div>
+
+  <div class="notes">
+    <h2>代码在哪</h2>
+    <ul class="paths">
+      <li><code>backend/paideia-ai/…/memory/MemoryStore.java</code> — 召回（<code>RECALL_LIMIT = 8</code>）、写入、判重的池子</li>
+      <li><code>backend/paideia-ai/…/memory/MemoryExtractionService.java</code> — 每轮触发条件与游标抢占</li>
+      <li><code>backend/paideia-ai/…/memory/SelfAssessmentMemoryBridge.java</code> — 自评 → 记忆的桥</li>
+      <li><code>backend/paideia-ai/…/settings/AiSettingsStore.java</code> — 三个开关与「清空并关闭」</li>
+      <li><code>backend/paideia-app/src/main/resources/db/migration/V6__create_memory_tables.sql</code>、<code>V12__memory_auto_extraction_and_settings.sql</code></li>
+    </ul>
+  </div>
+
+  <div class="warn">
+    <b>别把「记忆」和「会话历史」混为一谈。</b>历史是逐字的消息记录，按会话窗口截断；记忆是从历史里提炼出来的短句。注入提示词时两者是两段不同的内容，开关也是分开的（引用记忆 / 引用历史）。调参时先分清是哪一段给多了或给少了。
+  </div>
+</main>
+
+<script src="vendor/mermaid.min.js"></script>
+<script src="diagram.js"></script>
+</body>
+</html>

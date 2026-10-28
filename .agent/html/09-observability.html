@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>09 · 可观测与发版 — Paideia 架构导读</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="nav.js"></script>
+
+<main>
+  <p class="kicker">09 / 运维</p>
+  <h1>怎么知道它正在变坏</h1>
+  <p class="question"><strong>这张图回答：</strong>出了问题怎么被发现的？指标、日志、链路三者怎么汇到一起？一次纯后端发版为什么是六十秒而不是二十分钟？</p>
+
+  <h2>先给结论</h2>
+  <p>三层数据各有分工：<b>指标</b>回答「是否在变坏」（Prometheus，按本机来源读取）、<b>日志</b>回答「发生了什么」（Loki）、<b>链路</b>回答「慢在哪一步」（Tempo，traceId 从 SSE 的 <code>done</code> 事件一路对到用户的那次点击）。</p>
+  <p>告警不是「阈值超了就叫」，而是 <b>SLO 燃尽率</b>：按错误预算的消耗速度触发，能在「一直小错」和「突然大错」两种情况下都合理报警。规则文件有配套的单元测试，改规则先跑测试。</p>
+
+  <figure>
+    <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  APP["paideia-app<br/>Micrometer 指标 · 结构化日志 · span"] -->|"仅本机来源可读<br/>/actuator/prometheus"| PROM["Prometheus"]
+  APP -->|日志| LOKI["Loki"]
+  APP -->|span| TEMPO["Tempo"]
+  PROM --> GRAF["Grafana<br/>管理端同源 iframe"]
+  LOKI --> GRAF
+  TEMPO --> GRAF
+  PROM --> RULES["告警规则<br/>SLO 燃尽率"]
+  RULES -->|"webhook 只允许回环来源<br/>+ 常量时间令牌"| HOOK["/api/v1/ops/hooks/**"]
+  HOOK --> INC[("ops_incidents<br/>ops_incident_events")]
+  INC --> DIAG["OpsEvidenceCollector<br/>→ OpsDiagnosisService"]
+  DIAG -->|"AI 诊断，走积分"| DG[("ops_diagnoses")]
+  GRAF --> UI["管理端运维页"]
+</pre>
+    </div>
+    <figcaption><b>观测链路。</b>诊断的输入永远是<b>聚合指标与脱敏后的日志</b>（<code>OpsLogRedactor</code> / <code>TempoTraceRedactor</code>），不是原始流量。</figcaption>
+  </figure>
+
+  <h2>发版：只传差异</h2>
+  <figure>
+    <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  B["本地构建 jar"] --> M["解包成 exploded/<br/>算清单：自家文件 SHA-256<br/>依赖按同名同大小"]
+  M --> C["与服务器 exploded.manifest 比对"]
+  C -->|"只传差异（纯后端约 60 秒）"| S["服务器 exploded/ 覆盖"]
+  S --> R["jar c0fm 重新打包"]
+  R --> X["systemd 重启"]
+  X --> H["/actuator/health 探活"]
+</pre>
+    </div>
+    <figcaption><b>增量发版。</b>82 MB 的 jar 里自家模块只有 1.4 MB、69 个文件——传全量是纯浪费。</figcaption>
+  </figure>
+
+  <div class="notes">
+    <h2>读图要点</h2>
+    <ul>
+      <li><b>指标端点只允许本机读。</b><code>/actuator/prometheus</code> 会暴露 JVM 内部结构与业务维度标签，不能像 <code>/health</code> 那样整体放行。注意这条白名单的前提是「进程前面没有反向代理」——一旦挂了反代，远端地址都变成回环，白名单就失效了，那时必须改成独立的回环管理端口。这句话写在代码注释里，不是修补计划。</li>
+      <li><b>Grafana 反代是<b>整体放行</b>的，安全边界交给 Grafana 自己的登录。</b>试过而放弃的三条路：要求 ADMIN（iframe 导航不带 Authorization 头 → 401）、加 <code>?ticket=</code>（静态资源与子请求不带查询串 → 逐个 401）、只放行 <code>/public/**</code>（dashboard API 又 401）。根因是本项目无 Cookie、纯 Bearer，而 Grafana 是 SPA，需要一套跨请求自动携带的会话。</li>
+      <li><b>告警 webhook 不是「免鉴权」。</b>它只允许回环来源，并在控制器里再做一次常量时间令牌比较——机器到机器，没有 JWT。</li>
+      <li><b>SLO 燃尽率告警有一类共同的坑，演练时全踩过：</b>5xx 速率在无请求时是空集被当成 NoData、SLI 无样本时算出 NaN 被当数值、protobuf 省略 status 零值被写成空串。改规则时先想「没有数据时它会怎样」。</li>
+      <li><b>别用 <code>pnpm -r build</code> 发版。</b>它会把 Electron 桌面壳一起打（首次还要下载 Electron），近二十分钟。纯后端改动用 <code>-SkipWeb</code>，前端没改时脚本本来就会跳过那 80 秒。</li>
+      <li><b><code>jar c0fm</code> 不是 <code>jar cfm</code>。</b><code>cfm</code> 会 deflate 嵌套的 jar，Spring Boot 4 直接起不来——真断过六分钟。这个字符是发版链路上最贵的一个字符。</li>
+      <li><b>服务器上的 <code>exploded/</code> 与 <code>exploded.manifest</code> 由脚本维护</b>，不要手工删。删了下次发版就退化成全量传输。</li>
+    </ul>
+  </div>
+
+  <div class="notes">
+    <h2>代码在哪</h2>
+    <ul class="paths">
+      <li><code>backend/paideia-app/src/main/java/io/github/xiaou61/ops/</code> — 证据收集、诊断、事件、Grafana 反代、Loki/Tempo 客户端</li>
+      <li><code>backend/paideia-ai/…/diagnosis/</code> — AI 诊断的提示词与结果解析</li>
+      <li><code>deploy/ops/prometheus-rules.yml</code>、<code>deploy/ops/provisioning/alerting/paideia-rules.yaml</code> — 告警规则</li>
+      <li><code>deploy/ops/prometheus-rules.test.yml</code> — 规则单元测试，改规则先跑它</li>
+      <li><code>scripts/release.ps1</code> — 增量发版全流程</li>
+      <li><code>backend/paideia-security/…/SecurityConfiguration.java</code> 第 125–165 行 — 观测相关的全部规则与它们的理由</li>
+    </ul>
+  </div>
+
+  <div class="warn">
+    <b>这份导读里不含任何服务器地址、主机名与凭据。</b>公开仓库一旦提交就无法回收，历史、fork、缓存都能检索到。引用密钥只写环境变量名。
+  </div>
+</main>
+
+<script src="vendor/mermaid.min.js"></script>
+<script src="diagram.js"></script>
+</body>
+</html>

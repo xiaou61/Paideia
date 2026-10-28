@@ -38,6 +38,7 @@ flowchart TB
   ai --> persistence
   ai --> security
   ai --> knowledge
+  ai --> sandbox
   sandbox --> platform
   sandbox --> persistence
   sandbox --> security
@@ -67,7 +68,7 @@ flowchart TB
 | `paideia-account` | `paideia-platform`、`paideia-persistence`、`paideia-security` |
 | `paideia-knowledge` | `paideia-platform`、`paideia-persistence`、`paideia-security` |
 | `paideia-note` | `paideia-platform`、`paideia-persistence`、`paideia-security` |
-| `paideia-ai` | `paideia-platform`、`paideia-persistence`、`paideia-security`、`paideia-knowledge` |
+| `paideia-ai` | `paideia-platform`、`paideia-persistence`、`paideia-security`、`paideia-knowledge`、`paideia-sandbox` |
 | `paideia-sandbox` | `paideia-platform`、`paideia-persistence`、`paideia-security` |
 | `paideia-mcp` | `paideia-platform`、`paideia-persistence`、`paideia-security` |
 | `paideia-app` | `paideia-platform`、`paideia-web`、`paideia-persistence`、`paideia-security`、`paideia-account`、`paideia-knowledge`、`paideia-note`、`paideia-ai`、`paideia-sandbox`、`paideia-mcp` |

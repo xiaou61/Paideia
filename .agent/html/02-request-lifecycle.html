@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>02 · 一次请求的一生 — Paideia 架构导读</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="nav.js"></script>
+
+<main>
+  <p class="kicker">02 / 请求链路</p>
+  <h1>一次请求的一生</h1>
+  <p class="question"><strong>这张图回答：</strong>一个 HTTP 请求从浏览器到数据库，经过哪几道闸？被拒绝时，401、403、402、429 分别是哪一层拒绝的？</p>
+
+  <h2>先给结论</h2>
+  <p>鉴权只有一层，且是<b>无状态</b>的：<code>SecurityFilterChain</code> 解析 JWT，不查数据库、不建会话（<code>SessionCreationPolicy.STATELESS</code>）。「这段代码关不关得住」由<b>规则的声明顺序</b>决定——Spring Security 按顺序取<b>第一条匹配的规则</b>，写反了不会报错，只会在某天表现为越权。这是全项目最危险的一类错误，没有之一。</p>
+  <p>过了鉴权之后还有第二条闸：<b>业务闸</b>。积分不足（402）不是授权问题，是业务规则，由 <code>CreditService.reserve</code> 在 Service 层抛出，位置在 Controller 之后、调用上游之前。</p>
+
+  <figure>
+    <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant B as 浏览器
+  participant F as Security
+  participant C as Controller
+  participant S as Service
+  participant D as MySQL
+  B->>F: Bearer access
+  F->>F: 解析 JWT（签名 + 过期，不查库）
+  alt 没有 token / 过期 / 签名不符
+    F-->>B: 401
+  else 要求 ADMIN 但角色不符
+    F-->>B: 403
+  end
+  F->>C: 已认证，携带身份
+  C->>S: 业务调用
+  alt 余额不足（reserve 抛出）
+    S-->>B: 402 + 业务码 40200
+  end
+  S->>D: SQL（只传参数，不拼语句）
+  D-->>S: 行 → 实体
+  S-->>C: 结果
+  C-->>B: {code, data, message, traceId}
+</pre>
+    </div>
+    <figcaption><b>一条正常请求。</b>三层拒绝，三种含义：<b>401</b> = 你没证明你是谁；<b>403</b> = 证明了你不是这个角色；<b>402</b> = 你是对的用户，但钱不够。</figcaption>
+  </figure>
+
+  <h2>登录与刷新：一条链、一把锁</h2>
+  <p>登录失败要被限流，按<b>账号</b>和<b>来源地址</b>两个维度分别计数——只按 IP 挡不住撞库，只按账号挡不住扫号。刷新令牌用「家族」组织：每次轮换签发新的、旧的立刻作废；如果旧的被再用一次，说明有第二个人拿着同一个令牌，于是<b>整条家族链一起吊销</b>。</p>
+
+  <figure>
+    <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant B as 浏览器
+  participant A as Auth
+  participant R as 限流
+  participant L as Login
+  participant T as Token
+  participant D as MySQL
+  B->>A: POST /auth/login
+  A->>R: 按账号与来源地址计数
+  alt 超过阈值
+    R-->>B: 429
+  else 允许
+    A->>L: login（identifier, password, source）
+    L->>D: users 按用户名或邮箱查
+    L->>L: PasswordHasher 校验
+    alt 校验失败
+      L-->>B: 401，与「账号不存在」同一个响应
+    else 成功
+      L->>T: issueFor（user）
+      T->>D: refresh_tokens 写一行，带 family_id
+      T-->>B: access 短寿命 + refresh 14 天
+    end
+  end
+  Note over B,T: 之后每次刷新
+  B->>T: rotate（presentedRefresh）
+  T->>D: UPDATE … WHERE revoked_at IS NULL
+  alt 影响 0 行，或令牌已吊销
+    T->>D: revokeFamily（整条链）
+    T-->>B: 401 检测到令牌被重复使用
+  else 抢到这次轮换
+    T-->>B: 新 access + 新 refresh，同一 family
+  end
+</pre>
+    </div>
+    <figcaption><b>登录与刷新。</b>并发刷新不互踢：那条 <code>AND revoked_at IS NULL</code> 的 UPDATE 是「谁抢到」的唯一信号，影响 0 行就走盗用处理。</figcaption>
+  </figure>
+
+  <div class="notes">
+    <h2>读图要点</h2>
+    <ul>
+      <li><b>无 Cookie、纯 Bearer。</b>这样才能让浏览器 SPA 和 Electron 桌面壳共用一套认证。代价是任何「浏览器自己发起的请求」都拿不到凭据——<code>&lt;img&gt;</code>、iframe 导航、Service Worker 注册都是（见 <a href="10-trust-boundary.html">10</a> 与 <a href="09-observability.html">09</a>）。</li>
+      <li><b>业务码与 HTTP 状态是两个维度。</b><code>BizException</code> 带 <code>ErrorCode</code>，由 <code>GlobalExceptionHandler</code> 映射成 HTTP 状态，同时把业务码写进响应体。<b>映射必须穷尽</b>：历史缺陷是一个 <code>switch</code> 掉了 <code>default</code>，业务码 40200 正确而 HTTP 变成了 500。</li>
+      <li><b>未知路由要显式 404。</b>否则 <code>@ExceptionHandler(Exception.class)</code> 会把它兜成 500——「路径写错了」看起来像「服务端崩了」，还会掩盖「本该存在的端点不存在」。</li>
+      <li><b>响应体统一由 <code>ApiResponseBodyAdvice</code> 包一层</b>，异常路径带 <code>traceId</code>，前端报错截图可以直接拿去查日志（见 <a href="09-observability.html">09</a>）。</li>
+      <li><b>登出只吊销 refresh 家族</b>，已签发的 access 在剩余寿命内仍然有效。这是无状态 JWT 的固有代价，不是漏洞；要立刻失效就得引入令牌黑名单，那会变成有状态。</li>
+      <li><b>前端守卫不是授权边界。</b>路由守卫只决定「显示什么」，<code>/api/**</code> 上的规则才决定「能做什么」。静态资源放行也不等于数据放行。</li>
+    </ul>
+  </div>
+
+  <div class="notes">
+    <h2>代码在哪</h2>
+    <ul class="paths">
+      <li><code>backend/paideia-security/…/SecurityConfiguration.java</code> — 全部规则与顺序，注释里写了每条「必须排在谁之前」</li>
+      <li><code>backend/paideia-account/…/login/LoginService.java</code> — 登录、失败限流</li>
+      <li><code>backend/paideia-account/…/token/TokenService.java</code> — 签发、轮换、家族吊销</li>
+      <li><code>backend/paideia-account/…/support/RateLimiter.java</code> — 计数窗口</li>
+      <li><code>backend/paideia-web/…/GlobalExceptionHandler.java</code>、<code>ApiResponseBodyAdvice.java</code> — 错误映射与包装</li>
+    </ul>
+  </div>
+
+  <div class="warn">
+    <b>改这一层之前先读 <a href="10-trust-boundary.html">10</a>。</b>新增一条 <code>/admin/**</code> 规则时，位置比内容更容易出错；已经有一次真缺陷是「把 <code>/sandbox/admin/**</code> 写在 <code>/sandbox/**</code> 之后」，任何登录用户都能下架别人的数据集——它不报错，是契约测试抓到的。
+  </div>
+</main>
+
+<script src="vendor/mermaid.min.js"></script>
+<script src="diagram.js"></script>
+</body>
+</html>

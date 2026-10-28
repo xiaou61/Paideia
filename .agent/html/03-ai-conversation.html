@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>03 · AI 对话与积分 — Paideia 架构导读</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="nav.js"></script>
+
+<main>
+  <p class="kicker">03 / AI 主干</p>
+  <h1>一次 AI 对话，与它的账</h1>
+  <p class="question"><strong>这张图回答：</strong>我敲一句话点发送，到屏幕上出现第一个字，中间发生了什么？积分在哪一步动？为什么一次回答可能花掉好几轮的钱？</p>
+
+  <h2>先给结论</h2>
+  <p>一次对话 = <b>公共行为 × 私有数据</b>。公共行为是一份场景提示词加一组场景工具（助手、面试官、导师、点评）；私有数据是这个用户的历史窗口、记忆片段、页面上下文、额度。个性化只发生在两者的交叉点上——「同一个面试官行为 + 你的记忆 → 专门追问你上次答砸的那个知识点」。</p>
+  <p>钱的部分只有一条铁律：<b>先预留，后调用</b>。预留成功才允许向上游发第一个请求；余额不足时直接 402，一个字节都不发给上游。这不是为了记账好看，而是唯一能真正防欠费的形状——事后结算意味着你已经把对方要花的钱花出去了。</p>
+
+  <h2>同步阶段只做三件事，然后就返回</h2>
+  <p>控制器在校验、组上下文、预留之后<b>立刻</b>把 SSE 连接交出去，真正的生成在另一个线程里跑。这个分界很重要：<b>只有同步阶段的错误能得到正常的 HTTP 状态码</b>（400/402/404），一旦连接建立，后面所有的失败都只能以 <code>error</code> 事件的形式推回来。</p>
+
+  <figure>
+    <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant B as 浏览器
+  participant C as Controller
+  participant S as Service
+  participant P as 积分
+  B->>C: POST /messages（Accept: SSE）
+  C->>S: prepare（无事务）
+  S->>S: 历史窗口 + 召回记忆 + 组提示词
+  S->>S: 先落用户消息
+  S->>P: reserve
+  alt 余额不足
+    P-->>B: 402，上游一个请求都不发
+  else 预留成功
+    S-->>C: TurnPreparation
+    C-->>B: 200 + SseEmitter（连接已建立）
+  end
+</pre>
+    </div>
+    <figcaption><b>同步阶段。</b>顺序不能变：先落用户消息、最后才 <code>reserve</code>，因为它是最后一个可能抛异常的动作。</figcaption>
+  </figure>
+
+  <h2>异步阶段：工具循环与结算</h2>
+  <figure>
+    <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant B as 浏览器
+  participant H as harness
+  participant U as 上游
+  participant S as Service
+  participant P as 积分
+  loop 工具循环，有轮数上限
+    H->>U: 流式请求
+    U-->>H: thinking / content 增量
+    H-->>B: 同名事件（thinking · content）
+    opt 上游要求调用工具
+      H->>H: 执行工具，结果逐条回填
+      Note over H: 每轮记一条 span
+    end
+  end
+  H->>S: complete（落 assistant 消息）
+  H->>P: settle（按实际 token 多退少补）
+  H-->>B: done{messageId, traceId}
+</pre>
+    </div>
+    <figcaption><b>异步阶段。</b><code>draft</code> 事件在需要「生成笔记草稿」时出现。任何一步抛错都走 <code>refund</code> 全额退还，然后发 <code>error</code>。</figcaption>
+  </figure>
+
+  <h2>账本只有四种主要动作</h2>
+  <figure>
+    <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  A["reserve<br/>按估算额冻结"] -->|余额够| B["调用上游"]
+  A -->|余额不足| X["402<br/>不产生任何上游流量"]
+  B --> C["settle<br/>按实际 token 多退少补"]
+  B -->|上游失败 / 线程池满 / 中断| D["refund<br/>全额退还"]
+  C --> E[("ai_credit_ledger<br/>RESERVE − / SETTLE 差额 / REFUND +")]
+  D --> E
+  E --> F[("ai_credit_accounts<br/>余额")]
+</pre>
+    </div>
+    <figcaption><b>账务。</b>流水自带计量量（model、input_tokens、output_tokens），不从别的表 join——否则「精简」那一路的消耗永远查不到。</figcaption>
+  </figure>
+
+  <div class="notes">
+    <h2>读图要点</h2>
+    <ul>
+      <li><b><code>prepare</code> 不加事务，<code>reserve</code> 是最后一个可能抛异常的动作。</b>早年它带着事务，结果被 402 拦下的那一轮连用户刚发的消息一起回滚丢了——界面因为只有乐观本地状态而看不出来，刷新就消失。</li>
+      <li><b>工具循环的每一轮都是真调用、真花钱。</b>历史缺陷是「每轮都调上游，但只上报最后一轮的 token」，桩掉上游端口的测试永远看不见它。现在每轮落一条 span，账才能对上。</li>
+      <li><b>上游有三个硬限制</b>（DeepSeek 系列）：工具名只接受下划线；工具结果必须<b>逐条</b>发回；思考内容不能塞进历史。三条都是踩过之后写进代码的。</li>
+      <li><b>SSE 只有五个事件：</b><code>thinking</code>、<code>content</code>、<code>draft</code>、<code>done</code>、<code>error</code>。<code>done</code> 带 <code>traceId</code>，用户点赞/点踩时用它把反馈挂到那条 run 上。</li>
+      <li><b>线程池是有界的。</b>队列满时任务根本没跑起来，预留到不了结算也没有别的补偿出口——所以那里显式退款并返回 <b>429</b>，而不是让异常被兜成 500（否则用户看着「内部错误」，实际是被白扣了一次分）。</li>
+      <li><b>流水按用途分类</b>（对话 / 自动整理记忆 / 面试点评 / 简历 / 训练营 / 复习 / 运维诊断）。分开记是需求：用户要能回答「最近改简历花了多少」，合成一类就永远算不清。</li>
+      <li><b>积分面板与扣费是两个入口，同一个余额。</b>余额是账户表的一列，流水是明细；对不上账时先看是不是有一次 RESERVE 没有对应的 SETTLE 或 REFUND。</li>
+    </ul>
+  </div>
+
+  <div class="notes">
+    <h2>代码在哪</h2>
+    <ul class="paths">
+      <li><code>backend/paideia-ai/…/web/AssistantConversationController.java</code> — SSE 端点、五个事件、线程池拒绝时的退款</li>
+      <li><code>backend/paideia-ai/…/conversation/ConversationService.java</code> — <code>prepare</code>（历史/记忆/提示词）与 <code>complete</code></li>
+      <li><code>backend/paideia-ai/…/conversation/AgentScopeAssistantAnswerer.java</code> — 自写 harness 的循环本身，AgentScope 只提供了模型客户端与流式累加器</li>
+      <li><code>backend/paideia-ai/…/billing/CreditService.java</code> — reserve / settle / refund，以及每种用途的 settle 方法</li>
+      <li><code>backend/paideia-ai/…/telemetry/</code> — <code>ai_runs</code> / <code>ai_run_spans</code> 的写入队列与清洗</li>
+      <li><code>frontend/packages/assistant/src/sse.ts</code> — 客户端解析五种事件</li>
+    </ul>
+  </div>
+
+  <div class="warn">
+    <b>这条链路上所有「只有真跑才看得见」的缺陷都在这一层。</b>桩掉上游的单元测试能证明分支走对了，证明不了「账记全了」「HTTP 状态对了」「用户消息还在」——这三个都是实际跑过一次上游/一次 402 才暴露的。改这里务必真连一次上游，或者至少真跑一次完整的 e2e。
+  </div>
+</main>
+
+<script src="vendor/mermaid.min.js"></script>
+<script src="diagram.js"></script>
+</body>
+</html>

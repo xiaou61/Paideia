@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>01 · 全景：它由什么拼成 — Paideia 架构导读</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="nav.js"></script>
+
+<main>
+  <p class="kicker">01 / 全景</p>
+  <h1>它由什么拼成</h1>
+  <p class="question"><strong>这张图回答：</strong>我打开浏览器点开这个站点，一共用到了哪几台机器、几个进程、哪些外部服务？「11 个模块」是 11 个服务吗？</p>
+
+  <h2>先给结论</h2>
+  <p>部署上是<b>一台机器、一个 Java 进程、一个数据库</b>。十一个 Maven 模块是<b>编译期边界</b>，不是部署单元——它们全部打进同一个 jar，由同一个 <code>systemd</code> 单元跑起来。前端有两个可运行面（学习者端、管理端），构建成静态资源后由这同一个进程提供，管理端挂在 <code>/admin/</code> 子路径下。</p>
+  <p>外部依赖只有四个：MySQL（唯一数据源，不可替换）、对象存储（附件，走 S3 协议，有端口抽象）、AI 上游（OpenAI 兼容接口，唯一真正花钱的地方）、以及两个可选增强（面经判定服务、抓取与监控）。</p>
+
+  <figure>
+    <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  L["学习者<br/>浏览器 / Electron 壳"] --> APP["@paideia/app<br/>学习者端"]
+  A["管理员<br/>浏览器"] --> ADM["@paideia/admin<br/>管理端 /admin/"]
+  APP --> API["paideia-app<br/>单进程 · 178 个端点"]
+  ADM --> API
+  API --> DB[("MySQL<br/>59 张表")]
+  API --> OBJ["RustFS<br/>S3 兼容对象存储"]
+  API --> LLM["AI 上游<br/>OpenAI 兼容接口"]
+  API --> LAYA["Laya 判定服务<br/>面经相关性重排"]
+  API --> MON["Prometheus / Loki / Tempo<br/>Grafana 同源反代"]
+  API <--> MCP["外部 MCP 客户端<br/>PAT 鉴权的 /mcp"]
+</pre>
+    </div>
+    <figcaption><b>系统上下文。</b>箭头是「谁调谁」。注意学习者端和管理端是两条独立构建产物，但共用同一个后端与同一套前端库。</figcaption>
+  </figure>
+
+  <h2>十一个模块，一条向下的依赖链</h2>
+  <p>依赖方向是<b>依赖方 → 被依赖方</b>，而且只许单向下行：底层的模块不需要知道谁在调它。<code>spring-modulith</code> 在构建期挡循环依赖，<code>ModularityTest</code> 在测试期挡「跨模块去引用别人的 <code>internal</code> 包」——所以模块之间只能通过公开契约接口说话，实现类改名不会波及别的模块。</p>
+
+  <figure>
+    <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  platform["paideia-platform"]
+  web["paideia-web"]
+  persistence["paideia-persistence"]
+  security["paideia-security"]
+  account["paideia-account"]
+  knowledge["paideia-knowledge"]
+  note["paideia-note"]
+  ai["paideia-ai"]
+  sandbox["paideia-sandbox"]
+  mcp["paideia-mcp"]
+  app["paideia-app"]
+  web --> platform
+  persistence --> platform
+  security --> platform
+  account --> platform
+  account --> persistence
+  account --> security
+  knowledge --> platform
+  knowledge --> persistence
+  knowledge --> security
+  note --> platform
+  note --> persistence
+  note --> security
+  ai --> platform
+  ai --> persistence
+  ai --> security
+  ai --> knowledge
+  ai --> sandbox
+  sandbox --> platform
+  sandbox --> persistence
+  sandbox --> security
+  mcp --> platform
+  mcp --> persistence
+  mcp --> security
+  app --> platform
+  app --> web
+  app --> persistence
+  app --> security
+  app --> account
+  app --> knowledge
+  app --> note
+  app --> ai
+  app --> sandbox
+  app --> mcp
+</pre>
+    </div>
+    <figcaption><b>模块依赖。</b>由 <code>scripts/gen-arch-diagram.mjs</code> 从 11 个 <code>pom.xml</code> 生成（33 条依赖），权威副本在 <code>docs/architecture/01-module-dependencies.md</code>。</figcaption>
+  </figure>
+
+  <div class="notes">
+    <h2>读图要点</h2>
+    <ul>
+      <li><b><code>paideia-app</code> 是唯一的装配点。</b>它依赖全部十个模块，负责把各自登记的 Bean 拼起来。除它之外，没有任何模块依赖别人的「应用层」。</li>
+      <li><b><code>paideia-ai</code> 为什么依赖 <code>knowledge</code> 和 <code>sandbox</code>：</b>助手要能读知识库条目、要在 SQL 沙箱里跑自己生成的 SQL。这两个依赖是<b>能力依赖</b>，不是数据依赖——AI 模块没有拿到别人的表。</li>
+      <li><b>三个底座模块之间互不依赖。</b><code>platform</code>（异常、业务码、时间、Clock）、<code>persistence</code>（MyBatis 与会话）、<code>security</code>（JWT 与规则）各自独立，谁也不认识谁。</li>
+      <li><b>没有消息队列。</b>全仓的异步只有两种形态：请求线程内的异步任务，和 <code>@Scheduled</code> 定时任务（清理过期状态、抓取、每日速递）。看到架构规则里提到消息中间件时不要去找代码，那是没落地的决策。</li>
+      <li><b>外部依赖里最容易误判的是对象存储。</b>它有一个端口接口，本地磁盘实现与 S3 实现可以配置切换——「端口可换」这句话的真假，取决于同一批用例有没有在两种实现上都跑过。</li>
+    </ul>
+  </div>
+
+  <div class="notes">
+    <h2>代码在哪</h2>
+    <ul class="paths">
+      <li><code>backend/pom.xml</code> — 模块清单与依赖声明，图的唯一事实源</li>
+      <li><code>backend/paideia-app/</code> — 装配点；启动类、<code>ModularityTest</code>、所有业务编排都在这</li>
+      <li><code>backend/paideia-platform/</code> — 异常基类与业务码、<code>Clock</code></li>
+      <li><code>frontend/apps/app</code>、<code>frontend/apps/admin</code>、<code>frontend/apps/desktop</code> — 三个可运行端</li>
+    </ul>
+  </div>
+
+  <div class="warn">
+    <b>看图时最容易犯的错：</b>把模块当微服务，然后去找它们之间的 HTTP 调用。没有。所有跨模块调用都是同进程的方法调用，失败不会变成超时，也不会重试——出问题就是一个异常向上抛，由 <code>GlobalExceptionHandler</code> 转成业务码（见 <a href="02-request-lifecycle.html">02</a>）。
+  </div>
+</main>
+
+<script src="vendor/mermaid.min.js"></script>
+<script src="diagram.js"></script>
+</body>
+</html>
