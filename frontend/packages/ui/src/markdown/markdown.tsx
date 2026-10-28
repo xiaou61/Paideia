@@ -109,14 +109,31 @@ type MermaidPlugin = Awaited<typeof import('@streamdown/mermaid')>['mermaid']
 const MERMAID_CONFIG = {
   startOnLoad: false,
   securityLevel: 'strict',
-  // 默认主题是奶油黄，与站点的中性/靛蓝色板打架；neutral 是灰阶，观感接近本仓的卡片。
-  // 深色主题下仍是浅底（已知限制）：跟随主题要按当前主题重建插件实例，本期未做。
-  theme: 'neutral',
   themeCSS:
     '.flowchart-link{stroke-dasharray:6 4;animation:pd-flow 1.2s linear infinite}' +
     '@keyframes pd-flow{to{stroke-dashoffset:-20}}' +
     '@media (prefers-reduced-motion:reduce){.flowchart-link{animation:none;stroke-dasharray:none}}',
 } as const
+
+/**
+ * 主题跟着 `<html class="dark">` 走，不依赖 ThemeProvider。
+ *
+ * <p>为什么不直接用 `useTheme()`：它没有 Provider 时会抛错，而 `Markdown` 被助手、管理端预览、
+ * 测试三处共用，不能要求每个调用点都包一层主题上下文。直接订阅根元素的 class 更省事：
+ * 主题的唯一事实来源本来就是 DOM（见 theme-context 的注释）。
+ */
+function useDarkMode(): boolean {
+  const subscribe = useCallback((notify: () => void) => {
+    const observer = new MutationObserver(notify)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
+  return useSyncExternalStore(
+    subscribe,
+    () => document.documentElement.classList.contains('dark'),
+    () => false,
+  )
+}
 
 let mermaidPlugin: MermaidPlugin | undefined
 let mermaidLoading: Promise<void> | null = null
@@ -162,8 +179,14 @@ const MERMAID_FENCE = /(^|\n)\s*```mermaid\b/
 /**
  * 静态（长文）模式的呈现开关。**这两个是模块常量，不是每次渲染新建的字面量**——
  * 上游那个组件的记忆化比较里含 props 的引用相等，随手新建的对象会白让它重算一遍顶层。
+ *
+ * <p>mermaid 图保留全屏（长图很有用），去掉复制与下载：图的源码对读者没有意义，
+ * 那两个按钮只会让一张图看起来像一段代码。
  */
-const DOCUMENT_CONTROLS = { table: false }
+const DOCUMENT_CONTROLS = {
+  table: false,
+  mermaid: { copy: false, download: false, fullscreen: true },
+}
 const DOCUMENT_LINK_SAFETY = { enabled: false }
 
 /**
@@ -249,6 +272,29 @@ export function Markdown({
   const hasMermaid = useMemo(() => MERMAID_FENCE.test(markdown), [markdown])
   const codePlugin = useCodeHighlighting(hasFence)
   const mermaidPlugin = useMermaidPlugin(!streaming && hasMermaid)
+  // 图的配色跟着当前主题走：neutral 是灰阶（浅色下接近本仓卡片），dark 是 mermaid 的深色主题
+  const dark = useDarkMode()
+  const mermaidOptions = useMemo(
+    () => ({ config: { ...MERMAID_CONFIG, theme: dark ? 'dark' : 'neutral' } }),
+    [dark],
+  )
+  /**
+   * 让文件已经打开时切主题也能重画图。
+   *
+   * <p>上游按「图表源码的哈希」缓存已渲染的 SVG，只换 config 不会触发重画（实测：切到深色后
+   * 正文变暗、图仍是浅底）。往每个 mermaid 块里插一行以 `%%` 开头的注释——渲染时被忽略，
+   * 但源码变了，于是只有这些块被重建，正文与已作答的小测不受影响。
+   */
+  const themedMarkdown = useMemo(
+    () =>
+      hasMermaid
+        ? markdown.replace(
+            /(^|\n)([ \t]*```mermaid[^\n]*\n)/g,
+            (_match, lead: string, fence: string) => `${lead}${fence}%% theme: ${dark ? 'dark' : 'light'}\n`,
+          )
+        : markdown,
+    [markdown, hasMermaid, dark],
+  )
   // 合并后的对象身份必须稳定：它进上游的块级记忆化比较，每次渲染换一个新对象会让记忆化全失效
   const mergedComponents = useMemo(
     () => (streaming ? components : { ...documentComponents, ...components }),
@@ -290,12 +336,13 @@ export function Markdown({
       className={className}
       components={mergedComponents}
       plugins={plugins}
+      mermaid={streaming ? undefined : mermaidOptions}
       // 长文里的外链是管理员写进去的，直接打开；流式回答里的链接是模型生成的，走上游的确认弹窗
       linkSafety={streaming ? undefined : DOCUMENT_LINK_SAFETY}
       // 长文里不需要表格的复制/下载下拉——那是聊天场景里"把我给你的表拿走"才需要的
       controls={streaming ? undefined : DOCUMENT_CONTROLS}
     >
-      {markdown}
+      {themedMarkdown}
     </Streamdown>
   )
 

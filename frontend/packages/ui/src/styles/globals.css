@@ -461,3 +461,11 @@
     }
   }
 }
+
+/* ── mermaid 图：去掉「代码块」感 ────────────────────────────────
+   streamdown 给图套了和代码块一样的壳：左上角一行 `mermaid` 标签，右上角复制/下载/全屏。
+   复制与下载对读者没意义（图不是给他复制的源码），已经在 markdown.tsx 里关掉；
+   这里再抹掉那行标签——控件是绝对定位的，不受影响，全屏仍然保留。 */
+[data-streamdown='mermaid-block'] > div:first-child {
+  display: none;
+}
