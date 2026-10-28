@@ -196,7 +196,7 @@ S1 的基线必须用**现状代码**跑出来，不能等改完再补。
   3. 注销清单确认包含候选表；集成测试断言四张表（两记忆 + 候选）都清空。
 - 验证：`-Dtest='MemorySwitchTest,MemoryDeletionTest'` 全绿
 
-### TASK-011 | in_progress | 面板「待确认」与 e2e
+### TASK-011 | done | 面板「待确认」与 e2e
 
 - 对应：`REQ-008`、`AC-007`、`AC-008`
 - 依赖：TASK-010
@@ -208,7 +208,7 @@ S1 的基线必须用**现状代码**跑出来，不能等改完再补。
   3. e2e：插入一条候选 → 面板可见 → 接受 → 正式列表出现、候选区消失。
 - 验证：`playwright test e2e/assistant.spec.ts --grep "记忆"` 通过
 
-### TASK-012 | pending | 复测与对比报告
+### TASK-012 | in_progress | 复测与对比报告
 
 - 对应：`AC-010`、`AC-011`
 - 依赖：TASK-003 到 TASK-011 全部
