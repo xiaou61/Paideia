@@ -1,3 +1,6 @@
 # cp 到 Windows 时 core.autocrlf=true 会把 shell 脚本转成 CRLF，Bash 会在 `\r` 上直接失败。
 # 只有真正要执行的脚本需要钉死；其余文件保持仓库默认策略。
 *.sh text eol=lf
+
+# install-ops.sh 会 source 这个文件；CRLF 会让 bash 把  当成命令（2026-10-28 实测）。
+deploy/ops/*.conf text eol=lf
