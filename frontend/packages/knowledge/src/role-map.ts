@@ -73,9 +73,10 @@ const TIERS: Record<RoleKey, { core: readonly string[]; advanced: readonly strin
     core: ['sql-practice', 'mysql-from-zero'],
     advanced: ['redis', 'system-design', 'algorithms'],
   },
-  // 前端岗位目前**没有任何内容**（22 条线里 slug 含 front/react/css 的为 0）。
-  // 留空不是占位，是如实反映现状；页面对 available=false 有专门的处理。
-  frontend: { core: [], advanced: [] },
+  // 前端岗位**没有任何专属内容**（22 条线里 slug 含 front/react/css 的为 0）。
+  // 但不能留空表：空表意味着"全部落进选读"，顺序就退化成后端/算法那套，等于给前端的人
+  // 推荐 Java 与 Python。这里放三条与岗位无关的通用线，页面对 available=false 另有一句说明。
+  frontend: { core: ['git', 'network-basics', 'algorithms'], advanced: [] },
 }
 
 export function roleMeta(role: RoleKey): RoleMeta {

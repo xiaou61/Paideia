@@ -22,6 +22,16 @@ describe('岗位映射（WORK-047）', () => {
     expect(rank).toBe(Number.MAX_SAFE_INTEGER)
   })
 
+  it('没有专属内容的岗位也要有通用核心，不能退化成"全部选读"', () => {
+    // 空表意味着所有线落进选读、顺序跟着表外的默认走，等于给前端的人推 Java 与 Python
+    for (const role of ROLES.filter((item) => !item.available)) {
+      const coreCount = ['git', 'network-basics', 'algorithms'].filter(
+        (slug) => tierOf(role.key, slug).tier === 'core',
+      ).length
+      expect(coreCount).toBeGreaterThan(0)
+    }
+  })
+
   it('同段内按表里的顺序给 rank', () => {
     expect(tierOf('backend', 'java-from-zero').rank).toBe(0)
     expect(tierOf('backend', 'spring').rank).toBe(1)

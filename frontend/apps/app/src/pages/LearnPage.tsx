@@ -254,7 +254,8 @@ export function LearnPage() {
         <Alert className="mb-6" data-testid="learn-role-empty">
           <AlertTitle>{meta.label}的内容还在建设中</AlertTitle>
           <AlertDescription>
-            这个岗位暂时没有专属内容。先按「后端开发」的顺序给你推荐——上面切换岗位即可。
+            这个岗位暂时没有专属内容，下面按 Git、网络、算法三条通用线排序；其余都在「选读」里，
+            不影响你能看什么。
           </AlertDescription>
         </Alert>
       ) : null}
@@ -307,7 +308,7 @@ export function LearnPage() {
         </Link>
       ) : null}
 
-      {meta.available && tracks.isSuccess ? (
+      {tracks.isSuccess ? (
         <>
           <TrackSection
             testId="learn-core"
