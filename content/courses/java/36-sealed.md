@@ -1,9 +1,9 @@
 ---
-title: 34 · sealed 与封闭类型
-order: 34
+title: 36 · sealed 与封闭类型
+order: 36
 chapter: 现代 Java
 level: advanced
-prerequisite: 33 · record
+prerequisite: 35 · record
 category: java-from-zero
 minutes: 28
 status: published

@@ -1,9 +1,9 @@
 ---
-title: 32 · instanceof 模式匹配
-order: 32
+title: 34 · instanceof 模式匹配
+order: 34
 chapter: 现代 Java
 level: intermediate
-prerequisite: 31 · switch 表达式与箭头语法
+prerequisite: 33 · switch 表达式与箭头语法
 category: java-from-zero
 minutes: 24
 status: published

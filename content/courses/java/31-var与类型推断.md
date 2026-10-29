@@ -1,9 +1,9 @@
 ---
-title: 29 · var 与类型推断
-order: 29
+title: 31 · var 与类型推断
+order: 31
 chapter: 现代 Java
 level: beginner
-prerequisite: 28 · 日志：程序出事了怎么查
+prerequisite: 30 · 日志：程序出事了怎么查
 category: java-from-zero
 minutes: 22
 status: published

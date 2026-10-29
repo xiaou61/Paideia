@@ -1,9 +1,9 @@
 ---
-title: 31 · switch 表达式与箭头语法
-order: 31
+title: 33 · switch 表达式与箭头语法
+order: 33
 chapter: 现代 Java
 level: intermediate
-prerequisite: 30 · 文本块
+prerequisite: 32 · 文本块
 category: java-from-zero
 minutes: 26
 status: published
@@ -104,7 +104,7 @@ HIGH=进阶
 | 枚举，且覆盖了全部常量 | 不必须 |
 | 枚举，只覆盖一部分 | 必须 |
 | `int` / `String` 等开放类型 | 必须 |
-| `sealed` 接口的全部实现（第 34 课） | 不必须 |
+| `sealed` 接口的全部实现（第 36 课） | 不必须 |
 
 编译器会检查"表达式是否一定有一个值"。少一个分支，编译直接失败——这比运行时才发现没处理某个状态好得多。
 

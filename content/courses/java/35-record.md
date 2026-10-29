@@ -1,9 +1,9 @@
 ---
-title: 33 · record
-order: 33
+title: 35 · record
+order: 35
 chapter: 现代 Java
 level: intermediate
-prerequisite: 32 · instanceof 模式匹配
+prerequisite: 34 · instanceof 模式匹配
 category: java-from-zero
 minutes: 28
 status: published
