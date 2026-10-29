@@ -32,6 +32,25 @@ export function serializePageContext(context: PageContext | null): string | unde
     }
     return parts.join('\n')
   }
+  if (context.kind === 'study-log') {
+    const block = (text: string) => truncateContext(text, PAGE_CONTEXT_LIMITS.studyLogBlock)
+    return [
+      '页面：学习记录',
+      '以下四块是平台算好的事实（数字不会骗人，缺的块会显示"暂无"）：',
+      '',
+      '各线进度：',
+      block(context.lines),
+      '',
+      '最近没拿满分的关卡：',
+      block(context.failing),
+      '',
+      '到期的复习：',
+      block(context.dueReviews),
+      '',
+      '掌握度最低的概念：',
+      block(context.weakConcepts),
+    ].join('\n')
+  }
   return undefined
 }
 

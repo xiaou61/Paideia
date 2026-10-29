@@ -45,6 +45,7 @@ const NAV_GROUP_OF = {
   'learner-nav-learn': 'learner-nav-group-learn',
   'learner-nav-digest': 'learner-nav-group-learn',
   'learner-nav-review': 'learner-nav-group-learn',
+  'learner-nav-progress': 'learner-nav-group-learn',
   'learner-nav-camp': 'learner-nav-group-learn',
   'learner-nav-knowledge': 'learner-nav-group-knowledge',
   'learner-nav-books': 'learner-nav-group-knowledge',

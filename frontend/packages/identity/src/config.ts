@@ -13,7 +13,7 @@ export interface IdentityConfig {
   /** 首页优先推荐的知识库分类 slug（按顺序；不存在的忽略）。 */
   preferredCategories: string[]
   /** 导航顺序：把哪几个入口提前。 */
-  preferredNav: readonly ('learn' | 'graph' | 'sql-practice' | 'knowledge' | 'notes' | 'my-assessments' | 'interview' | 'digest')[]
+  preferredNav: readonly ('learn' | 'graph' | 'sql-practice' | 'knowledge' | 'notes' | 'my-assessments' | 'interview' | 'digest' | 'progress')[]
   /** 助手在"没有条目上下文"时的开场白。 */
   assistantGreeting: string
   /** 面试页的开场说明（面试官自己会再问第一题）。 */

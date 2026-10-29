@@ -103,3 +103,35 @@ describe('extractSqlBlock', () => {
     expect(extractSqlBlock('```java\nSystem.out.println(1);\n```')).toBeNull()
   })
 })
+
+describe('学习记录页上下文（WORK-053）', () => {
+  const studyLog: PageContext = {
+    kind: 'study-log',
+    lines: 'Java 从零开始 3/37，下一关 循环与方法',
+    failing: '第 12 关 数组与字符串（挑战 1/3）',
+    dueReviews: '依赖注入、事务边界',
+    weakConcepts: '并发可见性 0.31；索引最左前缀 0.42',
+  }
+
+  it('四块都进提示词，且标明是平台算出的事实', () => {
+    const text = serializePageContext(studyLog) ?? ''
+    expect(text).toContain('页面：学习记录')
+    expect(text).toContain('3/37')
+    expect(text).toContain('第 12 关')
+    expect(text).toContain('依赖注入')
+    expect(text).toContain('0.31')
+  })
+
+  it('按 studyLogBlock 上限截断并标注剩余长度', () => {
+    const long = '甲'.repeat(PAGE_CONTEXT_LIMITS.studyLogBlock + 50)
+    const text = serializePageContext({ ...studyLog, lines: long }) ?? ''
+    expect(text).toContain(`后面还有 50 个字符没显示`)
+  })
+
+  it('不把敏感字段带进上下文——没有邮箱与令牌的痕迹', () => {
+    const text = serializePageContext(studyLog) ?? ''
+    expect(text).not.toMatch(/@\w+\./)
+    expect(text).not.toContain('token')
+    expect(text).not.toContain('password')
+  })
+})

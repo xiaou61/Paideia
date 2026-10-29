@@ -32,7 +32,7 @@ export interface AssistantApi {
    * <p>`harness` 是**公共行为**（WORK-010）：面试页传 `interview`，点评用 `review`。
    * 不传 = 通用助手。**行为会记在会话上**——从通用入口继续一段面试对话仍是面试行为。
    */
-  createConversation(entryId: number | null, harness?: 'assistant' | 'interview' | 'tutor'): Promise<ConversationView>
+  createConversation(entryId: number | null, harness?: 'assistant' | 'interview' | 'tutor' | 'planner'): Promise<ConversationView>
   /** 本人的会话列表（**不含消息内容**，只用来选一条）。 */
   conversations(): Promise<ConversationView[]>
   /** 面试点评（一次性结果，非流式）。 */

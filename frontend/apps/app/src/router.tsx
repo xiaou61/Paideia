@@ -5,6 +5,7 @@ import { HomePage } from './pages/HomePage'
 import { BooksPage } from './pages/BooksPage'
 import { BookChaptersPage } from './pages/BookChaptersPage'
 import { GraphPage } from './pages/GraphPage'
+import { ProgressPage } from './pages/ProgressPage'
 import { ReviewPage } from './pages/ReviewPage'
 import { KnowledgeEntryPage } from './pages/KnowledgeEntryPage'
 import { CampDetailPage } from './pages/CampDetailPage'
@@ -73,6 +74,15 @@ export const router = createHashRouter([
     element: (
       <RequireAuth>
         <LearnPage />
+      </RequireAuth>
+    ),
+  },
+  // 学习记录（WORK-053）：四块汇总 + 三个 AI 入口。它不是第二个 /learn，地图还在那边。
+  {
+    path: '/progress',
+    element: (
+      <RequireAuth>
+        <ProgressPage />
       </RequireAuth>
     ),
   },

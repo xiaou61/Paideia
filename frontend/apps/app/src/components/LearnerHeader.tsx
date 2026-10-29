@@ -59,6 +59,9 @@ const NAV = [
   { key: 'digest' as const, group: 'learn' as const, to: '/digest', label: '每日速递', testId: 'learner-nav-digest' },
   // 复习（WORK-034）：每天要看的入口。
   { key: 'review' as const, group: 'learn' as const, to: '/review', label: '复习', testId: 'learner-nav-review' },
+  // 学习记录（WORK-053）：进度 / 卡关 / 到期 / 薄弱四块，外加三个 AI 入口。
+  // 不进 preferredNav —— 身份排序只管那几个老入口，新入口固定排在后面。
+  { key: 'progress' as const, group: 'learn' as const, to: '/progress', label: '学习记录', testId: 'learner-nav-progress' },
   // 训练营（WORK-029）：它是"还没有学习记录的人"的入口。
   // 不进 preferredNav —— 身份排序只管那几个老入口，新入口固定排在后面。
   { key: 'camp' as const, group: 'learn' as const, to: '/camp', label: '训练营', testId: 'learner-nav-camp' },

@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 
 /** 一次对话的公共行为（WORK-020 起新增 tutor）。 */
-export type AssistantHarness = 'assistant' | 'interview' | 'tutor'
+export type AssistantHarness = 'assistant' | 'interview' | 'tutor' | 'planner'
 
 /** 悬浮壳能看到的"当前内容"。 */
 export interface AssistantContextValue {
@@ -28,7 +28,25 @@ export interface AssistantContextValue {
   pageContext: PageContext | null
 }
 
-/** 页面场景。目前只有 SQL 工作台一种；加新的时按 kind 扩展。 */
+/**
+ * 学习记录页的上下文（WORK-053）。
+ *
+ * <p>四块都是**已经算好的数字与名字**，不是原始数据：模型要的是"他卡在哪"，不是让他自己统计。
+ * 每块都按 {@link PAGE_CONTEXT_LIMITS} 截断。
+ */
+export interface StudyLogPageContext {
+  kind: 'study-log'
+  /** 各线进度：`Java 从零开始 3/37，下一关 循环与方法`。 */
+  lines: string
+  /** 最近没拿满分的关卡：`第 12 关 数组与字符串（挑战 1/3）`。 */
+  failing: string
+  /** 到期复习条目名。 */
+  dueReviews: string
+  /** 掌握度最低的几个概念与概率。 */
+  weakConcepts: string
+}
+
+/** 页面场景。目前两种；加新的时按 kind 扩展。 */
 export interface SqlWorkbenchPageContext {
   kind: 'sql-workbench'
   /** 当前选中的数据集 key。 */
@@ -39,7 +57,7 @@ export interface SqlWorkbenchPageContext {
   lastResult: string
 }
 
-export type PageContext = SqlWorkbenchPageContext
+export type PageContext = SqlWorkbenchPageContext | StudyLogPageContext
 
 /**
  * 页面上下文的长度上限。
@@ -51,6 +69,8 @@ export type PageContext = SqlWorkbenchPageContext
 export const PAGE_CONTEXT_LIMITS = {
   draftSql: 2000,
   lastResult: 800,
+  /** 学习记录四块各 300 字符：够放 8 条线 + 5 个卡关，又不至于把提示词挤爆。 */
+  studyLogBlock: 300,
 } as const
 
 /** 按上限截断，并在尾部标明"还有多少没显示"。 */

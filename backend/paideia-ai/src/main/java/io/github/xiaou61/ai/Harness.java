@@ -30,7 +30,9 @@ public enum Harness {
     INTERVIEW("interview"),
     REVIEW("review"),
     /** 编程课导师（WORK-020）：先要思路、分级提示、默认不给完整答案。 */
-    TUTOR("tutor");
+    TUTOR("tutor"),
+    /** 学习规划（WORK-053）：看着学习记录快照先反问、再给具体建议；只能建议，不能替用户写。 */
+    PLANNER("planner");
 
     private final String key;
 

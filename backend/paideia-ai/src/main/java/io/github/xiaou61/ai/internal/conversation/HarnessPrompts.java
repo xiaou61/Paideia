@@ -31,6 +31,7 @@ public final class HarnessPrompts {
             case INTERVIEW -> InterviewPrompt.system();
             case REVIEW -> ReviewPrompt.system();
             case TUTOR -> TutorPrompt.system();
+            case PLANNER -> PlannerPrompt.system();
         };
     }
 
@@ -49,6 +50,7 @@ public final class HarnessPrompts {
             case INTERVIEW -> InterviewPrompt.VERSION;
             case REVIEW -> ReviewPrompt.VERSION;
             case TUTOR -> TutorPrompt.version();
+            case PLANNER -> PlannerPrompt.version();
         };
     }
 }

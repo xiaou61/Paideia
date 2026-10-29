@@ -91,6 +91,9 @@ public class AgentToolBridge {
             case REVIEW -> Set.of();
             // 导师要能查到本人学情（learning 组），也要按需检索知识点与读条目
             case TUTOR -> Set.of("knowledge", "learning", "assessment", "assistant", "sql");
+            // 规划场景只多一个 planner 组（生成类工具，仍然只读：产出草稿、不落库）。
+            // 学习记录快照由页面经 page-context 送进来，不靠工具去查。
+            case PLANNER -> Set.of("knowledge", "learning", "assessment", "assistant", "planner");
         };
     }
 
