@@ -88,6 +88,12 @@ public class SandboxProperties {
     /** Spring 容器的内存上限：`@SpringBootTest` 起内嵌 Tomcat 实测 400–600MB。 */
     private String springMemory = "1g";
 
+    /**
+     * Spring 容器的 CPU：Maven 编译 + 起 Spring 上下文都是 CPU 密集。
+     * 实测 0.5 核时一次跑 55 秒（上下文 22 秒），2 核约 15 秒——档位不变会踩到 90 秒上限。
+     */
+    private String springCpus = "2";
+
     /** 代码与 stdin 的长度上限（字符）。 */
     private int maxCodeChars = 20_000;
     private int maxStdinChars = 4_000;
@@ -179,7 +185,10 @@ public class SandboxProperties {
 
     /** 该语言的 CPU 上限。 */
     public String cpusFor(String language) {
-        return isSql(language) ? sqlCpus : cpus;
+        if (isSql(language)) {
+            return sqlCpus;
+        }
+        return "spring".equalsIgnoreCase(language) ? springCpus : cpus;
     }
 
     /** 该语言的进程数上限。 */
@@ -266,6 +275,14 @@ public class SandboxProperties {
 
     public void setSpringMemory(String springMemory) {
         this.springMemory = springMemory;
+    }
+
+    public String getSpringCpus() {
+        return springCpus;
+    }
+
+    public void setSpringCpus(String springCpus) {
+        this.springCpus = springCpus;
     }
 
     public int getMaxCodeChars() {

@@ -252,6 +252,8 @@ class DockerCommandTest {
         assertThat(command).contains("paideia-spring:1");
         // Maven 要开上百个 jar：nofile=64 会让插件"类缺失"（实测），spring 单独放宽
         assertThat(command).contains("nofile=1024", "nproc=256", "--pids-limit=256");
+        // 0.5 核实测一次跑 55 秒（上下文 22 秒），spring 单独给 2 核
+        assertThat(command).contains("--cpus=2");
         // Spring 要装骨架副本 + target，tmpfs 必须比普通 java 大
         assertThat(command).contains("/tmp:rw,size=512m,exec");
         String script = command.get(command.size() - 1);
