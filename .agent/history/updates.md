@@ -7815,3 +7815,18 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：`verify_course.py --dir content/courses/java` 38 文件含执行通过；线上 `06 · static 与值传递` 正文回读含「第 22 课会看到代价」「第 18 课细讲」，旧字符串已无；重导 dry-run 复跑 0 变更。
 - 本地提交：`9fdf34e`；已 push（`1202252..9fdf34e`）
 - 远端推送：已执行
+
+## 2026-10-29 12:40 +0800 · 知识库 · 条目页不再重复渲染与标题同文的正文一级标题
+
+- 类型：fix（前端）
+- 变更：新增 `@paideia/knowledge` 的 `stripDuplicateTitle(markdown, entryTitle)`——正文开头的一级标题与条目标题同文（比对前去课号前缀，所以总览那种「正文只写课程名」的形态也命中）就不渲染；标题不同则原样保留。`KnowledgeEntryPage` 在数据层剥一次，正文、目录（两份 `EntryToc`）、练习册（`extractQuizzes`）都吃同一份。
+- 决策：**必须和目录一起剥**。`EntryToc` 与正文按同一次 `extractHeadings` 的顺序编号，只给正文剥会让目录多一条、点下去错位一节——所以剥在页面层而不是 `MarkdownBody` 内部（后者拿不到"要不要同时影响目录"这个信息）。
+- 依据：课程正文以 `# NN · 标题` 开头（74 篇），页面本身已渲染条目标题，顶部因此出现两条同文大标题；`EntryToc`/`MarkdownBody` 共用 `extractHeadings` 的既有约定。
+- 验证：
+  - `entry-body.test.ts` 8 条（同文剥掉、总数只写课程名也剥、标题不同保留、正文以 `##` 开头不动、H1 不在开头不动、未传标题不动、只有 H1 时返回空、前后空白与课号差异不影响判等）。
+  - `@paideia/knowledge` 全量 **86 条 / 11 个文件**通过；`knowledge` 与 `app` 的 `tsc --noEmit` 均 0 错误。
+  - 发版 `release.ps1`（含前端重建）**294.3 秒**，健康检查通过。
+  - ego lite 线上复看三类页面：`26 · 枚举与常量`（正文带课号 H1）→ `h1Count=1`、目录首项「这一课你要会」；`00 · Java 从零开始`（正文 H1 无课号）→ 剥掉、目录首项「为什么 Java 比 Python 多一道坎」；`对象与集合`（正文无 H1）→ 原样、目录 22 条不动。
+- 未做：`e2e/knowledge.spec.ts` 没跑（本机没装 Playwright 的 Chromium，改用 ego lite 手验）；移动端窄屏那份目录只确认了数据源同源，没做窄屏截图。
+- 本地提交：`d40b538`；已 push
+- 远端推送：已执行
