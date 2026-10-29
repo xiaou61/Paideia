@@ -2,9 +2,12 @@
 artifact: tasks
 work_id: WORK-056
 work: Linux 判题式练习场
-status: draft
+status: approved
 created: 2026-10-29
 updated: 2026-10-29
+approved_by: xiaou61
+approved_at: 2026-10-29 17:02:06 +0800
+approver_role: CTO
 ---
 
 # Linux 判题式练习场实施任务
