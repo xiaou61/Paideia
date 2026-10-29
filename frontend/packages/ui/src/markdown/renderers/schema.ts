@@ -393,7 +393,13 @@ export interface RunChallenge {
   id: string
   kind: 'run'
   title: string
-  language: 'java' | 'python'
+  /** `spring` = 整项目跑 `mvn test`（WORK-055）：必须配 `editablePath` 与 `files`。 */
+  language: 'java' | 'python' | 'spring'
+  /**
+   * 项目模式下**学习者编辑的那份文件**的路径（相对项目根）。
+   * java / python 缺省是 `Main.java` / `main.py`；spring 必须显式给，因为骨架里文件名不止一个。
+   */
+  editablePath?: string
   starter: string
   /**
    * 只读的支撑文件（WORK-038）：项目模式下与 `starter`（学习者编辑的那个文件）一起提交。
@@ -481,7 +487,20 @@ export function parseCodeChallenge(code: string): ParseResult<CodeChallenge> {
 
     if (kind === 'run') {
       const language = asText(raw['language'], 'language', 16).toLowerCase()
-      need(language === 'java' || language === 'python', 'language 目前只能是 java 或 python')
+      need(language === 'java' || language === 'python' || language === 'spring',
+        'language 只能是 java / python / spring')
+      const editablePath = raw['editablePath'] === undefined
+        ? undefined
+        : asText(raw['editablePath'], 'editablePath', 200)
+      if (editablePath !== undefined) {
+        need(/^[A-Za-z0-9_./-]+$/.test(editablePath) && !editablePath.startsWith('/')
+          && !editablePath.includes('..'), `editablePath 不合法：${editablePath}`)
+      }
+      // spring 必须给路径与支撑文件：骨架在镜像里，缺任一项都会"跑起来但什么都没验"
+      if (language === 'spring') {
+        need(editablePath !== undefined, 'spring 关卡必须写 editablePath（学习者改哪个文件）')
+        need(raw['files'] !== undefined, 'spring 关卡必须写 files（测试文件等支撑文件）')
+      }
       const starter = asText(raw['starter'], 'starter', LIMITS.codeChars)
       const cases = asArray(raw['cases'], 'cases', 1, 10).map((item, index) => {
         const entry = asObject(item, `cases[${index}]`)
@@ -503,7 +522,10 @@ export function parseCodeChallenge(code: string): ParseResult<CodeChallenge> {
           return { path, content: typeof entry['content'] === 'string' ? entry['content'] : '' }
         },
       )
-      return { id, kind, title, language: language as 'java' | 'python', starter, files, cases, explain }
+      return {
+        id, kind, title, language: language as 'java' | 'python' | 'spring',
+        editablePath, starter, files, cases, explain,
+      }
     }
 
     if (kind === 'bug') {

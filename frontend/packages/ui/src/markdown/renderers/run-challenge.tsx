@@ -74,7 +74,8 @@ export function RunBody({
       const collected: { testCase: RunCase; output: RunOutput; passed: boolean }[] = []
       // 项目模式（WORK-038）：可编辑文件的路径按语言固定，其余文件原样带上。
       // 支撑文件里若也写了这个路径，以编辑器内容为准——否则学习者改的不是被执行的那份。
-      const editablePath = challenge.language === 'java' ? 'Main.java' : 'main.py'
+      const editablePath = challenge.editablePath
+        ?? (challenge.language === 'python' ? 'main.py' : 'Main.java')
       const files = challenge.files === undefined
         ? undefined
         : [
@@ -89,7 +90,10 @@ export function RunBody({
           files,
           caseId: `${challenge.id}:${testCase.name}`,
         })
-        collected.push({ testCase, output, passed: judgeRun(testCase, output) })
+        // Spring 项目判分看退出码：输出里混着 mvn 日志，逐字比 expected 不可靠；
+        // `mvn test` 有失败用例时退出码非 0（镜像里的脚本会再把汇总打出来）。
+        const passed = challenge.language === 'spring' ? output.exitCode === 0 : judgeRun(testCase, output)
+        collected.push({ testCase, output, passed })
       }
       setResults(collected)
       const passed = collected.filter((item) => item.passed).length
