@@ -27,6 +27,7 @@ export type {
   RunCodeResult,
   SandboxStatus,
 } from './client'
+export { stripDuplicateTitle } from './entry-body'
 export { EntryToc } from './entry-toc'
 export { PracticeEntry } from './practice-entry'
 export { findCategoryBySlug } from './category-tree'

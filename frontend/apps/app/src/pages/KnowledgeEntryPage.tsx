@@ -7,6 +7,7 @@ import {
   createKnowledgeApi,
   createLearningApi,
   createServerProgressPort,
+  stripDuplicateTitle,
 } from '@paideia/knowledge'
 import type { EntryRef, SelfAssessmentLevel } from '@paideia/knowledge'
 import {
@@ -135,10 +136,17 @@ export function KnowledgeEntryPage() {
    * <p>在**数据层**摘而不是做一个"只收集不渲染"的渲染器：后者要在渲染期写共享状态，
    * React 严格模式会把渲染跑两遍，同一道题就被收两次。
    */
-  const practice = useMemo(
-    () => extractQuizzes(entry.data?.body ?? ''),
-    [entry.data?.body],
+  /**
+   * 顶部已经渲染了条目标题，正文开头那条同名一级标题就不再显示——课程页原来会并排出现
+   * 两条同文大标题。**必须和目录用同一份**：`EntryToc` 与正文按同一次 `extractHeadings`
+   * 的顺序编号，只给正文剥掉会让目录多一条、点下去错位一节。
+   */
+  const body = useMemo(
+    () => stripDuplicateTitle(entry.data?.body ?? '', entry.data?.title),
+    [entry.data?.body, entry.data?.title],
   )
+
+  const practice = useMemo(() => extractQuizzes(body), [body])
 
   // 把"当前在读哪一条"交给悬浮壳：它是唯一知道这件事的地方。
   // 离开页面时清空，壳随即回到"打开一条内容后可用"的状态。
@@ -275,7 +283,7 @@ export function KnowledgeEntryPage() {
               </summary>
               <div className="mt-2">
                 {/* 窄屏这份用独立 testid：宽屏右栏那份也叫 entry-toc，同页两份会让数量断言数到 2 */}
-                <EntryToc markdown={entry.data.body} testId="entry-toc-mobile" />
+                <EntryToc markdown={body} testId="entry-toc-mobile" />
               </div>
             </details>
 
@@ -329,7 +337,7 @@ export function KnowledgeEntryPage() {
           */}
           <aside className="hidden lg:block">
             <div className="lg:sticky lg:top-20">
-              <EntryToc markdown={entry.data.body} />
+              <EntryToc markdown={body} />
             </div>
           </aside>
         </div>
