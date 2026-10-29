@@ -7782,3 +7782,20 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
   - 抽查新条目：`26 · 枚举与常量` 4629 字符 published sortOrder=26 含 quiz、`37 · 虚拟线程` 4482 字符 published sortOrder=37 含 quiz。
 - 本地提交：`24fd9ee`（脚本修复）+ 本笔；**已 push**：`8a9101d..3672044`（13 笔），本次追加后再 push。
 - 远端推送：用户 2026-10-29 明确授权后执行；HTTPS 直连（`GIT_HTTP_VERSION=HTTP/1.1`）一次成功。
+
+## 2026-10-29 11:20 +0800 · 内容 · 线上渲染验收（ego lite）修掉两处只有看页面才发现的缺陷
+
+- 类型：verification + fix
+- 变更：
+  1. 用 **ego lite**（`C:\Program Files\Citro Labs\ego lite\Application .6.1.13\ego-browser.exe`，不在 PATH 上，需全路径）开真浏览器验收线上内容：`/#/learn` 显示 Java **37 关**、/learn/java-from-zero 地图列出 24–37 全部 14 课；`26 · 枚举与常量` 正文 4 个代码块带高亮、7 个规定章节齐、`开始测一测` 按钮在、无「不支持的围栏块」；`实现 averageByTeam` 与 `对象与集合` 的挑战块正常渲染（含运行按钮）。
+  2. **发现并修**：改号后正文一级标题仍是旧课号（`# 24 · 枚举与常量`），页面同时显示 `26 · 枚举与常量` 与 `24 · 枚举与常量`。12 篇正文标题同步到现在课号。
+  3. **发现并修**：`05-分组求平均` 的 TestMain 直接解引用 `map.get(...)`，走 starter 会抛 NPE 而不是逐条 `fail:`——与这条线「失败会点名哪个用例」的承诺不符。改为缺键算不通过。
+- 决策：之前用 API 断言「正文长度 + 含 quiz + status」判过一轮"通过"，但这类**渲染层面的错号/异常**只有真开页面才看得见。结论：内容类验收至少要有一次浏览器级复查，纯 API 断言不够。
+- 依据：ego lite 快照（`page.snapshot`）与截图；`page.evaluate` 读 `h1` 与运行面板文本。
+- 验证：
+  - 修后复看：`h1` 两个都是 `26 · 枚举与常量`；`averageByTeam` 点运行 → 实际输出 `ok: empty` + 五条 `fail:` + `failed=5`，无异常栈。
+  - 本地同时验了 starter 与参考解（参考解六条 ok 与 expected 逐字一致）；`verify_course.py --dir content/courses/java` 38 文件含执行通过。
+  - 线上重导：java 12 条 + java-project 1 条 updated，复跑 dry-run 0 变更。
+- 未做：只抽查了 4 个页面（learn 清单、java 地图、26 课、averageByTeam、对象与集合），没有逐篇看 37 课；ego lite 的 `报告` 里没有做移动端窄屏。
+- 本地提交：`8b72d09`；已 push（`42d5dc8..8b72d09`）
+- 远端推送：已执行
