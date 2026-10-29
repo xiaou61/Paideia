@@ -53,7 +53,7 @@ public class SandboxProperties {
     private long sqlTimeoutMs = 20_000;
 
     /**
-     * SQL 常驻容器池的大小（WORK-049）。**0 = 关闭池化**，全部走一次性容器。
+     * SQL 常驻容器池的大小（WORK-052）。**0 = 关闭池化**，全部走一次性容器。
      *
      * <p>池化把一次执行从 3.5–4.2 秒降到约 120 毫秒：省掉起容器、拷 datadir 与起 mysqld。
      * 代价是隔离从"一人一个容器"降为"共享 mysqld、按库+账号隔离"。

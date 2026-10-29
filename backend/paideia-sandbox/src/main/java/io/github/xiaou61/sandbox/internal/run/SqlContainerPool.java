@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * SQL 沙箱容器池（WORK-049）。
+ * SQL 沙箱容器池（WORK-052）。
  *
  * <p><b>为什么要有它</b>：一次性容器每次执行要付三笔固定成本——起容器 1.1 秒、拷 78MB 基准
  * datadir 1.05 秒、mysqld 初始化 InnoDB 约 2 秒。线上实测一次 SQL 要 3.5–4.2 秒，而数据集

@@ -58,7 +58,7 @@ class DockerCodeRunner implements CodeRunner {
 
     @Override
     public CodeRun.Result run(CodeRun.Request request) {
-        // SQL 先走常驻容器池（WORK-049）：一次性容器每次要付"起容器 + 拷 78MB datadir +
+        // SQL 先走常驻容器池（WORK-052）：一次性容器每次要付"起容器 + 拷 78MB datadir +
         // mysqld 初始化"约 4 秒，而数据集只有 1.4 KB。池不可用/忙/异常时返回 empty，
         // 继续往下走原来那条一次性的路——功能不能因为池而不可用。
         if (isSql(request.language()) && !request.project()) {

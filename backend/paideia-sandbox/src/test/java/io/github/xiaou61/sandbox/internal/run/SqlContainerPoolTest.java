@@ -7,7 +7,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 容器池（WORK-049）的纯逻辑部分。
+ * 容器池（WORK-052）的纯逻辑部分。
  *
  * <p>**真容器路径不在这里测**：本机没有 Docker，起不来容器。真实执行的验证在服务器上做
  * （见验收报告）。这里守的是两件在本地就能守住的事：
