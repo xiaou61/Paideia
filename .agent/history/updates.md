@@ -7200,6 +7200,20 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 本地提交：本笔
 - 远端推送：已执行（用户明确授权）
 
+## 2026-10-28 11:41:56 +0800 · 新增阅读线「从 0 开始学架构」（11 篇）
+
+- 类型：content
+- 变更：
+  - 新增 `content/reading/architecture/` 共 11 篇（总览 + 10 篇），slug `architecture-from-zero`，`line_sort` 67，`line_kind` reading
+  - 三笔内容提交：`72ea0dc`（00–02）、`9021c2a`（03–06）、`8279cbb`（07–10）
+  - 已导入线上：分类 id=58，发布 11 关
+- 决策：做成阅读线而不是独立专题页——`/learn` 的理论栏就是主题轴，再开导航入口会让同一批内容有两个门；与「设计模式」（零件）、「系统设计」（上量之后）划清边界，本线停在单体能维护、能上线
+- 决策：slug 不用 `architecture`——开发种子库已有 `架构/architecture` 分类且未标 `line_kind`，`LearningProgressIntegrationTest` 有断言「它不是一条线」；且 `ensureCategory` 命中已存在 slug 时原样返回、不补 `line_kind`，用了它新线不会出现在 `/learn` 且不报错
+- 依据：`scripts/import-course.mjs`（分类与条目创建、幂等）、`LearningProgressRules.Rule.THEORY`（理论线通关只看小测且 ≥80%，所以每篇必须有 quiz）、`SpanSpec`/`FileStorage`/`SecurityConfiguration`/`CreditService` 等作为各篇真实案例
+- 验证：内容自检脚本（frontmatter / quiz JSON / learning-path / CRLF / 字数）11 文件通过；线上导入 `created 11 / updated 0`，复跑 `created 0 / updated 0`；`GET /api/v1/learning/lines` 返回 `stationCount=11`、`sortOrder=67`；条目正文 5576 字且含 quiz 围栏
+- 本地提交：本条目随第四笔提交
+- 远端推送：未执行
+- 未完成：未合并 master（主树 `.agent/history/updates.md` 有并发会话未提交改动，合并会被拒）；线上知识库浏览树暂时看不到该分类，待主树那笔 `CategoryService` 改动发布；WORK-047 的 `role-map.ts` 落地后需把该 slug 登记为后端「进阶」
 ## 2026-10-28 11:55:00 +0800 · 架构导读新增工程规范四页（11–14）
 - 类型：docs
 - 变更：
