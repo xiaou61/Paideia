@@ -8438,3 +8438,22 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
   本轮页面验收全部用 ego lite。
 - 本地提交：`648c0a1`、`ead64d2`；已 push（`ec798f3..ead64d2`）
 - 远端推送：已执行
+
+## 2026-10-29 16:25 +0800 · 项目 · 全量收尾发版：Spring 双线导入 + 代码块配色 + 岗位核心调整
+
+- 类型：deployment
+- 背景：另一个会话的 Spring 课程线工作已收尾、且确认没有别的会话在操作工作区，按用户要求把工作区里剩下的全部内容验证、提交、发版、导库、推送。
+- 变更（4 笔提交）：
+  - `8fa3008` content(spring)：`spring-from-zero` 21 课 + `spring-handmade` 5 关 + `scripts/verify_handmade.py`；原 `spring` 阅读线总览同步。
+  - `a08174a` feat(ui)：代码块从三层套娃压成一张卡；配色 github-light/dark → one-light/one-dark-pro（前者关键字与类型同族红，看着像没上色）。
+  - `a0dec56` fix(learn)：后端岗位核心换成 `spring-from-zero`，原 `spring` 降到进阶。
+  - `334cd97` docs(work)：WORK-054 四件工件与验证记录。
+- 验证：
+  - `verify_course.py --dir content/courses/spring` → 21 个文件含代码执行通过；`verify_handmade.py` → 5 关通过（starter 不绿、答案全绿）。
+  - knowledge / ui / app 三个包 `tsc --noEmit` 均 0 错误；knowledge 单测 93 条绿；`ModularityTest`（起上下文）+ `MigrationVersionFormatTest` 绿。
+  - **`ui` 的令牌门禁有 1 条红**：`tokens.test.ts` 报 `apps/admin/src/pages/AnalyticsPage.tsx` 有 12 处调色板颜色（amber/sky/emerald/violet）。**这是既有欠账**（2026-10-28 起就红），不是本轮引入，本轮未修——改它要给图表定一组语义色令牌，属独立事项。
+  - 发版 `release.ps1` 217.1 秒，`/actuator/health` 200。
+  - 导入线上：`spring-from-zero` **新建 21 / 轨道 20 关**、`spring-handmade` **新建 6 / 轨道 5 关**、`spring` 阅读线总览更新 1 条。线上核对：三条线 20 / 5 / 8 关，首关「01 · Maven、目录结构与第一个接口」，末关「20 · 打包与部署」。
+- 遗留：`plugins.test`（tokens 门禁）红；`progress.spec.ts` / `sql-practice.spec.ts` 仍未跑（本机 Playwright 浏览器重装未完成）。
+- 本地提交：四笔；已 push
+- 远端推送：已执行
