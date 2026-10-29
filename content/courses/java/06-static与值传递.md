@@ -51,7 +51,7 @@ class Counter {
 - **`static` 方法里不能直接用实例字段**，也没有 `this`——因为它不知道操作的是哪个对象；
 - **实例方法可以直接访问 `static` 成员**，反过来不行。
 
-`static` 适合工具函数（`Math.max`）和常量（`static final`）。**不该用来存"全局状态"**：多线程下会变成共享可变数据，第 12 课会看到代价。
+`static` 适合工具函数（`Math.max`）和常量（`static final`）。**不该用来存"全局状态"**：多线程下会变成共享可变数据，第 22 课会看到代价。
 
 ### Java 只有值传递
 
@@ -78,7 +78,7 @@ static void reassign(Student s) { s = new Student("新", 0); }
 
 - 判空：`if (value != null)`；
 - 常量放前面：`"abc".equals(value)`；
-- 用 `Optional` 表达"可能没有"（第 8 课讲集合时再说，不要到处套）。
+- 用 `Optional` 表达"可能没有"（第 18 课细讲，别到处套）。
 
 **不要为了"防 NPE"到处塞 null 检查**：先想清楚"这里允许为 null 吗"。允许就在类型和文档上标明。
 
