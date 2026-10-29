@@ -10,6 +10,35 @@ import { signIn } from './session'
  *
  * <p>**不断言 token 的具体值**：它是随机的，断言只会让用例在别处变红。
  */
+/**
+ * 每轮都会在**真实账号**上建两条凭据，而服务端有 20 条上限。跑十轮就把额度占满，
+ * 之后所有用例都红在「最多只能有 20 个凭据」——2026-10-29 线上就是这么红的。
+ * 所以每个用例结束后把本套建过的（下面这些前缀）逐条吊销。
+ *
+ * <p>两个坑：① 已失效的行仍在列表里，只按名字筛会撞上它们而提前退出，必须再按
+ * 「还有吊销按钮」筛；② 吊销走 `window.confirm`，Playwright 默认把对话框当取消，
+ * 不显式 accept 就是点了没反应。
+ */
+test.afterEach(async ({ page }) => {
+  await page.goto('/#/settings/mcp')
+  const revocable = page
+    .getByTestId('mcp-token-row')
+    .filter({ hasText: /^(e2e|scoped|revoke|limit|nolimit)-/ })
+    .filter({ has: page.getByTestId('mcp-token-revoke') })
+  for (let i = 0; i < 40; i++) {
+    const before = await revocable.count()
+    if (before === 0) {
+      return
+    }
+    page.once('dialog', (dialog) => {
+      void dialog.accept()
+    })
+    await revocable.first().getByTestId('mcp-token-revoke').click()
+    // 等这一条真的变成"已失效"：只 sleep 会点在同一条上，最后剩下几条永远吊销不掉
+    await expect(revocable).toHaveCount(before - 1, { timeout: 10_000 })
+  }
+})
+
 test('MCP 凭据：创建后明文只出现一次，刷新后只显示前缀', async ({ page }) => {
   await signIn(page)
   await page.goto('/#/settings/mcp')

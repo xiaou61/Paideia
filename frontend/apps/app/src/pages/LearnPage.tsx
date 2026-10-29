@@ -563,7 +563,9 @@ function TrackSection({
           {emptyText ?? '还没有内容。'}
         </p>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {/* 基宽必须显式 `grid-cols-1`：隐式列是 auto（按 min-content 撑），360px 下卡片
+              会被内容撑到 394px、整页横向滚 50px。`grid-cols-1` 是 minmax(0,1fr)，卡片才肯缩。 */}
           {tracks.map((track) => (
             <TrackCard key={track.id} track={track} />
           ))}

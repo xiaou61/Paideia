@@ -31,21 +31,30 @@ test.describe('书籍详解', () => {
     const card = page.getByTestId('book-card-books-man-month')
     await expect(card).toBeVisible()
     await expect(card).toContainText('人月神话')
-    await expect(card).toContainText('共 3 篇')
+    // 篇数由分类下的条目数决定，不写死：本地种子是 3 条、线上内容源是 5 条
+    await expect(card).toContainText(/共 \d+ 篇/)
   })
 
   test('点书进章节目录，首条是总览且带序号', async ({ page }) => {
     await page.goto('/#/books')
-    await page.getByTestId('book-card-books-man-month').click()
 
+    // 章节目录的条数必须等于书单卡片上的篇数（同一个"分类下条目数"口径），
+    // 而不是写死某个数字——本地种子与线上内容源的条数不同。
+    const card = page.getByTestId('book-card-books-man-month')
+    // 卡片先渲染成「共 0 篇」，等条目列表回来才变成真实篇数，所以要等一个正数
+    await expect(card).toContainText(/共 [1-9]\d* 篇/, { timeout: 15_000 })
+    const cardText = await card.textContent()
+    const expected = Number(cardText?.match(/共 (\d+) 篇/)?.[1] ?? 0)
+    expect(expected).toBeGreaterThan(0)
+
+    await card.click()
     await expect(page).toHaveURL(/#\/books\/books-man-month/)
     const chapters = page.locator('[data-testid^="book-chapter-"]')
-    await expect(chapters).toHaveCount(3)
+    await expect(chapters).toHaveCount(expected)
 
     // 顺序由 sortOrder 决定，不是接口返回的发布时间倒序：首条必须是 order 0 的总览
     await expect(chapters.first()).toContainText('总览')
     await expect(chapters.first()).toContainText('1')
-    await expect(chapters.nth(1)).toContainText('为什么加人反而更慢')
   })
 
   test('章节能点进正文', async ({ page }) => {
