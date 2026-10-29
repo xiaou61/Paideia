@@ -33,6 +33,11 @@ export interface KnowledgeApi {
   /** 执行一次练习代码。**服务端只回实际输出，判定在客户端**。 */
   runCode(input: RunCodeInput): Promise<RunCodeResult>
   /**
+   * Linux 判题练习（WORK-056）。**结论由服务端给**——判定脚本不下发到客户端，
+   * 因为它要判的是最终状态（权限位、文件内容），发下来等于把答案一起发下来。
+   */
+  runShell(input: ShellRunInput): Promise<ShellRunResult>
+  /**
    * 数据集的结构快照（WORK-035）。只读、不含数据行、不占配额。
    *
    * <p>返回的是**原始 JSON 字符串**——服务端不解析它，前端拿到再 `JSON.parse`。
@@ -98,6 +103,38 @@ export interface RunCodeInput {
   files?: { path: string; content: string }[]
   entryId?: number
   caseId?: string
+}
+
+/** 判题练习的提交（WORK-056）。`judge` 是题目自带的判定脚本，只在容器里跑。 */
+export interface ShellRunInput {
+  code: string
+  judge: string
+  /** 题目声明的初始文件。路径由服务端再校验一次。 */
+  seed?: { path: string; content: string }[]
+  entryId?: number
+  caseId?: string
+}
+
+/**
+ * 判题结果（WORK-056）。
+ *
+ * <p>形状与 `@paideia/ui` 的 `ShellOutcome` 一致；这里独立声明是为了让本包不依赖 UI 包的类型
+ * 也能被后端契约测试引用。多出来的两个字段是**用量**，用来在按钮旁显示"今天还剩几次"。
+ */
+export interface ShellRunResult {
+  verdict: 'passed' | 'failed' | 'undetermined'
+  runExit: number
+  judgeExit: number
+  stdout: string
+  stderr: string
+  judgeStdout: string
+  judgeStderr: string
+  diff: string
+  durationMs: number
+  truncated: boolean
+  reason: string | null
+  usedToday: number
+  dailyLimit: number
 }
 
 /**
@@ -186,6 +223,14 @@ export function createKnowledgeApi(client: ApiClient): KnowledgeApi {
 
     runCode: (input) =>
       client.requestEnvelope<RunCodeResult>('/api/v1/sandbox/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      }),
+
+    /** Linux 判题（WORK-056）：与 runCode 同一套配额与并发，判定由服务端给。 */
+    runShell: (input) =>
+      client.requestEnvelope<ShellRunResult>('/api/v1/sandbox/shell/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),

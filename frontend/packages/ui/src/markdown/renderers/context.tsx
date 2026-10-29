@@ -79,6 +79,42 @@ export interface SandboxPort {
    * 前端退回"一次性运行"，不显示播放器。
    */
   trace?(input: { language: string; code: string; stdin?: string; caseId?: string }): Promise<TraceResult>
+  /**
+   * Linux 判题练习（WORK-056）。**可选**：端口没实现、或后端没配 shell 镜像时，
+   * 题型降级为"这一题可以改命令，但当前环境没有启用运行"。
+   *
+   * <p>结论由**服务端**给（`verdict`），客户端不参与判定——判定脚本不下发。
+   */
+  runShell?(input: {
+    code: string
+    judge: string
+    seed?: { path: string; content: string }[]
+    caseId?: string
+  }): Promise<ShellOutcome>
+}
+
+/**
+ * 一次判题结果（WORK-056）。
+ *
+ * <p>`verdict` 是稳定值，不要在前端重算：`undetermined` 与 `failed` 的区别就是
+ * "你不知道"和"你做错了"，混在一起会让学习者对着一个没跑起来的容器改半小时命令。
+ */
+export interface ShellOutcome {
+  verdict: 'passed' | 'failed' | 'undetermined'
+  runExit: number
+  judgeExit: number
+  stdout: string
+  stderr: string
+  judgeStdout: string
+  judgeStderr: string
+  /** 文件变更（`find` 快照 diff）。空字符串表示工作区没动过。 */
+  diff: string
+  durationMs: number
+  truncated: boolean
+  /** `undetermined` 时的人话原因（超时 / 输出被截断 / 容器没回来）。 */
+  reason: string | null
+  usedToday: number
+  dailyLimit: number
 }
 
 /** 一个录制步。`locals` 是"变量名 → 浅层 repr"，值已在服务端截断。 */

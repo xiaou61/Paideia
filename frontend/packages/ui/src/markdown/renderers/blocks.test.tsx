@@ -460,3 +460,85 @@ describe('CodeChallenge · run', () => {
     expect(screen.getByText(/超时/)).toBeTruthy()
   })
 })
+
+/**
+ * Linux 判题题型（WORK-056）。
+ *
+ * <p>三件事必须成立：没端口/端口没实现时**不渲染运行按钮**；结论由服务端给
+ * （前端不重算）；`未通过` 与 `未能判定` 必须是两个不同的显示——混在一起会让学习者
+ * 对着一个没跑起来的容器改半小时命令。
+ */
+describe('shell 判题块', () => {
+  const SHELL = {
+    id: 'linux-04-chmod',
+    kind: 'shell',
+    title: '把密钥文件收成只有属主可读',
+    seed: [{ path: 'app/secrets.env', content: 'TOKEN=demo\n' }],
+    starter: 'chmod ??? app/secrets.env',
+    judge: 'test "$(stat -c %a app/secrets.env)" = 600',
+    explain: '600 只有属主可读写。',
+  }
+
+  const outcome = (verdict: 'passed' | 'failed' | 'undetermined', extra = {}) => ({
+    verdict,
+    runExit: 0,
+    judgeExit: verdict === 'passed' ? 0 : 1,
+    stdout: '',
+    stderr: '',
+    judgeStdout: '',
+    judgeStderr: verdict === 'failed' ? '权限应为 600' : '',
+    diff: '> -rw------- 12 ./app/secrets.env',
+    durationMs: 900,
+    truncated: false,
+    reason: verdict === 'undetermined' ? '超时（超过 15 秒）' : null,
+    usedToday: 3,
+    dailyLimit: 200,
+    ...extra,
+  })
+
+  const shellSandbox = (result: ReturnType<typeof outcome>) => ({
+    ready: async () => true,
+    run: async () => {
+      throw new Error('不该被调用')
+    },
+    runShell: async () => result,
+  })
+
+  it('没有端口时不渲染运行按钮', () => {
+    renderBlock(<CodeChallenge code={JSON.stringify(SHELL)} isIncomplete={false} language="code-challenge" />, {
+      entryId: 1,
+    })
+    expect(screen.queryByTestId('challenge-run')).toBeNull()
+    expect(screen.getByText(/没有接上执行能力/)).toBeTruthy()
+  })
+
+  it('通过时显示通过徽标与文件变化', async () => {
+    renderBlock(<CodeChallenge code={JSON.stringify(SHELL)} isIncomplete={false} language="code-challenge" />, {
+      entryId: 1,
+      sandbox: shellSandbox(outcome('passed')),
+    })
+    fireEvent.click(await screen.findByTestId('challenge-run'))
+    await waitFor(() => expect(screen.getByText('通过')).toBeTruthy())
+    expect(screen.getByTestId('challenge-shell-result').textContent).toContain('app/secrets.env')
+  })
+
+  it('未通过时把判定脚本的说明显示出来', async () => {
+    renderBlock(<CodeChallenge code={JSON.stringify(SHELL)} isIncomplete={false} language="code-challenge" />, {
+      entryId: 1,
+      sandbox: shellSandbox(outcome('failed')),
+    })
+    fireEvent.click(await screen.findByTestId('challenge-run'))
+    await waitFor(() => expect(screen.getByText('未通过')).toBeTruthy())
+    expect(screen.getByText(/权限应为 600/)).toBeTruthy()
+  })
+
+  it('未能判定与未通过分开显示，并给出原因', async () => {
+    renderBlock(<CodeChallenge code={JSON.stringify(SHELL)} isIncomplete={false} language="code-challenge" />, {
+      entryId: 1,
+      sandbox: shellSandbox(outcome('undetermined')),
+    })
+    fireEvent.click(await screen.findByTestId('challenge-run'))
+    await waitFor(() => expect(screen.getByText('未能判定')).toBeTruthy())
+    expect(screen.getByTestId('challenge-shell-reason').textContent).toContain('超时')
+  })
+})

@@ -116,6 +116,7 @@ export {
   type ProgressPort,
   type RunOutput,
   type SandboxPort,
+  type ShellOutcome,
 } from './markdown/renderers'
 
 export { isTheme, THEME_KEY, THEME_STORAGE_KEY, type Theme, type ThemeStorage } from './theme/keys'
