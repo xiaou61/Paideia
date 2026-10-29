@@ -227,6 +227,10 @@ final class DockerCommand {
         }
         String normalized = language.trim().toLowerCase(Locale.ROOT);
         boolean sql = "sql".equals(normalized);
+        // Spring（WORK-055）：Maven 会 fork 一个 JVM 并同时打开上百个 jar。
+        // 60 个 fd 时它连 maven-resources-plugin 都加载不了（报"类缺失"，实测），
+        // 所以这几个上限单独放宽——仍是**有界值**，不是取消限制。
+        boolean spring = "spring".equals(normalized);
         if (project && sql) {
             throw new IllegalArgumentException("SQL 不支持项目模式");
         }
@@ -255,9 +259,9 @@ final class DockerCommand {
                 "--memory=" + props.memoryFor(normalized),
                 "--memory-swap=" + props.memoryFor(normalized),
                 "--cpus=" + props.cpusFor(normalized),
-                "--pids-limit=" + props.pidsLimitFor(normalized),
-                "--ulimit", sql ? "nofile=1024" : "nofile=64",
-                "--ulimit", sql ? "nproc=128" : "nproc=64",
+                "--pids-limit=" + (spring ? "256" : String.valueOf(props.pidsLimitFor(normalized))),
+                "--ulimit", sql || spring ? "nofile=1024" : "nofile=64",
+                "--ulimit", sql ? "nproc=128" : spring ? "nproc=256" : "nproc=64",
                 // 停止超时 0：超时后立即 SIGKILL，不给程序自己收尾的机会
                 "--stop-timeout=0",
                 // 记录容器 id：宿主上的 docker CLI 被强杀后容器仍归 daemon 管，
