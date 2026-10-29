@@ -62,8 +62,8 @@ export const DEFAULT_ROLE: RoleKey = 'backend'
  */
 const TIERS: Record<RoleKey, { core: readonly string[]; advanced: readonly string[] }> = {
   backend: {
-    core: ['java-from-zero', 'spring', 'redis', 'mysql-from-zero', 'network-basics'],
-    advanced: ['concurrency', 'jvm', 'system-design', 'os'],
+    core: ['java-from-zero', 'spring-from-zero', 'redis', 'mysql-from-zero', 'network-basics'],
+    advanced: ['spring', 'concurrency', 'jvm', 'system-design', 'os'],
   },
   'ai-algo': {
     core: ['algorithms', 'python-from-zero', 'ai'],

@@ -11,7 +11,9 @@ function track(slug: string, passed = 0, stage = 6, extra: Partial<RecommendTrac
 
 describe('岗位映射（WORK-047）', () => {
   it('后端岗位的核心与进阶取自表，其余兜底为选读', () => {
-    expect(tierOf('backend', 'spring').tier).toBe('core')
+    expect(tierOf('backend', 'spring-from-zero').tier).toBe('core')
+    // WORK-054：spring 是"写过之后再来读"的深入篇，从核心降到进阶
+    expect(tierOf('backend', 'spring').tier).toBe('advanced')
     expect(tierOf('backend', 'jvm').tier).toBe('advanced')
     expect(tierOf('backend', 'git').tier).toBe('optional')
   })
@@ -34,7 +36,7 @@ describe('岗位映射（WORK-047）', () => {
 
   it('同段内按表里的顺序给 rank', () => {
     expect(tierOf('backend', 'java-from-zero').rank).toBe(0)
-    expect(tierOf('backend', 'spring').rank).toBe(1)
+    expect(tierOf('backend', 'spring-from-zero').rank).toBe(1)
   })
 
   it('同一个 slug 在不同岗位落在不同段位——切岗位必须真的重排', () => {
@@ -114,7 +116,7 @@ describe('推荐位（WORK-047）', () => {
         track('system-design', 5),
         track('concurrency', 5),
         track('git', 5),
-        track('spring', 0),
+        track('spring-from-zero', 0),
       ],
       'backend',
       NOW,
@@ -136,7 +138,7 @@ describe('推荐位（WORK-047）', () => {
 
 describe('规则理由（WORK-047）', () => {
   it('未开始的核心说的是"入口"，并带上真实关卡数', () => {
-    const [scored] = scoreTracks([track('spring', 0, 8)], 'backend', NOW)
+    const [scored] = scoreTracks([track('spring-from-zero', 0, 8)], 'backend', NOW)
     const reason = ruleReason(scored!)
     expect(reason).toContain('入口')
     expect(reason).toContain('8 关')
