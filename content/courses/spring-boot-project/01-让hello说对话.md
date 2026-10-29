@@ -41,7 +41,8 @@ status: published
   ],
   "cases": [
     {
-      "name": "两条测试全绿"
+      "name": "两条测试全绿",
+      "expected": "两条测试全绿：输出里能看到「Tests run: 2, Failures: 0」"
     }
   ],
   "explain": "判分看 mvn test 的退出码：有失败用例时非 0。先把去空白与转小写做对，再看 HTTP 那一条。"

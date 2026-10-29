@@ -8526,3 +8526,30 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
+
+## 2026-10-29 17:20 +0800 · WORK-055 · Spring 小项目在沙箱里真跑通了（第 1 关上线）
+
+- 类型：implementation + deployment
+- 变更：
+  - 后端新增 `spring` 语言：`spring-image` / `spring-timeout-ms`（90s）/ `spring-memory`（1g）/ `spring-cpus`（2）四个配置；
+    `DockerCommand` 加 `SPRING_PROJECT_SCRIPT`（拷 `/opt/skeleton` → 写用户文件 → `mvn -o test` → 打 surefire 汇总）；
+    `SandboxController` 拒绝 spring 的单文件模式。
+  - 前端 `code-challenge` 允许 `language: spring`，新增 `editablePath`（学习者改哪个文件）；spring 判分看退出码。
+  - 镜像 `paideia-spring:3`（988MB，`maven:3.9-eclipse-temurin-21` + `/opt/m2` 离线仓库 + `/opt/skeleton`）；
+    服务器 yml 加四个键。
+  - 内容：`content/courses/spring-boot-project/` 总览 + 第 1 关，已导入线上（分类 64，轨道 1 关）。
+- 踩到并修掉的四个问题（都是"只有真跑才看得见"）：
+  1. **`--ulimit nofile=64` 让 Maven 加载不了插件**（报 `A required class was missing: StringUtils`，本质 fd 耗尽）→
+     spring 提到 nofile=1024 / nproc=256 / pids=256（仍有界）。
+  2. **骨架漏了 `HelloController`** → `/hello/zoe` 直接 404，测试报错看起来像断言写错。
+  3. **构建自检的 `SmokeTest` 被发给了学习者**（starter 时多出一条与关卡无关的失败）→ 移到 `verify/`，只参与镜像构建。
+  4. **0.5 核时一次跑 55 秒**（Spring 上下文 22 秒）→ spring 单独给 2 核，回到 ~15 秒。
+- 另：发版时前端被"dist 比源码新"的检查跳过一次，线上包没有新 schema（`editablePath` 搜不到）→ 用 `-WithWeb` 强制重建。
+- 验证（线上 API 实测，非本地）：
+  - `POST /sandbox/run`（language=spring，正确实现）→ **exit=0 / 15.1 秒**，surefire「Tests run: 2, Failures: 0」。
+  - 同一请求换 starter → **exit=1 / 14.5 秒**，正好两条 `AcceptanceTest` 失败并被点名。
+  - 页面上（ego lite）：挑战块渲染、有运行按钮、点运行 15.6 秒出「通过 0 / 1」。
+  - 后端 `DockerCommandTest` 18 条绿（新增 3 条：加固参数逐条在、未配置镜像不暴露、单文件模式拒绝 + CPU 档）。
+- 未做：内容只有 1 关（计划 3 关）、`scripts/verify_spring_project.py` 未写、并发槽未压测。
+- 本地提交：见当日提交；已 push
+- 远端推送：已执行

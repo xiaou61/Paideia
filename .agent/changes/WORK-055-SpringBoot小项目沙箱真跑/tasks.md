@@ -37,7 +37,7 @@ approver_role: CTO
 
 ## 任务
 
-### TASK-001 | pending | 语言档位配置
+### TASK-001 | done | 语言档位配置
 
 - 对应：`REQ-001`、`REQ-002`
 - 依赖：无
@@ -46,7 +46,7 @@ approver_role: CTO
 - 测试：`SandboxPropertiesTest`
 - 验证：`mvn -pl paideia-sandbox test` → 0 failed
 
-### TASK-002 | pending | 运行脚本与容器参数
+### TASK-002 | done | 运行脚本与容器参数
 
 - 对应：`REQ-003`、`REQ-004`、`REQ-008`
 - 依赖：TASK-001
@@ -54,7 +54,7 @@ approver_role: CTO
 - 测试：`DockerCommandTest`（参数不放松 + 脚本含 `-Dmaven.repo.local`）
 - 验证：同上
 
-### TASK-003 | pending | 控制器守卫
+### TASK-003 | done | 控制器守卫
 
 - 对应：`REQ-001`
 - 依赖：TASK-001
@@ -62,7 +62,7 @@ approver_role: CTO
 - 测试：`SandboxProjectValidationTest` 加一条
 - 验证：同上
 
-### TASK-004 | pending | 镜像与服务器配置
+### TASK-004 | done | 镜像与服务器配置
 
 - 对应：`REQ-004`、`REQ-008`
 - 依赖：TASK-002
@@ -70,7 +70,7 @@ approver_role: CTO
 - 修改：服务器 `/opt/paideia-app/application.yml` 加 `sandbox.spring-image` / `spring-timeout-ms: 90000` / `spring-memory: 1g`
 - 验证：真实 `POST /sandbox/run`（AC-001/AC-002）
 
-### TASK-005 | pending | 前端语言白名单与渲染
+### TASK-005 | done | 前端语言白名单与渲染
 
 - 对应：`REQ-005`
 - 依赖：TASK-001
@@ -78,12 +78,14 @@ approver_role: CTO
 - 测试：`schema.test.ts` / `blocks.test.tsx`
 - 验证：`pnpm --filter @paideia/ui test`
 
-### TASK-006 | pending | 内容 3 关 + 校验脚本
+### TASK-006 | in_progress | 内容 3 关 + 校验脚本
 
 - 对应：`REQ-006`、`REQ-007`
 - 依赖：TASK-004、TASK-005
 - 新建：`content/courses/spring-boot-project/`（总览 + 3 关）、`scripts/verify_spring_project.py`
 - 验证：`verify_spring_project.py`（starter 必不绿、参考解必全绿）
+- 进度：第 1 关已完成并线上验过（正确实现 exit=0 / 15.1 秒；starter exit=1 且点名两条失败）。
+  第 2、3 关与校验脚本未做。
 
 ### TASK-007 | pending | 上线与验收记录
 
