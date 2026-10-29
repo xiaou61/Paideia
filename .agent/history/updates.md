@@ -8623,3 +8623,26 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 未验：`shell-image` 留空时的 503 只有单测覆盖；判题块没写 e2e（依赖真容器、本机无 Docker）。
 - 本地提交：分支 `feat/work-056-shell` 六笔，随后合并 master
 - 远端推送：未执行
+
+## 2026-10-29 18:40 +0800 · 内容 · 给新写的 13 篇补图与术语表，运维线加第一道可运行题
+
+- 类型：content
+- 变更：
+  - **13 张 mermaid 图**：运维线 10 篇各一张（location 匹配顺序、证书续期失败链、systemd 停止时序、
+    发布/回滚状态、备份与恢复闭环、SLI/SLO/预算、**排障五层决策树**、K8s 请求路径、Pod 状态转移、
+    五层链路总览）；Docker 线 3 张（多阶段 vs 单阶段镜像内容、512m 容器的内存账、容器六道门）。
+  - **每篇加「先对齐几个词」**：把正文里第一次出现就默认你懂的术语先讲清楚
+    （反向代理 / 上游 / 探针 / cgroup / 漏桶 / revision / inode / jstack…），用一句生活化解释。
+  - **运维线第一道可运行题**（07 篇）：从一段 nginx access log 算 5xx 占比，`language: python`，
+    三个用例（有 5xx / 没有 / 空输入），坑在「按空格切会被 URL 与 UA 里的空格坑到」。
+- 验证：
+  - `node scripts/check-diagrams.mjs content/reading/ops` → 10 个图块全部可解析；
+    `... content/reading/docker` → 3 个通过。
+  - 两个目录的 quiz / code-challenge / learning-path JSON 全部解析通过。
+  - 线上导入：ops **更新 10 条**、docker **更新 3 条**（都是 updated，没有新建）。
+  - 线上真跑那道题（`POST /sandbox/run`，language=python）：**参考解 0.40 = 期望 0.40（exit 0）**；
+    **starter 输出 0.00 ≠ 期望（判为不通过）**——说明题目真的在判，不是摆设。
+- 未做：**没有把 quiz 的定义题改写成场景题**（仍是 3 题/篇，题型偏"概念选择"）；
+  运维线只有 1 道可运行题，其它 8 篇仍是 reading 形态；没有逐篇在浏览器里通读。
+- 本地提交：本笔；已 push
+- 远端推送：已执行

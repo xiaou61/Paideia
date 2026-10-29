@@ -16,7 +16,28 @@ status: published
 `--network=none`、`--pids-limit`、`--memory/--cpus`。下面每个都给出它到底挡住了什么，
 以及**焊死之后踩到过的坑**（本仓线上沙箱的真实记录）。
 
+## 先对齐几个词
+
+- **capability**：把 root 的特权拆成几十项（改网络、挂文件系统…）。`--cap-drop=ALL` 是"一项都不给"。
+- **只读根**：容器里的 `/` 不可写。要写只能写挂进来的 tmpfs。
+- **fd（文件描述符）**：进程能同时打开的文件数上限，`--ulimit nofile` 管它。
+- **tmpfs**：内存里的临时文件系统，容器退出即消失，**且计入容器内存**。
+
 ## 讲解
+
+### 一道请求要过六道门
+
+```mermaid
+flowchart TB
+  A["容器里跑着别人的代码"] --> B{"能上网吗"}
+  B -->|"--network=none"| B1["挡住：扫内网、连矿池、外传数据"]
+  A --> C{"能改系统文件吗"}
+  C -->|"--read-only"| C1["挡住：改 crontab、换二进制、写 /etc"]
+  A --> D{"是 root 吗"}
+  D -->|"--user + --cap-drop=ALL"| D1["挡住：提权、setuid、挂载"]
+  A --> E{"能无限开进程/吃满内存吗"}
+  E -->|"--pids-limit / --memory / --ulimit"| E1["挡住：fork 炸弹、OOM 拖死宿主"]
+```
 
 ### 一个真实的最小加固命令
 

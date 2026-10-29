@@ -15,7 +15,28 @@ status: published
 **结论先说**：把进程交给 **systemd**——它负责开机自启、崩了重启、日志进 journald、
 停止时先发 SIGTERM 让应用收尾。一个 20 行的 unit 文件换掉一整套手工作业。
 
+## 先对齐几个词
+
+- **unit**：systemd 的一个配置文件，描述"这个服务怎么启动、怎么停、挂了怎么办"。
+- **SIGTERM / SIGKILL**：前者是"请你收尾后退出"，进程可以处理；后者是"立刻死"，无法拒绝。
+- **journald**：systemd 的日志系统，自动按磁盘比例轮转，`journalctl` 就是查它。
+- **退出码 143**：128 + 15，意思是"被 SIGTERM 干掉的"，属于正常停止。
+
 ## 讲解
+
+### 停止时到底发生了什么
+
+```mermaid
+flowchart TB
+  A["systemctl stop / restart"] --> B["systemd 发 SIGTERM"]
+  B --> C{"应用配了 graceful shutdown 吗"}
+  C -->|配了| D["停止接新请求，等在途请求完成"]
+  C -->|没配| E["立刻退出，在途请求全部失败（502）"]
+  D --> F["进程退出，退出码 143"]
+  E --> G["systemd 认为失败，可能触发重启"]
+  B --> H["超过 TimeoutStopSec 还在？"]
+  H -->|是| I["SIGKILL，强杀"]
+```
 
 ### 一个能上生产的 unit
 
