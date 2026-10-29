@@ -186,6 +186,23 @@ export function SqlPracticePage() {
    * 成功后刷新数据集清单，新数据集会出现在选择器里。
    */
   const [datasetTopic, setDatasetTopic] = useState('')
+  // 助手产出的 SQL 要落到这里再保存（WORK-053）：不进编辑器，避免污染用户正在写的查询
+  const [datasetSql, setDatasetSql] = useState('')
+  /** 数据集名：用户填了主题就用主题，没填给个通用名。后端限 100 字符，这里留余量。 */
+  const datasetName = () =>
+    (datasetTopic.trim() === '' ? '我的数据集' : datasetTopic.trim()).slice(0, 60)
+
+  const saveDataset = useMutation({
+    mutationFn: () => knowledge.uploadSqlDataset(datasetName(), datasetSql),
+    onSuccess: async (created) => {
+      setError(null)
+      setDatasetSql('')
+      await status.refetch()
+      setDataset(created.key)
+    },
+    onError: (cause) => setError(cause instanceof Error ? cause.message : String(cause)),
+  })
+
   const createDataset = useMutation({
     mutationFn: () => knowledge.generateSqlDataset(datasetTopic.trim() === '' ? undefined : datasetTopic.trim()),
     onSuccess: async (created) => {
@@ -335,20 +352,59 @@ export function SqlPracticePage() {
                   aria-label="数据集描述"
                   data-testid="sql-dataset-topic"
                 />
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {/*
+                    主路径走助手（WORK-053 REQ-009）：助手先问清要什么，再调 `sql_build_dataset`
+                    把 SQL 拼出来。它只产出文本，保存仍由下面的按钮走上传接口（白名单 + 干跑）。
+                  */}
                   <Button
                     type="button"
                     size="sm"
+                    data-testid="sql-ask-dataset"
+                    onClick={() =>
+                      ask(
+                        datasetTopic.trim() === ''
+                          ? '帮我造一个 SQL 练习数据集。先问我三个问题：用来练什么、要哪些表、大概多少行。'
+                          : `帮我造一个 SQL 练习数据集，主题是「${datasetTopic.trim()}」。先问我还缺什么，再用工具把 SQL 拼出来。`,
+                      )
+                    }
+                  >
+                    让 AI 造
+                  </Button>
+                  {/* 降级：助手不可用（余额/上游）时仍然能一次性生成 */}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
                     disabled={createDataset.isPending}
                     data-testid="sql-generate-dataset"
                     onClick={() => createDataset.mutate()}
                   >
-                    {createDataset.isPending ? '生成中…' : '让 AI 造'}
+                    {createDataset.isPending ? '生成中…' : '直接生成'}
                   </Button>
                   <span className="text-muted-foreground text-xs">
-                    只允许建表与插数；生成后会先在沙箱里真跑一遍，跑不通不会保存
+                    只允许建表与插数；保存前会在沙箱里真跑一遍，跑不通不会存
                   </span>
                 </div>
+                <textarea
+                  value={datasetSql}
+                  onChange={(event) => setDatasetSql(event.target.value)}
+                  rows={4}
+                  placeholder="把助手给出的 SQL 粘到这里（或自己写），再点保存"
+                  aria-label="数据集 SQL"
+                  data-testid="sql-dataset-sql"
+                  className="border-border bg-background focus-visible:border-ring w-full rounded-lg border p-2 font-mono text-xs"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={saveDataset.isPending || datasetSql.trim() === ''}
+                  data-testid="sql-save-dataset"
+                  onClick={() => saveDataset.mutate()}
+                >
+                  {saveDataset.isPending ? '保存中…' : '保存为数据集'}
+                </Button>
               </div>
             </details>
 

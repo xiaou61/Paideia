@@ -42,6 +42,8 @@ export interface KnowledgeApi {
   /** 在数据集上现场出一道题（WORK-035 T-12）。期望结果集来自**真跑参考解**。 */
   generateSqlQuestion(key: string, goal?: string): Promise<GeneratedSqlQuestion>
   /** 让 AI 造一个数据集并保存为私人数据集（WORK-035 T-13）。 */
+  uploadSqlDataset(name: string, sql: string): Promise<{ key: string }>
+
   generateSqlDataset(topic?: string): Promise<{ key: string }>
   traceCode(input: RunCodeInput): Promise<TraceCodeResult>
   /** 记一次浏览（WORK-021）。旁路数据：失败不影响阅读。 */
@@ -203,6 +205,14 @@ export function createKnowledgeApi(client: ApiClient): KnowledgeApi {
           body: JSON.stringify(goal === undefined ? {} : { goal }),
         },
       ),
+
+    /** 保存一段 SQL 为自己的数据集（WORK-053）：与手动上传同一条后端校验路径。 */
+    uploadSqlDataset: (name, sql) =>
+      client.requestEnvelope<{ key: string }>('/api/v1/sql-datasets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, sql }),
+      }),
 
     /** AI 造数据集（WORK-035 T-13）：生成的 SQL 走与手动上传相同的检查。 */
     generateSqlDataset: (topic) =>
