@@ -64,7 +64,7 @@ approver_role: CTO
 - 测试：`AgentToolBridgeTest`、`HarnessPromptsTest`
 - 验证：`mvn -pl paideia-ai test` → 0 failed
 
-### TASK-004 | pending | 只读工具 `planner_build_dataset`
+### TASK-004 | done | 只读工具 `planner_build_dataset`
 
 - 对应：`REQ-009`、`REQ-010`
 - 依赖：无
@@ -99,7 +99,7 @@ approver_role: CTO
 - 测试：`identity.spec.ts`（导航可达）
 - 验证：`pnpm --filter @paideia/app build` 通过 + e2e
 
-### TASK-008 | pending | SQL 工作台「让 AI 造」改走助手
+### TASK-008 | done | SQL 工作台「让 AI 造」改走助手
 
 - 对应：`REQ-009`、`AC-008`
 - 依赖：TASK-003、TASK-004

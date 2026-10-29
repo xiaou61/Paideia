@@ -8342,3 +8342,99 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 立项：**WORK-053 学习记录页与 AI 强联动（试点）**，`requirements.md` 已起草（draft）。起草前核实了三条现成原语，避免重复造：上行 `setPageContext`（现只有 `sql-workbench` 一个变体，加 `study-log`）、请求 `ask()`（打开并预填、不发送）、下行 `applySql()` 的"待消费一次"回填模式（WORK-035）——强联动就照这三条长。
 - 本地提交：`ceb5da6`（代码）+ 本笔（立项与历史）；已 push
 - 远端推送：已执行
+
+## 2026-10-29 14:03:13 +0800 · WORK-053 · 签署 .agent/changes/WORK-053-学习记录页与AI强联动/requirements.md、.agent/changes/WORK-053-学习记录页与AI强联动/proposal.md、.agent/changes/WORK-053-学习记录页与AI强联动/design.md、.agent/changes/WORK-053-学习记录页与AI强联动/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-053-学习记录页与AI强联动/requirements.md、.agent/changes/WORK-053-学习记录页与AI强联动/proposal.md、.agent/changes/WORK-053-学习记录页与AI强联动/design.md、.agent/changes/WORK-053-学习记录页与AI强联动/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-053-学习记录页与AI强联动/requirements.md、.agent/changes/WORK-053-学习记录页与AI强联动/proposal.md、.agent/changes/WORK-053-学习记录页与AI强联动/design.md、.agent/changes/WORK-053-学习记录页与AI强联动/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 14:25 +0800 · 项目 · 复习页主按钮居中
+
+- 类型：fix
+- 变更（行为）：`ReviewPage` 到期列表上方那行由「按钮 + 共 N 个到期」横排左对齐改为竖排居中。原先按钮贴在内容列左边缘，用户看到的第一个问题就是"这个按钮怎么没在中间"。
+- 决策：不用 `justify-center` 保留横排。横排居中时按钮本身仍偏左半个计数文字的宽度，"按钮在中间"不成立；计数放到按钮下方一行，按钮才是几何中心。
+- 依据：`frontend/apps/app/src/pages/ReviewPage.tsx:218`；线上 bundle 里同一段 JSX 与仓库一致（不是构建漂移，是排版选择）。
+- 验证：`review.spec` 全部用 `data-testid=review-start` 取元素，不依赖位置；改动只有一个布局类组合。发版后按线上页面复看。
+- 本地提交：仅 `ReviewPage.tsx`；本记录与工作区里另一会话的 WORK-053 工件未提交
+- 远端推送：未执行
+
+## 2026-10-29 14:51:02 +0800 · WORK-054 · 签署 .agent/changes/WORK-054-Spring与SpringBoot课程线及手写实战/requirements.md、.agent/changes/WORK-054-Spring与SpringBoot课程线及手写实战/proposal.md、.agent/changes/WORK-054-Spring与SpringBoot课程线及手写实战/design.md、.agent/changes/WORK-054-Spring与SpringBoot课程线及手写实战/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-054-Spring与SpringBoot课程线及手写实战/requirements.md、.agent/changes/WORK-054-Spring与SpringBoot课程线及手写实战/proposal.md、.agent/changes/WORK-054-Spring与SpringBoot课程线及手写实战/design.md、.agent/changes/WORK-054-Spring与SpringBoot课程线及手写实战/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-054-Spring与SpringBoot课程线及手写实战/requirements.md、.agent/changes/WORK-054-Spring与SpringBoot课程线及手写实战/proposal.md、.agent/changes/WORK-054-Spring与SpringBoot课程线及手写实战/design.md、.agent/changes/WORK-054-Spring与SpringBoot课程线及手写实战/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 15:10:26 +0800 · WORK-054 · Spring 与 Spring Boot 课程线及手写实战（内容 + 一条实战线）
+
+- 类型：implementation
+- 变更：新增 content/courses/spring/（21 个文件：总览 + 20 课，六章）与 content/courses/spring-handmade/（6 个文件：总览 + 5 关实战）；新增 scripts/verify_handmade.py；改 frontend/packages/knowledge/src/role-map.ts 与 recommend.test.ts；改 content/reading/spring/00-总览.md（六篇改八篇、补定位、line_sort 15 改 28）
+- 决策：可运行示例一律是纯 Java 手写机制，真 Spring 代码只放非运行块作对照；实战线用既有 java project 判题（TestMain 只读），不新建镜像、不引 Spring 依赖；spring 阅读线从后端核心降到进阶，核心第 2 位换成 spring-from-zero
+- 依据：本机没有 Docker，任何需要预烤 Spring 镜像的方案都无法给出证据；verify_course.py 要求每课至少一个真执行的示例，而沙箱里没有 Spring 依赖
+- 验证：verify_course.py 课程线 21 个文件含代码执行通过；实战线 6 个文件通过；verify_handmade.py 五关 starter 编译通过但不绿、答案全绿、演示输出一致；javac --release 21 覆盖 20 个示例 0 失败；pnpm --filter @paideia/knowledge test 93 passed；两条 import dry-run 退出码 0；validate --strict 无 WORK-054 警告
+- 本地提交：未提交（等待用户授权）
+- 远端推送：未执行
+
+## 2026-10-29 15:27:15 +0800 · 项目 · 代码块配色与底色：从「满屏红 + 白板」改成单一卡片
+
+- 类型：maintenance
+- 变更：frontend/packages/ui/src/markdown/markdown.tsx 改用 createCodePlugin({themes:['one-light','one-dark-pro']}) 取代插件默认的 github-light/github-dark；frontend/packages/ui/src/styles/globals.css 新增三条规则：压平 code-block-body 的底色/边框/圆角、pre 背景透明、text 围栏去掉无意义的语言标签并补上边距
+- 决策：配色只换主题名、不动 token 令牌体系；底色统一交给最外层 bg-muted 卡片，不再让 shiki 主题自己涂底
+- 依据：单测打印出真实 DOM 后确认：高亮一直在生效，问题是 github-light 把关键字/类型/类名给成同一族红色（#D73A49/#E36209），且上游是三层底色（bg-sidebar 卡 → bg-background 带框面板 → pre 主题白底），视觉上像没上色且像套娃
+- 验证：ui 包 typecheck 通过；pnpm --filter @paideia/ui test 235/236（唯一失败是 apps/admin/src/pages/AnalyticsPage.tsx 的调色板类，该文件在 HEAD d1cc48b 已如此，与本次无关）；pnpm --filter @paideia/app build 通过，构建产物 CSS 里 grep 到四条新规则；用构建产物 CSS + 真实渲染片段在 Edge 截浅色与深色各一张，确认单卡片、无白板、色层次可读
+- 本地提交：未提交（等待用户授权）
+- 远端推送：未执行
+
+## 2026-10-29 15:34:26 +0800 · WORK-054 · 复查实战五关：判题输出改 ASCII，并真跑一遍分帧协议
+
+- 类型：verification
+- 变更：content/courses/spring-handmade 五关的 TestMain 判题输出全部改成 ASCII（原来打中文没生效说明）；scripts/verify_handmade.py 增加守卫：TestMain 或 expected 含非 ASCII 即失败；testing/report.md 更新未验证项与证据
+- 决策：判题输出一律 ASCII；源码里的中文注释保留（既有 java-project 线 starter 一直带中文注释且在用，证明 UTF-8 源码能编译）
+- 依据：容器里没有 LANG，System.out 编码不保证 UTF-8，中文 FAIL 文案会变成问号；既有 java-project 的 expected 全是 ASCII、TestMain 只有注释含中文，是现成约定
+- 验证：反向验证：往一关 TestMain 塞中文 → verify_handmade.py 退出码 1 并点名文件；去掉 → 0；另用 DockerCommand.projectScriptFor 的原样脚本 + DockerCodeRunner 的字节协议跑五关，starter 全 exit 1、答案全 exit 0 且 stdout 恰为 ALL PASS；verify_course 两条线仍全绿
+- 本地提交：未提交（等待用户授权）
+- 远端推送：未执行
+
+## 2026-10-29 15:44:22 +0800 · 项目 · 修两处：测一测不显示上次作答、架构地图节点被截成「…」
+
+- 类型：bugfix
+- 变更：新增 `GET /api/v1/learning/entries/{id}/attempts`（QuestionAttemptController + QuestionAttemptService.answered + QuestionAttemptMapper.findChoices），返回本人在这条里每题最后选的那一项，**只认与当前正文指纹一致的作答**；`@paideia/knowledge` 新增 `learning.answered(entryId)`、`AnsweredChoice` 与 `practice-seed.ts`（`restoreAnswers`/`summarizeAnswers`）；`PracticeEntry` 新增 `previous` 入参，用服务端记录做初始状态，打开不再 `setAnswers({})`，入口卡改成「上次答对 X / Y」+「继续测一测」；`KnowledgeEntryPage` 先取已答再渲染卡片；`code-map.tsx` 节点标签从 `truncate` 改成 `line-clamp-2 + break-words + title`
+- 决策：**恢复只认指纹一致的作答**——题目内容改过就当没答过，否则旧选择会锁住一道新题、还显示一个跟当前选项对不上的对错；**重做只清本次会话，不清库里流水**（作答是账本，追加是设计），重做后卡片仍显示"上次"，重开面板不会又变回已答；节点宽度/高度不动（176×62），靠折两行解决截断——现有内容最长标签 18 个汉字，两行放得下，再长的靠 `title`
+- 依据：`practice-entry.tsx` 原来在 `openPanel` 里 `setAnswers({})` 并注释"不做答到一半的持久化"，于是答完刷新就是「已答 0 / 3」；而服务端 `question_attempts` 一直有逐题流水、`learning_progress.quizzes_json` 有整份得分，只是没往回读。`code-map.tsx` 用固定 176px 宽 + `truncate`（nowrap + ellipsis），内容区只有 152px，11 个汉字就开始出「…」
+- 验证：`QuestionAttemptIntegrationTest` 6/0（新增用例：空 → 答一次读回 choice=1 → 改题干后读回空）；`@paideia/knowledge` 单测 93/0（新增 `practice-seed.test.ts` 6 条：按 blockKey+questionKey 恢复、部分作答留空、别的题块不串、越界下标丢弃、summarize 数对）；`@paideia/knowledge` 与 `@paideia/app` typecheck 通过；`e2e/source-reading.spec.ts` 10 passed（新增断言：答完 3 题 → 刷新 → 卡片「上次答对 3 / 3」、面板 quiz-score 仍是「答对 3 / 3」）；`@paideia/ui` 测试 235/236，唯一失败是 `apps/admin/src/pages/AnalyticsPage.tsx` 的调色板类，该文件在 HEAD `d1cc48b` 已如此、与本次无关；**code-map 的观感没有真截图复验**：临时起后端时 jar 被并发会话在 15:39 重建、进程 `NoClassDefFoundError`，改为只确认 `line-clamp` 是 Tailwind 4.3.3 的核心工具类（会被生成）
+- 本地提交：待提交本次范围文件（不含 updates.md 里别人的条目）
+- 远端推送：未执行
+
+## 2026-10-29 15:55 +0800 · WORK-053 · 造数据集改走助手；工具名撞组前缀导致线上停了 4 分钟
+
+- 类型：implementation + incident
+- 变更：
+  - 新增只读工具 `planner_build_dataset`（组 `planner`，只有 planner 场景可见）：按表/列/行数**确定性**拼出
+    CREATE TABLE + INSERT，不调模型、不落库；自己校验标识符与类型白名单。
+  - SQL 工作台：「让 AI 造」改成 `ask()`（预填意图、不发送）；旧的一次性生成降为「直接生成」作降级；
+    新增「粘贴 SQL → 保存为数据集」，走原有的上传接口（白名单 + 沙箱干跑），校验没放松。
+- **事故**：第一版工具名叫 `sql_build_dataset` 却注册在 `planner` 组，`ToolCatalog` 的启动校验拒绝
+  （工具名必须以工具组前缀开头）→ 应用起不来，systemd 重启 7 次后停在失败，**线上不可用约 4 分钟**
+  （15:48 起，15:52 修复版本起来）。`/actuator/health` 从 200 变 000。
+- 修复：改名 `planner_build_dataset`（提示词与工件同步），重新发版；核对线上 jar 里只有新名字、无旧名字。
+- 教训（已写进提交信息）：**动工具目录的改动，模块内单测看不见**——校验发生在 Spring 启动时。
+  发版前必须跑 `ModularityTest`（起上下文，13 秒）；这次是发版后才靠线上日志发现。
+- 依据：`ToolCatalog` 的组前缀校验；线上 journal 的 `工具目录校验失败` 栈。
+- 验证：
+  - `SqlDatasetBuildToolsTest` 6 条（含"产出能过 SqlStatementGuard"、确定性、非法标识符/类型/行数拒绝）；
+    `PlannerPromptTest` 4 条；`ModularityTest` 1 条（起上下文）全绿。
+  - 线上 ego lite 复看：页面有「让 AI 造 / 直接生成 / 粘贴保存」；点「让 AI 造」→ 助手打开、
+    输入框预填「帮我造一个 SQL 练习数据集。先问我三个问题…」且**未发送**。
+  - `GET /actuator/health` → 200；`systemctl is-active paideia` → active。
+- 未做：`progress.spec.ts` / `sql-practice.spec.ts` 仍未跑（本机 Playwright 浏览器在重装）；
+  本轮页面验收全部用 ego lite。
+- 本地提交：`648c0a1`、`ead64d2`；已 push（`ec798f3..ead64d2`）
+- 远端推送：已执行
