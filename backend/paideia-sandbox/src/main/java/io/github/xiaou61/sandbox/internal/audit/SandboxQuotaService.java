@@ -38,24 +38,26 @@ public class SandboxQuotaService {
         return Math.max(0, properties.getDailyLimit() - usedToday(userId));
     }
 
-    /** 今天某语言还剩几次（SQL 有单独一档，WORK-032）。 */
+    /** 今天某语言还剩几次（SQL 与 Linux 练习各有单独一档）。 */
     public int remaining(long userId, String language) {
-        if (!isSql(language)) {
+        String own = ownLimit(language);
+        if (own == null) {
             return remaining(userId);
         }
-        return Math.max(0, properties.getSqlDailyLimit() - usedToday(userId, language));
+        return Math.max(0, limitFor(own) - usedToday(userId, language));
     }
 
     public int usedToday(long userId) {
         return mapper.countSince(userId, startOfUtcDay());
     }
 
-    /** 今天某语言用了多少次。 */
+    /** 今天某语言用了多少次。有独立上限的语言只数它自己的。 */
     public int usedToday(long userId, String language) {
-        if (!isSql(language)) {
+        String own = ownLimit(language);
+        if (own == null) {
             return usedToday(userId);
         }
-        return mapper.countSinceForLanguage(userId, startOfUtcDay(), "sql");
+        return mapper.countSinceForLanguage(userId, startOfUtcDay(), own);
     }
 
     /** 超了抛 429。**在真正执行之前调用**，避免先跑再拒绝。 */
@@ -67,24 +69,36 @@ public class SandboxQuotaService {
     }
 
     /**
-     * 按语言检查配额（WORK-032）。SQL 走自己的 20 次/天，与其它语言互不影响。
+     * 按语言检查配额（WORK-032 / WORK-056）。SQL 与 shell 各走自己的一档，与其它语言互不影响。
      *
      * <p>**顺序很重要**：调用方必须在启动容器之前调这个。
      */
     public void requireQuota(long userId, String language) {
-        if (!isSql(language)) {
+        String own = ownLimit(language);
+        if (own == null) {
             requireQuota(userId);
             return;
         }
         int used = usedToday(userId, language);
-        if (used >= properties.getSqlDailyLimit()) {
+        int limit = limitFor(own);
+        if (used >= limit) {
             throw new BizException(ErrorCode.TOO_MANY_REQUESTS,
-                    "今天的 SQL 运行次数已用完（每天 " + properties.getSqlDailyLimit() + " 次），明天再来");
+                    "今天的" + ("shell".equals(own) ? " Linux 练习" : " SQL")
+                            + "运行次数已用完（每天 " + limit + " 次），明天再来");
         }
     }
 
-    private static boolean isSql(String language) {
-        return language != null && "sql".equalsIgnoreCase(language.trim());
+    /** 有独立上限的语言返回它自己，其余返回 null（走通用额度）。 */
+    static String ownLimit(String language) {
+        if (language == null) {
+            return null;
+        }
+        String normalized = language.trim().toLowerCase(java.util.Locale.ROOT);
+        return "sql".equals(normalized) || "shell".equals(normalized) ? normalized : null;
+    }
+
+    private int limitFor(String own) {
+        return "shell".equals(own) ? properties.getShellDailyLimit() : properties.getSqlDailyLimit();
     }
 
     /** 写一条审计。`status` 用 {@link CodeRun.Status} 的名字，存进去就是稳定值。 */

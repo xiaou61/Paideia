@@ -94,6 +94,36 @@ public class SandboxProperties {
      */
     private String springCpus = "2";
 
+    /**
+     * Linux 判题练习场的镜像（WORK-056）。**留空 = 不启用**，与 sql/spring 同一条口径。
+     *
+     * <p>选 debian 而不是 alpine：判题要用 GNU 的 `find -printf`（BusyBox 没有），
+     * 而课程里讲的 `sed -i`、`ps` 列、`grep -P` 也都是 GNU 行为——镜像与教材不一致时，
+     * 学习者照着课敲会得出"课错了"的结论。
+     */
+    private String shellImage;
+
+    /** 练习容器的内存：跑的是 grep/awk/小脚本，256m 足够。 */
+    private String shellMemory = "256m";
+
+    /** 练习容器的 CPU：与 java/python 同档。 */
+    private String shellCpus = "0.5";
+
+    /** 练习容器的进程数上限：仍要防 fork 炸弹，但不给 Maven 那种余量。 */
+    private int shellPidsLimit = 64;
+
+    /**
+     * 练习的墙钟上限。一次提交要跑「学习者脚本 + judge」两段，比单文件语言多一步；
+     * 首批题目都是纯状态操作（毫秒级），15 秒只是防死循环的上限，不是预算。
+     */
+    private long shellTimeoutMs = 15_000;
+
+    /**
+     * 练习的日配额。**熔断器不是预算**：它不花 AI 积分，真正的保护是每人并发 1。
+     * 200 次按每题重试 10 次算，够把 6 道题练完再从头来一遍。
+     */
+    private int shellDailyLimit = 200;
+
     /** 代码与 stdin 的长度上限（字符）。 */
     private int maxCodeChars = 20_000;
     private int maxStdinChars = 4_000;
@@ -143,6 +173,9 @@ public class SandboxProperties {
         if (springImage != null && !springImage.isBlank()) {
             available.add("spring");
         }
+        if (shellImage != null && !shellImage.isBlank()) {
+            available.add("shell");
+        }
         return Set.copyOf(available);
     }
 
@@ -157,6 +190,8 @@ public class SandboxProperties {
             case "sql" -> blankToNull(sqlImage);
             // Spring 项目（WORK-055）：JDK + Maven + 离线仓库 + 骨架，只能按项目模式跑
             case "spring" -> blankToNull(springImage);
+            // Linux 判题练习场（WORK-056）：也走项目模式的文件分帧，但入口是判题脚本
+            case "shell" -> blankToNull(shellImage);
             default -> null;
         };
     }
@@ -171,6 +206,9 @@ public class SandboxProperties {
         if ("spring".equalsIgnoreCase(language)) {
             return springTimeoutMs;
         }
+        if (isShell(language)) {
+            return shellTimeoutMs;
+        }
         return timeoutMs;
     }
 
@@ -180,7 +218,10 @@ public class SandboxProperties {
             return sqlMemory;
         }
         // Spring 起上下文实测 400–600MB（@SpringBootTest + 内嵌 Tomcat），512m 会 OOM
-        return "spring".equalsIgnoreCase(language) ? springMemory : memory;
+        if ("spring".equalsIgnoreCase(language)) {
+            return springMemory;
+        }
+        return isShell(language) ? shellMemory : memory;
     }
 
     /** 该语言的 CPU 上限。 */
@@ -188,21 +229,34 @@ public class SandboxProperties {
         if (isSql(language)) {
             return sqlCpus;
         }
-        return "spring".equalsIgnoreCase(language) ? springCpus : cpus;
+        if ("spring".equalsIgnoreCase(language)) {
+            return springCpus;
+        }
+        return isShell(language) ? shellCpus : cpus;
     }
 
     /** 该语言的进程数上限。 */
     public int pidsLimitFor(String language) {
-        return isSql(language) ? sqlPidsLimit : pidsLimit;
+        if (isSql(language)) {
+            return sqlPidsLimit;
+        }
+        return isShell(language) ? shellPidsLimit : pidsLimit;
     }
 
     /** 该语言的每日运行次数。 */
     public int dailyLimitFor(String language) {
-        return isSql(language) ? sqlDailyLimit : dailyLimit;
+        if (isSql(language)) {
+            return sqlDailyLimit;
+        }
+        return isShell(language) ? shellDailyLimit : dailyLimit;
     }
 
     private static boolean isSql(String language) {
         return language != null && "sql".equalsIgnoreCase(language.trim());
+    }
+
+    private static boolean isShell(String language) {
+        return language != null && "shell".equalsIgnoreCase(language.trim());
     }
 
     private static String blankToNull(String value) {
@@ -283,6 +337,54 @@ public class SandboxProperties {
 
     public void setSpringCpus(String springCpus) {
         this.springCpus = springCpus;
+    }
+
+    public String getShellImage() {
+        return shellImage;
+    }
+
+    public void setShellImage(String shellImage) {
+        this.shellImage = shellImage;
+    }
+
+    public String getShellMemory() {
+        return shellMemory;
+    }
+
+    public void setShellMemory(String shellMemory) {
+        this.shellMemory = shellMemory;
+    }
+
+    public String getShellCpus() {
+        return shellCpus;
+    }
+
+    public void setShellCpus(String shellCpus) {
+        this.shellCpus = shellCpus;
+    }
+
+    public int getShellPidsLimit() {
+        return shellPidsLimit;
+    }
+
+    public void setShellPidsLimit(int shellPidsLimit) {
+        this.shellPidsLimit = shellPidsLimit;
+    }
+
+    public long getShellTimeoutMs() {
+        return shellTimeoutMs;
+    }
+
+    public void setShellTimeoutMs(long shellTimeoutMs) {
+        this.shellTimeoutMs = shellTimeoutMs;
+    }
+
+    public int getShellDailyLimit() {
+        return shellDailyLimit;
+    }
+
+    public void setShellDailyLimit(int shellDailyLimit) {
+        this.shellDailyLimit = shellDailyLimit;
     }
 
     public int getMaxCodeChars() {

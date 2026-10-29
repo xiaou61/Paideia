@@ -76,6 +76,62 @@ final class DockerCommand {
             exit $code""";
 
     /**
+     * Linux 判题练习场的容器内脚本（WORK-056）。
+     *
+     * <p><b>脚本与工作区分开</b>：判题要看"学习者把工作区改成了什么样"，所以 `run.sh` /
+     * `judge.sh` 落在工作区之外（`/tmp/in`），否则它们自己也会出现在变更列表里。
+     *
+     * <p><b>学习者的输出全部重定向到文件</b>：容器的 stdout 只留我们自己的协议块，
+     * 学习者脚本里写 `echo '###RC'` 伪造不了判定。
+     *
+     * <p><b>用 bash 而不是 sh</b>：课程讲的是 bash（`[[ ]]`、`set -euo pipefail`），
+     * debian 的 `sh` 是 dash，照着课抄会失败——镜像行为必须与教材一致。
+     *
+     * <p>`find -printf` 是 GNU 特性（BusyBox 没有），这也是镜像选 debian 的直接原因；
+     * 快照含 `%M` 权限位，所以 `chmod` 这种"内容不变、只有权限变"的改动看得见。
+     *
+     * <p>每节在容器内 `head -c` 截断：协议块整体不超过 ~32KB，稳定落在输出上限内，
+     * 且不会因为学习者刷屏把判定信息挤掉。
+     */
+    private static final String SHELL_ENTRY = """
+            read -r count
+            i=0
+            mkdir -p /tmp/in /tmp/work
+            while [ "$i" -lt "$count" ]; do
+              read -r path
+              read -r size
+              mkdir -p "/tmp/in/$(dirname "$path")"
+              dd bs=1 count="$size" of="/tmp/in/$path" 2>/dev/null
+              i=$((i + 1))
+            done
+            cp -a /tmp/in/work/. /tmp/work/ 2>/dev/null
+            cd /tmp/work || exit 125
+            find . -printf '%M %s %p\\n' 2>/dev/null | sort > /tmp/.before
+            bash /tmp/in/run.sh > /tmp/.out 2> /tmp/.err
+            rc=$?
+            bash /tmp/in/judge.sh > /tmp/.jout 2> /tmp/.jerr
+            jrc=$?
+            find . -printf '%M %s %p\\n' 2>/dev/null | sort > /tmp/.after
+            echo '###RC'
+            echo "$rc $jrc"
+            echo '###OUT'
+            head -c 8000 /tmp/.out
+            echo
+            echo '###ERR'
+            head -c 8000 /tmp/.err
+            echo
+            echo '###JUDGE'
+            head -c 4000 /tmp/.jout
+            echo
+            echo '###JUDGEERR'
+            head -c 4000 /tmp/.jerr
+            echo
+            echo '###DIFF'
+            diff /tmp/.before /tmp/.after | head -c 8000
+            echo
+            """;
+
+    /**
      * 录制脚本（WORK-023）：用 sys.settrace 逐步记录行号、局部变量与输出。
      *
      * <p><b>三条安全约束</b>写在脚本里而不是靠"调用方记得"：
@@ -302,6 +358,10 @@ final class DockerCommand {
             // Spring 的脚本自己读帧、自己写 src/ 下，不走 /tmp/work 那套单文件入口
             return SPRING_PROJECT_SCRIPT;
         }
+        if ("shell".equals(language)) {
+            // Linux 判题练习场（WORK-056）：读帧 → 分开脚本与工作区 → 跑两段 → 输出协议块
+            return SHELL_ENTRY;
+        }
         String entry = "python".equals(language)
                 ? "cd /tmp/work && python test_main.py"
                 : "cd /tmp/work && javac -d /tmp/work/out $(find . -name '*.java') && java -cp /tmp/work/out TestMain";
@@ -379,6 +439,8 @@ final class DockerCommand {
             case "sql" -> explain ? SQL_EXPLAIN_SCRIPT : SQL_SCRIPT;
             // Spring 只能项目模式：单文件跑一个 Spring 项目没有意义，静默落到 python 更糟
             case "spring" -> throw new IllegalArgumentException("spring 只支持项目模式（需要 files）");
+            // shell 也只能项目模式：判题要工作区 + run.sh + judge.sh 三样一起进去
+            case "shell" -> throw new IllegalArgumentException("shell 只支持项目模式（需要 files）");
             default -> PYTHON_SCRIPT;
         };
     }
