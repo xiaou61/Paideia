@@ -8457,3 +8457,52 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 遗留：`plugins.test`（tokens 门禁）红；`progress.spec.ts` / `sql-practice.spec.ts` 仍未跑（本机 Playwright 浏览器重装未完成）。
 - 本地提交：四笔；已 push
 - 远端推送：已执行
+
+## 2026-10-29 16:30:35 +0800 · WORK-055 · 签署 .agent/changes/WORK-055-SpringBoot小项目沙箱真跑/requirements.md、.agent/changes/WORK-055-SpringBoot小项目沙箱真跑/proposal.md、.agent/changes/WORK-055-SpringBoot小项目沙箱真跑/design.md、.agent/changes/WORK-055-SpringBoot小项目沙箱真跑/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-055-SpringBoot小项目沙箱真跑/requirements.md、.agent/changes/WORK-055-SpringBoot小项目沙箱真跑/proposal.md、.agent/changes/WORK-055-SpringBoot小项目沙箱真跑/design.md、.agent/changes/WORK-055-SpringBoot小项目沙箱真跑/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-055-SpringBoot小项目沙箱真跑/requirements.md、.agent/changes/WORK-055-SpringBoot小项目沙箱真跑/proposal.md、.agent/changes/WORK-055-SpringBoot小项目沙箱真跑/design.md、.agent/changes/WORK-055-SpringBoot小项目沙箱真跑/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 17:20 +0800 · 内容 · 新增两条阅读线：Linux 从零开始（19 关）与 Docker 从零开始（12 关）
+
+- 类型：content
+- 背景：用户要求「在从零开始那里加 Docker 学习，以及非常详细的 Linux」。当时只有 `linux`（Linux 排查，7 关，面向已会命令的人），没有从零地基，也没有 Docker 内容。
+- 变更：
+  - `content/reading/linux-from-zero/`：总览 + 19 关（命令线与帮助 → 目录树 FHS → 文件操作 → 权限与 umask → 用户/组/sudo → 管道与 fd → grep/sed/awk → 进程与作业控制 → 信号与 kill → 环境变量与 PATH → 包管理 → systemd → 日志 → 磁盘与 inode → 网络与防火墙 → SSH → Shell 脚本 → cron/timer → 上机实战）。`line_sort: 42`，与 `linux`（排查，45）分工：先地基、后排查。
+  - `content/reading/docker/`：总览 + 12 关（容器与虚拟机分界 → docker run → 镜像分层 → Dockerfile → 数据卷 → 网络 → Compose → 仓库 → 资源/日志 → 排查 → Jar+MySQL 实战 → 安全底线）。`line_sort: 46`。
+  - `frontend/apps/app/src/pages/LearnPage.tsx`：`TRACK_ICONS` 补 `linux-from-zero: Terminal`、`docker: Container`（新 slug 不加会落到兜底书图标）。
+  - 每关都带 `quiz`（每题有 explain）与部分 `code-challenge`（fill/order/bug，均不依赖运行沙箱）。
+- 决策：
+  - **做成 reading 线而不是 course**：`verify_course.py` 要求每课至少一个 `<!-- run -->` 且只能是 python/java/sql；Linux/Docker 的示例是 shell，硬塞一个无关的 Python 示例只为过门禁是错的。
+  - **不改成判题式练习场**：本关内容本来就按「一串可执行命令」写，将来若批准 shell 练习场不必重写。
+  - **不在本轮发版**：工作区里有另一个会话在飞的 `paideia-sandbox`（WORK-055）改动，`release.ps1` 从工作区构建会把它一起发出去。图标改动等下次发版生效（当前线上两条线用兜底图标，内容与轨道均已可见）。
+- 验证：
+  - `python scripts/check_quiz_explain.py` → 256 个 quiz 块 / 755 道题 / **0 处问题**；自写的围栏块校验（fill 空位数、order 排列、bugLine、answer 越界）两条线 33 个文件全通过。
+  - `import-course.mjs --dry-run` 两条线均正确解析（20 / 13 条）。
+  - 线上导入：`linux-from-zero` **新建 20 条、轨道 19 关**；`docker` **新建 13 条、轨道 12 关**；复跑均 `created 0 / updated 0`（幂等）。
+  - 线上 `GET /api/v1/learn/tracks`：`linux-from-zero` 19 关（首关「登录与第一条命令」）、`docker` 12 关（首关「容器是什么：与虚拟机的分界」），总轨道 29 条。
+- 未做：前端未重新构建（需要发版，见上）；两条线没有 e2e（内容型，按既有惯例不写）。
+- 本地提交：见本条之后的提交
+- 远端推送：未执行
+
+## 2026-10-29 16:55 +0800 · 内容 · 新线接入岗位推荐 + 立 WORK-056（Linux 判题式练习场，draft）
+
+- 类型：content
+- 变更：
+  - `frontend/packages/knowledge/src/role-map.ts`：后端岗位的「进阶」补 `linux-from-zero` 与 `docker`。这两条线原先未列入任何岗位，按兜底规则全落「选读」——内容上线但推荐位看不见。
+  - `.agent/changes/WORK-056-Linux判题式练习场/requirements.md`：新建工作项（strict / full，15 条 REQ 里 8 条、10 条 AC），把用户「能不能也做个 Linux 练习场」的诉求、复用面、非目标与两条待确认问题写进去。
+- 决策：
+  - **练习场按「判题式」而不是「交互终端」**：一次提交一段脚本 → 容器执行 → 跑判定脚本看最终状态。理由是现有 SQL 沙箱的隔离来自"用完即弃"，而持久容器要额外解决磁盘配额、空闲回收、重连与注销级联，安全面大一个量级；且 systemd、防火墙、SSH 在容器里本来就练不了。
+  - **保持 `--network=none`**：网络与 SSH 两关只读不练。这一条写进了 requirements 的待确认问题，等用户明确。
+  - **只起草需求，不动代码**：`继续` 只表达动作意图，不是阶段批准；实现、设计、任务都停在这道门槛之后。
+- 验证：
+  - `vitest run src/recommend.test.ts` → 20 passed（岗位映射改动未破坏既有 rank 与兜底断言）。
+  - `project-lifecycle validate` → WORK-056 无结构性警告；`resume --work WORK-056` 下一步为「核对待确认问题；内容收敛后请用户明确确认需求」。
+- 未做：练习场的任何实现（等签署）；未发版（另一会话仍在动 `paideia-sandbox`）。
+- 本地提交：见本条之后的提交
+- 远端推送：未执行
