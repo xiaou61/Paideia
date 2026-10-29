@@ -39,6 +39,43 @@ final class DockerCommand {
             cd /tmp && python main.py""";
 
     /**
+     * Spring 项目脚本（WORK-055）。
+     *
+     * <p>与其它语言的区别只有三处，全部来自尖刺实测（`.agent/notes/spring-project-sandbox-spike.md`）：
+     * <ol>
+     *   <li>骨架在镜像里（`/opt/skeleton`），用户文件覆盖到 `/tmp/app/src/` 下；</li>
+     *   <li>离线跑：`mvn -o` + `-Dmaven.repo.local=/opt/m2/repository`（**必须指到 repository 子目录**，
+     *       指到上一级会报 "parent POM absent"）；</li>
+     *   <li>`HOME` 与 `MAVEN_CONFIG` 要指到可写目录——基础镜像把它们写死在 `/root` 下，
+     *       而容器是非 root、根只读。</li>
+     * </ol>
+     *
+     * <p>判分看退出码（测试不通过时 mvn 非 0）；下面再把 surefire 的汇总与失败用例打到输出里，
+     * 让用户知道挂在哪一条——不解析这两段也能判，但没人愿意只看到一句"退出码 1"。
+     */
+    private static final String SPRING_PROJECT_SCRIPT = """
+            read -r count
+            i=0
+            mkdir -p /tmp/app /tmp/home
+            cp -a /opt/skeleton/. /tmp/app/
+            while [ "$i" -lt "$count" ]; do
+              read -r path
+              read -r size
+              mkdir -p "/tmp/app/src/$(dirname "$path")"
+              dd bs=1 count="$size" of="/tmp/app/src/$path" 2>/dev/null
+              i=$((i + 1))
+            done
+            cd /tmp/app || exit 71
+            export HOME=/tmp/home
+            export MAVEN_CONFIG=/tmp/home/.m2
+            mvn -o -q -B -Dmaven.repo.local=/opt/m2/repository test
+            code=$?
+            echo
+            grep -h "Tests run" target/surefire-reports/*.txt 2>/dev/null || echo "没有产生测试报告（编译失败或依赖缺失）"
+            grep -h -A3 "<<< FAILURE" target/surefire-reports/*.txt 2>/dev/null | head -20 || true
+            exit $code""";
+
+    /**
      * 录制脚本（WORK-023）：用 sys.settrace 逐步记录行号、局部变量与输出。
      *
      * <p><b>三条安全约束</b>写在脚本里而不是靠"调用方记得"：
@@ -204,7 +241,11 @@ final class DockerCommand {
                 "--read-only",
                 // SQL 的 datadir 副本要装下 180MB 基准 + 系统库写入，64m 远远不够；
                 // 768m 给了 4 倍余量，且仍是硬上限。
-                "--tmpfs", sql ? "/tmp:rw,size=768m,exec" : "/tmp:rw,size=64m,exec",
+                // Spring 项目要装骨架副本 + target + mvn 自己的临时文件，64m 不够；实测 256m 够用，给 512m 余量。
+                "--tmpfs",
+                sql ? "/tmp:rw,size=768m,exec"
+                        : "spring".equals(normalized) ? "/tmp:rw,size=512m,exec"
+                        : "/tmp:rw,size=64m,exec",
                 // ── 身份与权限：非 root、cap 全丢、禁止提权 ──
                 // mysqld 必须以 mysql 用户跑（镜像里是 uid 999），其它语言用 nobody。
                 "--user", sql ? "999:999" : "65534:65534",
@@ -253,6 +294,10 @@ final class DockerCommand {
      * 入口名来自常量，请求里的任何内容都进不了命令行。
      */
     private static String projectScriptFor(String language) {
+        if ("spring".equals(language)) {
+            // Spring 的脚本自己读帧、自己写 src/ 下，不走 /tmp/work 那套单文件入口
+            return SPRING_PROJECT_SCRIPT;
+        }
         String entry = "python".equals(language)
                 ? "cd /tmp/work && python test_main.py"
                 : "cd /tmp/work && javac -d /tmp/work/out $(find . -name '*.java') && java -cp /tmp/work/out TestMain";
@@ -328,6 +373,8 @@ final class DockerCommand {
         return switch (normalized) {
             case "java" -> JAVA_SCRIPT;
             case "sql" -> explain ? SQL_EXPLAIN_SCRIPT : SQL_SCRIPT;
+            // Spring 只能项目模式：单文件跑一个 Spring 项目没有意义，静默落到 python 更糟
+            case "spring" -> throw new IllegalArgumentException("spring 只支持项目模式（需要 files）");
             default -> PYTHON_SCRIPT;
         };
     }

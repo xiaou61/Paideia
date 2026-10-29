@@ -160,6 +160,12 @@ class SandboxController {
         }
         List<CodeRun.FileEntry> files = validateProject(body, language);
         boolean project = !files.isEmpty();
+        // Spring 项目（WORK-055）：骨架在镜像里，用户必须提交文件覆盖它。放行单文件模式会
+        // 落到一个"没有 pom 的 mvn"上，报错信息对用户毫无意义。
+        if ("spring".equals(language) && !project) {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT,
+                    "Spring 项目必须以项目模式提交（需要 files）");
+        }
         // 项目模式下 code 只进审计：真正的执行内容是 files。
         String code = body.code() == null ? "" : body.code();
         if (!project && code.isBlank()) {

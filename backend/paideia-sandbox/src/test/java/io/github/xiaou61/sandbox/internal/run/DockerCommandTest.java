@@ -235,4 +235,47 @@ class DockerCommandTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("不支持项目模式");
     }
+
+    @Test
+    void spring项目走项目模式且加固参数一个不少() {
+        SandboxProperties properties = props();
+        properties.setSpringImage("paideia-spring:1");
+        List<String> command = DockerCommand.of("spring", properties, "/tmp/x.cid", false, true);
+
+        // 不复用 assertHardened：它把内存写死成 256m，而 Spring 是 1g。
+        // 逐条断言安全参数——这些才是"不能因为换语言就少一条"的东西。
+        assertThat(command).contains("--network=none", "--read-only", "--cap-drop=ALL",
+                "--security-opt=no-new-privileges", "--user", "65534:65534",
+                "--memory=1g", "--memory-swap=1g");
+        assertThat(command).noneMatch(item -> item.equals("-v") || item.startsWith("--volume")
+                || item.startsWith("--mount"));
+        assertThat(command).contains("paideia-spring:1");
+        // Spring 要装骨架副本 + target，tmpfs 必须比普通 java 大
+        assertThat(command).contains("/tmp:rw,size=512m,exec");
+        String script = command.get(command.size() - 1);
+        // 离线仓库路径必须是 repository 子目录，指到上一级会报 "parent POM absent"
+        assertThat(script).contains("-Dmaven.repo.local=/opt/m2/repository", "mvn -o");
+        // 非 root + 只读根下，HOME 与 MAVEN_CONFIG 必须可写
+        assertThat(script).contains("HOME=/tmp/home", "MAVEN_CONFIG=/tmp/home/.m2");
+    }
+
+    @Test
+    void 未配置spring镜像时不暴露该语言() {
+        SandboxProperties properties = props();
+        assertThat(properties.languages()).doesNotContain("spring");
+        properties.setSpringImage("paideia-spring:1");
+        assertThat(properties.languages()).contains("spring");
+        assertThat(properties.timeoutMsFor("spring")).isEqualTo(90_000);
+        assertThat(properties.timeoutMsFor("java")).isEqualTo(10_000);
+        assertThat(properties.memoryFor("spring")).isEqualTo("1g");
+    }
+
+    @Test
+    void spring不能走单文件模式() {
+        SandboxProperties properties = props();
+        properties.setSpringImage("paideia-spring:1");
+        assertThatThrownBy(() -> DockerCommand.scriptFor("spring", false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("项目模式");
+    }
 }

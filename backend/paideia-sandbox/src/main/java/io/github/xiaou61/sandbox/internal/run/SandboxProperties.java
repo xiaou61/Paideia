@@ -76,6 +76,18 @@ public class SandboxProperties {
     /** 墙钟上限（毫秒）。超时即 `destroyForcibly`。 */
     private long timeoutMs = 10_000;
 
+    /**
+     * Spring 项目的镜像（WORK-055）。**留空 = 不启用**：`languages()` 就不会暴露 spring，
+     * 前端也就不会渲染运行按钮——渲染一个必然失败的按钮比不渲染更糟。
+     */
+    private String springImage;
+
+    /** Spring 项目的墙钟上限：全量 `mvn test` 实测 15–27 秒，给 3 倍余量。 */
+    private long springTimeoutMs = 90_000;
+
+    /** Spring 容器的内存上限：`@SpringBootTest` 起内嵌 Tomcat 实测 400–600MB。 */
+    private String springMemory = "1g";
+
     /** 代码与 stdin 的长度上限（字符）。 */
     private int maxCodeChars = 20_000;
     private int maxStdinChars = 4_000;
@@ -122,6 +134,9 @@ public class SandboxProperties {
         if (sqlImage != null && !sqlImage.isBlank()) {
             available.add("sql");
         }
+        if (springImage != null && !springImage.isBlank()) {
+            available.add("spring");
+        }
         return Set.copyOf(available);
     }
 
@@ -134,18 +149,32 @@ public class SandboxProperties {
             case "java" -> blankToNull(javaImage);
             case "python" -> blankToNull(pythonImage);
             case "sql" -> blankToNull(sqlImage);
+            // Spring 项目（WORK-055）：JDK + Maven + 离线仓库 + 骨架，只能按项目模式跑
+            case "spring" -> blankToNull(springImage);
             default -> null;
         };
     }
 
     /** 该语言的墙钟上限。SQL 单独一档：启动 mysqld 本身就要 3 秒上下。 */
     public long timeoutMsFor(String language) {
-        return isSql(language) ? sqlTimeoutMs : timeoutMs;
+        if (isSql(language)) {
+            return sqlTimeoutMs;
+        }
+        // 实测：Spring 项目全量 mvn test 1 核 27 秒、2 核 15 秒（见 .agent/notes/spring-project-sandbox-spike.md），
+        // 90 秒给到 3 倍余量；普通 java/python 仍是 10 秒。
+        if ("spring".equalsIgnoreCase(language)) {
+            return springTimeoutMs;
+        }
+        return timeoutMs;
     }
 
     /** 该语言的内存上限。 */
     public String memoryFor(String language) {
-        return isSql(language) ? sqlMemory : memory;
+        if (isSql(language)) {
+            return sqlMemory;
+        }
+        // Spring 起上下文实测 400–600MB（@SpringBootTest + 内嵌 Tomcat），512m 会 OOM
+        return "spring".equalsIgnoreCase(language) ? springMemory : memory;
     }
 
     /** 该语言的 CPU 上限。 */
@@ -213,6 +242,30 @@ public class SandboxProperties {
 
     public void setTimeoutMs(long timeoutMs) {
         this.timeoutMs = timeoutMs;
+    }
+
+    public String getSpringImage() {
+        return springImage;
+    }
+
+    public void setSpringImage(String springImage) {
+        this.springImage = springImage;
+    }
+
+    public long getSpringTimeoutMs() {
+        return springTimeoutMs;
+    }
+
+    public void setSpringTimeoutMs(long springTimeoutMs) {
+        this.springTimeoutMs = springTimeoutMs;
+    }
+
+    public String getSpringMemory() {
+        return springMemory;
+    }
+
+    public void setSpringMemory(String springMemory) {
+        this.springMemory = springMemory;
     }
 
     public int getMaxCodeChars() {
