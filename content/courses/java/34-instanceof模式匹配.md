@@ -9,7 +9,7 @@ minutes: 24
 status: published
 ---
 
-# 32 · instanceof 模式匹配
+# 34 · instanceof 模式匹配
 
 ## 这一课你要会
 

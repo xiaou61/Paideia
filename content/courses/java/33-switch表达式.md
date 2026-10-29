@@ -9,7 +9,7 @@ minutes: 26
 status: published
 ---
 
-# 31 · switch 表达式与箭头语法
+# 33 · switch 表达式与箭头语法
 
 ## 这一课你要会
 

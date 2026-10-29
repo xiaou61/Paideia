@@ -9,7 +9,7 @@ minutes: 28
 status: published
 ---
 
-# 34 · sealed 与封闭类型
+# 36 · sealed 与封闭类型
 
 ## 这一课你要会
 

@@ -9,7 +9,7 @@ minutes: 22
 status: published
 ---
 
-# 29 · var 与类型推断
+# 31 · var 与类型推断
 
 ## 这一课你要会
 
