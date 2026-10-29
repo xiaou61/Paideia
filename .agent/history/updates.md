@@ -8331,3 +8331,14 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：回读 frontmatter：accepted_by=xiaou61
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
+
+## 2026-10-29 15:20 +0800 · 项目 · 前端开发岗位不再退化成后端顺序；AI 强联动立为 WORK-053
+
+- 类型：fix + decision
+- 变更（行为）：`role-map.ts` 的 `frontend` 从空表改为核心 = Git / 网络 / 算法三条通用线；`LearnPage` 的文案同步，并去掉"地图只在 available 时渲染"的门（原来选了它连地图都看不到，还写着「先按后端开发的顺序给你推荐」）。
+- 决策：不与"真做前端内容线"混在一起。前端线（JS/TS → 浏览器渲染 → 框架 → 性能）是独立工作项；本次只修"退化推荐"这个错误。
+- 依据：`frontend/packages/knowledge/src/role-map.ts`（空表 → 未列出的线全落选读）；线上实测点「前端开发」的文案与渲染。
+- 验证：`recommend.test` 20 条通过（新增一条：没有专属内容的岗位核心不能为空）；knowledge / app 的 tsc 均 0 错误；发版 243.5 秒、health 200；线上复看：核心 = Git / 计算机网络 / 算法与数据结构，选读 22 条，文案已换；`learn.spec` + `layout.mobile.spec` 27 passed / 1 skipped。
+- 立项：**WORK-053 学习记录页与 AI 强联动（试点）**，`requirements.md` 已起草（draft）。起草前核实了三条现成原语，避免重复造：上行 `setPageContext`（现只有 `sql-workbench` 一个变体，加 `study-log`）、请求 `ask()`（打开并预填、不发送）、下行 `applySql()` 的"待消费一次"回填模式（WORK-035）——强联动就照这三条长。
+- 本地提交：`ceb5da6`（代码）+ 本笔（立项与历史）；已 push
+- 远端推送：已执行
