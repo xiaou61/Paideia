@@ -8553,3 +8553,23 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 未做：内容只有 1 关（计划 3 关）、`scripts/verify_spring_project.py` 未写、并发槽未压测。
 - 本地提交：见当日提交；已 push
 - 远端推送：已执行
+
+## 2026-10-29 17:55 +0800 · 内容 · Docker 线从 12 关扩到 20 关
+
+- 类型：content
+- 变更：新增 8 篇（13–20），`content/reading/docker/`：
+  多阶段构建与镜像瘦身 / 构建缓存与 BuildKit / 健康检查与启动顺序 / 容器里的 JVM 与内存 /
+  把容器焊死（非 root、只读根、无网络）/ 镜像扫描与供应链 / 日志与指标 / 从 Compose 到 K8s。
+  总览同步：十二关→二十关、新增「上生产」一段、learning-path 补 8 步（共 20 步，等于渲染器上限）。
+- 取材：13–20 都是**本仓真实踩过的坑**——多阶段构建对应 WORK-055 的 988MB 镜像；
+  容器里的 JVM 对应 SQL 池 512m 让 mysqld 静默 OOM；焊死那一篇的 `nofile=64 → 类缺失` 是今天
+  Spring 沙箱的真实报错；供应链那一篇引用了 SQL 镜像钉 digest 的做法。
+- 验证：
+  - 全部 21 个文件的 frontmatter / quiz JSON / learning-path JSON 逐条解析通过；
+    期间修掉一处 **quiz JSON 未转义的双引号**（15 篇，"能用"），这正是这类内容最容易犯的错。
+  - 线上导入：**新建 8 / 更新 1**（总览），轨道 `docker` 由 12 关变 **20 关**；
+    `/learn/tracks/docker` 末两关为「日志与指标」「从 Compose 到 K8s」。
+- 未做：没有逐篇在浏览器里读一遍（靠 JSON 解析 + 线上关卡数核对）；没有补 `code-challenge` 类的动手题
+  （这条线是 reading，通关看小测）。
+- 本地提交：本笔；已 push
+- 远端推送：已执行
