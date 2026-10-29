@@ -7754,3 +7754,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：`approve --artifact all --by xiaou61 --role CTO` → 四件同批签署；`approve --artifact test-report` 登记验收；`status` 显示 **完成沉淀 / 已完成**，6 个任务全 done；`validate` 无错误，仅剩历史项的软警告（核心文档超 20KB、报告绑定提交之后又有提交）。
 - 本地提交：本笔
 - 远端推送：未执行
+
+## 2026-10-29 09:58 +0800 · 项目 · 合入后的后端发版（12114d3）
+
+- 类型：maintenance + deployment
+- 变更：`powershell -File scripts/release.ps1`（工作区干净、无前端改动，脚本自动跳过前端重建）→ **106.7 秒**；增量上传 **3 个文件 / 465**（上传 25.8s + 重启 2.5s + 健康检查 25.1s）。发版内容 = 本次合入的两处后端修复（导读不再登记为关卡、进度读取上限 200→2000）与 WORK-052 的注释改号。
+- 依据：`git status` 仅 `.agent/html.rar` 未跟踪；HEAD `12114d3`。
+- 验证：`GET /actuator/health` → **200 / status UP**；发版标记已写。
+- 未做：**没有导入线上内容**。java-expand 的 12 课（26–37）与三条实战线新增的 4 关只在仓库里，线上 `/learn` 的 Java 仍是 26 关。导入需要管理员凭据，且会向公开站点新增 15 条已发布条目，留给用户点头后再跑 `node scripts/import-course.mjs`。
+- 本地提交：本笔（仅更新历史）
+- 远端推送：未执行
