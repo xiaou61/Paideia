@@ -169,6 +169,11 @@ function collectLessons(dir) {
 
 /* ------------------------------------------------------------------ HTTP */
 
+// 行尾与首尾空行不参与比较：库里既有 CRLF 也有 LF，且解析 CRLF 文件时 `text.slice(end + 4)`
+// 会留下一个行首 "\r\n"（`/^\n+/` 剥不掉它）。不归一化的话每次导入都会重写同一批条目
+// ——2026-10-29 实测 23 条纯空白差异。
+const normalizeBody = (text) => text.replace(/\r\n/g, '\n').replace(/^\s+|\s+$/g, '')
+
 function createClient(baseUrl, token) {
   async function call(method, route, body) {
     const response = await fetch(new URL(route.replace(/^\//, ''), baseUrl), {
@@ -348,7 +353,9 @@ async function importLanguage(client, language, lessons, options, allEntries) {
       continue
     }
     const detail = await client.get(`/api/v1/knowledge/admin/entries/${existing.id}`)
-    const sameBody = (detail.body ?? '') === lesson.body
+    // 行尾不参与比较：库里的历史内容 CRLF 与 LF 混着，检出的行尾由 .gitattributes 决定，
+    // 不归一化会让每次导入都重写同一批条目（2026-10-29 实测 23 条纯行尾差异）。
+    const sameBody = normalizeBody(detail.body ?? "") === normalizeBody(lesson.body)
     const sameOrder = (detail.sortOrder ?? null) === payload.sortOrder
     if (sameBody && sameOrder && detail.status === payload.status) {
       continue
