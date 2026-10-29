@@ -9,7 +9,7 @@ import { configFor, createIdentityApi } from '@paideia/identity'
 import { AppShell, Button, Card, Input, Section, Spinner } from '@paideia/ui'
 import { useAuth } from '@paideia/auth'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, BookOpen, Database, Dumbbell, FileQuestion, GraduationCap, Layers, MessagesSquare, Network, Newspaper, NotebookPen, Search, Sparkles, Target } from 'lucide-react'
+import { ArrowRight, BookOpen, Container, Database, Dumbbell, FileQuestion, GraduationCap, Layers, MessagesSquare, Network, Newspaper, NotebookPen, Search, Sparkles, Target, Terminal } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 
@@ -44,6 +44,25 @@ const QUICK_LINKS: {
     icon: GraduationCap,
     title: '从零开始',
     description: 'Python / Java 两条线，一课二十分钟，边学边练。',
+  },
+  {
+    // Linux / Docker 的直达卡（2026-10-29 用户要求）：它们是「从零开始」里的轨道，
+    // 但在进阶栏里排得偏后，首页给一个一次点击的入口。key 为 null —— 与岗位无关，
+    // 不参与身份排序（它与 `learn` 共用 key 会被排序丢掉一张，见下面「源码解读」的注释）。
+    key: null,
+    to: '/learn/linux-from-zero',
+    testId: 'home-entry-linux',
+    icon: Terminal,
+    title: 'Linux 从零开始',
+    description: '19 关：权限、管道、进程、systemd、日志、磁盘、SSH，其中 6 关能真跑真判。',
+  },
+  {
+    key: null,
+    to: '/learn/docker',
+    testId: 'home-entry-docker',
+    icon: Container,
+    title: 'Docker 从零开始',
+    description: '20 关：镜像分层、Dockerfile、卷、网络、Compose、排查与安全。',
   },
   {
     // 自由练习（WORK-032）：key 为 null —— 它不属于任何身份，永远排在最后。
