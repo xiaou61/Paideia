@@ -47,16 +47,19 @@ class SandboxController {
     private final RunSlot slots;
     private final SandboxTraceService trace;
     private final SqlDatasets datasets;
+    private final io.github.xiaou61.sandbox.internal.run.ShellRunner shellRunner;
 
     SandboxController(SandboxProperties properties, CodeRunner runner,
                       SandboxQuotaService quota, RunSlot slots,
-                      SandboxTraceService trace, SqlDatasets datasets) {
+                      SandboxTraceService trace, SqlDatasets datasets,
+                      io.github.xiaou61.sandbox.internal.run.ShellRunner shellRunner) {
         this.properties = properties;
         this.runner = runner;
         this.quota = quota;
         this.slots = slots;
         this.trace = trace;
         this.datasets = datasets;
+        this.shellRunner = shellRunner;
     }
 
     /**
@@ -123,13 +126,23 @@ class SandboxController {
         if ("sql".equals(language)) {
             throw new BizException(ErrorCode.INVALID_ARGUMENT, "SQL 不支持项目模式");
         }
-        if (body.files().size() > properties.getMaxProjectFiles()) {
+        return validateFiles(body.files());
+    }
+
+    /**
+     * 文件列表校验（项目模式与 Linux 练习共用）。
+     *
+     * <p>判题题的初始文件（seed）和项目模式的源码是同一条信任边界：都会被拼进容器的写文件
+     * 脚本里，所以只允许相对路径与安全字符集，并拒绝 `..`。
+     */
+    List<CodeRun.FileEntry> validateFiles(List<ProjectFile> files) {
+        if (files.size() > properties.getMaxProjectFiles()) {
             throw new BizException(ErrorCode.INVALID_ARGUMENT,
                     "一次最多提交 " + properties.getMaxProjectFiles() + " 个文件");
         }
-        List<CodeRun.FileEntry> files = new java.util.ArrayList<>();
+        List<CodeRun.FileEntry> entries = new java.util.ArrayList<>();
         int total = 0;
-        for (ProjectFile file : body.files()) {
+        for (ProjectFile file : files) {
             String path = file.path();
             if (!PROJECT_PATH.matcher(path).matches() || path.startsWith("/") || path.contains("..")) {
                 throw new BizException(ErrorCode.INVALID_ARGUMENT, "文件名不合法：" + path);
@@ -140,13 +153,13 @@ class SandboxController {
                         path + " 超过 " + properties.getMaxProjectFileChars() + " 字符");
             }
             total += content.length();
-            files.add(new CodeRun.FileEntry(path, content));
+            entries.add(new CodeRun.FileEntry(path, content));
         }
         if (total > properties.getMaxProjectTotalChars()) {
             throw new BizException(ErrorCode.INVALID_ARGUMENT,
                     "全部文件合计超过 " + properties.getMaxProjectTotalChars() + " 字符");
         }
-        return List.copyOf(files);
+        return List.copyOf(entries);
     }
 
     @PostMapping("/run")
@@ -309,6 +322,90 @@ class SandboxController {
 
     record TraceView(List<SandboxTraceService.TraceStep> steps, String output,
                      String reason, boolean truncated, long durationMs) {
+    }
+
+    /**
+     * Linux 判题练习（WORK-056）。
+     *
+     * <p><b>为什么单独一个端点</b>：结论不是"输出等于什么"，而是"judge 退出码是不是 0"。
+     * 塞进 {@code /run} 会把返回形状与判定语义都变成方言——`/run` 的契约是"只回实际输出，
+     * 判定在客户端"，而这里判定必须在服务端：**判定脚本不能发给客户端**。
+     *
+     * <p>与 `/run` 同一套并发闸、配额与审计；被判题需要的三样东西由这一个请求带齐。
+     */
+    @PostMapping("/shell/run")
+    ApiResponse<ShellRunView> shellRun(@Valid @RequestBody ShellRunRequest body) {
+        long userId = currentUserId();
+        if (!properties.isSupported("shell")) {
+            throw new BizException(ErrorCode.SANDBOX_DISABLED, "Linux 练习不可用（未配置镜像）");
+        }
+        List<CodeRun.FileEntry> seed = body.seed() == null || body.seed().isEmpty()
+                ? List.of()
+                : validateFiles(body.seed());
+        String code = body.code();
+        String judge = body.judge();
+
+        if (!runner.ready()) {
+            quota.record(userId, body.entryId(), body.caseId(), "shell",
+                    CodeRun.Status.DISABLED, null, 0, 0, false, code);
+            throw new BizException(ErrorCode.SANDBOX_DISABLED,
+                    runner.unavailableReason() == null ? "代码执行不可用" : runner.unavailableReason());
+        }
+        // 配额与并发都**在起容器之前**拒绝；被拒的不计入次数（见 countSince 排除 REJECTED）
+        try {
+            quota.requireQuota(userId, "shell");
+        } catch (BizException rejected) {
+            quota.record(userId, body.entryId(), body.caseId(), "shell",
+                    CodeRun.Status.REJECTED, null, 0, 0, false, code);
+            throw rejected;
+        }
+
+        io.github.xiaou61.sandbox.internal.run.ShellRunner.Result result;
+        try (RunSlot.Slot ignored = slots.acquire(userId)) {
+            List<io.github.xiaou61.sandbox.internal.run.ShellRunner.Seed> seeds = seed.stream()
+                    .map(file -> new io.github.xiaou61.sandbox.internal.run.ShellRunner.Seed(
+                            file.path(), file.content()))
+                    .toList();
+            result = shellRunner.run(code, judge, seeds, body.caseId());
+        } catch (BizException rejected) {
+            quota.record(userId, body.entryId(), body.caseId(), "shell",
+                    CodeRun.Status.REJECTED, null, 0, 0, false, code);
+            throw rejected;
+        }
+
+        // `failed` 是**正常结果**（学习者答错了），不是错误：审计记 OK，退出码记 judge 的。
+        CodeRun.Status status = switch (result.verdict()) {
+            case "passed", "failed" -> CodeRun.Status.OK;
+            default -> result.reason() != null && result.reason().startsWith("超时")
+                    ? CodeRun.Status.TIMEOUT
+                    : CodeRun.Status.RUNTIME_ERROR;
+        };
+        int outputBytes = (result.stdout() + result.stderr() + result.judgeStderr() + result.diff())
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+        // 审计只存哈希与长度：判定脚本和正文一起进哈希，便于回溯"哪一版题"
+        quota.record(userId, body.entryId(), body.caseId(), "shell", status,
+                "undetermined".equals(result.verdict()) ? null : result.judgeExit(),
+                result.durationMs(), outputBytes, result.truncated(),
+                code + "\n--judge--\n" + judge);
+
+        return ApiResponse.ok(new ShellRunView(result.verdict(), result.runExit(), result.judgeExit(),
+                result.stdout(), result.stderr(), result.judgeStdout(), result.judgeStderr(),
+                result.diff(), result.durationMs(), result.truncated(), result.reason(),
+                quota.usedToday(userId, "shell"), properties.getShellDailyLimit()));
+    }
+
+    record ShellRunRequest(@Positive Long entryId,
+                           @Size(max = 64) String caseId,
+                           @NotBlank @Size(max = 20_000) String code,
+                           // 判定脚本随题下发；它只进容器，不回传给客户端
+                           @NotBlank @Size(max = 20_000) String judge,
+                           @Size(max = 20) List<ProjectFile> seed) {
+    }
+
+    record ShellRunView(String verdict, int runExit, int judgeExit, String stdout, String stderr,
+                        String judgeStdout, String judgeStderr, String diff,
+                        long durationMs, boolean truncated, String reason,
+                        int usedToday, int dailyLimit) {
     }
 
     record StatusView(boolean enabled, boolean ready, String runtime, List<String> languages,

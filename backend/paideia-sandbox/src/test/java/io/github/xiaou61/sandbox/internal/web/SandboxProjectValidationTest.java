@@ -20,7 +20,7 @@ class SandboxProjectValidationTest {
 
     private static SandboxController controller(SandboxProperties properties) {
         // 校验只用到 properties，其余依赖传 null 即可——不启动任何容器
-        return new SandboxController(properties, null, null, null, null, null);
+        return new SandboxController(properties, null, null, null, null, null, null);
     }
 
     private static SandboxController.RunRequest request(List<SandboxController.ProjectFile> files) {
@@ -112,5 +112,35 @@ class SandboxProjectValidationTest {
                 .validateProject(request(files(1)), "sql"))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("SQL 不支持项目模式");
+    }
+
+    /**
+     * 判题题的初始文件走同一条校验（WORK-056）。`..` 是重点：它能把文件写到工作区之外，
+     * 而工作区之外就是 `/tmp/in`——两个脚本所在的地方。
+     */
+    @Test
+    void 判题题的seed路径拒绝上一级目录() {
+        SandboxProperties properties = new SandboxProperties();
+        assertThatThrownBy(() -> controller(properties)
+                .validateFiles(List.of(new SandboxController.ProjectFile("../run.sh", "rm -rf /"))))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("文件名不合法");
+    }
+
+    @Test
+    void 判题题的seed拒绝绝对路径() {
+        SandboxProperties properties = new SandboxProperties();
+        assertThatThrownBy(() -> controller(properties)
+                .validateFiles(List.of(new SandboxController.ProjectFile("/etc/passwd", "x"))))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("文件名不合法");
+    }
+
+    @Test
+    void 判题题的seed合法路径原样通过() {
+        SandboxProperties properties = new SandboxProperties();
+        List<CodeRun.FileEntry> accepted = controller(properties).validateFiles(
+                List.of(new SandboxController.ProjectFile("app/secrets.env", "TOKEN=demo")));
+        assertThat(accepted).extracting(CodeRun.FileEntry::path).containsExactly("app/secrets.env");
     }
 }

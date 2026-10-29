@@ -199,6 +199,29 @@ drwxrwxrwt 12 root root 4096 /tmp
  "explain":"755 是脚本的标准权限；600 让密钥文件除属主外谁都读不到。777 会把写权限也放给所有人，是不该出现的默认值。"}
 ```
 
+上面是选择题，这一道要真的把权限改对——判定看的是 `stat` 出来的权限位，不是你的输出。
+
+```code-challenge
+{
+ "id": "linux-04-shell-chmod",
+ "kind": "shell",
+ "title": "把密钥文件收成只有属主可读写",
+ "seed": [
+  {
+   "path": "app/secrets.env",
+   "content": "DB_PASSWORD=demo\n"
+  },
+  {
+   "path": "app/app.conf",
+   "content": "port=8080\n"
+  }
+ ],
+ "starter": "# 只改 app/secrets.env：属主可读写，同组与他人没有任何权限\n",
+ "judge": "set -e\nmode=$(stat -c %a app/secrets.env)\n[ \"$mode\" = \"600\" ] || { echo \"app/secrets.env 现在是 $mode，期望 600（只有属主可读写）\"; exit 1; }\nconf=$(stat -c %a app/app.conf)\n[ \"$conf\" = \"644\" ] || { echo \"app/app.conf 现在是 $conf，期望 644——别用 chmod -R 一起改\"; exit 1; }",
+ "explain": "600 是 rw-------。640 会让同组读到口令，644 是所有人都能读。app.conf 不该被一起改，所以判定也检查它仍是 644——`chmod -R` 是这道题最常见的错法。"
+}
+```
+
 ## 检查一下
 
 ```quiz

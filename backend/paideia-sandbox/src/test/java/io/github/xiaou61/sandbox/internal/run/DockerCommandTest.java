@@ -86,6 +86,50 @@ class DockerCommandTest {
         assertThat(DockerCommand.of("java", gvisor, "/tmp/x.cid")).contains("--runtime=runsc");
     }
 
+    /**
+     * Linux 判题练习场（WORK-056）：它是**新加的可执行入口**，隔离参数一条都不能少。
+     *
+     * <p>这条用例的存在理由和上面那组一样：少一个 `--cap-drop=ALL` 程序照样跑，
+     * 本地也观察不到，只有真被利用时才知道。
+     */
+    @Test
+    void shell走项目模式时同样加固且入口是判题脚本() {
+        SandboxProperties properties = props();
+        properties.setShellImage("debian:12-slim");
+        List<String> command = DockerCommand.of("shell", properties, "/tmp/x.cid", false, true);
+
+        assertHardened(command);
+        assertThat(command).contains("debian:12-slim", "--user", "65534:65534");
+        // 判题脚本必须能自己读帧：入口不是 java/python 的那两个固定测试入口
+        String entry = command.get(command.size() - 1);
+        assertThat(entry).contains("read -r count", "work/", "bash /tmp/in/run.sh", "bash /tmp/in/judge.sh");
+        // 三个协议标记缺一不可：少了就永远判不出结果
+        assertThat(entry).contains("###RC", "###OUT", "###DIFF");
+        // 学习者的输出必须进文件，否则他 echo 一个 ###RC 就能伪造结论
+        assertThat(entry).contains("> /tmp/.out 2> /tmp/.err");
+    }
+
+    @Test
+    void shell不允许单文件模式() {
+        SandboxProperties properties = props();
+        properties.setShellImage("debian:12-slim");
+        assertThatThrownBy(() -> DockerCommand.scriptFor("shell"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("只支持项目模式");
+    }
+
+    @Test
+    void 未配置shell镜像时语言清单里没有shell() {
+        SandboxProperties properties = props();
+        assertThat(properties.languages()).doesNotContain("shell");
+        properties.setShellImage("debian:12-slim");
+        assertThat(properties.languages()).contains("shell");
+        assertThat(properties.imageFor("shell")).isEqualTo("debian:12-slim");
+        assertThat(properties.timeoutMsFor("shell")).isEqualTo(15_000);
+        assertThat(properties.memoryFor("shell")).isEqualTo("256m");
+        assertThat(properties.dailyLimitFor("shell")).isEqualTo(200);
+    }
+
     @Test
     void 语言标识大小写不敏感但不支持的语言被拒() {
         assertThat(DockerCommand.of("JAVA", props(), "/tmp/x.cid")).contains(DockerCommand.scriptFor("java"));

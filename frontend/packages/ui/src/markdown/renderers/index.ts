@@ -43,5 +43,6 @@ export type {
   ProgressPort,
   RunOutput,
   SandboxPort,
+  ShellOutcome,
 } from './context'
 export * from './schema'

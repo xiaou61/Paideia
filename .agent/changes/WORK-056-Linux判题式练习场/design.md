@@ -217,3 +217,13 @@ record ShellRunView(String verdict, int runExit, int judgeExit, String stdout, S
 ## 待决定事项
 
 无。
+
+## 实现订正（2026-10-29 落地时）
+
+两处与上文不同，都是"按真实情况改文档"，不改已批准的边界：
+
+1. **入口用 `bash` 而不是 `sh`**。课程讲的是 bash（`[[ ]]`、`set -euo pipefail`），debian 的
+   `sh` 是 dash，照课抄会失败。`SHELL_ENTRY` 里两段脚本都用 `bash /tmp/in/*.sh` 执行。
+2. **判定说明两段都显示**。作者写 `echo` 时说明落在 judge 的 **stdout**，写 `>&2` 才在 stderr；
+   首次上线实测到"判了但不说为什么"，于是组件把 `judgeStdout` 与 `judgeStderr` 合并展示
+   （接口仍分开返回）。`ShellRunView` 因此多了一个 `reason` 字段与 `usedToday/dailyLimit`。

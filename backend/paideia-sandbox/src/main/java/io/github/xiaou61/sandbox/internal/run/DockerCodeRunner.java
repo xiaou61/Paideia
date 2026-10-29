@@ -232,7 +232,8 @@ class DockerCodeRunner implements CodeRunner {
         boolean finished;
         try {
             // 项目模式要编译多个文件再跑测试，冷容器里 10 秒常常不够；给到 30 秒下限。
-            long timeout = request.project()
+            // shell 练习不编译，它的 15 秒是题目诚实性的一部分（超时就是"没做完"），不吃这个下限。
+            long timeout = request.project() && !isShell(request.language())
                     ? Math.max(properties.timeoutMsFor(request.language()), 30_000L)
                     : properties.timeoutMsFor(request.language());
             finished = process.waitFor(timeout, TimeUnit.MILLISECONDS);
@@ -277,6 +278,10 @@ class DockerCodeRunner implements CodeRunner {
 
     private static boolean isSql(String language) {
         return language != null && "sql".equalsIgnoreCase(language.trim());
+    }
+
+    private static boolean isShell(String language) {
+        return language != null && "shell".equalsIgnoreCase(language.trim());
     }
 
     /**

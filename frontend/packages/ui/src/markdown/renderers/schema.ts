@@ -419,7 +419,32 @@ export interface RunFile {
   content: string
 }
 
-export type CodeChallenge = FillChallenge | OrderChallenge | BugChallenge | RunChallenge | SqlChallenge
+/**
+ * Linux 判题练习（WORK-056）。
+ *
+ * <p>**判定在服务端**：`judge` 是一段脚本，只在容器里跑、不发给客户端。这与 `run` 题型
+ * 正好相反（那边用例在正文里、判定在客户端）——因为这里要判的是"最终状态"
+ * （权限位、文件内容、进程），不是可以逐字比对的 stdout。
+ */
+export interface ShellSeedFile {
+  path: string
+  content: string
+}
+
+export interface ShellChallenge {
+  id: string
+  kind: 'shell'
+  title: string
+  /** 学习者看到的初始脚本；可以为空（题目要求从零写）。 */
+  starter?: string
+  /** 初始文件。落在容器工作区里，路径必须是相对路径。 */
+  seed: ShellSeedFile[]
+  /** 判定脚本：退出码 0 = 通过。只进容器。 */
+  judge: string
+  explain?: string
+}
+
+export type CodeChallenge = FillChallenge | OrderChallenge | BugChallenge | RunChallenge | SqlChallenge | ShellChallenge
 
 /**
  * SQL 写查询 / 改错（WORK-032）。
@@ -543,6 +568,26 @@ export function parseCodeChallenge(code: string): ParseResult<CodeChallenge> {
       }
     }
 
+    if (kind === 'shell') {
+      const judge = asText(raw['judge'], 'judge', LIMITS.codeChars)
+      const starter = optionalText(raw['starter'], 'starter', LIMITS.codeChars)
+      const seedRaw = raw['seed'] === undefined ? [] : asArray(raw['seed'], 'seed', 0, 20)
+      let total = 0
+      const seed: ShellSeedFile[] = seedRaw.map((item, index) => {
+        const entry = asObject(item, `seed[${index}]`)
+        const path = asText(entry['path'], `seed[${index}].path`, 200)
+        // 路径会被拼进容器的写文件脚本，与项目模式同一条信任边界
+        need(/^[A-Za-z0-9_./-]+$/.test(path) && !path.startsWith('/') && !path.includes('..'),
+          `seed[${index}].path 不合法：${path}`)
+        const content = typeof entry['content'] === 'string' ? entry['content'] : ''
+        need(content.length <= 64_000, `seed[${index}].content 超过 64000 字符`)
+        total += content.length
+        return { path, content }
+      })
+      need(total <= 256_000, 'seed 全部文件合计超过 256000 字符')
+      return { id, kind, title, starter, seed, judge, explain }
+    }
+
     if (kind === 'sql-write' || kind === 'sql-fix') {
       const starter = asText(raw['starter'], 'starter', LIMITS.codeChars)
       const dataset = asStringArray(raw['dataset'], 'dataset', 1, LIMITS.focus, 64)
@@ -580,7 +625,7 @@ export function parseCodeChallenge(code: string): ParseResult<CodeChallenge> {
       }
     }
 
-    throw new BadInput('kind 只能是 fill / order / bug / run / sql-write / sql-fix')
+    throw new BadInput('kind 只能是 fill / order / bug / run / sql-write / sql-fix / shell')
   })
 }
 

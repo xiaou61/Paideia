@@ -188,6 +188,17 @@ paideia:
     # 只是让人紧张。WORK-038 再提到 1000，与代码沙箱对齐——实战关卡要反复试错。
     # 真正的保护是 RunSlot 的**每人并发 1**；这个数字是熔断器（写脚本刷的天花板）。
     sql-daily-limit: 1000
+    # ── Linux 判题练习场（WORK-056）──────────────────────────────────────────
+    # 镜像由 `backend/paideia-sandbox/images/shell/build.sh` 构建（debian + GNU 工具 + systemd）。
+    # **留空 = 该语言不可用**：`/sandbox/status` 不返回 shell，前端也就不渲染运行按钮。
+    # 本仓库默认留空是有意的：镜像要额外拉一次，没拉之前开着一个必然失败的语言只会让人困惑。
+    shell-image: ""
+    shell-memory: 256m
+    shell-cpus: "0.5"
+    shell-pids-limit: 64
+    # 一次提交跑两段（学习者脚本 + 判定脚本），都是毫秒级；15 s 只是防死循环。
+    shell-timeout-ms: 15000
+    shell-daily-limit: 1000
 
 management:
   # 运维监控（WORK-028）：多暴露一个 prometheus 端点给本机 Prometheus 抓取。

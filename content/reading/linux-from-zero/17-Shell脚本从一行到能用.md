@@ -229,6 +229,33 @@ ls -1t "$BACKUP_ROOT"/*.tar.gz | tail -n +$((KEEP + 1)) | xargs -r rm -f
  "explain":"`$1` 没传时 `LOG_DIR` 为空，第 5 行展开成 `rm -rf /*.gz`——危险且不可逆。要写成 `rm -rf \"${LOG_DIR:?}\"/*.gz`：变量为空时直接报错退出，引号也防止路径里含空格被拆开。"}
 ```
 
+这一道是「改写一个会删库的脚本」，判定会真的拿空参数调它一次。
+
+```code-challenge
+{
+ "id": "linux-17-shell-quote-fix",
+ "kind": "shell",
+ "title": "修掉那个会删错东西的清理脚本",
+ "seed": [
+  {
+   "path": "app/cleanup.sh",
+   "content": "#!/bin/bash\n# 删掉指定目录下的 *.tmp\nDIR=$1\nrm -rf $DIR/*.tmp\n"
+  },
+  {
+   "path": "app/keep.tmp",
+   "content": "only deleted when DIR=app\n"
+  },
+  {
+   "path": "app/keep.txt",
+   "content": "never delete me\n"
+  }
+ ],
+ "starter": "# 重写 app/cleanup.sh（用 heredoc 写回去），要求：\n# - 参数为空时直接报错退出，一个文件都不许删\n# - 正常传入目录时删掉里面的 *.tmp，别动其它文件\n",
+ "judge": "set -e\n[ -f app/keep.tmp ] || { echo \"app/keep.tmp 一开始就没了——脚本在正常调用之前就删了东西\"; exit 1; }\nif bash app/cleanup.sh \"\" > /dev/null 2>&1; then echo \"参数为空时脚本仍然成功：要用 ${1:?} 让它报错退出\"; exit 1; fi\n[ -f app/keep.tmp ] || { echo \"参数为空时把 app/keep.tmp 删了\"; exit 1; }\nbash app/cleanup.sh app || { echo \"正常调用（传 app）时脚本失败了\"; exit 1; }\n[ ! -f app/keep.tmp ] || { echo \"传 app 之后 app/keep.tmp 还在：没删掉 .tmp\"; exit 1; }\n[ -f app/keep.txt ] || { echo \"app/keep.txt 被误删了：只该删 *.tmp\"; exit 1; }",
+ "explain": "核心是 `${DIR:?}` 与引号：`rm -rf \"${DIR:?}\"/*.tmp` 在参数为空时直接报错退出，不会变成 `rm -rf /*.tmp`。判定先传空参数确认它拒绝，再传 app 确认真能删。"
+}
+```
+
 ## 检查一下
 
 ```quiz

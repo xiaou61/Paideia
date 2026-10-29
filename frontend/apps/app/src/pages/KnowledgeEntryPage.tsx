@@ -92,6 +92,13 @@ export function KnowledgeEntryPage() {
       // 所以那些地方的「逐步执行」按钮不会出现——与 `run` 同一条纪律。
       trace: (input: { language: string; code: string; stdin?: string; caseId?: string }) =>
         knowledge.traceCode({ ...input, entryId }),
+      // Linux 判题（WORK-056）：判定脚本不下发，结论由服务端给
+      runShell: (input: {
+        code: string
+        judge: string
+        seed?: { path: string; content: string }[]
+        caseId?: string
+      }) => knowledge.runShell({ ...input, entryId }),
     }),
     [entryId],
   )
