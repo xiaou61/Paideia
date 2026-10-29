@@ -7,6 +7,8 @@ evidence: required
 workflow: full
 created: 2026-10-20
 updated: 2026-10-20
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:19:10 +0800
 ---
 
 # 八股文专区验证报告

@@ -5,6 +5,8 @@ work: 记忆的少而准：召回排序、时间淘汰、半自动提案与离�
 status: passed
 created: 2026-10-28
 evidence: required
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:22:19 +0800
 ---
 
 # 记忆的少而准验证报告

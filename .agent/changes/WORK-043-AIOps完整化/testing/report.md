@@ -7,6 +7,8 @@ evidence: required
 verified_commit: c01f4c2
 created: 2026-10-27
 updated: 2026-10-27
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:21:16 +0800
 ---
 
 # WORK-043 验证报告

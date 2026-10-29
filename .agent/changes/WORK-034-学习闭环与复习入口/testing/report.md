@@ -6,6 +6,8 @@ status: passed
 evidence: required
 created: 2026-10-23
 updated: 2026-10-23
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:20:07 +0800
 ---
 
 # WORK-034 验证报告

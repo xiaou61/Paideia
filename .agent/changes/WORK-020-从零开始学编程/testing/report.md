@@ -8,6 +8,8 @@ workflow: full
 created: 2026-10-19
 updated: 2026-10-19
 verified_commit: 7dd4258
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:18:30 +0800
 ---
 
 # 从零开始学编程验证报告

@@ -6,6 +6,8 @@ status: passed
 evidence: required
 verified_commit: 30f96fe
 verified_at: 2026-10-18
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:17:43 +0800
 ---
 
 # 源码解读专题验证报告

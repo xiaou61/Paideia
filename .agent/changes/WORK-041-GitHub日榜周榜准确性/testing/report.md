@@ -7,6 +7,8 @@ evidence: required
 created: 2026-10-26
 updated: 2026-10-27
 verified_commit: d02dfa5 + 2026-10-27 线上复核
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:20:56 +0800
 ---
 
 # GitHub 日榜/周榜准确性验证报告

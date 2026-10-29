@@ -6,6 +6,8 @@ status: passed
 evidence: required
 verified_commit: 7dd4258
 verified_at: 2026-10-19
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:17:16 +0800
 ---
 
 # 身份化千人千面与求职者面验证报告

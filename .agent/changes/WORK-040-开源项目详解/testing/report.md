@@ -7,6 +7,8 @@ evidence: required
 verified_commit: 41f3c98 + 2026-10-27 内容导入
 created: 2026-10-27
 updated: 2026-10-27
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:20:45 +0800
 ---
 
 # 开源项目详解验证报告

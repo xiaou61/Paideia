@@ -6,6 +6,8 @@ status: passed
 evidence: required
 verified_commit: 0df2f9c
 verified_at: 2026-10-17
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:17:05 +0800
 ---
 
 # 验收报告 · 对象存储接入

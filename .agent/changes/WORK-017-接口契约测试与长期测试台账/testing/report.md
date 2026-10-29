@@ -9,6 +9,8 @@ evidence: required
 created: 2026-10-18
 updated: 2026-10-18
 verified_commit: 6b30d4f
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:18:10 +0800
 ---
 
 # 接口契约测试与长期测试台账验证报告

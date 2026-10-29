@@ -6,6 +6,8 @@ status: passed
 verified_commit: b40f2a6
 created: 2026-10-28
 updated: 2026-10-28
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:22:11 +0800
 ---
 
 # WORK-049 验证报告

@@ -6,6 +6,8 @@ status: passed
 evidence: required
 verified_commit: a71b411
 verified_at: 2026-10-18
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:17:50 +0800
 ---
 
 # 代码执行沙箱验证报告

@@ -5,6 +5,8 @@ work: 移动端最佳适配
 status: passed
 evidence: required
 verified_at: 2026-10-18
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:18:03 +0800
 ---
 
 # 移动端最佳适配验证报告

@@ -7,6 +7,8 @@ evidence: required
 verified_commit: d8626cd
 created: 2026-10-28
 updated: 2026-10-28
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:22:25 +0800
 ---
 
 # 手绘风配图（sketch 围栏块）验证报告

@@ -8,6 +8,8 @@ workflow: full
 evidence: required
 created: 2026-10-18
 updated: 2026-10-18
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:18:16 +0800
 ---
 
 # 验证报告 · 简历识别与优化

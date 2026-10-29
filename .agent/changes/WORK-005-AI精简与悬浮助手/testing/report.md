@@ -6,6 +6,8 @@ status: passed
 evidence: required
 created: 2026-10-12
 updated: 2026-10-12
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:16:53 +0800
 ---
 
 # AI 精简与悬浮助手验证报告

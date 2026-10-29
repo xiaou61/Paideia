@@ -7728,7 +7728,8 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
   - `verify_course.py --dir content/courses/java` → **38 个文件通过（含代码执行）**；python 21、mysql 16 未受影响。
   - java-project 01/02 用参考解 `javac` + `java` 真跑，stdout 与 expected **逐字一致**。
   - `scripts/test-db.sh mvn -B -T 1C -pl '!paideia-app' test`（从 `backend/` 起，独占库自动删）→ **740 用例 / 0 失败 / 0 错误 / 16 跳过**，10 个模块全部 SUCCESS。16 条跳过全是依赖外部服务的 live 用例（Laya、DeepSeek 上游、速递 live probe、AIOps 金集、MemoryEval）。
-- 踩坑：改号脚本第一次把主树 24/25 一起移了（同名 24→26 映射冲突）；且 `^order: (\d+)$` 在 CRLF 文件上匹配不到（行尾 ``）。改为显式文件名清单 + 脚本内断言"文件名 / title / order 三者一致"，第二次通过。
+- 踩坑：改号脚本第一次把主树 24/25 一起移了（同名 24→26 映射冲突）；且 `^order: (\d+)$` 在 CRLF 文件上匹配不到（行尾 `
+`）。改为显式文件名清单 + 脚本内断言"文件名 / title / order 三者一致"，第二次通过。
 - 本地提交：`606e099`、`fa81a03`、`70d0843`、`cae42b8`
 - 远端推送：未执行
 
@@ -7850,3 +7851,483 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 未做：没跑管理端 e2e（`apps/admin`）；31 条跳过是套件自己的线上守卫（依赖本地种子条目 / 会真花积分），没有逐条复核。
 - 本地提交：`4af3c29`、`d56c10f`；已 push
 - 远端推送：已执行
+
+## 2026-10-29 13:16:35 +0800 · WORK-002 · 登记业务验收 .agent/changes/WORK-002-前端组件化与管理端拆分/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-002-前端组件化与管理端拆分/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-002-前端组件化与管理端拆分/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:16:41 +0800 · WORK-003 · 登记业务验收 .agent/changes/WORK-003-账号与认证/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-003-账号与认证/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-003-账号与认证/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:16:47 +0800 · WORK-004 · 登记业务验收 .agent/changes/WORK-004-知识库/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-004-知识库/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-004-知识库/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:16:53 +0800 · WORK-005 · 登记业务验收 .agent/changes/WORK-005-AI精简与悬浮助手/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-005-AI精简与悬浮助手/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-005-AI精简与悬浮助手/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:16:58 +0800 · WORK-006 · 登记业务验收 .agent/changes/WORK-006-Agent运行时记忆与个人笔记/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-006-Agent运行时记忆与个人笔记/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-006-Agent运行时记忆与个人笔记/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:17:05 +0800 · WORK-007 · 登记业务验收 .agent/changes/WORK-007-对象存储接入/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-007-对象存储接入/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-007-对象存储接入/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:17:10 +0800 · WORK-009 · 登记业务验收 .agent/changes/WORK-009-AI网关与积分配额/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-009-AI网关与积分配额/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-009-AI网关与积分配额/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:17:16 +0800 · WORK-010 · 登记业务验收 .agent/changes/WORK-010-身份化千人千面与求职者面/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-010-身份化千人千面与求职者面/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-010-身份化千人千面与求职者面/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:17:23 +0800 · WORK-011 · 登记业务验收 .agent/changes/WORK-011-AI助手面板与会话历史/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-011-AI助手面板与会话历史/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-011-AI助手面板与会话历史/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:17:29 +0800 · WORK-012 · 登记业务验收 .agent/changes/WORK-012-流式Markdown渲染/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-012-流式Markdown渲染/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-012-流式Markdown渲染/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:17:36 +0800 · WORK-013 · 登记业务验收 .agent/changes/WORK-013-AI记忆的自动提取与控制面/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-013-AI记忆的自动提取与控制面/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-013-AI记忆的自动提取与控制面/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:17:43 +0800 · WORK-014 · 登记业务验收 .agent/changes/WORK-014-源码解读专题与交互式代码走读/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-014-源码解读专题与交互式代码走读/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-014-源码解读专题与交互式代码走读/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:17:50 +0800 · WORK-015 · 登记业务验收 .agent/changes/WORK-015-代码执行沙箱与可运行练习/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-015-代码执行沙箱与可运行练习/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-015-代码执行沙箱与可运行练习/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:18:03 +0800 · WORK-016 · 登记业务验收 .agent/changes/WORK-016-移动端最佳适配/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-016-移动端最佳适配/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-016-移动端最佳适配/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:18:10 +0800 · WORK-017 · 登记业务验收 .agent/changes/WORK-017-接口契约测试与长期测试台账/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-017-接口契约测试与长期测试台账/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-017-接口契约测试与长期测试台账/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:18:16 +0800 · WORK-018 · 登记业务验收 .agent/changes/WORK-018-简历识别与优化/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-018-简历识别与优化/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-018-简历识别与优化/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:18:23 +0800 · WORK-019 · 登记业务验收 .agent/changes/WORK-019-MCP网关与工具目录/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-019-MCP网关与工具目录/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-019-MCP网关与工具目录/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:18:30 +0800 · WORK-020 · 登记业务验收 .agent/changes/WORK-020-从零开始学编程/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-020-从零开始学编程/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-020-从零开始学编程/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:18:38 +0800 · WORK-021 · 登记业务验收 .agent/changes/WORK-021-个人知识图谱与掌握度/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-021-个人知识图谱与掌握度/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-021-个人知识图谱与掌握度/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:18:46 +0800 · WORK-022 · 登记业务验收 .agent/changes/WORK-022-AI调用追踪与运营统计/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-022-AI调用追踪与运营统计/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-022-AI调用追踪与运营统计/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:18:54 +0800 · WORK-023 · 登记业务验收 .agent/changes/WORK-023-逐行执行与可视化调试/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-023-逐行执行与可视化调试/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-023-逐行执行与可视化调试/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:19:02 +0800 · WORK-024 · 登记业务验收 .agent/changes/WORK-024-学习轨道与闯关地图/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-024-学习轨道与闯关地图/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-024-学习轨道与闯关地图/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:19:10 +0800 · WORK-025 · 登记业务验收 .agent/changes/WORK-025-八股文专区/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-025-八股文专区/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-025-八股文专区/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:19:17 +0800 · WORK-026 · 登记业务验收 .agent/changes/WORK-026-决策模型接入Laya/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-026-决策模型接入Laya/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-026-决策模型接入Laya/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:19:23 +0800 · WORK-027 · 登记业务验收 .agent/changes/WORK-027-每日技术速递/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-027-每日技术速递/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-027-每日技术速递/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:19:29 +0800 · WORK-028 · 登记业务验收 .agent/changes/WORK-028-运维监控面板/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-028-运维监控面板/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-028-运维监控面板/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:19:36 +0800 · WORK-029 · 登记业务验收 .agent/changes/WORK-029-AI训练营/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-029-AI训练营/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-029-AI训练营/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:19:42 +0800 · WORK-030 · 登记业务验收 .agent/changes/WORK-030-管理端优化/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-030-管理端优化/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-030-管理端优化/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:19:48 +0800 · WORK-031 · 登记业务验收 .agent/changes/WORK-031-Agent运行时迁移到ReActAgent/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-031-Agent运行时迁移到ReActAgent/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-031-Agent运行时迁移到ReActAgent/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:19:54 +0800 · WORK-032 · 登记业务验收 .agent/changes/WORK-032-MySQL实训沙箱与题库/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-032-MySQL实训沙箱与题库/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-032-MySQL实训沙箱与题库/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:20:00 +0800 · WORK-033 · 登记业务验收 .agent/changes/WORK-033-题目知识点关联与掌握诊断/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-033-题目知识点关联与掌握诊断/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-033-题目知识点关联与掌握诊断/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:20:07 +0800 · WORK-034 · 登记业务验收 .agent/changes/WORK-034-学习闭环与复习入口/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-034-学习闭环与复习入口/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-034-学习闭环与复习入口/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:20:13 +0800 · WORK-035 · 登记业务验收 .agent/changes/WORK-035-SQL工作台数据集与AI联动/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-035-SQL工作台数据集与AI联动/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-035-SQL工作台数据集与AI联动/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:20:20 +0800 · WORK-036 · 登记业务验收 .agent/changes/WORK-036-AI观测面板优化/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-036-AI观测面板优化/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-036-AI观测面板优化/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:20:28 +0800 · WORK-038 · 登记业务验收 .agent/changes/WORK-038-理论线与实战线/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-038-理论线与实战线/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-038-理论线与实战线/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:20:35 +0800 · WORK-039 · 登记业务验收 .agent/changes/WORK-039-管理端MCP工具/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-039-管理端MCP工具/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-039-管理端MCP工具/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:20:45 +0800 · WORK-040 · 登记业务验收 .agent/changes/WORK-040-开源项目详解/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-040-开源项目详解/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-040-开源项目详解/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:20:56 +0800 · WORK-041 · 登记业务验收 .agent/changes/WORK-041-GitHub日榜周榜准确性/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-041-GitHub日榜周榜准确性/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-041-GitHub日榜周榜准确性/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:21:07 +0800 · WORK-042 · 登记业务验收 .agent/changes/WORK-042-AIOps自建诊断层/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-042-AIOps自建诊断层/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-042-AIOps自建诊断层/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:21:16 +0800 · WORK-043 · 登记业务验收 .agent/changes/WORK-043-AIOps完整化/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-043-AIOps完整化/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-043-AIOps完整化/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:21:26 +0800 · WORK-044 · 登记业务验收 .agent/changes/WORK-044-MCP网关补全/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-044-MCP网关补全/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-044-MCP网关补全/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:21:34 +0800 · WORK-045 · 登记业务验收 .agent/changes/WORK-045-数据大屏与数据流转/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-045-数据大屏与数据流转/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-045-数据大屏与数据流转/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:21:44 +0800 · WORK-046 · 登记业务验收 .agent/changes/WORK-046-书籍详解专题/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-046-书籍详解专题/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-046-书籍详解专题/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:21:53 +0800 · WORK-047 · 登记业务验收 .agent/changes/WORK-047-岗位地图与AI推荐/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-047-岗位地图与AI推荐/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-047-岗位地图与AI推荐/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:22:03 +0800 · WORK-048 · 登记业务验收 .agent/changes/WORK-048-练习册与测一测入口/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-048-练习册与测一测入口/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-048-练习册与测一测入口/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:22:12 +0800 · WORK-049 · 登记业务验收 .agent/changes/WORK-049-AIOps缺口修复/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-049-AIOps缺口修复/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-049-AIOps缺口修复/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:22:19 +0800 · WORK-050 · 登记业务验收 .agent/changes/WORK-050-记忆少而准与离线评测/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-050-记忆少而准与离线评测/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-050-记忆少而准与离线评测/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-29 13:22:25 +0800 · WORK-051 · 登记业务验收 .agent/changes/WORK-051-手绘风配图围栏块/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-051-手绘风配图围栏块/testing/report.md
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-051-手绘风配图围栏块/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行

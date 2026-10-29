@@ -4,6 +4,8 @@ work_id: WORK-002
 work: 前端组件化与管理端拆分
 status: passed
 created: 2026-10-09
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:16:35 +0800
 ---
 
 # 前端组件化与管理端拆分验证报告

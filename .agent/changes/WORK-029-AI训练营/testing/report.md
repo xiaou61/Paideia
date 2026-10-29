@@ -6,6 +6,8 @@ status: passed
 evidence: required
 run_at: 2026-10-21 15:40 +0800
 target: 本地独占测试库（scripts/test-db.sh）+ 本地 Playwright
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:19:36 +0800
 ---
 
 # AI训练营验收报告

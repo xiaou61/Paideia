@@ -8,6 +8,8 @@ verified_commit: 30d25a2
 verified_at: 2026-10-27
 created: 2026-10-27
 updated: 2026-10-27
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:21:26 +0800
 ---
 
 # MCP 网关补全验证报告

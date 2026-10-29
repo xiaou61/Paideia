@@ -8,6 +8,8 @@ workflow: full
 created: 2026-10-19
 updated: 2026-10-19
 verified_commit: 1b7c663
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:18:46 +0800
 ---
 
 # AI 调用追踪与运营统计验证报告

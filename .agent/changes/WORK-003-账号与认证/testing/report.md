@@ -5,6 +5,8 @@ work: 账号与认证
 status: passed
 created: 2026-10-09
 evidence: required
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:16:41 +0800
 ---
 
 # 账号与认证验证报告

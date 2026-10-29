@@ -7,6 +7,8 @@ evidence: required
 verified_commit: dfb2ea1
 created: 2026-10-27
 updated: 2026-10-27
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:21:34 +0800
 ---
 
 # WORK-045 验证报告

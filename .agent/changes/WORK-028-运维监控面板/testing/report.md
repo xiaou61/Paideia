@@ -6,6 +6,8 @@ status: passed
 evidence: required
 run_at: 2026-10-20 18:20 +0800
 target: codenest-online（生产）
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:19:29 +0800
 ---
 
 # 运维监控面板验收报告

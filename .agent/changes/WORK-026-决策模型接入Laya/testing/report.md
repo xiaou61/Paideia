@@ -7,6 +7,8 @@ evidence: required
 workflow: full
 created: 2026-10-20
 updated: 2026-10-20
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:19:17 +0800
 ---
 
 # 决策模型接入（Laya）验证报告

@@ -6,6 +6,8 @@ status: passed
 evidence: required
 created: 2026-10-26
 updated: 2026-10-26
+accepted_by: xiaou61
+accepted_at: 2026-10-29 13:21:07 +0800
 ---
 
 # AIOps 自建诊断层验证报告
