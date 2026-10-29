@@ -7764,3 +7764,21 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 未做：**没有导入线上内容**。java-expand 的 12 课（26–37）与三条实战线新增的 4 关只在仓库里，线上 `/learn` 的 Java 仍是 26 关。导入需要管理员凭据，且会向公开站点新增 15 条已发布条目，留给用户点头后再跑 `node scripts/import-course.mjs`。
 - 本地提交：本笔（仅更新历史）
 - 远端推送：未执行
+
+## 2026-10-29 10:35 +0800 · 内容 · 导入线上（15 条新建 / 15 条更新）+ 推送
+
+- 类型：deployment
+- 变更：
+  - `PAIDEIA_ADMIN_USER/PASSWORD` 从被忽略的 `backend/config/application-local.yml` 读取（不打印、不落文件），`node scripts/import-course.mjs --base-url http://36.212.5.130:8081` 跑 courses，再逐条跑 `content/reading/*` 全部 26 条线。
+  - 结果：**新建 15**（Java 26–37 十二课、调试「对象与集合」、项目「词频统计」「分组求平均」）、**更新 15**（Java 总览、Python 12–17 的 `<!-- run -->` 示例、Java/项目/读代码/SQL 四条实战线总览、agents/ai/network/os 四篇的「下一篇」指引）。
+  - 轨道登记：java 37 关、python 20、mysql 14、code-reading 4、java-debug 4、java-project 5、sql-practice 5 —— **导读（order 0）已按 java-expand 的修复排除**，不再被算成关卡。
+  - 顺手修 `scripts/import-course.mjs` 的正文比较（`24fd9ee`）：行尾与首尾空行归一化。
+- 决策：导入前先跑 dry-run 逐条核对，发现"23 条待更新"其实是纯空白差异（库里 CRLF/LF 混着 + 解析 CRLF 文件留下的行首 `
+`）。先修比较逻辑再导，避免把 23 条线上正文无意义地重写一遍（`updated_at` 与 revision 全动、内容一字未改）。
+- 依据：`import-course.mjs` 的 `sameBody/sameOrder/status` 比较；“线上条目按 title 匹配”这条既有语义。
+- 验证：
+  - 复跑全量 dry-run → **0 条待创建 / 0 条待更新**（幂等）。
+  - 线上 API 核对：`/api/v1/learning/lines` 的条目数 python 21 / java 38 / mysql 15 / 调试 5 / 项目 6 / 读代码 5 / SQL 6；条目总数 306 → **321**。
+  - 抽查新条目：`26 · 枚举与常量` 4629 字符 published sortOrder=26 含 quiz、`37 · 虚拟线程` 4482 字符 published sortOrder=37 含 quiz。
+- 本地提交：`24fd9ee`（脚本修复）+ 本笔；**已 push**：`8a9101d..3672044`（13 笔），本次追加后再 push。
+- 远端推送：用户 2026-10-29 明确授权后执行；HTTPS 直连（`GIT_HTTP_VERSION=HTTP/1.1`）一次成功。
