@@ -83,7 +83,7 @@ record ShellRunView(String verdict, int runExit, int judgeExit, String stdout, S
 
 ## 任务
 
-### TASK-001 | todo | 配置项与语言开关
+### TASK-001 | done | 配置项与语言开关
 
 - 对应：`REQ-001`、`REQ-006`
 - 依赖：无
@@ -96,7 +96,7 @@ record ShellRunView(String verdict, int runExit, int judgeExit, String stdout, S
   3. `SandboxQuotaService`：把 `isSql` 那三个分支泛化成"有独立上限的语言"（sql 500 / shell 200），其余走通用 50。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-sandbox test` → 0 failed；`languages()` 在 `shellImage` 为空时不含 shell。
 
-### TASK-002 | todo | 容器入口脚本
+### TASK-002 | done | 容器入口脚本
 
 - 对应：`REQ-002`、`REQ-004`、`REQ-005`
 - 依赖：`TASK-001`
@@ -109,7 +109,7 @@ record ShellRunView(String verdict, int runExit, int judgeExit, String stdout, S
   3. 分帧沿用 `projectScriptFor` 的思路，但**shell 的路径前缀是 `work/`**（seed 进 `/tmp/in/work`，脚本进 `/tmp/in` 根）。
 - 验证：`DockerCommandTest` 断言命令行包含 `--network=none`、`--read-only`、`--cap-drop=ALL`、`--security-opt=no-new-privileges`、`--user 65534:65534`、`--pids-limit=64`、`--stop-timeout=0`、`--cidfile`。
 
-### TASK-003 | todo | ShellRunner：执行与解析
+### TASK-003 | done | ShellRunner：执行与解析
 
 - 对应：`REQ-002`、`REQ-003`、`REQ-004`
 - 依赖：`TASK-002`
@@ -124,7 +124,7 @@ record ShellRunView(String verdict, int runExit, int judgeExit, String stdout, S
   5. 截断：若原始输出长度触及 `maxOutputBytes`，把 `truncated` 置 true（各节已在容器内 head -c，不会把协议块切坏）。
 - 验证：`ShellRunnerTest` 全绿；其中 `#缺协议块时为 undetermined` 与 `#超时按 cidfile 强删` 必须能反向失败（去掉对应分支会红）。
 
-### TASK-004 | todo | 端点与配额接线
+### TASK-004 | done | 端点与配额接线
 
 - 对应：`REQ-001`、`REQ-003`、`REQ-006`
 - 依赖：`TASK-003`
@@ -138,7 +138,7 @@ record ShellRunView(String verdict, int runExit, int judgeExit, String stdout, S
   4. 审计 `code` 传 `script + "\n--judge--\n" + judge`（只存哈希与长度）。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-sandbox test`；`SandboxControllerTest` 四条新用例绿。
 
-### TASK-005 | todo | 前端题型与组件
+### TASK-005 | done | 前端题型与组件
 
 - 对应：`REQ-007`
 - 依赖：`TASK-004`（契约已定即可并行）
@@ -151,7 +151,7 @@ record ShellRunView(String verdict, int runExit, int judgeExit, String stdout, S
   3. 注册表加 `{ language: ['shell-challenge'], component }`；`streaming` 模式不带（与既有块一致）。
 - 验证：`pnpm --filter @paideia/ui test` 绿；`tsc --noEmit` 0 错误。
 
-### TASK-006 | todo | 内容：6 道题与结构校验
+### TASK-006 | done | 内容：6 道题与结构校验
 
 - 对应：`REQ-005`、`REQ-008`
 - 依赖：`TASK-005`
@@ -164,7 +164,7 @@ record ShellRunView(String verdict, int runExit, int judgeExit, String stdout, S
   3. 校验脚本按 `check_quiz_explain.py` 的写法（全仓扫描、退出码 0/1）。
 - 验证：校验脚本 0 处问题；`node scripts/import-course.mjs --dir content/reading/linux-from-zero` 幂等（第二次 `created 0 / updated 0`）。
 
-### TASK-007 | todo | 部署与线上真跑
+### TASK-007 | done | 部署与线上真跑
 
 - 对应：`AC-001`…`AC-010` 里只能在真机验的部分
 - 依赖：`TASK-004`、`TASK-005`、`TASK-006`

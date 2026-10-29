@@ -8526,3 +8526,34 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
+
+## 2026-10-29 17:45 +0800 · WORK-056 · Linux 判题式练习场实施完成并上线
+
+- 类型：implementation
+- 变更（6 笔提交，`feat/work-056-shell` 分支）：
+  - 后端：`SandboxProperties` 加 shell 开关与资源档；`SandboxQuotaService` 把 sql 专用分支泛化成
+    "有独立上限的语言"；`DockerCommand.SHELL_ENTRY`（读帧 → 分开脚本与工作区 → 跑两段 → 输出协议块）；
+    `ShellRunner`（解析协议块、判 passed/failed/undetermined）；`/api/v1/sandbox/shell/run`
+    （复用 `validateFiles`/`RunSlot`/配额/审计）。
+  - 前端：`kind: shell` 题型 + `shell-challenge.tsx` + `runShell` 端口；`code-challenge` 分发。
+  - 内容：04/06/07/09/12/17 六关各一道判题练习；`scripts/check_shell_cases.py`。
+  - 镜像：`backend/paideia-sandbox/images/shell/`（debian:12-slim 按 digest 钉住 + GNU 工具 + systemd）。
+- 决策：
+  - **不复制加固参数表**：shell 走 `DockerCommand.of` 的同一条组装路径，参数只有一份。
+  - **学习者输出全部重定向进文件**，容器 stdout 只留协议块——`echo '###RC'` 伪造不了判定。
+  - **判定只看 judge 退出码**：学习者脚本非 0 不算失败（很多题就是要让他看到命令报错）。
+- 验证（详见 `.agent/changes/WORK-056-Linux判题式练习场/testing/report.md`）：
+  - 后端 116 通过 / 0 失败；ui 239 通过 / 1 失败（`tokens.test` 的 AnalyticsPage 调色板，
+    2026-10-28 起的既有欠账）；ui/knowledge/app 三个包 tsc 0 错误。
+  - 6 道题在服务器上按生产隔离参数双跑：正确解全 passed、错误解全 failed，不符预期 0。
+  - 线上接口：AC-001…AC-010 逐条有实测；并发 `[200, 429]`；死循环 15.286s 拦成 undetermined；
+    `yes` 输出 7999 字节；容器内 `uid=65534`、`/dev/tcp` 不可达；跨次不可见；
+    `code_runs` 里 13 行 shell 记录只有哈希与长度。
+  - 发版 202.7s（首次，带前端）+ 113.9s（前端修复后），`/actuator/health` 200。
+- 实施中修掉两个真缺陷：① 判定说明落在 judge stdout 而界面只渲染 stderr → "未通过"没有理由；
+  ② 六道 judge 原来只说失败不说原因。
+- 副作用：本次发版从包含 master 的分支构建，**WORK-055 的 spring 语言随之一起上线**
+  （线上 `spring-image` 本来已配）——已提交代码，但首次由本次发版带上去。
+- 未验：`shell-image` 留空时的 503 只有单测覆盖；判题块没写 e2e（依赖真容器、本机无 Docker）。
+- 本地提交：分支 `feat/work-056-shell` 六笔，随后合并 master
+- 远端推送：未执行
