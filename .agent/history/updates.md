@@ -8573,3 +8573,23 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
   （这条线是 reading，通关看小测）。
 - 本地提交：本笔；已 push
 - 远端推送：已执行
+
+## 2026-10-29 18:05 +0800 · 内容 · 新开「上线与运维」阅读线（9 关）
+
+- 类型：content
+- 变更：`content/reading/ops/`（slug `ops`，line_sort 48）：总览 + 9 关——
+  Nginx 反向代理与静态资源 / Nginx 的 HTTPS、负载均衡与限流 / systemd 把 jar 变成服务 /
+  发布与回滚 / 备份与恢复 / 监控与告警 / 排障顺序五层 / K8s 最小闭环 / K8s 排障。
+- 取材：全部围绕"一个人把服务放到公网"会踩的坑——Nginx 的 location 匹配顺序与 proxy_pass 斜杠、
+  证书续期时 acme-challenge 必须先放行、systemd 的 SuccessExitStatus=143 与 daemon-reload、
+  发布要能在三分钟内回滚、备份必须真恢复一次、告警按症状不按原因、排障固定五层顺序、
+  K8s 的 readiness 与 liveness 不能混用。
+- 验证：
+  - 10 个文件 frontmatter / quiz JSON / learning-path JSON 全部解析通过（总览 learning-path 9 步）。
+  - 线上导入：**新建分类「上线与运维」(id=65) + 10 条条目**，轨道 `ops` **9 关**；
+    线上核对首关「Nginx：反向代理与静态资源」、末关「K8s 排障：从 Pod 状态到事件」。
+- 事故旁注：导入后验证时撞上 `ECONNREFUSED`——查证是**另一个会话 17:35 发版**的重启窗口
+  （jar 与 service 启动时间都是 17:35），不是本次改动导致；服务随后 UP。
+- 未做：没有逐篇在浏览器里读；这条线是 reading，动手只有命令片段，没有可判题的 `code-challenge`。
+- 本地提交：本笔；已 push
+- 远端推送：已执行
