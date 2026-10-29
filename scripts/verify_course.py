@@ -57,8 +57,9 @@ LIMITS = {
     "id": 64,
     "title": 120,
     "steps": 20,
-    # Java 从零开始已扩到 23 关；渲染器本身不限长，这个数只挡明显失控。
-    "pathSteps": 30,
+    # 与渲染器 schema.ts 的 LIMITS.pathSteps 一致：超过 20 步前端会把整块判为不合法，
+    # 而本脚本却能通过——两边不同步会让"校验通过但页面不渲染"静默发生。
+    "pathSteps": 20,
     "quizQuestions": 10,
     "challengeLines": 60,
     "codeChars": 20_000,
