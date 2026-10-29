@@ -215,7 +215,8 @@ export function ReviewPage() {
         </Empty>
       ) : (
         <section className="mt-6" data-testid="review-due">
-          <div className="mb-4 flex flex-wrap items-center gap-3">
+          {/* 竖排居中：按钮与「共 N 个到期」同处一行时，按钮会偏左半个计数文字 */}
+          <div className="mb-4 flex flex-col items-center gap-2">
             <Button onClick={() => start.mutate()} disabled={start.isPending} data-testid="review-start">
               开始复习（最多 5 题）
             </Button>
