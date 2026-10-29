@@ -64,12 +64,12 @@ approver_role: CTO
 - 测试：`AgentToolBridgeTest`、`HarnessPromptsTest`
 - 验证：`mvn -pl paideia-ai test` → 0 failed
 
-### TASK-004 | pending | 只读工具 `sql_generate_dataset`
+### TASK-004 | pending | 只读工具 `planner_build_dataset`
 
 - 对应：`REQ-009`、`REQ-010`
 - 依赖：无
 - 修改：`backend/paideia-sandbox/.../dataset/SqlDatasetTools.java`
-- 接口：`sql_generate_dataset(topic, tables, rows)` → 返回 DDL/INSERT 草稿文本，`ToolScope.READ`，`group="sql"`
+- 接口：`planner_build_dataset(topic, tables, rows)` → 返回 DDL/INSERT 草稿文本，`ToolScope.READ`，`group="sql"`
 - 测试：`SqlDatasetToolsTest`
 - 验证：`mvn -pl paideia-sandbox test` → 0 failed
 

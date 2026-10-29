@@ -32,7 +32,7 @@ approver_role: CTO
 | 场景 | `Harness` 四档 + `toolsetsOf(harness)` | 加 `PLANNER` 一档，只加一行组清单 |
 
 **核心机制：内部助手工具保持只读。** `ToolQuery.internal(...)` 把作用域硬编码成 `Set.of(ToolScope.READ)`（WORK-006 的裁决：助手不替用户写）。所以：
-- `sql_generate_dataset` 是一个**只读工具**：返回生成好的 DDL/INSERT 文本，**不落库**；
+- `planner_build_dataset` 是一个**只读工具**：返回生成好的 DDL/INSERT 文本，**不落库**；
 - 落库仍走页面现有的"粘贴 SQL → 白名单校验 → 沙箱干跑 → 保存"那条路，校验一点不放松；
 - 计划项同理：助手给候选，"采用"是用户在页面上的动作。
 
@@ -63,7 +63,7 @@ approver_role: CTO
 | `backend/paideia-ai/src/main/java/io/github/xiaou61/ai/Harness.java` | 加 `PLANNER("planner")` |
 | `backend/paideia-ai/.../conversation/HarnessPrompts.java` | planner 提示词（先问、别伪造结果） |
 | `backend/paideia-ai/.../tools/AgentToolBridge.java` | `toolsetsOf` 加一档 |
-| `backend/paideia-sandbox/.../dataset/SqlDatasetTools.java` | 加 `sql_generate_dataset`（只读，返回 SQL 草稿） |
+| `backend/paideia-sandbox/.../dataset/SqlDatasetTools.java` | 加 `planner_build_dataset`（只读，返回 SQL 草稿） |
 | `frontend/apps/app/src/pages/ProgressPage.tsx` | 新建页面 |
 | `frontend/apps/app/src/pages/SqlPracticePage.tsx` | 「让 AI 造」改成 `ask()` |
 | `frontend/apps/app/src/router.tsx`、`components/LearnerHeader.tsx` | 路由 + 导航入口 |

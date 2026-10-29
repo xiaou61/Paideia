@@ -16,7 +16,7 @@ approver_role: CTO
 
 `/progress` 页面（学习者端）读四个既有接口拿数据，通过 `useAssistantContext()` 把四块快照注册成页面上下文；
 用户点入口时 `ask()` 打开助手，助手按 `PLANNER` 场景的系统提示词反问，需要生成时调用只读工具
-`sql_generate_dataset`，产物以 ```sql 块回到对话，页面用 `pendingSql` 那条既有通道回填。
+`planner_build_dataset`，产物以 ```sql 块回到对话，页面用 `pendingSql` 那条既有通道回填。
 
 ## 组件与职责
 
@@ -28,7 +28,7 @@ approver_role: CTO
 | `Harness.PLANNER` | 服务端场景枚举 | 新增 |
 | `HarnessPrompts` | planner 的系统提示词 | 新增文案 |
 | `AgentToolBridge.toolsetsOf` | `PLANNER → 只读组` | 加一行 |
-| `SqlDatasetTools` | `sql_generate_dataset`（只读，返回 SQL 草稿） | 新增工具 |
+| `SqlDatasetTools` | `planner_build_dataset`（只读，返回 SQL 草稿） | 新增工具 |
 | `SqlPracticePage` | 「让 AI 造」从直调接口改成 `ask()` | 改按钮与提示 |
 
 ## 请求或事件流程
@@ -42,7 +42,7 @@ approver_role: CTO
 
 1. 页面点「让 AI 造」→ `ask('帮我造一份 SQL 数据集，先问我几个问题')`；
 2. 助手（`PLANNER`）按提示词反问主题/字段/规模（最多三个问题，能用默认值就用默认值）；
-3. 用户答完，助手调 `sql_generate_dataset(topic, tables, rows)`，工具**只返回 DDL/INSERT 文本**；
+3. 用户答完，助手调 `planner_build_dataset(topic, tables, rows)`，工具**只返回 DDL/INSERT 文本**；
 4. 助手把 SQL 放进 ```sql 块回复；页面已有 `applySql`/`extractSqlBlock`，用户点「填回」→ 落进上传框；
 5. 用户点保存 → 走原有的白名单 + 沙箱干跑 → 落库。（校验不在对话链路里，绕不过去）
 
@@ -50,7 +50,7 @@ approver_role: CTO
 
 - 读：`/api/v1/learn/tracks`（进度）、`/api/v1/learning/progress`（最近未满分块）、`/api/v1/learning/reviews`（到期）、`/api/v1/learning/graph`（掌握度最低 5）。
 - 新增接口：无。
-- 新工具：`sql_generate_dataset`，`ToolScope.READ`，`group = "sql"`，只进 `PLANNER` 的工具组。
+- 新工具：`planner_build_dataset`，`ToolScope.READ`，`group = "sql"`，只进 `PLANNER` 的工具组。
 
 ## 持久化与迁移
 
@@ -73,7 +73,7 @@ approver_role: CTO
 
 ## 可观测性
 
-- 复用现有对话追踪（`ai_runs`）：每轮记录 harness、工具名与耗时，`planner` 与 `sql_generate_dataset` 可单独筛。
+- 复用现有对话追踪（`ai_runs`）：每轮记录 harness、工具名与耗时，`planner` 与 `planner_build_dataset` 可单独筛。
 - 不新增指标。
 
 ## 实施顺序（同一工作项内的阶段）
@@ -82,7 +82,7 @@ approver_role: CTO
 
 1. 后端枚举与提示词（`Harness.PLANNER`、`HarnessPrompts`、`toolsetsOf`）。
 2. 前端上下文（`study-log`、`planner`、序列化与上限）。
-3. 只读工具 `sql_generate_dataset`。
+3. 只读工具 `planner_build_dataset`。
 4. `/progress` 页面 + 路由 + 导航入口。
 5. SQL 工作台「让 AI 造」改造。
 6. e2e 与线上复看。

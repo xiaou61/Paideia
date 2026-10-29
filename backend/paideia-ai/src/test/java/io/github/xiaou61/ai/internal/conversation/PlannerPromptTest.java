@@ -34,7 +34,7 @@ class PlannerPromptTest {
     @Test
     @DisplayName("生成数据要走工具，不凭记忆写建表语句")
     void usesToolsForGeneration() {
-        assertThat(PlannerPrompt.system()).contains("sql_generate_dataset");
+        assertThat(PlannerPrompt.system()).contains("planner_build_dataset");
     }
 
     @Test

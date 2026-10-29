@@ -74,7 +74,7 @@ public final class SqlDatasetBuildTools {
                             "rows", Map.of("type", "integer", "description", "每张表插入多少行，1–200")),
                     "required", List.of("tables", "rows"));
             return new ToolDescriptor(
-                    "sql_build_dataset",
+                    "planner_build_dataset",
                     "planner",
                     "拼一份练习数据集的 SQL",
                     "用户要「造一个数据集」时用它：先把表、列、行数问清楚，再用这个工具拼出"
