@@ -532,6 +532,17 @@ describe('shell 判题块', () => {
     expect(screen.getByText(/权限应为 600/)).toBeTruthy()
   })
 
+  it('判定脚本用 echo 写的说明也会显示（它落在 stdout 上）', async () => {
+    // 2026-10-29 上线后实测发现的坑：作者用 `echo` 写说明时它走 stdout，
+    // 只渲染 stderr 会让「未通过」变成没有理由的未通过
+    renderBlock(<CodeChallenge code={JSON.stringify(SHELL)} isIncomplete={false} language="code-challenge" />, {
+      entryId: 1,
+      sandbox: shellSandbox(outcome('failed', { judgeStderr: '', judgeStdout: '现在是 644，期望 600' })),
+    })
+    fireEvent.click(await screen.findByTestId('challenge-run'))
+    await waitFor(() => expect(screen.getByText(/期望 600/)).toBeTruthy())
+  })
+
   it('未能判定与未通过分开显示，并给出原因', async () => {
     renderBlock(<CodeChallenge code={JSON.stringify(SHELL)} isIncomplete={false} language="code-challenge" />, {
       entryId: 1,

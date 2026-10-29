@@ -142,8 +142,8 @@ export function ShellBody({
           {outcome.stderr.trim() === '' ? null : (
             <Output title="错误输出（stderr）" text={outcome.stderr} />
           )}
-          {outcome.judgeStderr.trim() === '' ? null : (
-            <Output title="判定说哪里不对" text={outcome.judgeStderr} />
+          {judgeMessage(outcome) === '' ? null : (
+            <Output title="判定说哪里不对" text={judgeMessage(outcome)} />
           )}
           {outcome.diff.trim() === '' ? (
             <p className="text-muted-foreground text-xs">工作区没有任何文件变化。</p>
@@ -172,6 +172,17 @@ function Verdict({ outcome }: { outcome: ShellOutcome }) {
   }
   // 与「未通过」分开：这时不知道对错，让他去查原因而不是改命令
   return <Pill>未能判定</Pill>
+}
+
+/**
+ * 判定脚本的人类可读输出。
+ *
+ * <p>**两段都显示**：作者写 `echo` 时它在 stdout，写 `>&2` 时在 stderr——让内容作者记住
+ * 该用哪个流没有意义，漏一个就变成"判了但不说为什么"（WORK-056 首次上线就踩了）。
+ */
+function judgeMessage(outcome: ShellOutcome): string {
+  const parts = [outcome.judgeStdout.trim(), outcome.judgeStderr.trim()]
+  return parts.filter((part) => part !== '').join('\n')
 }
 
 function Output({ title, text }: { title: string; text: string }) {
