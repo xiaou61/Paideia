@@ -7830,3 +7830,23 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 未做：`e2e/knowledge.spec.ts` 没跑（本机没装 Playwright 的 Chromium，改用 ego lite 手验）；移动端窄屏那份目录只确认了数据源同源，没做窄屏截图。
 - 本地提交：`d40b538`；已 push
 - 远端推送：已执行
+
+## 2026-10-29 14:10 +0800 · 测试 · 装上 Playwright 浏览器，全量 e2e 打线上 103 passed / 0 failed
+
+- 类型：maintenance + fix
+- 变更：
+  - 装 Chromium 到 **F 盘**：`PLAYWRIGHT_BROWSERS_PATH=F:/caches/ms-playwright`，719MB（chromium + headless shell + ffmpeg + winldd），revision **1248**（对应 `@playwright/test 1.64.0`）。
+  - 全量学习者端 e2e 打线上（`E2E_BASE_URL` + 四个凭据）：**134 条 / 103 passed / 31 skipped / 0 failed / 4.5 分钟**。
+- 踩坑（已写进 `.agent/notes/dev-workflow.md`）：`npx playwright install` 解析到的是全局缓存的 **1.58.0**，装成 `chromium-1223`，而 workspace 要 1.64.0 的 `1248`——版本对不上还是报「Executable doesn't exist」。必须用 `apps/app/node_modules/.bin/playwright`；错版的 685MB 已删。
+- 12 条最初的红拆成四类，全部处理：
+  1. **真 bug（已修并上线）**：`/#/learn` 卡片网格写的是 `grid gap-4 md:grid-cols-2 xl:grid-cols-3`，基宽没有显式列 → 隐式列 `auto` 按 min-content 撑，360px 下卡片 394px、整页横向滚 50px。加 `grid-cols-1`（= minmax(0,1fr)）。实测溢出 50 → 0；发版 115.2 秒，health 200。
+  2. **测试卫生（已修）**：mcp-tokens 每轮在真实账号建两条凭据不清理，20 条上限占满后 5 条全红。加 `afterEach` 逐条吊销；两个坑：已失效的行仍在列表里（要再按「还有吊销按钮」筛）、吊销走 `window.confirm`（不 accept 等于没点）。顺手把线上账号积压的 **36 条有效凭据**用 API 全部吊销（列表里 54 条含已失效）。
+  3. **写死内容（已修）**：books 把「共 3 篇 / 3 章」写死，本地种子 3、线上内容源 5；改成从卡片读篇数、目录条数必须等于它（卡片会先渲染「共 0 篇」，要等正数）。
+  4. **用例假设账号状态（已修）**：learn 的岗位选择断言「默认是后端开发」，但目标岗位是落库的，上一轮跑过就变成「算法与 AI」。改成按当前状态切换并切回。
+  5. **缺凭据（非代码）**：graph 那 4 条要管理员造夹具，第一次跑只给了学习者凭据 → 补 `E2E_ADMIN_*` 即绿。
+- 决策：**e2e 与 ego lite 分工**——回归用 Playwright（断言写死、可重复、零模型成本），观感/新内容验收用 ego lite（这次它抓到旧课号与 NPE，都是没有断言覆盖的）。两者不互相替代。
+- 依据：`e2e/*.spec.ts`；`release.ps1`；本机 `pnpm --filter @paideia/app build` 的 JSX 语法错（`{/* */}` 放在三元分支括号里与 `<div>` 成了相邻表达式，已改到 div 内部）。
+- 验证：全量 103/0/31；单文件复跑 mcp-tokens 9 passed / 25.5s、books 4 passed / 15.7s、learn 7 passed / 1 skipped；线上 360px 溢出实测 0。
+- 未做：没跑管理端 e2e（`apps/admin`）；31 条跳过是套件自己的线上守卫（依赖本地种子条目 / 会真花积分），没有逐条复核。
+- 本地提交：`4af3c29`、`d56c10f`；已 push
+- 远端推送：已执行
