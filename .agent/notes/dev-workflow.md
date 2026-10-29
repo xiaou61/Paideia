@@ -199,6 +199,14 @@ MSYS_NO_PATHCONV=1 E2E_BASE_URL=http://<服务器>:8081 E2E_ADMIN_PATH=/admin/ \
   | 单文件 6 条（`notes.spec.ts`） | **54 秒** |
   | `--grep "八股文"` 1 条 | **13 秒** |
   即：**跑一个文件省 65–83%**，只验一条路径省 92%。全量只留给改共享包或发版前。
+- **浏览器装到 F 盘，且必须用包内那份 playwright**（2026-10-29 实测）：本机 C 盘紧张，浏览器缓存
+  指到 F：`PLAYWRIGHT_BROWSERS_PATH=F:/caches/ms-playwright`（约 719MB：chromium + headless shell +
+  ffmpeg + winldd）。**别用 `npx playwright install`**——`npx` 解析到的是全局缓存的另一个版本
+  （当时是 1.58.0，装成 `chromium-1223`），而 workspace 要的是 `@playwright/test 1.64.0`
+  （`chromium_headless_shell-1248`），版本对不上照样报 "Executable doesn't exist"。正确写法：
+  `cd frontend && PLAYWRIGHT_BROWSERS_PATH=F:/caches/ms-playwright ./apps/app/node_modules/.bin/playwright install chromium`
+  ——装完再核对目录名里的 revision 是否与报错里那个一致。运行同理，`PLAYWRIGHT_BROWSERS_PATH` 每次都要带
+  （shell 变量不跨调用保留）。
 - 这条路径的两个边界：① 它**真的写线上库**（知识库那条用例自己建、自己删）；② 注册/邮箱验证码那几条**只能在本机跑**——要靠内存信箱读验证码，线上是真实 SMTP。
 - **学习者端也能打线上**（2026-10-21 实测订正，旧说法"学习者端仍走本地那条"已过期）。
   命令与上一节相同，只把末尾换成 `pnpm --filter @paideia/app test:e2e`，**五个环境变量都要给**：

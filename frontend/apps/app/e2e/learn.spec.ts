@@ -45,10 +45,23 @@ test.describe('从零开始', () => {
     await expect(page.getByTestId('learn-advanced')).toBeVisible()
     await expect(page.getByTestId('learn-optional')).toBeVisible()
 
-    await expect(page.getByTestId('learn-role-backend')).toHaveAttribute('aria-pressed', 'true')
-    await page.getByTestId('learn-role-ai-algo').click()
-    await expect(page.getByTestId('learn-role-ai-algo')).toHaveAttribute('aria-pressed', 'true')
-    await expect(page.getByTestId('learn-role-backend')).toHaveAttribute('aria-pressed', 'false')
+    // 岗位选择是**存在账号上**的（WORK-047 落库），所以不能假设默认是哪一个：
+    // 上一轮跑过这条用例的账号可能已经把目标岗位改走了。先确认"恰好一个被选中"。
+    const pressed = page.locator('[data-testid^="learn-role-"][aria-pressed="true"]')
+    await expect(pressed).toHaveCount(1, { timeout: 10_000 })
+
+    const backend = page.getByTestId('learn-role-backend')
+    const aiAlgo = page.getByTestId('learn-role-ai-algo')
+    const backendWasOn = (await backend.getAttribute('aria-pressed')) === 'true'
+    const [from, to] = backendWasOn ? [backend, aiAlgo] : [aiAlgo, backend]
+
+    await to.click()
+    await expect(to).toHaveAttribute('aria-pressed', 'true')
+    await expect(from).toHaveAttribute('aria-pressed', 'false')
+
+    // 切回去：别把账号的目标岗位留给下一条用例
+    await from.click()
+    await expect(from).toHaveAttribute('aria-pressed', 'true')
   })
 
   test('推荐卡：每条理由都带真实数字，不是空泛的鼓励', async ({ page }) => {
