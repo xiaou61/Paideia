@@ -47,6 +47,20 @@ export function preloadMarkdown(): void {
  */
 type CodeHighlighter = Awaited<typeof import('@streamdown/code')>['code']
 
+type CodeModule = typeof import('@streamdown/code')
+type CodeThemes = NonNullable<Parameters<CodeModule['createCodePlugin']>[0]>['themes']
+
+/**
+ * 代码块的配色（[light, dark]）。
+ *
+ * <p><b>为什么不用插件的默认值（`github-light` / `github-dark`）</b>：它的关键字、类型、类名
+ * 是同一族红色（`public` `class` `Main` `String` 几乎一个色），满屏红黑之后看起来像"没上色"；
+ * 它给 `pre` 的底色又是纯白，套在 `bg-muted` 的卡片里就是一块白板。
+ * `one-light` / `one-dark-pro` 把关键字（紫）、类型（黄）、字符串（绿）、数字（橙）分开，
+ * 层次才读得出来。底色由 globals.css 统一压平到卡片那一层。
+ */
+const CODE_THEMES = ['one-light', 'one-dark-pro'] as CodeThemes
+
 let codePlugin: CodeHighlighter | undefined
 let codeLoading: Promise<void> | null = null
 const codeSubscribers = new Set<() => void>()
@@ -58,7 +72,7 @@ function loadCodeHighlighting(): Promise<void> {
   }
   codeLoading ??= import('@streamdown/code')
     .then((module) => {
-      codePlugin = module.code
+      codePlugin = module.createCodePlugin({ themes: CODE_THEMES })
       codeSubscribers.forEach((notify) => notify())
     })
     .catch(() => {

@@ -521,3 +521,32 @@
 [data-streamdown='mermaid-block'] > div:first-child {
   display: none;
 }
+
+/* ── 代码块：从三层套娃压成一张卡 ────────────────────────────────
+   上游的结构是三层底色：外层卡（`bg-sidebar`）→ 内层面板（`bg-background` + 边框 + 圆角）
+   → `pre`（shiki 主题自己的底色）。三层叠起来就是"灰卡里嵌一个带框的近白方块，
+   白方块里再有一块主题白底"，代码被挤在最里面，既显小又显脏。
+   这里只保留最外层那一张卡：内层与 `pre` 全部透明，边框与圆角交给卡片。
+   内边距收成 `0.25rem 0.75rem 0.75rem`——header 那行已经有 32px，再叠 16px 就太空。 */
+[data-streamdown='code-block'] [data-streamdown='code-block-body'] {
+  background-color: transparent;
+  border-color: transparent;
+  border-radius: 0;
+  padding: 0.25rem 0.75rem 0.75rem;
+}
+
+/* `!important` 是必要的：深色模式下 Tailwind 的 `.dark .dark\:bg-…` 特异性高于属性选择器，
+   而 `--sdm-bg` 又是写在 `pre` 上的内联变量，只能绕开它去改 `background-color` 本身。 */
+[data-streamdown='code-block'] pre {
+  background-color: transparent !important;
+}
+
+/* `text` 围栏装的是**期望输出**，它不是任何一种语言，挂一个 `text` 标签只会让人问"这是什么语言"。
+   整行去掉，再把正文的上边距补回来——否则右上角的复制按钮会压到第一行代码上。 */
+[data-streamdown='code-block'][data-language='text'] [data-streamdown='code-block-header'] {
+  display: none;
+}
+
+[data-streamdown='code-block'][data-language='text'] [data-streamdown='code-block-body'] {
+  padding-top: 2rem;
+}
