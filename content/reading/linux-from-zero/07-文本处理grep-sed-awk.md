@@ -188,7 +188,7 @@ awk -F'[][:/ ]+' '{print $3":"$4}' access.log | sort | uniq -c
   }
  ],
  "starter": "# 把 north 区域 amount 之和写进 sales/north-total.txt（只要数字）\n",
- "judge": "set -e\ntest \"$(tr -d ' \n' < sales/north-total.txt)\" = \"270\"",
+ "judge": "set -e\n[ -f sales/north-total.txt ] || { echo \"sales/north-total.txt 不存在\"; exit 1; }\ngot=$(tr -d ' \n' < sales/north-total.txt)\n[ \"$got\" = \"270\" ] || { echo \"合计是 $got，期望 270（north 只有 120 和 150）\"; exit 1; }",
  "explain": "`awk -F, '$2==\"north\"{s+=$3} END{print s}' sales/orders.csv > sales/north-total.txt`。-F, 指定逗号分隔，END 块在读完所有行后输出累计值。判定会去掉换行与空格再比，所以写成 270 或 270 换行都算对。"
 }
 ```

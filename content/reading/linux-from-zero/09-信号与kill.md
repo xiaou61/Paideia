@@ -176,7 +176,7 @@ $ kill -- -9812                    # 给整个进程组发 TERM（注意 --）
   }
  ],
  "starter": "# 1. 后台启动 app/run-worker.sh\n# 2. 先请求它退出（不要 -9），等它自己走完\n# 3. 把 /tmp/worker.state 的内容写进 app/result.txt\n",
- "judge": "set -e\ntest \"$(cat app/result.txt 2>/dev/null)\" = \"graceful\"\n! pgrep -f run-worker.sh > /dev/null",
+ "judge": "set -e\nstate=$(cat app/result.txt 2>/dev/null || true)\n[ \"$state\" = \"graceful\" ] || { echo \"app/result.txt 是 '$state'，期望 graceful：要用 kill -15 而不是 -9\"; exit 1; }\nif pgrep -f run-worker.sh > /dev/null; then echo \"run-worker.sh 还在跑：发了信号还要等它退出\"; exit 1; fi",
  "explain": "那个脚本装了 TERM 处理器：收到 `kill -15` 会写下 graceful 再退出。用 `kill -9` 它来不及写，result.txt 就取不到内容；判定还检查进程真的没了，所以「发了信号不等」也会失败。"
 }
 ```

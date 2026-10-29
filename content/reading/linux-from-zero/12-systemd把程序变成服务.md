@@ -234,7 +234,7 @@ ReadWritePaths=/var/lib/paideia /var/log/paideia
   }
  ],
  "starter": "# 写一个 Java 服务的 unit 到 app/paideia.service：\n# 用 /usr/bin/java 以 paideia 用户跑 /opt/paideia/paideia.jar，失败自动重启，开机自启\n",
- "judge": "set -e\ncommand -v systemd-analyze >/dev/null\nout=$(systemd-analyze verify app/paideia.service 2>&1 || true)\ncase \"$out\" in\n  *\"Executable path is not absolute\"*|*\"Invalid section\"*|*\"no ExecStart\"*) echo \"$out\"; exit 1;;\nesac\ngrep -q '^ExecStart=/usr/bin/java' app/paideia.service\ngrep -q '^User=paideia' app/paideia.service\ngrep -q '^Restart=' app/paideia.service\ngrep -q 'WantedBy=multi-user.target' app/paideia.service",
+ "judge": "set -e\n[ -f app/paideia.service ] || { echo \"app/paideia.service 不存在\"; exit 1; }\ncommand -v systemd-analyze > /dev/null || { echo \"镜像里没有 systemd-analyze\"; exit 1; }\nout=$(systemd-analyze verify app/paideia.service 2>&1 || true)\ncase \"$out\" in\n  *\"Executable path is not absolute\"*) echo \"ExecStart 必须是绝对路径：$out\"; exit 1;;\n  *\"Invalid section\"*) echo \"段落名不合法：$out\"; exit 1;;\n  *\"no ExecStart\"*) echo \"缺 ExecStart：$out\"; exit 1;;\nesac\ngrep -q '^ExecStart=/usr/bin/java' app/paideia.service || { echo \"ExecStart 应为 /usr/bin/java -jar ...\"; exit 1; }\ngrep -q '^User=paideia' app/paideia.service || { echo \"缺 User=paideia（服务不该以 root 跑）\"; exit 1; }\ngrep -q '^Restart=' app/paideia.service || { echo \"缺 Restart=（崩了要能自己起来）\"; exit 1; }\ngrep -q 'WantedBy=multi-user.target' app/paideia.service || { echo \"缺 WantedBy=multi-user.target，否则 enable 不了\"; exit 1; }",
  "explain": "四个要点：ExecStart 必须绝对路径（systemd 不读 PATH，就是第 01 关那个 203/EXEC 的成因）、以专用用户跑、失败重启、WantedBy 才能 enable。`systemd-analyze verify` 做的事和真实加载一致，它不报错基本就等于能起来。"
 }
 ```
