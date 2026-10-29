@@ -2,7 +2,7 @@
 artifact: requirements
 work_id: WORK-053
 work: 学习记录页与 AI 强联动（试点）
-status: draft
+status: approved
 mode: strict
 mode_reason: 新增一个学习者端页面与导航入口、扩展共享包 @paideia/assistant 的页面上下文与反向回填通道、可能新增一张计划表、并把"助手能不能替用户写数据"这条边界固定下来
 workflow: full
@@ -10,6 +10,9 @@ depends_on: []
 related_to: [WORK-005, WORK-006, WORK-011, WORK-024, WORK-034, WORK-047]
 created: 2026-10-29
 updated: 2026-10-29
+approved_by: xiaou61
+approved_at: 2026-10-29 14:03:13 +0800
+approver_role: CTO
 ---
 
 # 学习记录页与 AI 强联动需求
