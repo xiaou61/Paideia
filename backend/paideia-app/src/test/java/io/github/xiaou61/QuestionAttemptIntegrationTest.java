@@ -131,6 +131,40 @@ class QuestionAttemptIntegrationTest {
     }
 
     @Test
+    @DisplayName("已答的选择能读回来；题目改过之后旧作答不再算")
+    void answeredChoicesAreReadBack() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/v1/learning/entries/{id}/attempts", entryId)
+                        .header("Authorization", token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isEmpty());
+
+        mockMvc.perform(post("/api/v1/learning/attempts")
+                        .header("Authorization", token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body(1)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/v1/learning/entries/{id}/attempts", entryId)
+                        .header("Authorization", token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].blockKey").value(BLOCK))
+                .andExpect(jsonPath("$.data[0].questionKey").value(BLOCK + "#0"))
+                .andExpect(jsonPath("$.data[0].choice").value(1));
+
+        // 改题干 → 指纹变了，旧选择不能再锁住一道新题
+        jdbcTemplate.update("UPDATE knowledge_entries SET body = ? WHERE id = ?",
+                QUIZ_BODY.replace("两数相加", "两数相减"), entryId);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/v1/learning/entries/{id}/attempts", entryId)
+                        .header("Authorization", token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
     @DisplayName("选项越界返回 400，且不写作答")
     void outOfRangeChoiceIsRejected() throws Exception {
         mockMvc.perform(post("/api/v1/learning/attempts")

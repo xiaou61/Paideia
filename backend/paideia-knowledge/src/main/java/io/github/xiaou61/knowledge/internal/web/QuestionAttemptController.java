@@ -6,6 +6,7 @@ import io.github.xiaou61.platform.ApiAccess;
 import io.github.xiaou61.platform.ApiResponse;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -38,6 +39,12 @@ class QuestionAttemptController {
     @GetMapping("/mastery")
     ApiResponse<List<QuestionAttemptService.ConceptMasteryView>> mastery() {
         return ApiResponse.ok(service.mastery(CurrentUserId.require()));
+    }
+
+    /** 我在这条里已经答过的题：练习册打开时用它恢复上次的作答。 */
+    @GetMapping("/entries/{id}/attempts")
+    ApiResponse<List<QuestionAttemptService.AnsweredChoice>> answered(@PathVariable("id") long id) {
+        return ApiResponse.ok(service.answered(CurrentUserId.require(), id));
     }
 
     /** 练习选题（REQ-008）：传概念 id 列表，返回一道信息量最大的题。 */

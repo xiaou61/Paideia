@@ -75,10 +75,24 @@ test('练习与测验：判定与得分都给出明确反馈', async ({ page }) 
   await page.getByTestId('practice-open').click()
   const dialog = page.getByTestId('practice-dialog')
   await expect(dialog).toBeVisible()
-  for (const index of [0, 1, 2]) {
+  for (const index of [0, 1]) {
     await dialog.getByTestId(`quiz-option-${index}-0`).click()
   }
+  // 最后一题等接口真写完再往下走：紧接着要刷新，抢在写入之前会读到"没答过"
+  const lastAttempt = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/v1/learning/attempts') && response.request().method() === 'POST',
+  )
+  await dialog.getByTestId('quiz-option-2-0').click()
+  await lastAttempt
   await expect(dialog.getByTestId('quiz-score')).toContainText('答对 3 / 3')
+  await page.getByTestId('practice-close').click()
+
+  // 答过之后再进来要显示上次的成绩，而不是又回到"已答 0 / 3"
+  await page.reload()
+  await expect(page.getByTestId('practice-hint')).toContainText('上次答对 3 / 3')
+  await page.getByTestId('practice-open').click()
+  await expect(page.getByTestId('practice-dialog').getByTestId('quiz-score')).toContainText('答对 3 / 3')
   await page.getByTestId('practice-close').click()
 })
 

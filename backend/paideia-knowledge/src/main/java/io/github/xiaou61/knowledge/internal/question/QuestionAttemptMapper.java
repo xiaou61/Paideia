@@ -32,6 +32,14 @@ public interface QuestionAttemptMapper {
                       @Param("latencyMs") Integer latencyMs, @Param("judgedBy") String judgedBy,
                       @Param("now") Instant now);
 
+    /** 这一条里的全部作答，最新在前：调用方按题取第一条就是"上次选了什么"。 */
+    @Select("""
+            SELECT block_key, question_key, fingerprint, choice_index FROM question_attempts
+            WHERE user_id = #{userId} AND entry_id = #{entryId}
+            ORDER BY id DESC
+            """)
+    List<ChoiceRow> findChoices(@Param("userId") long userId, @Param("entryId") long entryId);
+
     @Select("""
             SELECT concept_id, weight FROM question_concepts
             WHERE entry_id = #{entryId} AND block_key = #{blockKey} AND question_key = #{questionKey}
@@ -166,6 +174,10 @@ public interface QuestionAttemptMapper {
     }
 
     record LinkRow(long conceptId, double weight) {
+    }
+
+    record ChoiceRow(String blockKey, String questionKey, String fingerprint,
+                     Integer choiceIndex) {
     }
 
     record MasteryRow(long userId, long conceptId, double mastery, int attempts, int correct) {

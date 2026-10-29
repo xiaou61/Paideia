@@ -1,6 +1,6 @@
 import type { ApiClient } from '@paideia/core'
 
-import type { AdviceRequest, AdviceResult, ConceptGraph, EntryProgressView, LearningLine, ProgressReport, ReviewDueList, ReviewSession, ReviewSubmitResult, TrackMap, TrackSummary } from './learning-types'
+import type { AdviceRequest, AdviceResult, AnsweredChoice, ConceptGraph, EntryProgressView, LearningLine, ProgressReport, ReviewDueList, ReviewSession, ReviewSubmitResult, TrackMap, TrackSummary } from './learning-types'
 
 /**
  * 学习线 / 学习记录的客户端（WORK-020）。
@@ -71,6 +71,10 @@ export function createLearningApi(client: ApiClient) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
       }),
+
+    /** 我在这条里已答过的题：练习册打开时恢复上次的作答。 */
+    answered: (entryId: number) =>
+      client.requestEnvelope<AnsweredChoice[]>(`/api/v1/learning/entries/${entryId}/attempts`),
 
     /** 我的知识图谱（WORK-021）。掌握度是服务端现算的，前端不缓存也不推导。 */
     graph: () => client.requestEnvelope<ConceptGraph>('/api/v1/learning/graph'),

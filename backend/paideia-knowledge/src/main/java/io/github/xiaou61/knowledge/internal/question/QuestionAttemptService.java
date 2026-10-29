@@ -39,6 +39,10 @@ public class QuestionAttemptService {
     public record ConceptMasteryView(long conceptId, String name, double mastery, String tier) {
     }
 
+    /** 我在这条里已经选过的答案。前端据此把上次的作答恢复出来，而不是每次打开都从零开始。 */
+    public record AnsweredChoice(String blockKey, String questionKey, int choice) {
+    }
+
     public record AttemptResult(boolean correct, String fingerprint,
                                 List<ConceptMasteryView> concepts,
                                 List<PrerequisiteDiagnosis.Suggestion> suggestions) {
@@ -149,6 +153,32 @@ public class QuestionAttemptService {
         long failed = links.get(0).conceptId();
         return PrerequisiteDiagnosis.suggest(failed, mastery, edges,
                 PrerequisiteDiagnosis.DEFAULT_MAX_DEPTH);
+    }
+
+    /**
+     * 我在这一条里已经答过的题。
+     *
+     * <p>只认**与当前正文指纹一致**的作答：题目内容改过就不再算答过，否则旧答案会锁住一道新题、
+     * 还会显示一个跟当前选项对不上的对错。
+     */
+    public List<AnsweredChoice> answered(long userId, long entryId) {
+        Entry entry = entryMapper.findPublishedById(entryId)
+                .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "条目不存在"));
+        Map<String, Integer> latest = new HashMap<>();
+        for (QuestionAttemptMapper.ChoiceRow row : mapper.findChoices(userId, entryId)) {
+            // 最新在前：同一道题第一次出现的才是"上次选的"
+            if (row.choiceIndex() != null) {
+                latest.putIfAbsent(row.questionKey() + '\u0000' + row.fingerprint(), row.choiceIndex());
+            }
+        }
+        List<AnsweredChoice> answers = new ArrayList<>();
+        for (QuestionCatalog.Question question : QuestionCatalog.parse(entry.getId(), entry.getBody())) {
+            Integer choice = latest.get(question.questionKey() + '\u0000' + question.fingerprint());
+            if (choice != null && choice < question.options().size()) {
+                answers.add(new AnsweredChoice(question.blockKey(), question.questionKey(), choice));
+            }
+        }
+        return answers;
     }
 
     /**

@@ -117,6 +117,17 @@ export function KnowledgeEntryPage() {
     retry: false,
   })
 
+  /**
+   * 已答过的题：练习册打开时要显示上次做到哪，所以和进度一样**先取再渲染卡片**。
+   * 取不到（老接口、网络抖动）就当没答过，卡片照常可用。
+   */
+  const serverAnswers = useQuery({
+    queryKey: ['learning-answers', entryId],
+    queryFn: () => learning.answered(entryId),
+    enabled: valid,
+    retry: false,
+  })
+
   const progressPort = useMemo(() => {
     if (!valid || serverProgress.isPending || entry.data === undefined) {
       return undefined
@@ -300,14 +311,17 @@ export function KnowledgeEntryPage() {
             />
 
             {/* 练习册（WORK-048）：题目从正文里摘出来，读完想测再测 */}
-            <PracticeEntry
-              quizzes={practice.quizzes}
-              entryTitle={entry.data.title}
-              onAttempt={recordAttempt}
-              onScore={(quizId, correct, total) =>
-                progressPort?.update({ quizzes: { [quizId]: { score: correct, total } } })
-              }
-            />
+            {serverAnswers.isPending ? null : (
+              <PracticeEntry
+                quizzes={practice.quizzes}
+                entryTitle={entry.data.title}
+                previous={serverAnswers.data}
+                onAttempt={recordAttempt}
+                onScore={(quizId, correct, total) =>
+                  progressPort?.update({ quizzes: { [quizId]: { score: correct, total } } })
+                }
+              />
+            )}
 
             <div className="mt-10">
               <SelfAssessmentButtons

@@ -92,7 +92,10 @@ export function CodeMap({ code }: CustomRendererProps) {
                     : 'border-border bg-card hover:bg-muted'
                 } ${interactive ? 'cursor-pointer' : 'cursor-default opacity-80'}`}
               >
-                <span className="truncate text-sm font-medium">{node.label}</span>
+                {/* 单行截断会把长标签变成一片「…」——节点里必须能读出整句话，最多折两行 */}
+                <span className="line-clamp-2 text-sm leading-snug font-medium break-words" title={node.label}>
+                  {node.label}
+                </span>
                 {node.file === undefined ? null : (
                   <span className="text-muted-foreground truncate font-mono text-[10px]">
                     {node.file}

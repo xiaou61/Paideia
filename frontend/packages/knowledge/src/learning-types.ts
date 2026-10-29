@@ -34,6 +34,13 @@ export interface BlockScore {
 
 export type LearningStatus = 'in_progress' | 'passed'
 
+/** 我在这条里已经选过的答案：练习册打开时据此恢复上次的作答。 */
+export interface AnsweredChoice {
+  blockKey: string
+  questionKey: string
+  choice: number
+}
+
 export interface EntryProgressView {
   entryId: number
   title: string

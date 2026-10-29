@@ -76,6 +76,7 @@ export {
   type ScoredTrack,
 } from './recommend'
 export type {
+  AnsweredChoice,
   BlockScore,
   ConceptCarrier,
   ConceptEdge,
