@@ -174,6 +174,25 @@ awk -F'[][:/ ]+' '{print $3":"$4}' access.log | sort | uniq -c
  "explain":"先取 IP 列，再排序让相同 IP 相邻（uniq 只合并相邻行），计数后按数字倒序排，最后取前 10。少了第一个 sort，uniq 会把同一个 IP 拆成好几段。"}
 ```
 
+这一道用 awk 按列算一个真结果。
+
+```code-challenge
+{
+ "id": "linux-07-shell-awk-sum",
+ "kind": "shell",
+ "title": "用 awk 统计北区销售额",
+ "seed": [
+  {
+   "path": "sales/orders.csv",
+   "content": "id,region,amount\n1,north,120\n2,south,80\n3,north,150\n4,east,50\n"
+  }
+ ],
+ "starter": "# 把 north 区域 amount 之和写进 sales/north-total.txt（只要数字）\n",
+ "judge": "set -e\ntest \"$(tr -d ' \n' < sales/north-total.txt)\" = \"270\"",
+ "explain": "`awk -F, '$2==\"north\"{s+=$3} END{print s}' sales/orders.csv > sales/north-total.txt`。-F, 指定逗号分隔，END 块在读完所有行后输出累计值。判定会去掉换行与空格再比，所以写成 270 或 270 换行都算对。"
+}
+```
+
 ## 检查一下
 
 ```quiz

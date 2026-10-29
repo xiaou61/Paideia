@@ -162,6 +162,25 @@ $ kill -- -9812                    # 给整个进程组发 TERM（注意 --）
  "explain":"先 SIGTERM 给程序收尾机会（关连接、刷盘、回滚事务），等它自己走；`kill -0` 只探测不发送，还在才升级到 SIGKILL。"}
 ```
 
+这一道让一个真进程优雅退出——判定要同时看到它留下的痕迹和它真的不在了。
+
+```code-challenge
+{
+ "id": "linux-09-shell-graceful-stop",
+ "kind": "shell",
+ "title": "让它自己退出，而不是强杀",
+ "seed": [
+  {
+   "path": "app/run-worker.sh",
+   "content": "#!/bin/bash\ntrap 'echo graceful > /tmp/worker.state; exit 0' TERM\nwhile :; do sleep 0.2; done\n"
+  }
+ ],
+ "starter": "# 1. 后台启动 app/run-worker.sh\n# 2. 先请求它退出（不要 -9），等它自己走完\n# 3. 把 /tmp/worker.state 的内容写进 app/result.txt\n",
+ "judge": "set -e\ntest \"$(cat app/result.txt 2>/dev/null)\" = \"graceful\"\n! pgrep -f run-worker.sh > /dev/null",
+ "explain": "那个脚本装了 TERM 处理器：收到 `kill -15` 会写下 graceful 再退出。用 `kill -9` 它来不及写，result.txt 就取不到内容；判定还检查进程真的没了，所以「发了信号不等」也会失败。"
+}
+```
+
 ## 检查一下
 
 ```quiz

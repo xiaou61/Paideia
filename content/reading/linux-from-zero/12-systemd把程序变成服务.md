@@ -220,6 +220,25 @@ ReadWritePaths=/var/lib/paideia /var/log/paideia
  "explain":"systemd 不读 PATH，`ExecStart` 必须是绝对路径，否则报 `Executable path is not absolute`（status=203/EXEC）。应写成 `ExecStart=/usr/bin/java -jar paideia.jar` 或先 `which java` 查真实路径。"}
 ```
 
+这一道写一份 unit 文件，用 `systemd-analyze` 做静态检查。
+
+```code-challenge
+{
+ "id": "linux-12-shell-unit-file",
+ "kind": "shell",
+ "title": "写一份能过静态检查的 unit",
+ "seed": [
+  {
+   "path": "app/paideia.jar",
+   "content": "占位文件，不参与运行\n"
+  }
+ ],
+ "starter": "# 写一个 Java 服务的 unit 到 app/paideia.service：\n# 用 /usr/bin/java 以 paideia 用户跑 /opt/paideia/paideia.jar，失败自动重启，开机自启\n",
+ "judge": "set -e\ncommand -v systemd-analyze >/dev/null\nout=$(systemd-analyze verify app/paideia.service 2>&1 || true)\ncase \"$out\" in\n  *\"Executable path is not absolute\"*|*\"Invalid section\"*|*\"no ExecStart\"*) echo \"$out\"; exit 1;;\nesac\ngrep -q '^ExecStart=/usr/bin/java' app/paideia.service\ngrep -q '^User=paideia' app/paideia.service\ngrep -q '^Restart=' app/paideia.service\ngrep -q 'WantedBy=multi-user.target' app/paideia.service",
+ "explain": "四个要点：ExecStart 必须绝对路径（systemd 不读 PATH，就是第 01 关那个 203/EXEC 的成因）、以专用用户跑、失败重启、WantedBy 才能 enable。`systemd-analyze verify` 做的事和真实加载一致，它不报错基本就等于能起来。"
+}
+```
+
 ## 检查一下
 
 ```quiz
