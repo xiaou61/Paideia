@@ -355,6 +355,8 @@ export function AssistantShell({
     const firstTime = !hasSeenHint()
     return (
       <div
+        /* 打印简历时浮标会一起印到纸上，而纸面只能有简历本身 */
+        data-print-hide
         className={`fixed z-40 flex flex-col items-end gap-2 ${
           // 窄屏收紧到 16px 并让开 iPhone 手势条：`max()` 保证没有安全区的设备仍保留 1rem，
           // 直接写 env() 会在那些设备上求值为 0、浮标贴死屏幕底边。
@@ -409,6 +411,7 @@ export function AssistantShell({
         />
       ) : null}
     <section
+      data-print-hide
       className={
         narrow
           ? 'border-border bg-card fixed inset-x-0 bottom-0 z-40 flex max-h-[85dvh] flex-col overflow-hidden rounded-t-2xl border-t shadow-2xl'

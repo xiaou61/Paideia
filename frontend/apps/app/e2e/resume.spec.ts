@@ -51,4 +51,43 @@ test.describe('简历编辑', () => {
     // 体检清单存在（内容随简历状态变化，这里只断言它渲染了）
     await expect(page.getByTestId('resume-checkup')).toBeVisible()
   })
+
+  /**
+   * 预览与版式（不需模型调用）。
+   *
+   * <p>验的是"编辑时就能看成品"这条入口，以及换版式后内容还在——这两件是这次改版
+   * 唯一会静默坏掉的地方（路由漏注册、`ResumeSheet` 某套版式漏一节）。
+   */
+  test('预览页：换版式不丢内容，选择记得住', async ({ page }) => {
+    await signIn(page)
+
+    await page.goto('/#/resume/create')
+    await page.locator('#resume-title').fill(`e2e-预览-${Date.now()}`)
+    await page.getByRole('button', { name: '创建并开始编辑' }).click()
+    await expect(page.getByTestId('resume-section-basics')).toBeVisible()
+
+    const name = `预览-${Date.now()}`
+    await page.locator('label', { hasText: '姓名' }).locator('input').fill(name)
+    await expect(page.getByTestId('resume-save-status')).toContainText('已保存', { timeout: 15_000 })
+
+    // 入口在编辑器头部：不必先跑一次「按岗位优化」就能看成品
+    await page.getByRole('button', { name: '预览', exact: true }).click()
+    await expect(page.getByTestId('resume-print')).toContainText(name)
+
+    await page.getByTestId('resume-template-sidebar').click()
+    await expect(page.getByTestId('resume-print').locator('aside')).toBeVisible()
+
+    await page.getByTestId('resume-template-compact').click()
+    await expect(page.getByTestId('resume-print').locator('aside')).toHaveCount(0)
+    await expect(page.getByTestId('resume-print')).toContainText(name)
+
+    // 打印态下悬浮助手必须消失：它挂在路由之外，不写 `data-print-hide` 会一起印到纸上
+    await page.emulateMedia({ media: 'print' })
+    await expect(page.getByTestId('assistant-launcher')).toBeHidden()
+    await page.emulateMedia({ media: 'screen' })
+
+    // 版式记在 localStorage：刷新后仍是紧凑
+    await page.reload()
+    await expect(page.getByTestId('resume-template-compact')).toHaveAttribute('aria-pressed', 'true')
+  })
 })

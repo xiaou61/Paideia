@@ -29,6 +29,7 @@ import { ResumeEditorPage } from './pages/ResumeEditorPage'
 import { ResumeImportReviewPage } from './pages/ResumeImportReviewPage'
 import { ResumeListPage, ResumeCreatePage } from './pages/ResumeListPage'
 import { ResumeOptimizePage } from './pages/ResumeOptimizePage'
+import { ResumePreviewPage } from './pages/ResumePreviewPage'
 import { ResumePrintPage } from './pages/ResumePrintPage'
 import { SharedNotePage } from './pages/SharedNotePage'
 import { SourceChapterPage } from './pages/SourceChapterPage'
@@ -299,6 +300,15 @@ export const router = createHashRouter([
     element: (
       <RequireAuth>
         <ResumeOptimizePage />
+      </RequireAuth>
+    ),
+  },
+  // 主简历预览：不必先跑一次优化就能看版式、存 PDF
+  {
+    path: '/resume/:id/preview',
+    element: (
+      <RequireAuth>
+        <ResumePreviewPage />
       </RequireAuth>
     ),
   },

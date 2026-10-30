@@ -20,6 +20,14 @@ export {
 export { createResumeApi, type ResumeApi } from './client'
 export { ChangedText, diffParts, RemovedText, removedParts, type DiffPart } from './diff'
 export {
+  readResumeTemplate,
+  RESUME_TEMPLATES,
+  ResumeSheet,
+  saveResumeTemplate,
+  type ResumeTemplateId,
+  type ResumeTemplateInfo,
+} from './templates'
+export {
   BUCKET_LABELS,
   emptyResume,
   type ChangeType,

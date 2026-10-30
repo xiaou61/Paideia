@@ -32,7 +32,7 @@ import {
   type ResumeData,
 } from '@paideia/resume'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, History, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Eye, History, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 
@@ -181,6 +181,10 @@ export function ResumeEditorPage() {
             <Button variant="outline" onClick={() => setHistoryOpen(true)}>
               <History className="size-4" />
               历史
+            </Button>
+            <Button variant="outline" onClick={() => navigate(`/resume/${documentId}/preview`)}>
+              <Eye className="size-4" />
+              预览
             </Button>
             <Button onClick={() => navigate(`/resume/${documentId}/optimize`)}>
               <Sparkles className="size-4" />
