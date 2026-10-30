@@ -9119,3 +9119,63 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 线上 e2e：`E2E_BASE_URL` 打部署实例，`resume.spec.ts` **2 passed / 13.7 秒**（含新增的预览/版式那条）。
 - 清理：线上 `e2e-learner` 名下积压的 `e2e-*` 简历 **31 份已删**（含本轮 2 份与历史遗留）。
 - 未做：没有 push；管理端没动，未重跑其 e2e；没人工点一遍（冒烟到 e2e 级）。
+
+## 2026-10-30 17:38:35 +0800 · WORK-058 · 签署 .agent/changes/WORK-058-助手对象化/requirements.md、.agent/changes/WORK-058-助手对象化/proposal.md、.agent/changes/WORK-058-助手对象化/design.md、.agent/changes/WORK-058-助手对象化/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-058-助手对象化/requirements.md、.agent/changes/WORK-058-助手对象化/proposal.md、.agent/changes/WORK-058-助手对象化/design.md、.agent/changes/WORK-058-助手对象化/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-058-助手对象化/requirements.md、.agent/changes/WORK-058-助手对象化/proposal.md、.agent/changes/WORK-058-助手对象化/design.md、.agent/changes/WORK-058-助手对象化/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-30 17:52:14 +0800 · WORK-058 · 签署 .agent/changes/WORK-058-助手对象化/requirements.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-058-助手对象化/requirements.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-058-助手对象化/requirements.md
+- 验证：回读 frontmatter：approved_by=xiaou61，1 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-30 17:52:25 +0800 · WORK-058 · 登记业务验收 .agent/changes/WORK-058-助手对象化/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-058-助手对象化/testing/report.md
+- 决策：审批人 xiaou61；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-058-助手对象化/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-30 17:53:03 +0800 · WORK-058 · 签署 .agent/changes/WORK-058-助手对象化/requirements.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-058-助手对象化/requirements.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-058-助手对象化/requirements.md
+- 验证：回读 frontmatter：approved_by=xiaou61，1 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-30 · WORK-058 结账（补验收证据，工件签批）
+
+- 类型：verification
+- 起因：用户要求把所有未收尾的 WORK 收尾。WORK-058 代码早已合并上线，但 `proposal/design/tasks`
+  仍是 draft、缺 `testing/report.md`，且验收只有零散单测。
+- 补的证据：新增 `e2e/attachments.spec.ts` 4 条（AC-001 条目选段 / AC-002 未保存笔记 / AC-004 到期复习 /
+  AC-010 375px + 键盘删附件）；`conversation-panel.test.tsx` 新增面板级引用接线 1 条（AC-006）；
+  `db/devdata/V959__seed_review_due.sql` 种一条到期复习项——AC-004 在空库上本来永远无法验。
+- 发现的真问题：`McpToolSnapshotTest` 期望 65 实际 66（WORK-053 的 `planner_build_dataset` 进组没更新快照），
+  自 053 合并起一直红；**单跑 `-pl paideia-app` 会因 `~/.m2` 旧 jar 假绿，必须带 `-am`**。已改 66 并补 `planner: 1`。
+- 另一条踩坑：改 `db/devdata` 后不重打 jar，e2e 起的 `target/*.jar` 里没有新迁移（V959 首跑静默缺席）。
+- 需求订正：原第 8 条验收标准（改笔记标题出现确认条）作废——内部助手只读，TASK-007 取消；
+  报备纪律"将来开写前必须先补确认闸"保留。
+- 验证：后端 `ToolUriTest` 3/3、`KnowledgeToolsTest` 8/8、`AttachmentUrisTest` 3/3、`ConversationPromptTest` 4/4、
+  `McpToolSnapshotTest` 4/4、`MigrationVersionFormatTest` 3/3；assistant 71 tests；app typecheck + build；
+  e2e `attachments.spec.ts` 4/4、`--grep WORK-058` 2/2（独占库自动删）。
+- 状态：WORK-058 `phase=completed / state=complete`，四件工件 + 测试报告全部 approved。
+- 本地提交：见下一次提交
+- 远端推送：未执行

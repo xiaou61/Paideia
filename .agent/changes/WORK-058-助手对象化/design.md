@@ -2,9 +2,12 @@
 artifact: design
 work_id: WORK-058
 work: 助手对象化（全站对象可附着、可执行）
-status: draft
+status: approved
 created: 2026-10-30
 updated: 2026-10-30
+approved_by: xiaou61
+approved_at: 2026-10-30 17:38:35 +0800
+approver_role: 
 ---
 
 # 助手对象化设计

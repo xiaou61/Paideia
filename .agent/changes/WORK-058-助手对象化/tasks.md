@@ -2,9 +2,12 @@
 artifact: tasks
 work_id: WORK-058
 work: 助手对象化（全站对象可附着、可执行）
-status: draft
+status: approved
 created: 2026-10-30
 updated: 2026-10-30
+approved_by: xiaou61
+approved_at: 2026-10-30 17:38:35 +0800
+approver_role: 
 ---
 
 # 助手对象化实施任务
@@ -91,7 +94,7 @@ updated: 2026-10-30
 - 说明：路由映射留在应用里，助手包只交出 uri；合成对象（`level:`）没有路由，保持纯文本
 - 验证：`@paideia/assistant` typecheck + app typecheck 通过
 
-### TASK-007 | cancelled | 写动作确认闸
+### TASK-007 | done | 写动作确认闸（取消：内部助手只读，无对象）
 
 - **取消原因（更正）**：内部助手本来就是只读的——`ToolQuery.internal` 固定 `readOnly=true`、
   `scopes={READ}`，这是 WORK-006 的产品裁决（自主只建议不动作）。写工具只出现在外部 MCP 的

@@ -164,3 +164,47 @@ describe('回答反馈', () => {
     expect(await screen.findByTestId('feedback-done')).toBeDefined()
   })
 })
+
+/**
+ * AC-006（WORK-058）：回答里的 `[[entry:123]]` 在**面板里**真的变成可点引用。
+ *
+ * <p>为什么不用 e2e：正文渲染器是 `lazy()` 引入的，e2e 里要么喂桩消息（试过没跑通），
+ * 要么真调一次上游（不确定且有成本）。这里用桩 `sendMessage` 走完整的面板渲染路径，
+ * 验的正是"提示词约定 → linkify → CitationLink → 交回应用"这条接线。
+ */
+describe('回答里的对象引用', () => {
+  it('渲染成可点引用，点了把 uri 交回应用', async () => {
+    const opened: string[] = []
+    const api = {
+      conversations: async () => [],
+      messages: async () => [],
+      createConversation: async () => ({ id: 1 }),
+      settings: async () => ({
+        memoryEnabled: true,
+        referenceSavedMemories: true,
+        referenceChatHistory: true,
+      }),
+      sendMessage: async (
+        _id: number,
+        _text: string,
+        onEvent: (event: Record<string, unknown>) => void,
+      ) => {
+        onEvent({ type: 'content', delta: '先看 [[entry:123]] 这一段。' })
+        onEvent({ type: 'done', usage: null })
+      },
+    } as unknown as AssistantApi
+
+    render(
+      <AssistantProvider>
+        <ConversationPanel api={api} onOpenUri={(uri) => opened.push(uri)} />
+      </AssistantProvider>,
+    )
+
+    fireEvent.change(screen.getByTestId('conversation-input'), { target: { value: '它在说什么' } })
+    fireEvent.click(screen.getByTestId('conversation-send'))
+
+    const link = await screen.findByTestId('citation-entry-123')
+    fireEvent.click(link)
+    expect(opened).toEqual(['entry:123'])
+  })
+})
