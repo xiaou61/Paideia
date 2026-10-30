@@ -440,10 +440,15 @@ function asRelativePath(value: unknown, where: string, max: number): string {
 
 function parseStateItems(value: unknown, where: string): StateVar[] {
   return asArray(value, where, 0, LIMITS.walkStateItems).map((item, index) => {
-    const variable = asObject(item, `${where}[${index}]`)
+    // 作者侧写成 [名, 值] 两元组：内容里一行一个变量，比 {"name":..,"value":..} 好读
+    need(
+      Array.isArray(item) && item.length === 2,
+      `${where}[${index}] 必须是 [名, 值] 两元组`,
+    )
+    const [name, text] = item as unknown[]
     return {
-      name: asText(variable['name'], `${where}[${index}].name`, 60),
-      value: asText(variable['value'], `${where}[${index}].value`, 200),
+      name: asText(name, `${where}[${index}][0]`, 60),
+      value: asText(text, `${where}[${index}][1]`, 200),
     }
   })
 }
