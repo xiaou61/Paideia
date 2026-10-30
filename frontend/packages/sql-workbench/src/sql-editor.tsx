@@ -6,9 +6,9 @@ import {
 } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { MySQL, sql } from '@codemirror/lang-sql'
-import { bracketMatching, indentOnInput, syntaxHighlighting, HighlightStyle } from '@codemirror/language'
+import { bracketMatching, indentOnInput, syntaxHighlighting } from '@codemirror/language'
 import { EditorState } from '@codemirror/state'
-import { tags } from '@lezer/highlight'
+import { codeMirrorHighlight, codeMirrorTheme } from '@paideia/ui/code-editor-theme'
 import {
   EditorView,
   drawSelection,
@@ -49,49 +49,9 @@ export interface SqlEditorProps {
 }
 
 /**
- * 用项目令牌给编辑器上色。
- *
- * <p>`&` 选择器让规则挂在编辑器根上，`!important` 不需要——CodeMirror 的默认样式优先级低于
- * 我们后注入的扩展。
+ * 配色与高亮规则在 `@paideia/ui/code-editor-theme`：动手练习的代码编辑器用的是同一份。
+ * 两个编辑区会并排出现在同一条知识条目里，各留一套一定会漂移。
  */
-const theme = EditorView.theme({
-  '&': {
-    fontSize: '13px',
-    backgroundColor: 'var(--muted)',
-    color: 'var(--foreground)',
-    border: '1px solid var(--border)',
-    borderRadius: 'calc(var(--radius) - 2px)',
-  },
-  '.cm-content': {
-    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-    padding: '12px 0',
-  },
-  '.cm-gutters': {
-    backgroundColor: 'transparent',
-    color: 'var(--muted-foreground)',
-    border: 'none',
-  },
-  '.cm-activeLine': { backgroundColor: 'color-mix(in oklab, var(--accent) 40%, transparent)' },
-  '.cm-activeLineGutter': { backgroundColor: 'transparent' },
-  '&.cm-focused': { outline: 'none', borderColor: 'var(--primary)' },
-  '.cm-selectionBackground, ::selection': { backgroundColor: 'var(--accent)' },
-})
-
-/**
- * 语法高亮：只用令牌里的语义色，不引 CodeMirror 自带的 `defaultHighlightStyle`。
- *
- * <p>自带样式是写死的十六进制色，深浅主题切换时不会跟着变——而本项目的配色全在
- * `--color-*` 变量里。所以这里自己定义一份最小的高亮规则。
- */
-const highlightStyle = HighlightStyle.define([
-  { tag: tags.keyword, color: 'var(--primary)', fontWeight: '600' },
-  { tag: [tags.string, tags.special(tags.string)], color: 'var(--success)' },
-  { tag: [tags.number, tags.bool, tags.null], color: 'var(--warning)' },
-  { tag: [tags.comment, tags.lineComment, tags.blockComment], color: 'var(--muted-foreground)', fontStyle: 'italic' },
-  { tag: [tags.operator, tags.punctuation], color: 'var(--muted-foreground)' },
-  { tag: [tags.typeName, tags.className], color: 'var(--info)' },
-  { tag: tags.invalid, color: 'var(--destructive)' },
-])
 
 export function SqlEditor({
   value,
@@ -139,8 +99,8 @@ export function SqlEditor({
       highlightActiveLine(),
       keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, ...completionKeymap, indentWithTab]),
       sql({ dialect: MySQL, schema: schemaRef.current ?? {}, upperCaseKeywords: true }),
-      theme,
-      syntaxHighlighting(highlightStyle),
+      codeMirrorTheme,
+      syntaxHighlighting(codeMirrorHighlight),
       EditorView.updateListener.of((update) => {
         if (update.docChanged) {
           onChangeRef.current(update.state.doc.toString())

@@ -1,11 +1,27 @@
 import { Play } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 
 import { Button } from '../../components/button'
 import { Pill } from './blocks'
 import { useSourceReading, type RunOutput, type TraceResult } from './context'
 import { judgeRun, type RunChallenge, type RunCase } from './schema'
 import { TracePlayer } from './trace-player'
+
+/**
+ * 带高亮与补全的代码编辑器（CodeMirror）。
+ *
+ * <p><b>必须懒加载</b>：本文件在主包里，而编辑器连同 Java/Python 语法约 100 kB gzip。
+ * 静态 import 会让每个进首页的人为它付费，构建守卫 `scripts/check-lazy-editor.mjs` 会拦下。
+ */
+const CodeEditor = lazy(async () => {
+  const module = await import('../../code-editor/editor')
+  return { default: module.CodeEditor }
+})
+
+/** 预热编辑器 chunk：与沙箱探测并行，等用户真要改代码时通常已经下载完。 */
+function preloadEditor(): void {
+  void import('../../code-editor/editor')
+}
 
 /**
  * 运行题型（WORK-015）。
@@ -43,6 +59,7 @@ export function RunBody({
       setReady(false)
       return
     }
+    preloadEditor()
     let alive = true
     sandbox
       .ready()
@@ -140,15 +157,26 @@ export function RunBody({
       <p className="text-muted-foreground text-xs">
         改完点「运行」：会在一次性的隔离环境里执行，没有网络、内存与时间都有上限。
       </p>
-      <textarea
-        value={code}
-        onChange={(event) => setCode(event.target.value)}
-        rows={Math.min(20, Math.max(8, code.split('\n').length + 1))}
-        spellCheck={false}
-        aria-label="练习代码"
-        data-testid="challenge-code"
-        className="border-border bg-muted/30 w-full resize-y rounded-lg border p-3 font-mono text-[12.5px] leading-6 outline-none"
-      />
+      <Suspense
+        fallback={
+          // 编辑器 chunk 还没到时先给可编辑的 textarea：能立刻开始改，到达后无缝换成高亮版
+          <textarea
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+            rows={Math.min(20, Math.max(8, code.split('\n').length + 1))}
+            spellCheck={false}
+            aria-label="练习代码"
+            data-testid="challenge-code"
+            className="border-border bg-muted/30 w-full resize-y rounded-lg border p-3 font-mono text-[12.5px] leading-6 outline-none"
+          />
+        }
+      >
+        <CodeEditor
+          value={code}
+          onChange={setCode}
+          language={challenge.language === 'python' ? 'python' : 'java'}
+        />
+      </Suspense>
       <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"

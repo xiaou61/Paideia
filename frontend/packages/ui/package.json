@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./styles.css": "./src/styles/globals.css",
-    "./vite": "./src/theme/vite-plugin.ts"
+    "./vite": "./src/theme/vite-plugin.ts",
+    "./code-editor-theme": "./src/code-editor/theme.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
@@ -30,6 +31,14 @@
   },
   "dependencies": {
     "@base-ui/react": "1.8.0",
+    "@codemirror/autocomplete": "6.20.4",
+    "@codemirror/commands": "6.11.1",
+    "@codemirror/lang-java": "6.0.2",
+    "@codemirror/lang-python": "6.2.1",
+    "@codemirror/language": "6.13.1",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.15",
+    "@lezer/highlight": "1.2.5",
     "@streamdown/code": "^2.0.0",
     "@streamdown/mermaid": "1.0.3",
     "class-variance-authority": "0.7.1",
