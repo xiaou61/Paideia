@@ -1,3 +1,4 @@
+import { Attach } from '@paideia/assistant'
 import { formatRelative } from '@paideia/core'
 import { MarkdownField, plainText } from '@paideia/knowledge'
 import {
@@ -345,6 +346,13 @@ export function NotesPage() {
                       有未保存的改动
                     </Badge>
                   ) : null}
+                  {/* 递的是**编辑器里的当前内容**（含未保存的改动）——服务端的笔记工具读不到草稿 */}
+                  <Attach
+                    type="note"
+                    id={selected}
+                    label={title.trim() === '' ? '未命名笔记' : title}
+                    excerpt={body}
+                  />
                   <Button size="sm" variant="outline" data-testid="note-share" onClick={() => setShareOpen(true)}>
                     分享
                   </Button>

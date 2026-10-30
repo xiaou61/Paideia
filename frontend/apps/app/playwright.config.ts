@@ -40,6 +40,9 @@ export default defineConfig({
     ...(process.env.PWA_BASE_URL === undefined ? { storageState: AUTH_FILE } : {}),
     // 失败就留 trace：retries 默认 0，`on-first-retry` 永远不会触发（2026-10-26 实测）
     trace: 'retain-on-failure',
+    // 本机没装与 Playwright 版本配套的浏览器时用系统 Chrome（`E2E_CHANNEL=chrome`）。
+    // 不设就是默认行为；两个 project 都继承这一项。
+    ...(process.env.E2E_CHANNEL === undefined ? {} : { channel: process.env.E2E_CHANNEL as 'chrome' }),
   },
   /**
    * 两个 project（WORK-016）：

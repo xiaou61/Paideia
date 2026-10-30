@@ -1,8 +1,9 @@
 import { Alert, AlertDescription, AlertTitle, Button, Markdown, Spinner } from '@paideia/ui'
-import { History, Plus, Send, ThumbsDown, ThumbsUp } from 'lucide-react'
+import { History, Plus, Send, ThumbsDown, ThumbsUp, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { AssistantApi } from './client'
+import { serializeAttachments } from './attachments'
 import { useAssistantContext } from './context'
 import { extractSqlBlock, serializePageContext } from './page-context'
 import { readStoredConversation, storeConversation } from './session-store'
@@ -34,7 +35,7 @@ export function ConversationPanel({
   api: AssistantApi
   onSaveNote?: (note: NoteDraftInput, entryId: number | null) => Promise<unknown>
 }) {
-  const { entryId, entryTitle, harness, pageContext, applySql, pendingPrompt, clearPendingPrompt } =
+  const { entryId, entryTitle, harness, pageContext, attachments, detach, applySql, pendingPrompt, clearPendingPrompt } =
     useAssistantContext()
   const [conversationId, setConversationId] = useState<number | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -247,6 +248,16 @@ export function ConversationPanel({
       previous.map((message, index) => (index === previous.length - 1 ? patch(message) : message)),
     )
 
+  /**
+   * 这一轮要带上的上下文：页面场景 + 对象附件（WORK-058）。
+   *
+   * <p>两者拼成**一段文本**发给服务端，不改成结构化数组：服务端只把它拼进提示词，改数组要动
+   * DTO、SSE 与历史回放三处，收益只是"更好看"（见 WORK-058 的 IC-002）。
+   */
+  const turnContext = [serializePageContext(pageContext), serializeAttachments(attachments)]
+    .filter((part): part is string => part !== undefined)
+    .join('\n\n')
+
   const send = async () => {
     const text = input.trim()
     if (text === '' || busy) {
@@ -297,8 +308,8 @@ export function ConversationPanel({
           }
         },
         controller.signal,
-        // 页面场景：只在这一轮进提示词，不落库（WORK-035 T-15）
-        serializePageContext(pageContext),
+        // 页面场景与附件：只在这一轮进提示词，不落库（WORK-035 T-15 / WORK-058）
+        turnContext === '' ? undefined : turnContext,
       )
       // 这一轮落库了，列表里的更新时间跟着变——顺手刷新，免得列表显示的时间是旧的
     } catch (cause) {
@@ -326,7 +337,12 @@ export function ConversationPanel({
     <div className="flex min-h-0 flex-1 flex-col gap-2" data-testid="conversation-panel">
       <div className="flex items-center justify-between gap-2">
         <p className="text-muted-foreground min-w-0 flex-1 truncate text-xs" data-testid="conversation-context">
-          {entryId === null ? '没有条目上下文，可直接提问。' : `上下文：${entryTitle ?? ''}`}
+          {[
+            entryId === null ? '没有条目上下文，可直接提问。' : `上下文：${entryTitle ?? ''}`,
+            attachments.length === 0 ? null : `附着 ${attachments.length} 个对象`,
+          ]
+            .filter((part) => part !== null)
+            .join(' · ')}
         </p>
         <Button
           variant="ghost"
@@ -590,6 +606,31 @@ export function ConversationPanel({
         <p className="text-muted-foreground text-[11px]" data-testid="conversation-current">
           正在这一段对话里（消息会留在服务端 7 天）
         </p>
+      )}
+
+      {/* 已附着的对象：随时可取下。放在输入框正上方，因为它是"这一条要带上的东西" */}
+      {attachments.length === 0 ? null : (
+        <div className="flex flex-wrap gap-1.5" data-testid="conversation-attachments">
+          {attachments.map((item) => (
+            <span
+              key={item.uri}
+              className="border-border bg-muted/40 inline-flex max-w-full items-center gap-1 rounded-full border py-0.5 pr-1 pl-2 text-[11px]"
+            >
+              <span className="truncate" title={item.uri}>
+                {item.label}
+              </span>
+              <button
+                type="button"
+                aria-label={`取下 ${item.label}`}
+                data-testid={`detach-${item.uri.replace(/[/:]/g, '-')}`}
+                onClick={() => detach(item.uri)}
+                className="hover:bg-accent rounded-full p-0.5"
+              >
+                <X className="size-3" />
+              </button>
+            </span>
+          ))}
+        </div>
       )}
 
       <form

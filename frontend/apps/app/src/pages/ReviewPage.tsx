@@ -1,3 +1,4 @@
+import { Attach } from '@paideia/assistant'
 import { createLearningApi, type ReviewSession, type ReviewSubmitResult } from '@paideia/knowledge'
 import {
   Alert,
@@ -231,21 +232,35 @@ export function ReviewPage() {
           <ul className="grid gap-3" data-testid="review-list">
             {items.map((item) => (
               <li key={item.entryId}>
-                <Link to={`/knowledge/entries/${item.entryId}`} data-testid="review-item">
-                  <Card className="hover:border-primary/40 transition-colors">
-                    <CardContent className="flex flex-wrap items-center gap-3 pt-5">
-                      <RotateCcw className="text-primary size-4 shrink-0" />
-                      <span className="min-w-0 flex-1 font-medium">{item.title}</span>
-                      {item.conceptName === null ? null : (
-                        <Badge variant="secondary">{item.conceptName}</Badge>
-                      )}
-                      <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                        <CalendarClock className="size-3.5" />第 {item.stage} 档 ·{' '}
-                        {new Date(item.reviewDueAt).toLocaleDateString('zh-CN')}
-                      </span>
-                    </CardContent>
-                  </Card>
-                </Link>
+                <Card className="hover:border-primary/40 transition-colors">
+                  <CardContent className="flex flex-wrap items-center gap-3 pt-5">
+                    <RotateCcw className="text-primary size-4 shrink-0" />
+                    {/* 链接只包标题：卡片里还要放「问助手」按钮，按钮套在链接里是嵌套可交互内容 */}
+                    <Link
+                      to={`/knowledge/entries/${item.entryId}`}
+                      data-testid="review-item"
+                      className="min-w-0 flex-1 font-medium underline-offset-4 hover:underline"
+                    >
+                      {item.title}
+                    </Link>
+                    {item.conceptName === null ? null : (
+                      <Badge variant="secondary">{item.conceptName}</Badge>
+                    )}
+                    <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                      <CalendarClock className="size-3.5" />第 {item.stage} 档 ·{' '}
+                      {new Date(item.reviewDueAt).toLocaleDateString('zh-CN')}
+                    </span>
+                    {/* 到期列表里只有条目 id，没有复习项自己的 id：对象就是那条条目，
+                        第几档与到期日放进摘录（WORK-058 的一期做法） */}
+                    <Attach
+                      type="entry"
+                      id={item.entryId}
+                      label={`复习：${item.title}`}
+                      excerpt={`第 ${item.stage} 档，${new Date(item.reviewDueAt).toLocaleDateString('zh-CN')} 到期`}
+                      compact
+                    />
+                  </CardContent>
+                </Card>
               </li>
             ))}
           </ul>

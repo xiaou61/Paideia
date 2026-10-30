@@ -8,6 +8,18 @@
  */
 
 export { AssistantShell } from './assistant-shell'
+export { Attach } from './attach'
+export {
+  ATTACHMENT_EXCERPT_LIMIT,
+  ATTACHMENT_LIMIT,
+  attachmentUri,
+  parseAttachmentUri,
+  putAttachment,
+  removeAttachment,
+  serializeAttachments,
+  type Attachment,
+  type AttachmentType,
+} from './attachments'
 export { createAssistantApi } from './client'
 export type { AssistantApi } from './client'
 export { ConversationPanel } from './conversation-panel'

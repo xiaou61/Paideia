@@ -14,7 +14,12 @@ export const AUTH_FILE = join(tmpdir(), 'paideia-app-e2e-auth.json')
  */
 export default async function globalSetup(config: FullConfig): Promise<void> {
   const baseURL = config.projects[0]?.use?.baseURL ?? 'http://127.0.0.1:5173'
-  const browser = await chromium.launch()
+  // 本机没装与 Playwright 版本配套的浏览器时，用系统 Chrome（E2E_CHANNEL=chrome）。
+  // 不设就是默认行为，CI 与其它机器不受影响。
+  const channel = process.env.E2E_CHANNEL
+  const browser = await chromium.launch(
+    channel === undefined ? {} : { channel: channel as 'chrome' },
+  )
   const context = await browser.newContext({ baseURL })
   const page = await context.newPage()
   await signIn(page)
