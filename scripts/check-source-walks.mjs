@@ -105,7 +105,10 @@ for (const dir of dirs) {
           )
         }
         if (step.predict !== undefined) {
-          const { answer, options } = step.predict
+          const { answer, options, question, reveal } = step.predict
+          if (typeof question !== 'string' || !Array.isArray(options) || typeof reveal !== 'string') {
+            errors.push(`${where}：steps[${index}].predict 需要 question / options / reveal 三个字段`)
+          }
           if (!Array.isArray(options) || !Number.isInteger(answer) || answer < 0 || answer >= options.length) {
             errors.push(`${where}：steps[${index}].predict.answer 下标不合法`)
           }
