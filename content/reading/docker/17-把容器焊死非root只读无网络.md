@@ -25,6 +25,21 @@ status: published
 
 ## 讲解
 
+```sketch
+{
+  "title": "跑不可信代码：几个参数把它焊死",
+  "rows": [
+    [
+      { "id": "user", "title": "--user", "sub": "不是 root", "tone": "blue" },
+      { "id": "ro", "title": "--read-only", "sub": "根文件系统只读", "tone": "blue" },
+      { "id": "cap", "title": "--cap-drop=ALL", "sub": "不留特权", "tone": "blue" },
+      { "id": "net", "title": "断网", "sub": "扫不了内网", "tone": "green" }
+    ]
+  ],
+  "arrows": []
+}
+```
+
 ### 一道请求要过六道门
 
 ```mermaid

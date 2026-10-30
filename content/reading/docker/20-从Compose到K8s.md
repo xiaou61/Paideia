@@ -17,6 +17,20 @@ K8s 只会给你增加一套要维护的分布式系统。判断标准是**痛�
 
 ## 讲解
 
+```sketch
+{
+  "title": "编排解决的是多机、恢复与声明式发布",
+  "rows": [
+    [
+      { "id": "sched", "title": "多机调度", "sub": "容器该放哪一台", "tone": "blue" },
+      { "id": "heal", "title": "自动恢复", "sub": "挂了自动拉起", "tone": "blue" },
+      { "id": "decl", "title": "声明式发布", "sub": "写期望状态，滚动更新", "tone": "green" }
+    ]
+  ],
+  "arrows": []
+}
+```
+
 ### Compose 的能力边界
 
 Compose 能做的：一台机器上定义多个服务、网络、卷、依赖顺序、健康检查、`up/down/logs`。

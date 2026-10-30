@@ -16,6 +16,23 @@ status: published
 
 ## 讲解
 
+```sketch
+{
+  "title": "一条指令变了，后面所有层都失效",
+  "rows": [
+    [
+      { "id": "cache", "title": "按层按内容哈希", "sub": "输入不变就复用", "tone": "blue" },
+      { "id": "break", "title": "某层输入变了", "sub": "它到最后一层全重来", "tone": "amber" },
+      { "id": "order", "title": "把易变的放最后", "sub": "依赖先装、源码后拷", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "cache", "to": "break" },
+    { "from": "break", "to": "order" }
+  ]
+}
+```
+
 ### 缓存怎么判定
 
 ```

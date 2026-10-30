@@ -21,6 +21,23 @@ status: published
 
 ## 讲解
 
+```sketch
+{
+  "title": "一次编排的三段：构建、打包、起服务",
+  "rows": [
+    [
+      { "id": "jar", "title": "先构建 jar", "sub": "在 CI 里做，镜像里不编译", "tone": "gray" },
+      { "id": "image", "title": "打进镜像", "sub": "只拷 jar 和 JRE", "tone": "blue" },
+      { "id": "compose", "title": "compose 起整套", "sub": "app 与 mysql 一起起", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "jar", "to": "image" },
+    { "from": "image", "to": "compose" }
+  ]
+}
+```
+
 ### 目录结构
 
 ```text

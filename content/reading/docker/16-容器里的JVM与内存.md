@@ -24,6 +24,23 @@ Java 服务在容器里跑，`--memory=512m`，堆只设了 `-Xmx256m`，看起�
 
 ## 讲解
 
+```sketch
+{
+  "title": "容器内存上限不等于堆大小",
+  "rows": [
+    [
+      { "id": "cgroup", "title": "cgroup 上限 512m", "sub": "整组进程的硬顶", "tone": "gray" },
+      { "id": "heap", "title": "-Xmx 只管堆", "sub": "元空间、栈、直接内存另算", "tone": "blue" },
+      { "id": "kill", "title": "超了就直接被杀", "sub": "日志里一行都没有", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "cgroup", "to": "heap" },
+    { "from": "heap", "to": "kill" }
+  ]
+}
+```
+
 ### 512MB 的容器里，内存都花在哪
 
 ```mermaid

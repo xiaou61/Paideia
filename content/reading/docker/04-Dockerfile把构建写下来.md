@@ -11,6 +11,23 @@ status: published
 
 镜像不是手工攒出来的，是**用 Dockerfile 描述出来的**。这一关讲四件事：
 
+```sketch
+{
+  "title": "指令顺序决定「改一行要不要等十分钟」",
+  "rows": [
+    [
+      { "id": "deps", "title": "先装依赖", "sub": "很少变，放前面", "tone": "gray" },
+      { "id": "copy", "title": "再拷源码", "sub": "天天变，放后面", "tone": "blue" },
+      { "id": "cache", "title": "缓存才命中", "sub": "前面不变就不用重跑", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "deps", "to": "copy" },
+    { "from": "copy", "to": "cache" }
+  ]
+}
+```
+
 - 常用指令各自干什么、`CMD` 和 `ENTRYPOINT` 到底差在哪；
 - 为什么指令顺序决定了"改一行代码要不要等十分钟"；
 - 多阶段构建怎么把 500MB 的构建工具留在构建阶段、不进运行镜像；

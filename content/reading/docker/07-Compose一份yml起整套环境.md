@@ -13,6 +13,23 @@ status: published
 
 Compose 把这些收进**一个 yml 文件**：`docker compose up -d` 起全部，`down` 收全部。
 
+```sketch
+{
+  "title": "七条 run 收进一个 yml",
+  "rows": [
+    [
+      { "id": "runs", "title": "七条 docker run", "sub": "读的人要自己拼全貌", "tone": "amber" },
+      { "id": "yml", "title": "一份 compose.yml", "sub": "服务、网络、卷、顺序", "tone": "blue" },
+      { "id": "up", "title": "up -d / down", "sub": "一键起停", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "runs", "to": "yml" },
+    { "from": "yml", "to": "up" }
+  ]
+}
+```
+
 ## 为什么用文件而不是脚本
 
 因为 Compose 文件是**声明式的**：它描述"最终应该是什么状态"，而不是"依次执行这些命令"。带来三个实际好处：

@@ -13,6 +13,25 @@ status: published
 
 这一关给一套固定顺序：**先看状态与退出码，再看日志，再看配置，最后才进去**。
 
+```sketch
+{
+  "title": "排查顺序：状态 → 日志 → 配置 → 进去",
+  "rows": [
+    [
+      { "id": "state", "title": "看状态与退出码", "sub": "docker ps -a", "tone": "gray" },
+      { "id": "log", "title": "看日志", "sub": "docker logs", "tone": "blue" },
+      { "id": "conf", "title": "看配置", "sub": "inspect 出的环境与挂载", "tone": "blue" },
+      { "id": "exec", "title": "最后才进去", "sub": "容器还活着时 exec 才有用", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "state", "to": "log" },
+    { "from": "log", "to": "conf" },
+    { "from": "conf", "to": "exec" }
+  ]
+}
+```
+
 ## 为什么顺序重要
 
 因为"进容器"（`docker exec`）**只对正在运行的容器有效**。容器已经 Exited，`exec` 直接报 `container is not running`——很多人卡在这一步，然后去猜。

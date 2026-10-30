@@ -13,6 +13,23 @@ status: published
 
 这一关讲清楚**镜像名的三段结构**，因为它是所有"推不上去、拉不下来"问题的源头。
 
+```sketch
+{
+  "title": "镜像名三段：仓库、名字、标签",
+  "rows": [
+    [
+      { "id": "host", "title": "仓库地址", "sub": "ghcr.io，不写就是 Docker Hub", "tone": "gray" },
+      { "id": "repo", "title": "名字", "sub": "lzf/myapp", "tone": "blue" },
+      { "id": "tag", "title": "标签", "sub": "不写默认 latest", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "host", "to": "repo" },
+    { "from": "repo", "to": "tag" }
+  ]
+}
+```
+
 ## 为什么每个镜像名都长得像地址
 
 因为镜像名本身就是**一个路径**：仓库地址 + 命名空间 + 名字 + 标签。

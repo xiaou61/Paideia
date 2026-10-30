@@ -11,6 +11,25 @@ status: published
 
 `docker run` 有几十个参数，但日常用的就八个。这一关把它们分成四组讲清楚：**跑在哪个模式（前台/后台）、叫什么名字、端口怎么通、用完删不删**。
 
+```sketch
+{
+  "title": "docker run 其实做了四件事",
+  "rows": [
+    [
+      { "id": "pull", "title": "拉镜像", "sub": "本地没有就先拉", "tone": "gray" },
+      { "id": "layer", "title": "建可写层", "sub": "在只读层上叠一层", "tone": "blue" },
+      { "id": "net", "title": "配网络与端口", "sub": "端口映射在这一步", "tone": "blue" },
+      { "id": "start", "title": "起进程", "sub": "前台还是后台看 -d", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "pull", "to": "layer" },
+    { "from": "layer", "to": "net" },
+    { "from": "net", "to": "start" }
+  ]
+}
+```
+
 顺带解决四条高频报错：`port is already allocated`、`name is already in use`、`permission denied ... docker.sock`、`exec format error`。
 
 ## 为什么 `run` 其实做了四件事
