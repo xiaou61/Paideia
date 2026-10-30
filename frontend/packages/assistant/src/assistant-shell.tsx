@@ -3,6 +3,7 @@ import { Sparkles, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 
 import type { AssistantApi } from './client'
+import type { Attachment } from './attachments'
 import { ConversationPanel } from './conversation-panel'
 import { CreditsPanel } from './credits-panel'
 import { MemoryPanel } from './memory-panel'
@@ -144,12 +145,15 @@ export function AssistantShell({
   api,
   onSaveNote,
   onOpenUri,
+  searchObjects,
 }: {
   api: AssistantApi
   /** 由应用注入：本包不认识笔记，只负责把"这一段话"交出去。 */
   onSaveNote?: (note: NoteDraftInput, entryId: number | null) => Promise<unknown>
   /** 由应用注入：把被附着的对象打开（WORK-058）。本包不认识路由。 */
   onOpenUri?: (uri: string) => void
+  /** 由应用注入：`@` 引用的搜索（WORK-058）。本包不认识业务检索端点。 */
+  searchObjects?: (query: string) => Promise<Attachment[]>
 }) {
   const { entryId, entryTitle, onlyMine, setOnlyMine, pendingPrompt, revealSeq } = useAssistantContext()
   const [panel, setPanel] = useState<PanelState>(readPanelState)
@@ -484,7 +488,12 @@ export function AssistantShell({
 
       <div className="safe-b flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
         {tab === 'chat' ? (
-          <ConversationPanel api={api} onSaveNote={onSaveNote} onOpenUri={onOpenUri} />
+          <ConversationPanel
+            api={api}
+            onSaveNote={onSaveNote}
+            onOpenUri={onOpenUri}
+            searchObjects={searchObjects}
+          />
         ) : tab === 'memory' ? (
           <MemoryPanel api={api} />
         ) : tab === 'credits' ? (

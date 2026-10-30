@@ -3,7 +3,8 @@ import { History, Plus, Send, ThumbsDown, ThumbsUp, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { AssistantApi } from './client'
-import { parseAttachmentUri, serializeAttachments } from './attachments'
+import { parseAttachmentUri, serializeAttachments, type Attachment } from './attachments'
+import { findMention, stripMention } from './mention'
 import { useAssistantContext } from './context'
 import { extractSqlBlock, serializePageContext } from './page-context'
 import { readStoredConversation, storeConversation } from './session-store'
@@ -32,6 +33,7 @@ export function ConversationPanel({
   api,
   onSaveNote,
   onOpenUri,
+  searchObjects,
 }: {
   api: AssistantApi
   onSaveNote?: (note: NoteDraftInput, entryId: number | null) => Promise<unknown>
@@ -40,8 +42,13 @@ export function ConversationPanel({
    * 这类地址，只把 uri 交出去。
    */
   onOpenUri?: (uri: string) => void
+  /**
+   * `@` 引用的搜索（WORK-058）。**业务接口也由应用决定**：本包不认识知识库与笔记的检索端点，
+   * 只要求"给个关键词、还一组可附着的对象"。不传就不显示 `@` 提示。
+   */
+  searchObjects?: (query: string) => Promise<Attachment[]>
 }) {
-  const { entryId, entryTitle, harness, pageContext, attachments, detach, applySql, pendingPrompt, clearPendingPrompt } =
+  const { entryId, entryTitle, harness, pageContext, attachments, attach, detach, applySql, pendingPrompt, clearPendingPrompt } =
     useAssistantContext()
   const [conversationId, setConversationId] = useState<number | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -50,6 +57,11 @@ export function ConversationPanel({
   /** 正在从服务端恢复历史——期间不显示"问点什么吧"的空态，否则会闪一下"没有对话"。 */
   const [restoring, setRestoring] = useState(true)
   const [input, setInput] = useState('')
+  /** `@` 引用（WORK-058）：`mention` 为 null 表示光标当前不在引用里。 */
+  const [mention, setMention] = useState<{ start: number; query: string } | null>(null)
+  const [candidates, setCandidates] = useState<Attachment[]>([])
+  const [activeCandidate, setActiveCandidate] = useState(0)
+  const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [savedIndexes, setSavedIndexes] = useState<number[]>([])
@@ -263,6 +275,56 @@ export function ConversationPanel({
   const turnContext = [serializePageContext(pageContext), serializeAttachments(attachments)]
     .filter((part): part is string => part !== undefined)
     .join('\n\n')
+
+  /** 光标一变就重算"是否正在引用"：点选、方向键移动、输入都走同一条规则。 */
+  const syncMention = (value: string) => {
+    if (searchObjects === undefined) {
+      return
+    }
+    const caret = inputRef.current?.selectionStart ?? value.length
+    setMention(findMention(value, caret))
+  }
+
+  useEffect(() => {
+    if (mention === null || searchObjects === undefined) {
+      setCandidates([])
+      return
+    }
+    let alive = true
+    // 每敲一个字都会重建 mention：短延迟一次，别把接口打成逐字请求
+    const timer = setTimeout(() => {
+      searchObjects(mention.query)
+        .then((list) => {
+          if (!alive) {
+            return
+          }
+          setCandidates(list.slice(0, 8))
+          setActiveCandidate(0)
+        })
+        .catch(() => {
+          // 搜不到就是没候选：不报错，用户继续打字即可
+          if (alive) {
+            setCandidates([])
+          }
+        })
+    }, 180)
+    return () => {
+      alive = false
+      clearTimeout(timer)
+    }
+  }, [mention, searchObjects])
+
+  /** 选中候选：把 `@查询` 从输入里删掉，对象进附件栈。 */
+  const pickCandidate = (candidate: Attachment) => {
+    if (mention === null) {
+      return
+    }
+    const caret = inputRef.current?.selectionStart ?? input.length
+    setInput(stripMention(input, mention.start, caret))
+    setMention(null)
+    setCandidates([])
+    attach(candidate)
+  }
 
   const send = async () => {
     const text = input.trim()
@@ -652,6 +714,33 @@ export function ConversationPanel({
         </div>
       )}
 
+      {/* `@` 引用的候选：方向键选、回车确定、Esc 关掉 */}
+      {mention === null || candidates.length === 0 ? null : (
+        <ul
+          role="listbox"
+          aria-label="可附着的对象"
+          data-testid="mention-list"
+          className="border-border bg-popover max-h-56 space-y-0.5 overflow-y-auto rounded-lg border p-1.5 shadow-sm"
+        >
+          {candidates.map((item, index) => (
+            <li key={item.uri} role="option" aria-selected={index === activeCandidate}>
+              <button
+                type="button"
+                data-testid={`mention-${index}`}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => pickCandidate(item)}
+                className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs ${
+                  index === activeCandidate ? 'bg-accent' : 'hover:bg-accent/50'
+                }`}
+              >
+                <span className="truncate">{item.label}</span>
+                <span className="text-muted-foreground ml-auto shrink-0 text-[10px]">{item.uri}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
       <form
         className="border-border bg-background focus-within:border-ring focus-within:ring-ring/40 flex items-end gap-2 rounded-xl border p-2 transition-colors focus-within:ring-3"
         onSubmit={(event) => {
@@ -660,10 +749,41 @@ export function ConversationPanel({
         }}
       >
         <textarea
+          ref={inputRef}
           value={input}
-          onChange={(event) => setInput(event.target.value)}
+          onChange={(event) => {
+            setInput(event.target.value)
+            syncMention(event.target.value)
+          }}
+          // 点选与方向键移动不触发 change，但同样会改变"是否还在引用"
+          onClick={(event) => syncMention(event.currentTarget.value)}
+          onKeyUp={(event) => syncMention(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if (mention === null || candidates.length === 0) {
+              return
+            }
+            if (event.key === 'ArrowDown') {
+              event.preventDefault()
+              setActiveCandidate((current) => (current + 1) % candidates.length)
+            } else if (event.key === 'ArrowUp') {
+              event.preventDefault()
+              setActiveCandidate((current) => (current - 1 + candidates.length) % candidates.length)
+            } else if (event.key === 'Enter') {
+              const pick = candidates[activeCandidate]
+              if (pick !== undefined) {
+                // 回车选中，而不是把半截 `@查询` 发出去
+                event.preventDefault()
+                pickCandidate(pick)
+              }
+            } else if (event.key === 'Escape') {
+              event.preventDefault()
+              setMention(null)
+            }
+          }}
           rows={2}
-          placeholder="问点什么…"
+          placeholder={
+            searchObjects === undefined ? '问点什么…' : '问点什么…（输入 @ 引用笔记或条目）'
+          }
           data-testid="conversation-input"
           className="placeholder:text-muted-foreground min-h-0 flex-1 resize-none bg-transparent px-1.5 py-1 text-sm leading-6 outline-none"
         />

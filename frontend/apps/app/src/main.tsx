@@ -1,5 +1,12 @@
-import { AssistantProvider, AssistantShell, createAssistantApi, parseAttachmentUri } from '@paideia/assistant'
+import {
+  AssistantProvider,
+  AssistantShell,
+  createAssistantApi,
+  parseAttachmentUri,
+  type Attachment,
+} from '@paideia/assistant'
 import { AuthProvider, useAuth } from '@paideia/auth'
+import { createKnowledgeApi } from '@paideia/knowledge'
 import { ThemeProvider } from '@paideia/ui'
 import '@paideia/ui/styles.css'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -8,7 +15,7 @@ import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router'
 
 import { auth } from './auth'
-import { saveNote } from './notes-api'
+import { notes, saveNote } from './notes-api'
 import { platform } from './host'
 import { PlatformProvider } from './platform'
 import { router } from './router'
@@ -18,6 +25,9 @@ import { router } from './router'
  * 因此它同样不认识令牌本身。
  */
 const assistantApi = createAssistantApi(auth.api)
+
+/** `@` 引用要用的检索（WORK-058）：与页面同一个 api，因此同样带令牌与 401 刷新重放。 */
+const knowledgeApi = createKnowledgeApi(auth.api)
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -75,6 +85,35 @@ function DesktopOauthBridge() {
 }
 
 /**
+ * `@` 引用的搜索（WORK-058）。
+ *
+ * <p>笔记走**本地过滤**（服务端没有笔记检索端点，列表本来就全量返回）；条目走服务端检索。
+ * 两边都用 `allSettled`：一边失败不该让另一边也空着。
+ *
+ * <p>shortcut: 每次 `@` 都会拉一次全量笔记列表，笔记上千条时这里会变慢，届时给笔记加检索端点。
+ */
+async function searchAttachments(query: string): Promise<Attachment[]> {
+  const keyword = query.trim()
+  const [notesResult, entriesResult] = await Promise.allSettled([
+    notes.list(),
+    knowledgeApi.entries(keyword === '' ? { size: 5 } : { q: keyword, size: 5 }),
+  ])
+  const found: Attachment[] = []
+  if (notesResult.status === 'fulfilled') {
+    const matched = notesResult.value.filter((item) => keyword === '' || item.title.includes(keyword))
+    for (const note of matched.slice(0, 5)) {
+      found.push({ uri: `note:${note.id}`, label: `笔记：${note.title}` })
+    }
+  }
+  if (entriesResult.status === 'fulfilled') {
+    for (const entry of entriesResult.value.items.slice(0, 5)) {
+      found.push({ uri: `entry:${entry.id}`, label: `条目：${entry.title}` })
+    }
+  }
+  return found
+}
+
+/**
  * 打开被附着的对象（WORK-058）。
  *
  * <p>uri 是助手的通用名字，路由是本应用的私事——助手包只把字符串交出来，怎么跳由这里决定。
@@ -125,7 +164,14 @@ function AssistantMount() {
     return null
   }
   // 把助手的回答接上笔记：助手包不认识笔记，这层接线放在组合根
-  return <AssistantShell api={assistantApi} onSaveNote={saveNote} onOpenUri={openAttachment} />
+  return (
+    <AssistantShell
+      api={assistantApi}
+      onSaveNote={saveNote}
+      onOpenUri={openAttachment}
+      searchObjects={searchAttachments}
+    />
+  )
 }
 
 const container = document.getElementById('root')
