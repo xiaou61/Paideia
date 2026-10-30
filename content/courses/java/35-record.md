@@ -116,6 +116,23 @@ record Order(String id, List<String> items) {}
 
 `items` 这个**引用**不能换，但 `items.add(...)` 仍然能改列表内容。如果需要真正不可变，在构造器里拷一份：
 
+```sketch
+{
+  "title": "final 锁住的是引用，不是里面的内容",
+  "rows": [
+    [
+      { "id": "field", "title": "record 的字段", "sub": "final，引用换不了", "tone": "green" },
+      { "id": "list", "title": "指向一个 List", "sub": "这个 List 本身没锁", "tone": "amber" },
+      { "id": "mutate", "title": "items.add(...)", "sub": "内容照样能改", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "field", "to": "list" },
+    { "from": "list", "to": "mutate" }
+  ]
+}
+```
+
 ```text
 record Order(String id, List<String> items) {
     Order {

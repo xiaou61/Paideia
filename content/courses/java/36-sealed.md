@@ -82,6 +82,25 @@ public class Main {
 
 如果写了 `default`，新增类型会被悄悄归到默认分支，运行时才可能发现行为错了。**这正是 sealed 最大的价值**。
 
+```sketch
+{
+  "title": "封闭家族全列出来，漏一个就编译失败",
+  "rows": [
+    [ { "id": "sealed", "title": "sealed Shape", "sub": "permits 写明全部子类型", "tone": "gray" } ],
+    [
+      { "id": "c", "title": "Circle", "sub": "一种实现", "tone": "blue" },
+      { "id": "s", "title": "Square", "sub": "另一种实现", "tone": "blue" },
+      { "id": "t", "title": "新加的 Triangle", "sub": "switch 会立刻编译失败", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "sealed", "to": "c" },
+    { "from": "sealed", "to": "s" },
+    { "from": "sealed", "to": "t" }
+  ]
+}
+```
+
 ### sealed 的三种子类型
 
 | 子类型修饰 | 含义 |

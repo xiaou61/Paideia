@@ -52,6 +52,26 @@ switch (day) {
 
 每个箭头分支只执行自己，不需要 `break`。传统冒号写法会从匹配的那一行一直往下执行，直到遇到 `break`——这是 `switch` 最著名的坑。
 
+```sketch
+{
+  "title": "冒号写法会往下漏，箭头写法只走自己",
+  "rows": [
+    [
+      { "id": "colon", "title": "case 1:", "sub": "忘了写 break", "tone": "amber" },
+      { "id": "fall", "title": "继续执行 case 2", "sub": "一直漏到 break 为止", "tone": "amber" }
+    ],
+    [
+      { "id": "arrow", "title": "case 1 ->", "sub": "执行完就结束", "tone": "green" },
+      { "id": "stop", "title": "不会碰到下一支", "sub": "不用再想 break", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "colon", "to": "fall" },
+    { "from": "arrow", "to": "stop" }
+  ]
+}
+```
+
 ### 当表达式用
 
 `switch` 现在可以直接算出值：

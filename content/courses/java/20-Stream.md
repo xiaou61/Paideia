@@ -59,6 +59,25 @@ users.stream().filter(u -> u.age() >= 18);      // 什么都不会发生
 users.stream().filter(u -> u.age() >= 18).count();  // 这时才真的遍历
 ```
 
+```sketch
+{
+  "title": "数据从源头流过每一站，最后被收成结果",
+  "rows": [
+    [
+      { "id": "src", "title": "List<User>", "sub": "数据源", "tone": "gray" },
+      { "id": "filter", "title": "filter 年龄 ≥ 18", "sub": "留下满足条件的", "tone": "blue" },
+      { "id": "map", "title": "map 取名字", "sub": "一个换一个", "tone": "blue" },
+      { "id": "end", "title": "collect 收成 List", "sub": "终结操作，这时才执行", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "src", "to": "filter" },
+    { "from": "filter", "to": "map" },
+    { "from": "map", "to": "end" }
+  ]
+}
+```
+
 ### `filter`：留下满足条件的
 
 ```java

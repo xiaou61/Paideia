@@ -62,6 +62,23 @@ int hashCode()                 // 内容对应的整数指纹
 
 如果两个对象 `equals` 相等但 `hashCode` 不同，它们会被放进**不同的桶**——第二步永远不会发生，于是"明明放进去过，却找不到"。
 
+```sketch
+{
+  "title": "先算 hashCode 找桶，再在桶里用 equals 比",
+  "rows": [
+    [
+      { "id": "key", "title": "放进去的 key", "sub": "一个 Point(1, 2)", "tone": "gray" },
+      { "id": "hash", "title": "hashCode()", "sub": "算出桶下标", "tone": "blue" },
+      { "id": "bucket", "title": "落到那个桶", "sub": "桶里用 equals 逐个比", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "key", "to": "hash" },
+    { "from": "hash", "to": "bucket" }
+  ]
+}
+```
+
 ```java
 class Point {
     final int x, y;

@@ -70,6 +70,28 @@ static void reassign(Student s) { s = new Student("新", 0); }
 
 **这就是"引用传递"这个说法的错处**：它让人以为 reassign 会生效。准确说法是"传引用的值"。
 
+```sketch
+{
+  "title": "传进去的永远是副本",
+  "rows": [
+    [
+      { "id": "num", "title": "int x", "sub": "副本是那个数字", "tone": "gray" },
+      { "id": "numCopy", "title": "方法里的 x", "sub": "改成 99，外面不变", "tone": "amber" }
+    ],
+    [
+      { "id": "obj", "title": "Student s", "sub": "副本是那个引用", "tone": "gray" },
+      { "id": "objCopy", "title": "方法里的 s", "sub": "指向同一个对象", "tone": "blue" },
+      { "id": "real", "title": "同一个对象", "sub": "改字段外面看得到", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "num", "to": "numCopy" },
+    { "from": "obj", "to": "objCopy" },
+    { "from": "objCopy", "to": "real" }
+  ]
+}
+```
+
 ### `null`
 
 引用类型默认值是 `null`。访问 `null` 的字段或方法抛 `NullPointerException`。
