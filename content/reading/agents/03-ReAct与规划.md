@@ -11,6 +11,24 @@ status: published
 
 ReAct 的意思是 **Reason + Act**：让模型在同一个循环里交替"想"和"做"，而不是先想完全部再一口气执行。
 
+```sketch
+{
+  "title": "ReAct：想一想、做一次、看结果，再来一轮",
+  "rows": [
+    [
+      { "id": "think", "title": "思考", "sub": "下一步该做什么", "tone": "gray" },
+      { "id": "act", "title": "行动", "sub": "调一个工具", "tone": "blue" },
+      { "id": "obs", "title": "观察", "sub": "拿到真实结果", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "think", "to": "act" },
+    { "from": "act", "to": "obs" },
+    { "from": "obs", "to": "think", "label": "结果不对再来一轮", "style": "back" }
+  ]
+}
+```
+
 它解决的是一个很具体的问题：**模型如果先规划完整步骤再动手，第一步拿到的事实和计划不符时，它不会回头改计划**。边做边看，才能在信息不全时修正。
 
 ## 为什么"先想清楚再动手"会翻车

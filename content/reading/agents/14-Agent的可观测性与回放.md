@@ -11,6 +11,21 @@ status: published
 
 Agent 出问题时，最没用的一句话是"模型不行"。有用的问题是：**哪一步、花了多少、卡了多久、为什么失败。**
 
+```sketch
+{
+  "title": "出问题时要能回答这四问",
+  "rows": [
+    [
+      { "id": "where", "title": "哪一步", "sub": "第几轮、哪个工具", "tone": "gray" },
+      { "id": "cost", "title": "花了多少", "sub": "token 与耗时", "tone": "blue" },
+      { "id": "stuck", "title": "卡了多久", "sub": "哪一次调用时间长", "tone": "blue" },
+      { "id": "why", "title": "为什么失败", "sub": "报错原文与入参", "tone": "green" }
+    ]
+  ],
+  "arrows": []
+}
+```
+
 可观测性不是"多打日志"，而是把一次任务拆成可查询的结构：
 
 1. **trace 与 span**：一次任务是一条 trace，每次模型调用、工具调用、检索、校验、重试是一个 span；

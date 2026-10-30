@@ -11,6 +11,23 @@ status: published
 
 模型**本身不能做任何事**。它只会输出文本。所谓"调用工具"，全过程是这样的：
 
+```sketch
+{
+  "title": "模型只出文本，干活的是宿主",
+  "rows": [
+    [
+      { "id": "model", "title": "模型输出", "sub": "一段「要调哪个工具」的 JSON", "tone": "gray" },
+      { "id": "host", "title": "宿主解析并执行", "sub": "真正调用函数或 HTTP", "tone": "blue" },
+      { "id": "back", "title": "结果塞回上下文", "sub": "模型再决定下一步", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "model", "to": "host" },
+    { "from": "host", "to": "back" }
+  ]
+}
+```
+
 1. 你在请求里附上一份**工具清单**（名字、用途、参数结构）；
 2. 模型输出一段结构化文本，表示"我想调 `search_code`，参数是 `{"q": "OrderMapper"}`"；
 3. **你的代码**解析这段文本、真的去执行、把结果拼成一条新消息；
