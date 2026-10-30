@@ -143,10 +143,13 @@ function storePanelState(state: PanelState): void {
 export function AssistantShell({
   api,
   onSaveNote,
+  onOpenUri,
 }: {
   api: AssistantApi
   /** 由应用注入：本包不认识笔记，只负责把"这一段话"交出去。 */
   onSaveNote?: (note: NoteDraftInput, entryId: number | null) => Promise<unknown>
+  /** 由应用注入：把被附着的对象打开（WORK-058）。本包不认识路由。 */
+  onOpenUri?: (uri: string) => void
 }) {
   const { entryId, entryTitle, onlyMine, setOnlyMine, pendingPrompt, revealSeq } = useAssistantContext()
   const [panel, setPanel] = useState<PanelState>(readPanelState)
@@ -481,7 +484,7 @@ export function AssistantShell({
 
       <div className="safe-b flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
         {tab === 'chat' ? (
-          <ConversationPanel api={api} onSaveNote={onSaveNote} />
+          <ConversationPanel api={api} onSaveNote={onSaveNote} onOpenUri={onOpenUri} />
         ) : tab === 'memory' ? (
           <MemoryPanel api={api} />
         ) : tab === 'credits' ? (

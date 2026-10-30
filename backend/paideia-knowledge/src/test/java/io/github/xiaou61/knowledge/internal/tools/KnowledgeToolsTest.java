@@ -142,6 +142,18 @@ class KnowledgeToolsTest {
     }
 
     @Test
+    void getEntryAcceptsObjectUri() {
+        // 前端递过来的附件是 entry:123 这种引用（WORK-058）；选中片段带 /selection 后缀也认
+        assertThat(new KnowledgeTools.GetEntry(KNOWLEDGE).call(CALLER, Map.of("uri", "entry:1")).text())
+                .contains("单体的边界");
+        assertThat(new KnowledgeTools.GetEntry(KNOWLEDGE).call(CALLER, Map.of("uri", "entry:1/selection")).text())
+                .contains("单体的边界");
+        // 类型不符不能当成别的对象读
+        assertThat(new KnowledgeTools.GetEntry(KNOWLEDGE).call(CALLER, Map.of("uri", "note:1")).error())
+                .isTrue();
+    }
+
+    @Test
     void descriptorsAreReadOnlyAndInKnowledgeToolset() {
         List<ToolDescriptor> descriptors = List.of(
                 new KnowledgeTools.Search(KNOWLEDGE).descriptor(),

@@ -6,6 +6,7 @@ import io.github.xiaou61.platform.ToolContext;
 import io.github.xiaou61.platform.ToolDescriptor;
 import io.github.xiaou61.platform.ToolResult;
 import io.github.xiaou61.platform.ToolScope;
+import io.github.xiaou61.platform.ToolUri;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Component;
@@ -76,18 +77,26 @@ public final class NoteTools {
         public ToolDescriptor descriptor() {
             return new ToolDescriptor(
                     "note_get", "note", "读取笔记正文",
-                    "按 id 读取**当前调用者自己**的一篇笔记全文。id 一般来自 note_list。"
+                    "按 id 读取**当前调用者自己**的一篇笔记全文。id 一般来自 note_list，"
+                            + "或用户递过来的对象引用（uri，如 note:45）。"
                             + "不存在或不是本人的都返回「没有找到」——两种情况刻意不区分。",
-                    objectSchema(Map.of("noteId", Map.of("type", "integer", "description", "笔记 id"))),
+                    objectSchema(Map.of(
+                            "noteId", Map.of("type", "integer", "description", "笔记 id"),
+                            "uri", Map.of("type", "string",
+                                    "description", "对象引用，如 note:45；传了就优先于 noteId"))),
                     null, true, false, true, ToolScope.READ, true);
         }
 
         @Override
         public ToolResult call(ToolContext context, Map<String, Object> arguments) {
-            Long id = longOf(arguments, "noteId");
-            if (id == null) {
-                return ToolResult.fail("缺少 noteId");
+            Long fromArgs = longOf(arguments, "noteId");
+            if (fromArgs == null) {
+                fromArgs = ToolUri.numericId(stringOf(arguments, "uri"), "note").orElse(null);
             }
+            if (fromArgs == null) {
+                return ToolResult.fail("缺少 noteId 或 uri（如 note:45）");
+            }
+            long id = fromArgs;
             return notes.find(context.userId(), id)
                     .map(note -> ToolResult.ok("标题：" + note.title() + "\n\n" + note.body()))
                     .orElseGet(() -> ToolResult.fail("没有找到 id=" + id + " 的笔记"));

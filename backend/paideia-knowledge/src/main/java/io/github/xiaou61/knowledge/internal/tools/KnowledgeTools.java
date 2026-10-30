@@ -6,6 +6,7 @@ import io.github.xiaou61.platform.ToolContext;
 import io.github.xiaou61.platform.ToolDescriptor;
 import io.github.xiaou61.platform.ToolResult;
 import io.github.xiaou61.platform.ToolScope;
+import io.github.xiaou61.platform.ToolUri;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Component;
@@ -83,19 +84,26 @@ public final class KnowledgeTools {
         public ToolDescriptor descriptor() {
             return new ToolDescriptor(
                     "knowledge_get_entry", "knowledge", "读取知识条目正文",
-                    "按 id 读取一篇**已发布**知识条目的标题与正文。id 一般来自 knowledge_search 的结果。"
+                    "按 id 读取一篇**已发布**知识条目的标题与正文。id 一般来自 knowledge_search 的结果，"
+                            + "或用户递过来的对象引用（uri，如 entry:123）。"
                             + "条目不存在或尚未发布时返回「没有找到」——两种情况刻意不区分。",
                     objectSchema(Map.of(
-                            "entryId", Map.of("type", "integer", "description", "条目 id"))),
+                            "entryId", Map.of("type", "integer", "description", "条目 id"),
+                            "uri", Map.of("type", "string",
+                                    "description", "对象引用，如 entry:123；传了就优先于 entryId"))),
                     null, true, false, true, ToolScope.READ, true);
         }
 
         @Override
         public ToolResult call(ToolContext context, Map<String, Object> arguments) {
-            Long id = longOf(arguments, "entryId");
-            if (id == null) {
-                return ToolResult.fail("缺少 entryId");
+            Long fromArgs = longOf(arguments, "entryId");
+            if (fromArgs == null) {
+                fromArgs = ToolUri.numericId(stringOf(arguments, "uri"), "entry").orElse(null);
             }
+            if (fromArgs == null) {
+                return ToolResult.fail("缺少 entryId 或 uri（如 entry:123）");
+            }
+            long id = fromArgs;
             return knowledge.findPublishedContent(id)
                     .map(entry -> ToolResult.ok("标题：" + entry.title() + "\n\n" + entry.body()))
                     .orElseGet(() -> ToolResult.fail("没有找到 id=" + id + " 的已发布条目"));

@@ -3,7 +3,7 @@ import { History, Plus, Send, ThumbsDown, ThumbsUp, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { AssistantApi } from './client'
-import { serializeAttachments } from './attachments'
+import { parseAttachmentUri, serializeAttachments } from './attachments'
 import { useAssistantContext } from './context'
 import { extractSqlBlock, serializePageContext } from './page-context'
 import { readStoredConversation, storeConversation } from './session-store'
@@ -31,9 +31,15 @@ import type { ChatMessage, ConversationView, NoteDraftInput } from './types'
 export function ConversationPanel({
   api,
   onSaveNote,
+  onOpenUri,
 }: {
   api: AssistantApi
   onSaveNote?: (note: NoteDraftInput, entryId: number | null) => Promise<unknown>
+  /**
+   * 打开一条被附着的对象（WORK-058）。**路由由应用决定**：本包不认识 `/knowledge/entries/123`
+   * 这类地址，只把 uri 交出去。
+   */
+  onOpenUri?: (uri: string) => void
 }) {
   const { entryId, entryTitle, harness, pageContext, attachments, detach, applySql, pendingPrompt, clearPendingPrompt } =
     useAssistantContext()
@@ -616,9 +622,22 @@ export function ConversationPanel({
               key={item.uri}
               className="border-border bg-muted/40 inline-flex max-w-full items-center gap-1 rounded-full border py-0.5 pr-1 pl-2 text-[11px]"
             >
-              <span className="truncate" title={item.uri}>
-                {item.label}
-              </span>
+              {/* 能定位的对象可点回去；合成对象（如关卡）没有路由就保持纯文本 */}
+              {onOpenUri === undefined || parseAttachmentUri(item.uri) === null ? (
+                <span className="truncate" title={item.uri}>
+                  {item.label}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="truncate underline-offset-2 hover:underline"
+                  title={`打开 ${item.uri}`}
+                  data-testid={`open-${item.uri.replace(/[/:]/g, '-')}`}
+                  onClick={() => onOpenUri(item.uri)}
+                >
+                  {item.label}
+                </button>
+              )}
               <button
                 type="button"
                 aria-label={`取下 ${item.label}`}

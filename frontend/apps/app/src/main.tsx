@@ -1,4 +1,4 @@
-import { AssistantProvider, AssistantShell, createAssistantApi } from '@paideia/assistant'
+import { AssistantProvider, AssistantShell, createAssistantApi, parseAttachmentUri } from '@paideia/assistant'
 import { AuthProvider, useAuth } from '@paideia/auth'
 import { ThemeProvider } from '@paideia/ui'
 import '@paideia/ui/styles.css'
@@ -75,6 +75,40 @@ function DesktopOauthBridge() {
 }
 
 /**
+ * 打开被附着的对象（WORK-058）。
+ *
+ * <p>uri 是助手的通用名字，路由是本应用的私事——助手包只把字符串交出来，怎么跳由这里决定。
+ * **认不出来就什么也不做**：宁可不动，也不要跳到一个猜出来的地址。
+ */
+function openAttachment(uri: string) {
+  const parsed = parseAttachmentUri(uri)
+  if (parsed === null) {
+    return
+  }
+  const head = parsed.id.split('/')[0] ?? ''
+  if (parsed.type === 'entry' && head !== '') {
+    void router.navigate(`/knowledge/entries/${head}`)
+    return
+  }
+  if (parsed.type === 'note' && Number.isFinite(Number(head))) {
+    // 笔记页本来就是用路由 state 选中一条（新建后跳转也走这条路）
+    void router.navigate('/notes', { state: { selected: Number(head) } })
+    return
+  }
+  if (parsed.type === 'track') {
+    void router.navigate(`/learn/${parsed.id}`)
+    return
+  }
+  if (parsed.type === 'book') {
+    void router.navigate(`/books/${parsed.id}`)
+    return
+  }
+  if (parsed.type === 'resume' && Number.isFinite(Number(head))) {
+    void router.navigate(`/resume/${head}`)
+  }
+}
+
+/**
  * 助手壳的挂载门。
  *
  * <p><b>必须等真正登录之后再挂</b>：壳一挂载就会去读"我的凭据"，那是受保护端点。
@@ -91,7 +125,7 @@ function AssistantMount() {
     return null
   }
   // 把助手的回答接上笔记：助手包不认识笔记，这层接线放在组合根
-  return <AssistantShell api={assistantApi} onSaveNote={saveNote} />
+  return <AssistantShell api={assistantApi} onSaveNote={saveNote} onOpenUri={openAttachment} />
 }
 
 const container = document.getElementById('root')
