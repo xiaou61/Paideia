@@ -57,6 +57,25 @@ with open("data.csv", newline="", encoding="utf-8-sig") as handle:
 
 先把"坏"分类，再决定每类怎么处理。最怕的是不分类就一句 `try/except` 全吞掉。
 
+```sketch
+{
+  "title": "一条流水线：读 → 校验 → 清洗 → 汇总",
+  "rows": [
+    [
+      { "id": "raw", "title": "原始 CSV", "sub": "别人给的，什么都有", "tone": "gray" },
+      { "id": "check", "title": "逐行校验", "sub": "缺列、脏值都挑出来", "tone": "blue" },
+      { "id": "clean", "title": "清洗后的行", "sub": "字段都合规", "tone": "blue" },
+      { "id": "report", "title": "汇总报表", "sub": "Counter 一算就出", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "raw", "to": "check" },
+    { "from": "check", "to": "clean" },
+    { "from": "clean", "to": "report" }
+  ]
+}
+```
+
 | 问题 | 典型样子 | 这一课的处理 | 不能怎么做 |
 | --- | --- | --- | --- |
 | 空值 | `amount` 为空、`"None"`、`category` 为空 | 跳过，并计入跳过数 | 当成 `0` 参与求和 |
