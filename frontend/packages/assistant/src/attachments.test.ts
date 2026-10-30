@@ -76,6 +76,15 @@ describe('serializeAttachments', () => {
     expect(text).toContain('一段正文')
   })
 
+  it('首行是给服务端读的 URI 汇总（改格式要同步 AttachmentUris.java）', () => {
+    const text =
+      serializeAttachments([
+        { uri: 'entry:12', label: 'x' },
+        { uri: 'note:3', label: 'y' },
+      ]) ?? ''
+    expect(text.split('\n')[0]).toBe('附着对象：entry:12, note:3')
+  })
+
   it('单条摘录超长时按上限截断并写明还剩多少', () => {
     const long = 'x'.repeat(ATTACHMENT_EXCERPT_LIMIT + 20)
     const text = serializeAttachments([{ uri: 'note:1', label: 'n', excerpt: long }]) ?? ''

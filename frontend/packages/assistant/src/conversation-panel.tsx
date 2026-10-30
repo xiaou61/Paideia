@@ -1,9 +1,11 @@
 import { Alert, AlertDescription, AlertTitle, Button, Markdown, Spinner } from '@paideia/ui'
 import { History, Plus, Send, ThumbsDown, ThumbsUp, X } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import type { AssistantApi } from './client'
 import { parseAttachmentUri, serializeAttachments, type Attachment } from './attachments'
+import { linkifyCitations } from './citation'
+import { CitationLink } from './citation-link'
 import { findMention, stripMention } from './mention'
 import { useAssistantContext } from './context'
 import { extractSqlBlock, serializePageContext } from './page-context'
@@ -276,6 +278,29 @@ export function ConversationPanel({
     .filter((part): part is string => part !== undefined)
     .join('\n\n')
 
+  /** 引用链接的文字优先用附件标签（WORK-058）：`[[entry:123]]` 显示成"第 13 关 异常"。 */
+  const citationLabels = useMemo(
+    () => new Map(attachments.map((item) => [item.uri, item.label])),
+    [attachments],
+  )
+
+  /**
+   * 接住 `paideia:` 协议的链接（WORK-058）：渲染层只说"这是一条引用"，跳到哪由应用决定。
+   *
+   * <p>**必须是稳定引用**：它变了会让上游的块级记忆化失效，流式输出时每个 token 都重解析整篇。
+   */
+  const markdownComponents = useMemo(
+    () =>
+      ({
+        a: ({ href, children }: { href?: string; children?: ReactNode }) => (
+          <CitationLink href={href} onOpenUri={onOpenUri}>
+            {children}
+          </CitationLink>
+        ),
+      }) as unknown as Parameters<typeof Markdown>[0]['components'],
+    [onOpenUri],
+  )
+
   /** 光标一变就重算"是否正在引用"：点选、方向键移动、输入都走同一条规则。 */
   const syncMention = (value: string) => {
     if (searchObjects === undefined) {
@@ -504,9 +529,10 @@ export function ConversationPanel({
                  */
                 <>
                   <Markdown
-                    markdown={message.content}
+                    markdown={linkifyCitations(message.content, citationLabels)}
                     streaming={busy && index === messages.length - 1}
                     className="text-sm leading-6"
+                    components={markdownComponents}
                   />
                   {/* 生成中的那条不给反馈按钮：回答还没长完，评价它没有意义 */}
                   {busy && index === messages.length - 1 ? null : (

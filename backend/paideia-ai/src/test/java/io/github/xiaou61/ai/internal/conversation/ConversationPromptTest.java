@@ -35,8 +35,17 @@ class ConversationPromptTest {
     }
 
     @Test
-    @DisplayName("提示词版本升到 v2：改了文案就必须换版本，否则前后两批 run 分不开")
+    @DisplayName("提示词版本升到 v3：改了文案就必须换版本，否则前后两批 run 分不开")
     void versionBumped() {
-        assertThat(ConversationPrompt.VERSION).isEqualTo("assistant-chat-v2");
+        assertThat(ConversationPrompt.VERSION).isEqualTo("assistant-chat-v3");
+    }
+
+    @Test
+    @DisplayName("回答了引用语法，并且明写不许编造 id（WORK-058）")
+    void citationSyntaxIsDeclared() {
+        String system = ConversationPrompt.system();
+
+        assertThat(system).contains("[[entry:123]]", "[[note:45]]");
+        assertThat(system).contains("不要编造");
     }
 }

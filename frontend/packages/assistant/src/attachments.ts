@@ -103,7 +103,13 @@ export function serializeAttachments(list: Attachment[]): string | undefined {
     }
     return lines.join('\n')
   })
-  return ['用户附着了以下对象（按附着顺序，最多 5 条）：', '', ...blocks].join('\n')
+  // 首行是**给服务端读的**（落 `ai_runs.attrs` 的 contextUris），格式改动要同步
+  // `AttachmentUris.java`；模型看到的仍是同一段文字。
+  return [
+    `附着对象：${list.map((item) => item.uri).join(', ')}`,
+    '',
+    ...blocks,
+  ].join('\n')
 }
 
 /**
