@@ -11,6 +11,23 @@ status: published
 
 **Spring 的 AOP 不修改你的字节码，它在运行时给你造一个"替身"，让调用先经过替身。**
 
+```sketch
+{
+  "title": "不改字节码，只造替身",
+  "rows": [
+    [
+      { "id": "caller", "title": "调用方", "sub": "以为自己调的是原对象", "tone": "gray" },
+      { "id": "proxy", "title": "运行时代理", "sub": "子类或接口实现", "tone": "blue" },
+      { "id": "target", "title": "原对象", "sub": "字节码一个字节没改", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "caller", "to": "proxy" },
+    { "from": "proxy", "to": "target" }
+  ]
+}
+```
+
 这个替身叫代理（proxy）。代理和你的类实现同一个接口（或继承你的类），外部拿到的其实是代理。代理在真正方法的前后插一段逻辑——这就是切面。
 
 由此可以推出本篇最重要的一条：

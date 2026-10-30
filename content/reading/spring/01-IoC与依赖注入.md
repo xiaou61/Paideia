@@ -11,6 +11,23 @@ status: published
 
 **IoC（控制反转）反转的是"谁来 new 这个对象"的决定权，从你的代码转移到容器。**
 
+```sketch
+{
+  "title": "反转的是「谁决定 new」",
+  "rows": [
+    [
+      { "id": "before", "title": "以前：自己 new", "sub": "依赖变了就得改调用方", "tone": "amber" },
+      { "id": "after", "title": "现在：容器造好送进来", "sub": "调用方只说我要什么", "tone": "blue" },
+      { "id": "why", "title": "代价是启动变慢", "sub": "换来的是换实现不动调用方", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "before", "to": "after" },
+    { "from": "after", "to": "why" }
+  ]
+}
+```
+
 你写 `new UserService(new UserDao())`，创建顺序由你决定；交给 Spring 后，你只声明"我需要一个 UserDao"，容器负责找、创建、按顺序塞进来。这个"塞进来"的动作就叫依赖注入（DI）。
 
 所以 IoC 是**目标**，DI 是**手段**。一句话记法：**你不要去拿依赖，依赖会被送到你手上。**
