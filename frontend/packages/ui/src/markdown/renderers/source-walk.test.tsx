@@ -28,9 +28,23 @@ const WALK = {
   ],
   controls: [{ id: 'cache', type: 'toggle', label: '开启一级缓存', default: true }],
   steps: [
-    { title: '第一步', file: A, line: 3, lines: 2, explain: '先看这里。' },
+    {
+      title: '第一步',
+      file: A,
+      line: 3,
+      lines: 2,
+      explain: '先看这里。',
+      predict: { question: '下一步会换文件吗？', options: ['会', '不会'], answer: 1, reveal: '不会，先看缓存分支。' },
+    },
     { title: '缓存步', file: A, line: 7, lines: 1, explain: '缓存分支。', when: { cache: true } },
-    { title: '换文件', file: B, line: 5, lines: 2, explain: '换到另一个文件。' },
+    {
+      title: '换文件',
+      file: B,
+      line: 5,
+      lines: 2,
+      explain: '换到另一个文件。',
+      refs: [{ label: '回到代理', file: A, line: 3 }],
+    },
   ],
 }
 
@@ -86,6 +100,35 @@ describe('SourceWalk（WORK-057）', () => {
     })
     fireEvent.click(screen.getByTestId('source-walk-next'))
     await waitFor(() => {
+      expect(screen.getAllByTestId('source-walk-focus-line')[0]?.textContent).toContain('B 行 5')
+    })
+  })
+
+  it('预测：选完显示揭晓', async () => {
+    renderWalk()
+    await screen.findAllByTestId('source-walk-focus-line')
+    fireEvent.click(screen.getByRole('button', { name: '会' }))
+    await waitFor(() => {
+      expect(screen.getByTestId('source-walk-predict').textContent).toContain('不会，先看缓存分支。')
+    })
+  })
+
+  it('跨文件定位：跳到目标行，返回后回到当前步', async () => {
+    renderWalk()
+    await screen.findAllByTestId('source-walk-focus-line')
+    fireEvent.click(screen.getByTestId('source-walk-next'))
+    fireEvent.click(screen.getByTestId('source-walk-next'))
+    await waitFor(() => {
+      expect(screen.getAllByTestId('source-walk-focus-line')[0]?.textContent).toContain('B 行 5')
+    })
+    fireEvent.click(screen.getByRole('button', { name: '回到代理' }))
+    await waitFor(() => {
+      const pinned = screen.getByTestId('source-walk-pin-line')
+      expect(pinned.textContent).toContain('A 行 3')
+    })
+    fireEvent.click(screen.getByRole('button', { name: '返回' }))
+    await waitFor(() => {
+      expect(screen.queryByTestId('source-walk-pin-line')).toBeNull()
       expect(screen.getAllByTestId('source-walk-focus-line')[0]?.textContent).toContain('B 行 5')
     })
   })

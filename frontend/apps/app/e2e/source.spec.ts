@@ -59,6 +59,34 @@ test.describe('源码精读', () => {
     await expect(steps.filter({ hasText: 'BATCH' })).toHaveCount(1)
   })
 
+  test('答完小测后「已读完」写进服务端，换一个浏览器上下文仍然在', async ({ page, browser }) => {
+    await page.goto('/#/source/mybatis-source')
+    await page.locator('[data-testid^="source-chapter-"]').first().click()
+    await expect(page.getByTestId('source-walk')).toBeVisible({ timeout: 15_000 })
+
+    // 总览那一关的 3 道题，答案分别是选项 1 / 2 / 0（见 00-总览.md）
+    await page.getByTestId('quiz-option-0-1').click()
+    await page.getByTestId('quiz-option-1-2').click()
+    await page.getByTestId('quiz-option-2-0').click()
+    // 通关规则是「动手题与小测都要 ≥80%」：总览的动手题是填空，选对再检查
+    await page.getByTestId('challenge-blank-0').selectOption('0')
+    await page.getByTestId('challenge-check').click()
+    // 上报是 600ms 去抖的，等它发出去
+    await page.waitForTimeout(2500)
+
+    const baseURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:5173'
+    const fresh = await browser.newPage({ baseURL })
+    try {
+      await signIn(fresh)
+      await fresh.goto('/#/source/mybatis-source')
+      const first = fresh.locator('[data-testid^="source-chapter-"]').first()
+      await expect(first).toBeVisible({ timeout: 15_000 })
+      await expect(first).toContainText('已读完')
+    } finally {
+      await fresh.close()
+    }
+  })
+
   test('24 章逐章都能打开并渲染出源码块', async ({ page }) => {
     await page.goto('/#/source/mybatis-source')
     const links = page.locator('[data-testid^="source-chapter-"]')
