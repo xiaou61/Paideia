@@ -114,6 +114,17 @@
   --tier-learning: hsl(213 85% 62%);
   --tier-familiar: hsl(152 55% 48%);
   --tier-mastered: hsl(243 62% 52%);
+  /*
+   * 简历纸张（WORK-018）。**刻意不跟随明暗主题**：纸永远白、字永远黑。
+   * 之前纸张用的是 `--foreground`，深色主题下打印出来是白字白纸。
+   * `.dark` 里不覆盖这几个变量，这就是"不跟随"的实现方式。
+   */
+  --paper: hsl(0 0% 100%);
+  --paper-ink: hsl(0 0% 9%);
+  --paper-muted: hsl(220 9% 46%);
+  --paper-subtle: hsl(0 0% 32%);
+  --paper-line: hsl(0 0% 78%);
+  --paper-rail: hsl(0 0% 96%);
   --border: hsl(220 14% 90%);
   /* 输入控件的线比普通分隔线略重一点，否则表单看起来"没有边界" */
   --input: hsl(220 14% 84%);
@@ -229,6 +240,12 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
+  --color-paper: var(--paper);
+  --color-paper-ink: var(--paper-ink);
+  --color-paper-muted: var(--paper-muted);
+  --color-paper-subtle: var(--paper-subtle);
+  --color-paper-line: var(--paper-line);
+  --color-paper-rail: var(--paper-rail);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);

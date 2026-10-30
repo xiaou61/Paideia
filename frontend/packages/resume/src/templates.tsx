@@ -70,7 +70,7 @@ function contactLine(data: ResumeData): string {
 
 function YearRange({ start, end }: { start: string; end: string }) {
   return (
-    <p className="shrink-0 text-[11px] text-neutral-500">
+    <p className="shrink-0 text-[11px] text-paper-muted">
       {start} - {end}
     </p>
   )
@@ -80,8 +80,8 @@ function YearRange({ start, end }: { start: string; end: string }) {
 function ClassicSheet({ data }: { data: ResumeData }) {
   const contact = contactLine(data)
   return (
-    <div className="space-y-5 text-[13px] text-neutral-900">
-      <header className="border-b border-neutral-300 pb-3">
+    <div className="space-y-5 text-[13px] text-paper-ink">
+      <header className="border-b border-paper-line pb-3">
         <h1 className="text-2xl font-semibold">{data.basics.name}</h1>
         {contact !== '' && <p className="mt-1">{contact}</p>}
         {data.intent.role !== '' && <p className="mt-1">求职意向：{data.intent.role}</p>}
@@ -89,7 +89,7 @@ function ClassicSheet({ data }: { data: ResumeData }) {
 
       {data.work.length > 0 && (
         <section>
-          <h2 className="mb-2 text-[12px] font-semibold tracking-widest text-neutral-500">工作与实习经历</h2>
+          <h2 className="mb-2 text-[12px] font-semibold tracking-widest text-paper-muted">工作与实习经历</h2>
           {data.work.map((item, index) => (
             <div key={index} className="resume-entry mb-3">
               <div className="flex items-baseline justify-between gap-2">
@@ -112,7 +112,7 @@ function ClassicSheet({ data }: { data: ResumeData }) {
 
       {data.projects.length > 0 && (
         <section>
-          <h2 className="mb-2 text-[12px] font-semibold tracking-widest text-neutral-500">项目经历</h2>
+          <h2 className="mb-2 text-[12px] font-semibold tracking-widest text-paper-muted">项目经历</h2>
           {data.projects.map((item, index) => (
             <div key={index} className="resume-entry mb-3">
               <div className="flex items-baseline justify-between gap-2">
@@ -120,7 +120,7 @@ function ClassicSheet({ data }: { data: ResumeData }) {
                   {item.name}
                   {item.role !== '' && <span> · {item.role}</span>}
                 </p>
-                {item.period !== '' && <p className="shrink-0 text-[11px] text-neutral-500">{item.period}</p>}
+                {item.period !== '' && <p className="shrink-0 text-[11px] text-paper-muted">{item.period}</p>}
               </div>
               <ul className="ml-4 list-disc">
                 {item.bullets.map((bullet, bulletIndex) => (
@@ -134,7 +134,7 @@ function ClassicSheet({ data }: { data: ResumeData }) {
 
       {data.education.length > 0 && (
         <section>
-          <h2 className="mb-2 text-[12px] font-semibold tracking-widest text-neutral-500">教育经历</h2>
+          <h2 className="mb-2 text-[12px] font-semibold tracking-widest text-paper-muted">教育经历</h2>
           {data.education.map((item, index) => (
             <div key={index} className="resume-entry mb-2">
               <div className="flex items-baseline justify-between gap-2">
@@ -159,7 +159,7 @@ function ClassicSheet({ data }: { data: ResumeData }) {
 
       {data.skills.length > 0 && (
         <section>
-          <h2 className="mb-2 text-[12px] font-semibold tracking-widest text-neutral-500">技能</h2>
+          <h2 className="mb-2 text-[12px] font-semibold tracking-widest text-paper-muted">技能</h2>
           <ul className="space-y-1">
             {data.skills.map((group, index) => (
               <li key={index}>
@@ -172,7 +172,7 @@ function ClassicSheet({ data }: { data: ResumeData }) {
 
       {data.awards.length > 0 && (
         <section>
-          <h2 className="mb-2 text-[12px] font-semibold tracking-widest text-neutral-500">证书与奖项</h2>
+          <h2 className="mb-2 text-[12px] font-semibold tracking-widest text-paper-muted">证书与奖项</h2>
           <ul className="list-disc">
             {data.awards.map((item, index) => (
               <li key={index} className="ml-4">
@@ -187,7 +187,7 @@ function ClassicSheet({ data }: { data: ResumeData }) {
 
       {data.selfEvaluation !== '' && (
         <section>
-          <h2 className="mb-2 text-[12px] font-semibold tracking-widest text-neutral-500">自我评价</h2>
+          <h2 className="mb-2 text-[12px] font-semibold tracking-widest text-paper-muted">自我评价</h2>
           <p className="whitespace-pre-line">{data.selfEvaluation}</p>
         </section>
       )}
@@ -199,20 +199,20 @@ function ClassicSheet({ data }: { data: ResumeData }) {
 function SidebarSheet({ data }: { data: ResumeData }) {
   const contact = contactLine(data)
   return (
-    <div className="flex items-stretch text-[12px] text-neutral-900">
-      <aside className="w-[58mm] shrink-0 space-y-5 border-r border-neutral-300 bg-neutral-100 px-4 py-6">
+    <div className="flex items-stretch text-[12px] text-paper-ink">
+      <aside className="w-[58mm] shrink-0 space-y-5 border-r border-paper-line bg-paper-rail px-4 py-6">
         <h1 className="text-xl font-semibold leading-tight">{data.basics.name}</h1>
 
         {contact !== '' && (
           <div>
-            <h2 className="mb-1 text-[10px] font-semibold tracking-widest text-neutral-500">联系方式</h2>
+            <h2 className="mb-1 text-[10px] font-semibold tracking-widest text-paper-muted">联系方式</h2>
             <p className="break-words">{contact}</p>
           </div>
         )}
 
         {(data.intent.role !== '' || data.intent.city !== '' || data.intent.availability !== '') && (
           <div>
-            <h2 className="mb-1 text-[10px] font-semibold tracking-widest text-neutral-500">求职意向</h2>
+            <h2 className="mb-1 text-[10px] font-semibold tracking-widest text-paper-muted">求职意向</h2>
             {data.intent.role !== '' && <p className="font-medium">{data.intent.role}</p>}
             {data.intent.city !== '' && <p>{data.intent.city}</p>}
             {data.intent.availability !== '' && <p>{data.intent.availability}</p>}
@@ -221,7 +221,7 @@ function SidebarSheet({ data }: { data: ResumeData }) {
 
         {data.skills.length > 0 && (
           <div>
-            <h2 className="mb-2 text-[10px] font-semibold tracking-widest text-neutral-500">技能</h2>
+            <h2 className="mb-2 text-[10px] font-semibold tracking-widest text-paper-muted">技能</h2>
             {data.skills.map((group, index) => (
               <div key={index} className="mb-2">
                 <p className="font-medium">{group.group}</p>
@@ -233,14 +233,14 @@ function SidebarSheet({ data }: { data: ResumeData }) {
 
         {data.education.length > 0 && (
           <div>
-            <h2 className="mb-2 text-[10px] font-semibold tracking-widest text-neutral-500">教育经历</h2>
+            <h2 className="mb-2 text-[10px] font-semibold tracking-widest text-paper-muted">教育经历</h2>
             {data.education.map((item, index) => (
               <div key={index} className="mb-2">
                 <p className="font-medium">{item.school}</p>
                 <p>
                   {[item.major, item.degree].filter((value) => value !== '').join(' · ')}
                 </p>
-                <p className="text-[11px] text-neutral-500">
+                <p className="text-[11px] text-paper-muted">
                   {item.start} - {item.end}
                 </p>
                 {item.highlights.length > 0 && (
@@ -257,11 +257,11 @@ function SidebarSheet({ data }: { data: ResumeData }) {
 
         {data.awards.length > 0 && (
           <div>
-            <h2 className="mb-2 text-[10px] font-semibold tracking-widest text-neutral-500">证书与奖项</h2>
+            <h2 className="mb-2 text-[10px] font-semibold tracking-widest text-paper-muted">证书与奖项</h2>
             {data.awards.map((item, index) => (
               <div key={index} className="mb-1">
                 <p className="font-medium">{item.name}</p>
-                <p className="text-[11px] text-neutral-500">
+                <p className="text-[11px] text-paper-muted">
                   {[item.issuer, item.date].filter((value) => value !== '').join(' · ')}
                 </p>
               </div>
@@ -273,7 +273,7 @@ function SidebarSheet({ data }: { data: ResumeData }) {
       <div className="min-w-0 flex-1 space-y-5 px-6 py-6">
         {data.work.length > 0 && (
           <section>
-            <h2 className="mb-2 text-[12px] font-semibold tracking-widest text-neutral-500">工作与实习经历</h2>
+            <h2 className="mb-2 text-[12px] font-semibold tracking-widest text-paper-muted">工作与实习经历</h2>
             {data.work.map((item, index) => (
               <div key={index} className="resume-entry mb-3">
                 <p className="font-medium">
@@ -294,13 +294,13 @@ function SidebarSheet({ data }: { data: ResumeData }) {
 
         {data.projects.length > 0 && (
           <section>
-            <h2 className="mb-2 text-[12px] font-semibold tracking-widest text-neutral-500">项目经历</h2>
+            <h2 className="mb-2 text-[12px] font-semibold tracking-widest text-paper-muted">项目经历</h2>
             {data.projects.map((item, index) => (
               <div key={index} className="resume-entry mb-3">
                 <p className="font-medium">
                   {item.name}
                   {item.role !== '' && <span> · {item.role}</span>}
-                  {item.period !== '' && <span className="ml-2 text-[11px] font-normal text-neutral-500">{item.period}</span>}
+                  {item.period !== '' && <span className="ml-2 text-[11px] font-normal text-paper-muted">{item.period}</span>}
                 </p>
                 <ul className="ml-4 list-disc">
                   {item.bullets.map((bullet, bulletIndex) => (
@@ -314,7 +314,7 @@ function SidebarSheet({ data }: { data: ResumeData }) {
 
         {data.selfEvaluation !== '' && (
           <section>
-            <h2 className="mb-2 text-[12px] font-semibold tracking-widest text-neutral-500">自我评价</h2>
+            <h2 className="mb-2 text-[12px] font-semibold tracking-widest text-paper-muted">自我评价</h2>
             <p className="whitespace-pre-line">{data.selfEvaluation}</p>
           </section>
         )}
@@ -327,13 +327,13 @@ function SidebarSheet({ data }: { data: ResumeData }) {
 function CompactSheet({ data }: { data: ResumeData }) {
   const contact = contactLine(data)
   return (
-    <div className="space-y-3 text-[11.5px] leading-snug text-neutral-900">
-      <header className="flex items-baseline justify-between gap-3 border-b border-neutral-300 pb-2">
+    <div className="space-y-3 text-[11.5px] leading-snug text-paper-ink">
+      <header className="flex items-baseline justify-between gap-3 border-b border-paper-line pb-2">
         <div>
           <h1 className="text-xl font-semibold leading-tight">{data.basics.name}</h1>
-          {data.intent.role !== '' && <p className="text-[11px] text-neutral-600">求职意向：{data.intent.role}</p>}
+          {data.intent.role !== '' && <p className="text-[11px] text-paper-subtle">求职意向：{data.intent.role}</p>}
         </div>
-        {contact !== '' && <p className="max-w-[55%] text-right text-[11px] text-neutral-600">{contact}</p>}
+        {contact !== '' && <p className="max-w-[55%] text-right text-[11px] text-paper-subtle">{contact}</p>}
       </header>
 
       {data.work.length > 0 && (
@@ -347,7 +347,7 @@ function CompactSheet({ data }: { data: ResumeData }) {
                 </p>
                 <YearRange start={item.start} end={item.end} />
               </div>
-              {item.summary !== '' && <p className="text-neutral-600">{item.summary}</p>}
+              {item.summary !== '' && <p className="text-paper-subtle">{item.summary}</p>}
               <ul className="ml-4 list-disc">
                 {item.bullets.map((bullet, bulletIndex) => (
                   <li key={bulletIndex}>{bullet}</li>
@@ -367,7 +367,7 @@ function CompactSheet({ data }: { data: ResumeData }) {
                   {item.name}
                   {item.role !== '' && <span> · {item.role}</span>}
                 </p>
-                {item.period !== '' && <p className="shrink-0 text-[11px] text-neutral-500">{item.period}</p>}
+                {item.period !== '' && <p className="shrink-0 text-[11px] text-paper-muted">{item.period}</p>}
               </div>
               <ul className="ml-4 list-disc">
                 {item.bullets.map((bullet, bulletIndex) => (
@@ -391,7 +391,7 @@ function CompactSheet({ data }: { data: ResumeData }) {
                 </p>
                 <YearRange start={item.start} end={item.end} />
               </div>
-              {item.highlights.length > 0 && <p className="text-neutral-600">{item.highlights.join('；')}</p>}
+              {item.highlights.length > 0 && <p className="text-paper-subtle">{item.highlights.join('；')}</p>}
             </div>
           ))}
         </CompactSection>
@@ -429,7 +429,7 @@ function CompactSheet({ data }: { data: ResumeData }) {
 function CompactSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
-      <h2 className="mb-1 border-b border-neutral-300 pb-0.5 text-[10.5px] font-semibold tracking-widest text-neutral-500">
+      <h2 className="mb-1 border-b border-paper-line pb-0.5 text-[10.5px] font-semibold tracking-widest text-paper-muted">
         {title}
       </h2>
       {children}

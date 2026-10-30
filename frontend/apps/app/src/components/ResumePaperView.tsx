@@ -69,7 +69,7 @@ export function ResumePaperView({ data }: { data: ResumeData }) {
 
       {/* 纸张固定白底黑字：深色主题下打印不会变成白字白纸 */}
       <article
-        className={`resume-print mx-auto max-w-[210mm] overflow-hidden bg-white text-neutral-900 shadow-sm ${
+        className={`resume-print mx-auto max-w-[210mm] overflow-hidden bg-paper text-paper-ink shadow-sm ${
           template === 'sidebar' ? '' : 'px-8 py-10'
         }`}
         data-testid="resume-print"
@@ -82,11 +82,11 @@ export function ResumePaperView({ data }: { data: ResumeData }) {
       <style>{`
         @media print {
           @page { size: A4; margin: 12mm; }
-          body { background: #fff !important; }
+          body { background: var(--paper) !important; }
           [data-print-hide] { display: none !important; }
           .resume-print { max-width: none; padding: 0 !important; box-shadow: none !important; }
           /* 版式里有中性灰（侧栏底、小节标题），统一压成黑白，任何主题与打印机都可读 */
-          .resume-print, .resume-print * { color: #000 !important; background: transparent !important; border-color: #bbb !important; }
+          .resume-print, .resume-print * { color: var(--paper-ink) !important; background: transparent !important; border-color: var(--paper-line) !important; }
           .resume-entry { break-inside: avoid; }
         }
       `}</style>
