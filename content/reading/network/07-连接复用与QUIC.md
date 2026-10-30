@@ -11,6 +11,23 @@ status: published
 
 问题只有一句话：**每次请求都要新建连接，太贵。**
 
+```sketch
+{
+  "title": "复用的三级台阶",
+  "rows": [
+    [
+      { "id": "new", "title": "每个请求新连接", "sub": "握手白白多花时间", "tone": "amber" },
+      { "id": "keep", "title": "keep-alive 复用", "sub": "一条连接跑多个请求", "tone": "blue" },
+      { "id": "quic", "title": "QUIC 多路复用", "sub": "丢包也不互相拖累", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "new", "to": "keep" },
+    { "from": "keep", "to": "quic" }
+  ]
+}
+```
+
 一次新建连接要付出：DNS、TCP 握手、TLS 握手。加起来冷启动 6 到 7 个往返。三代协议给了三种解法：
 
 | 代 | 方案 | 解决了什么 | 没解决什么 |

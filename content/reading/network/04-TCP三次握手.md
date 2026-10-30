@@ -11,6 +11,23 @@ status: published
 
 三次握手要解决的不是"确认对方在线"，而是**双方各自确认两件事：对方的收、对方的发都正常，并且双方对初始序号达成了一致**。
 
+```sketch
+{
+  "title": "三次握手：各确认一次收发，并对齐序号",
+  "rows": [
+    [
+      { "id": "syn", "title": "SYN", "sub": "我的序号从 x 开始", "tone": "blue" },
+      { "id": "synack", "title": "SYN + ACK", "sub": "收到 x，我的从 y 开始", "tone": "blue" },
+      { "id": "ack", "title": "ACK", "sub": "收到 y，连接建立", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "syn", "to": "synack" },
+    { "from": "synack", "to": "ack" }
+  ]
+}
+```
+
 两次做不到，因为第二次只能让一方确认双向，另一方还缺一半信息。
 
 ## 先把"序号"这件事摆到前面

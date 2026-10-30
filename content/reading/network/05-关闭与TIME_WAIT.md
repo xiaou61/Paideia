@@ -11,6 +11,25 @@ status: published
 
 关闭一条 TCP 连接要**四个包**，不是两个。而且**主动关闭的那一方**会在关闭后进入 `TIME_WAIT` 状态，停留约 60 秒。
 
+```sketch
+{
+  "title": "四次挥手，主动关的一方多等一会儿",
+  "rows": [
+    [
+      { "id": "fin", "title": "FIN", "sub": "我没数据要发了", "tone": "blue" },
+      { "id": "ack", "title": "ACK", "sub": "知道了，但我还有", "tone": "blue" },
+      { "id": "fin2", "title": "对方的 FIN", "sub": "我也发完了", "tone": "blue" },
+      { "id": "wait", "title": "TIME_WAIT 约 60 秒", "sub": "等最后的包过去", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "fin", "to": "ack" },
+    { "from": "ack", "to": "fin2" },
+    { "from": "fin2", "to": "wait" }
+  ]
+}
+```
+
 这 60 秒不是浪费，是两件必须做的事：让迟到的包自然消亡，以及让最后那个 ACK 丢了还能重发。代价是主动关闭方会占用一个端口四元组一段时间——端口耗尽的根本原因就在这里。
 
 ## 为什么是四次

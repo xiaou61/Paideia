@@ -11,6 +11,21 @@ status: published
 
 一个 HTTP 请求在网络里就是一串纯文本（HTTP/1.x），分四块：
 
+```sketch
+{
+  "title": "一个 HTTP 报文就是四块文本",
+  "rows": [
+    [
+      { "id": "line", "title": "起始行", "sub": "方法 路径 版本", "tone": "gray" },
+      { "id": "head", "title": "头部", "sub": "一行一个键值对", "tone": "blue" },
+      { "id": "blank", "title": "一个空行", "sub": "告诉对方头部结束", "tone": "violet" },
+      { "id": "body", "title": "正文", "sub": "可以有，也可以没有", "tone": "green" }
+    ]
+  ],
+  "arrows": []
+}
+```
+
 ```text
 GET /api/user?id=7 HTTP/1.1        ← 请求行
 Host: example.com                   ← 首部

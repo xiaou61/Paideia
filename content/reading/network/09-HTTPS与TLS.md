@@ -11,6 +11,23 @@ status: published
 
 **TLS 在 TCP 之上、HTTP 之下。它加密的不是"整个网络"，而是"两个端点之间的这段字节流"。**
 
+```sketch
+{
+  "title": "TLS 夹在 TCP 和 HTTP 之间",
+  "rows": [
+    [
+      { "id": "http", "title": "HTTP", "sub": "它自己不知道被加密", "tone": "gray" },
+      { "id": "tls", "title": "TLS", "sub": "握手、加密、校验", "tone": "blue" },
+      { "id": "tcp", "title": "TCP", "sub": "只管把字节送到", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "http", "to": "tls" },
+    { "from": "tls", "to": "tcp" }
+  ]
+}
+```
+
 - 你敲 `https://`，浏览器先完成 DNS 和 TCP 握手，再在 TCP 连接里做一次 TLS 握手，然后才发 HTTP 报文。
 - 从 TLS 握手完成那一刻起，HTTP 的请求行、首部、正文、响应全都装在加密记录里。中间的 Wi-Fi、路由器、运营商只能看到"哪个 IP、哪个端口、大概多少流量"。
 - 但**域名不一定藏得住**：TLS 1.2 的 ClientHello 里明文带着 SNI（服务器名指示），中间设备靠它知道你要访问哪个站点。TLS 1.3 默认仍加密不了 SNI，ECH（Encrypted Client Hello）还在推广中。
