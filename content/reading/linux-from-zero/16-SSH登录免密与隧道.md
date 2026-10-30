@@ -11,6 +11,21 @@ status: published
 
 SSH 是你和远端服务器之间唯一的一条线。这一关讲四件事：**密钥登录怎么配置（以及为什么权限必须小）**、**`~/.ssh/config` 怎么省掉一堆参数**、**端口转发怎么把远端端口搬到本地**、**服务器怎么挡住爆破**。
 
+```sketch
+{
+  "title": "SSH 一条线，四件事",
+  "rows": [
+    [
+      { "id": "key", "title": "密钥登录", "sub": "权限必须 600", "tone": "blue" },
+      { "id": "config", "title": "~/.ssh/config", "sub": "省掉一堆参数", "tone": "blue" },
+      { "id": "tunnel", "title": "端口转发", "sub": "远端端口搬到本地", "tone": "violet" },
+      { "id": "block", "title": "挡住爆破", "sub": "禁密码、限次数", "tone": "green" }
+    ]
+  ],
+  "arrows": []
+}
+```
+
 日常最高频的两句是 `ssh 别名` 和 `ssh -L 本地端口:目标:远端端口`，学会这两句就够用了。
 
 ## 为什么用密钥而不是密码

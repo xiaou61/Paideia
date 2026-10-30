@@ -11,6 +11,23 @@ status: published
 
 Linux 上几乎所有东西都是文本：配置、日志、CSV、`/proc` 里的状态。所以"从一堆文本里捞出你要的那几行、改掉某个字段、按列汇总"是最高频的操作，而这三个命令就是干这个的：
 
+```sketch
+{
+  "title": "捞、改、算：三个命令各管一段",
+  "rows": [
+    [
+      { "id": "grep", "title": "grep", "sub": "留下匹配的行", "tone": "blue" },
+      { "id": "sed", "title": "sed", "sub": "替换或删掉某几行", "tone": "blue" },
+      { "id": "awk", "title": "awk", "sub": "按列取、按条件汇总", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "grep", "to": "sed" },
+    { "from": "sed", "to": "awk" }
+  ]
+}
+```
+
 - **`grep` 挑行**：哪些行留下来；
 - **`sed` 改行**：留下来的行要换成什么；
 - **`awk` 切列**：按列看、按列算。

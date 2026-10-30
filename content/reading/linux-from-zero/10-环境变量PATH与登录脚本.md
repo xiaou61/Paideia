@@ -11,6 +11,23 @@ status: published
 
 同一个命令，**你在终端里能跑，写进 systemd 就报 `command not found`**；`java -version` 正常，但 `sudo java` 找不到 java；`.bashrc` 里加的别名在脚本里不生效。
 
+```sketch
+{
+  "title": "找不到命令，先问 PATH 是谁给的",
+  "rows": [
+    [
+      { "id": "shell", "title": "交互 shell", "sub": "读你的 .bashrc，PATH 长", "tone": "gray" },
+      { "id": "systemd", "title": "systemd 启动", "sub": "几乎不读你的 rc 文件", "tone": "amber" },
+      { "id": "fix", "title": "写绝对路径", "sub": "或在 unit 里配 Environment", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "shell", "to": "systemd" },
+    { "from": "systemd", "to": "fix" }
+  ]
+}
+```
+
 这些都是"环境变量什么时候被加载、被谁继承"的问题。这一关把 PATH 的查找机制和四类 shell 的启动文件讲清楚，以后这类问题能自己定位。
 
 ## 为什么有环境变量

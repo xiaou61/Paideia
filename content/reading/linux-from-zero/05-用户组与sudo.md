@@ -11,6 +11,21 @@ status: published
 
 为什么服务器上不直接用 root？`sudo` 和 `su` 差在哪？`id` 输出里那些组是怎么来的？这一关把"谁是这台机器上的谁"讲清楚，顺带解释一个很常见的怪现象：**同样的命令，别人能跑你跑不了**。
 
+```sketch
+{
+  "title": "你是谁，由用户和组一起决定",
+  "rows": [
+    [
+      { "id": "uid", "title": "用户", "sub": "一个 uid 加一个名字", "tone": "gray" },
+      { "id": "grp", "title": "所属组", "sub": "决定能碰哪些文件", "tone": "blue" },
+      { "id": "sudo", "title": "sudo", "sub": "借一次 root 的权限", "tone": "green" },
+      { "id": "su", "title": "su", "sub": "整个人换成另一个身份", "tone": "violet" }
+    ]
+  ],
+  "arrows": []
+}
+```
+
 ## 为什么要有普通用户
 
 因为 **root 不受权限约束**。`rm -rf /` 在 root 身份下会真的开始删，而系统不会问一句。用普通用户 + `sudo` 的组合，是为了在两件事上留出一道闸：

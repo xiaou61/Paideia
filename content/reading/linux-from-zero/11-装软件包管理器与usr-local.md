@@ -11,6 +11,23 @@ status: published
 
 Linux 上装东西有五条路：包管理器、官方安装脚本、下载压缩包、自己编译、用容器。新手最常见的两种事故是：**同一个软件装了两份，跑起来的是旧的那份**；**`sudo pip install` 把系统 Python 搞坏了**。
 
+```sketch
+{
+  "title": "装了两份，跑起来的往往是旧的那份",
+  "rows": [
+    [
+      { "id": "pkg", "title": "包管理器装的", "sub": "/usr/bin，系统管", "tone": "blue" },
+      { "id": "local", "title": "/usr/local 或自编译", "sub": "PATH 顺序不同", "tone": "violet" },
+      { "id": "which", "title": "which -a 看全部", "sub": "排在前面的生效", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "pkg", "to": "local" },
+    { "from": "local", "to": "which" }
+  ]
+}
+```
+
 这一关讲清楚五条路各自的边界，以及"装完了为什么版本没变"该怎么查。
 
 ## 为什么要有包管理器

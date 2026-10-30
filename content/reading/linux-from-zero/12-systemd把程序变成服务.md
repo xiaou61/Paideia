@@ -11,6 +11,23 @@ status: published
 
 `nohup ./app.sh &` 能跑，但机器一重启就没了、崩了不会自己起来、日志混在某个文件里、`ps` 里也看不出它是谁。**把这些"能跑"升级成"能长期活着"，就是 systemd 的职责。**
 
+```sketch
+{
+  "title": "从「能跑」到「长期活着」",
+  "rows": [
+    [
+      { "id": "nohup", "title": "nohup 后台跑", "sub": "重启就没了", "tone": "amber" },
+      { "id": "unit", "title": "写成 unit", "sub": "崩了自动拉起", "tone": "blue" },
+      { "id": "journal", "title": "日志进 journald", "sub": "开机自启、状态可查", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "nohup", "to": "unit" },
+    { "from": "unit", "to": "journal" }
+  ]
+}
+```
+
 这一关给你一份能直接改用的 unit 文件，和三个必须知道的行为：改完要 `daemon-reload`、`ExecStart` 必须是绝对路径、单元里读不到你的 shell 环境变量。
 
 ## 为什么是 systemd

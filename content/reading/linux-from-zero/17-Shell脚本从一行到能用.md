@@ -11,6 +11,23 @@ status: published
 
 命令行里一步一步敲能做的事，为什么要写成脚本？因为**要重复、要定时、要别人也能跑**。而脚本最容易出事的地方不是"语法写错"，是**出错之后还继续往下跑**——比如 `cd` 失败后仍在这个目录里执行 `rm -rf`。
 
+```sketch
+{
+  "title": "脚本最危险的不是语法，是「错了还往下跑」",
+  "rows": [
+    [
+      { "id": "cd", "title": "cd 失败了", "sub": "路径写错或没权限", "tone": "amber" },
+      { "id": "cont", "title": "脚本继续执行", "sub": "还在原来的目录里", "tone": "amber" },
+      { "id": "rm", "title": "rm -rf 删错了地方", "sub": "用 set -e 早停", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "cd", "to": "cont" },
+    { "from": "cont", "to": "rm" }
+  ]
+}
+```
+
 这一关给你一套可以当模板用的骨架（`set -euo pipefail`、引号规则、`trap` 清理），再加两件工具：`bash -x` 和 `shellcheck`。
 
 ## 为什么 shell 脚本"看起来简单、写起来危险"

@@ -11,6 +11,21 @@ status: published
 
 "Permission denied" 是新手最常遇到、也最容易用 `chmod 777` 糊过去的报错。这一关讲清楚三件事：**那九个字母到底管什么、目录的权限和文件的权限为什么不是一回事、`umask` 决定了你新建文件的默认权限**。
 
+```sketch
+{
+  "title": "九个字母管三组人",
+  "rows": [
+    [
+      { "id": "u", "title": "属主 u", "sub": "读 / 写 / 执行", "tone": "blue" },
+      { "id": "g", "title": "属组 g", "sub": "读 / 写 / 执行", "tone": "blue" },
+      { "id": "o", "title": "其他人 o", "sub": "读 / 写 / 执行", "tone": "blue" },
+      { "id": "umask", "title": "umask", "sub": "新建文件默认砍掉哪些位", "tone": "green" }
+    ]
+  ],
+  "arrows": []
+}
+```
+
 学完你应该能回答：为什么有的文件自己有读权限但别人打不开？为什么 `/tmp` 里谁都能建文件、却删不了别人的？
 
 ## 为什么是"三组九个位"

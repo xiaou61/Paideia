@@ -11,6 +11,23 @@ status: published
 
 磁盘满，是线上最常见、也最容易查错的一类故障。查错的原因是**"满"有三种**：
 
+```sketch
+{
+  "title": "「磁盘满」有三种",
+  "rows": [
+    [
+      { "id": "block", "title": "块满了", "sub": "df 一眼看到", "tone": "blue" },
+      { "id": "inode", "title": "inode 满了", "sub": "df -i 才看得到", "tone": "amber" },
+      { "id": "held", "title": "删了但被占用", "sub": "空间不释放，用 lsof 找", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "block", "to": "inode" },
+    { "from": "inode", "to": "held" }
+  ]
+}
+```
+
 1. 文件真的占满了空间；
 2. 文件被删了但进程还开着，空间没释放；
 3. 空间还有，但 **inode 用完了**，连一个空文件都建不出来。

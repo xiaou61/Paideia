@@ -11,6 +11,23 @@ status: published
 
 "每天凌晨备份一次""每 5 分钟同步一次"——这类需求在 Linux 上有两套做法：**cron**（老牌、简单）和 **systemd timer**（新、带日志与依赖）。
 
+```sketch
+{
+  "title": "定时任务两条路：cron 与 timer",
+  "rows": [
+    [
+      { "id": "cron", "title": "cron", "sub": "一行五个字段，简单", "tone": "blue" },
+      { "id": "timer", "title": "systemd timer", "sub": "带日志、能依赖服务", "tone": "violet" },
+      { "id": "log", "title": "出错要能查", "sub": "cron 的日志最容易丢", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "cron", "to": "timer" },
+    { "from": "timer", "to": "log" }
+  ]
+}
+```
+
 新手最常遇到的两个问题都在 cron 上：**时间写了但没跑**、**跑了但什么都不对**。根因几乎总是同一个：**cron 的环境和你终端的完全不一样**。
 
 ## 为什么 cron 让人困惑

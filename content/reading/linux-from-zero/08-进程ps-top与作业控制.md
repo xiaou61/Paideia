@@ -11,6 +11,23 @@ status: published
 
 程序"起了但好像没起"、任务"跑一半 ssh 断了就没了"、机器"负载 8 但 CPU 只用了 5%"——这些都要靠"看懂进程"来解决。
 
+```sketch
+{
+  "title": "负载高但 CPU 低，多半在等 IO",
+  "rows": [
+    [
+      { "id": "load", "title": "load 8", "sub": "八个在跑或在排队", "tone": "gray" },
+      { "id": "cpu", "title": "CPU 只用了 5%", "sub": "说明不是算不过来", "tone": "blue" },
+      { "id": "dstate", "title": "进程卡在 D 状态", "sub": "在等磁盘或网络 IO", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "load", "to": "cpu" },
+    { "from": "cpu", "to": "dstate" }
+  ]
+}
+```
+
 这一关给你三件事：**`ps` 的 STAT 列怎么读**、**前台/后台怎么切**、**为什么关掉终端程序就死**。
 
 ## 为什么进程是主角

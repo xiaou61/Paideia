@@ -11,6 +11,23 @@ status: published
 
 `kill` 不是"杀进程"的命令，是**发信号**的命令，而"杀掉"只是其中一个信号的效果。这一关讲清楚：`-15` 和 `-9` 差在哪、`Ctrl+C` 到底发了什么、为什么有的进程怎么都杀不掉。
 
+```sketch
+{
+  "title": "kill 是发信号，不是杀",
+  "rows": [
+    [
+      { "id": "term", "title": "-15 请它退", "sub": "能收尾、能关连接", "tone": "green" },
+      { "id": "kill9", "title": "-9 直接停", "sub": "来不及清理", "tone": "amber" },
+      { "id": "stuck", "title": "怎么都杀不掉", "sub": "多半卡在内核态 IO", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "term", "to": "kill9" },
+    { "from": "kill9", "to": "stuck" }
+  ]
+}
+```
+
 学完你会知道：`kill -9` 应该是最后手段，而不是第一反应。
 
 ## 为什么用信号而不是"命令进程去退出"
