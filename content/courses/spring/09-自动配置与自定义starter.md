@@ -37,6 +37,23 @@ status: published
 2. 每个配置类上写着**"什么情况下我才生效"**；
 3. 生效的配置类会向容器里登记对象；跳过的不登记。
 
+```sketch
+{
+  "title": "自动配置就是「一份清单加一堆条件」",
+  "rows": [
+    [
+      { "id": "list", "title": "候选清单", "sub": "可能用得上的配置类", "tone": "gray" },
+      { "id": "cond", "title": "逐个判条件", "sub": "有这个类、开了这个属性", "tone": "blue" },
+      { "id": "on", "title": "成立才登记", "sub": "不成立直接跳过", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "list", "to": "cond" },
+    { "from": "cond", "to": "on" }
+  ]
+}
+```
+
 ### 手写一遍内核
 
 下面这段代码就是那个内核。注意 `applyAutoConfiguration` 里只有一句判断：
@@ -193,6 +210,23 @@ Negative matches:
 **这张表是排查"为什么没生效"的第一站**。它逐条列出"哪些条件成立了、哪些没成立、没成立是因为缺哪个类"。不看这张表去猜，是最浪费时间的一种排查。
 
 ### 一个最小 starter 需要什么
+
+```sketch
+{
+  "title": "starter 是空壳，实现放在 autoconfigure 里",
+  "rows": [
+    [
+      { "id": "starter", "title": "xxx-starter", "sub": "只有一个 pom", "tone": "gray" },
+      { "id": "auto", "title": "autoconfigure 包", "sub": "配置类 + 条件注解", "tone": "blue" },
+      { "id": "deps", "title": "引一个就全带上", "sub": "依赖也跟着进来", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "starter", "to": "auto" },
+    { "from": "auto", "to": "deps" }
+  ]
+}
+```
 
 `starter` 这个词在 Boot 里其实是两件事，很多人混着说：
 

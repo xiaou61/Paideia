@@ -28,6 +28,23 @@ JSON 是前后端之间唯一的契约。契约上任何一处不对，表现都
 
 ### 这一步在请求链的哪一段
 
+```sketch
+{
+  "title": "返回对象时，框架替你换成 JSON",
+  "rows": [
+    [
+      { "id": "obj", "title": "返回 Book 对象", "sub": "方法交出去的是对象", "tone": "gray" },
+      { "id": "conv", "title": "MessageConverter", "sub": "按 Accept 挑格式", "tone": "blue" },
+      { "id": "json", "title": "JSON 文本", "sub": "写进响应体", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "obj", "to": "conv" },
+    { "from": "conv", "to": "json" }
+  ]
+}
+```
+
 第 1 课说过"返回值类型决定用哪个转换器"。具体到 JSON：
 
 ```text
@@ -178,6 +195,23 @@ spring:
 为什么 ISO-8601 更好：它自带时区信息（`Z` 或 `+08:00`），可读，能被所有语言直接解析。时间戳数字丢了时区，跨时区时必然出一次错。本项目所有的时刻都按 UTC 存、按 ISO-8601 输出。
 
 ### 坑四：双向关联
+
+```sketch
+{
+  "title": "双向关联会互相序列化到栈溢出",
+  "rows": [
+    [
+      { "id": "order", "title": "订单 → 客户", "sub": "序列化时跟过去", "tone": "gray" },
+      { "id": "back", "title": "客户 → 订单", "sub": "又跟回来", "tone": "amber" },
+      { "id": "fix", "title": "一边断开", "sub": "@JsonIgnore 或换成 DTO", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "order", "to": "back" },
+    { "from": "back", "to": "fix" }
+  ]
+}
+```
 
 ```java
 public class Book {

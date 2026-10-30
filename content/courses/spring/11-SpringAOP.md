@@ -54,6 +54,28 @@ status: published
 
 ### 五种通知的边界
 
+```sketch
+{
+  "title": "通知挂在方法的三条边上",
+  "rows": [
+    [
+      { "id": "before", "title": "@Before", "sub": "进方法之前", "tone": "blue" },
+      { "id": "target", "title": "目标方法", "sub": "真正干活的", "tone": "gray" },
+      { "id": "after", "title": "@AfterReturning", "sub": "正常返回后", "tone": "green" }
+    ],
+    [
+      { "id": "throw", "title": "@AfterThrowing", "sub": "抛异常才走这条", "tone": "amber" },
+      { "id": "around", "title": "@Around", "sub": "把整条包在里面", "tone": "violet" }
+    ]
+  ],
+  "arrows": [
+    { "from": "before", "to": "target" },
+    { "from": "target", "to": "after" },
+    { "from": "target", "to": "throw" }
+  ]
+}
+```
+
 | 注解 | 什么时候执行 | 拿得到返回值吗 | 能改变结果吗 |
 | --- | --- | --- | --- |
 | `@Before` | 方法之前 | 不能 | 不能（可以抛异常中断） |

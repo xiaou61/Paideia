@@ -28,6 +28,23 @@ status: published
 
 ### 池的四个参数
 
+```sketch
+{
+  "title": "连接池就三步：借、用、还",
+  "rows": [
+    [
+      { "id": "borrow", "title": "从池里借", "sub": "借不到就按超时等", "tone": "blue" },
+      { "id": "use", "title": "执行 SQL", "sub": "全程同一条连接", "tone": "gray" },
+      { "id": "back", "title": "还回池里", "sub": "是放回，不是关掉", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "borrow", "to": "use" },
+    { "from": "use", "to": "back" }
+  ]
+}
+```
+
 | 参数 | 含义 | 配错的后果 |
 | --- | --- | --- |
 | 最小空闲 | 池里常备几个 | 太小：突发流量时现建，前几个请求变慢 |
@@ -191,6 +208,23 @@ List<Book> books = jdbcTemplate.query(
 要让它们在一个事务里，必须由外层（`@Transactional` 的 Service 方法）在进入时拿一个连接并绑定到当前线程，之后所有 `JdbcTemplate` 调用都复用那一个。这就是"事务边界必须在 Service 层"的机制解释。
 
 ### N+1：最隐蔽的性能问题
+
+```sketch
+{
+  "title": "N+1：查一次列表，再为每条查一次",
+  "rows": [
+    [
+      { "id": "one", "title": "1 次查列表", "sub": "拿到 20 本书", "tone": "gray" },
+      { "id": "loop", "title": "循环里查分类", "sub": "20 次往返", "tone": "amber" },
+      { "id": "fix", "title": "改成一次 JOIN", "sub": "或批量查完再拼", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "one", "to": "loop" },
+    { "from": "loop", "to": "fix" }
+  ]
+}
+```
 
 ```java
 List<Book> books = bookMapper.findAll();          // 1 次

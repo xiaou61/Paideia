@@ -79,6 +79,23 @@ Maven 不认别的布局：`src/main/java` 下的 `.java` 会被编译，`src/ma
 
 去掉框架，一次 HTTP 请求在网络上就是**一段文本**。服务端读到请求行（`GET /hello HTTP/1.1`），拼一段响应文本写回去：
 
+```sketch
+{
+  "title": "一个 200，本质是一段拼好的文本",
+  "rows": [
+    [
+      { "id": "req", "title": "GET /hello", "sub": "网络上就是一行文本", "tone": "gray" },
+      { "id": "server", "title": "服务端处理", "sub": "找到方法、执行完", "tone": "blue" },
+      { "id": "resp", "title": "200 + hello", "sub": "再拼成响应文本写回去", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "req", "to": "server" },
+    { "from": "server", "to": "resp" }
+  ]
+}
+```
+
 ```text
 HTTP/1.1 200 OK
 Content-Length: 5
@@ -181,6 +198,25 @@ public class DemoApplication {
 **没有任何魔法**。它做的事和你刚才写的那 30 行是同一件，只是那张表是它替你建的，而且建得比 `switch` 更全（路径变量、通配、优先级）。
 
 ### `@SpringBootApplication` 是三个注解合起来
+
+```sketch
+{
+  "title": "启动类上那一个注解，里面是三个",
+  "rows": [
+    [ { "id": "one", "title": "启动类注解", "sub": "@SpringBootApplication", "tone": "gray" } ],
+    [
+      { "id": "cfg", "title": "配置类", "sub": "@SpringBootConfiguration", "tone": "blue" },
+      { "id": "scan", "title": "@ComponentScan", "sub": "扫包找 Bean", "tone": "blue" },
+      { "id": "auto", "title": "自动配置", "sub": "@EnableAutoConfiguration", "tone": "violet" }
+    ]
+  ],
+  "arrows": [
+    { "from": "one", "to": "cfg" },
+    { "from": "one", "to": "scan" },
+    { "from": "one", "to": "auto" }
+  ]
+}
+```
 
 ```java
 @SpringBootApplication   // 等价于下面三个

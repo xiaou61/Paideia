@@ -41,6 +41,23 @@ TransferService service = new TransferService(new AccountRepo());
 
 要"按类型给实例"，就必须能自己造对象——而你不知道这个类有哪些构造器、需要哪些参数。这就是为什么容器一定要用**反射**：它在运行时才能读到别人的类。
 
+```sketch
+{
+  "title": "容器就两件事：登记，然后按类型取",
+  "rows": [
+    [
+      { "id": "reg", "title": "登记", "sub": "知道要管哪些类", "tone": "gray" },
+      { "id": "new", "title": "反射造对象", "sub": "构造器、参数都得运行时读", "tone": "blue" },
+      { "id": "get", "title": "按类型取到同一个", "sub": "单例，重复取还是它", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "reg", "to": "new" },
+    { "from": "new", "to": "get" }
+  ]
+}
+```
+
 ### 手写版
 
 下面这 40 行就是容器的全部核心。注意它没有注解、没有 AOP、没有配置文件：
@@ -154,6 +171,23 @@ true
 ### Spring 补上的那一步：接口也算键
 
 真实容器会把"这个对象实现了哪些接口"一并记成可查询的键。于是 `getBean(Repo.class)` 也能拿到那个 `RepoImpl`。加上这一条之后，"面向接口注入"才成立：
+
+```sketch
+{
+  "title": "接口也算键，面向接口注入才成立",
+  "rows": [
+    [
+      { "id": "impl", "title": "RepoImpl 实例", "sub": "真正造出来的对象", "tone": "blue" },
+      { "id": "keys", "title": "登记两个键", "sub": "RepoImpl 和 Repo 都指向它", "tone": "violet" },
+      { "id": "inject", "title": "按接口注入", "sub": "调用方只写 Repo", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "impl", "to": "keys" },
+    { "from": "keys", "to": "inject" }
+  ]
+}
+```
 
 ```java
 @Service

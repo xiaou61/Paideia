@@ -28,6 +28,23 @@ MyBatis 把这一步自动做了：**你只写接口和 SQL，映射由反射完
 
 ### mapper 接口没有实现类
 
+```sketch
+{
+  "title": "mapper 没有实现类，运行时给它造一个",
+  "rows": [
+    [
+      { "id": "iface", "title": "mapper 接口", "sub": "只有方法签名", "tone": "gray" },
+      { "id": "proxy", "title": "启动时生成代理", "sub": "按注解或 XML 找 SQL", "tone": "blue" },
+      { "id": "run", "title": "调方法就执行 SQL", "sub": "结果反射填进对象", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "iface", "to": "proxy" },
+    { "from": "proxy", "to": "run" }
+  ]
+}
+```
+
 ```java
 @Mapper
 public interface BookMapper {
@@ -48,6 +65,23 @@ Spring 启动时扫到 @Mapper
 所以"mapper 接口能被注入"和"`@Transactional` 能生效"是同一套机制的两个应用。你现在应该对"为什么没实现类也能调"毫无疑问了。
 
 ### `#{}` 与 `${}`
+
+```sketch
+{
+  "title": "#{} 走预编译，${} 直接拼进 SQL",
+  "rows": [
+    [
+      { "id": "hash", "title": "#{title}", "sub": "变成占位符 ?", "tone": "green" },
+      { "id": "dollar", "title": "${title}", "sub": "原样拼进去", "tone": "amber" },
+      { "id": "risk", "title": "拼接就会中注入", "sub": "只有表名列名才考虑", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "hash", "to": "dollar" },
+    { "from": "dollar", "to": "risk" }
+  ]
+}
+```
 
 | 写法 | 底层 | 例子 |
 | --- | --- | --- |
