@@ -11,6 +11,23 @@ status: published
 
 同一条查询里做「存在性 + 可见性」，而不是查出来再在代码里判断。
 
+```sketch
+{
+  "title": "过滤写在 SQL 里，别查出来再判",
+  "rows": [
+    [
+      { "id": "sql", "title": "WHERE 带可见性条件", "sub": "一次就筛干净", "tone": "blue" },
+      { "id": "code", "title": "查出来再 if", "sub": "不该给的数据已经出库了", "tone": "amber" },
+      { "id": "risk", "title": "列表接口最容易漏判", "sub": "一处漏就等于公开", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "sql", "to": "code" },
+    { "from": "code", "to": "risk" }
+  ]
+}
+```
+
 代码取自仓库 `xiaou61/Paideia` 的提交 `93989e0`，点标题旁的链接能对上原文与行号。
 
 ```code-tour
