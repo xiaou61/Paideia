@@ -11,6 +11,23 @@ status: published
 
 CAS 是"**比较并交换**"：只有当变量还是我读到的那个旧值时，才把它改成新值；否则失败重来。
 
+```sketch
+{
+  "title": "CAS：旧值没变才敢写，变了就重来",
+  "rows": [
+    [
+      { "id": "read", "title": "读到 10", "sub": "记住这个旧值", "tone": "gray" },
+      { "id": "try", "title": "尝试写 11", "sub": "前提是还是 10", "tone": "blue" },
+      { "id": "retry", "title": "被人改过就失败", "sub": "重读再试，不阻塞", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "read", "to": "try" },
+    { "from": "try", "to": "retry" }
+  ]
+}
+```
+
 `AtomicInteger.incrementAndGet()` 就是"读一次、CAS 一次、失败就再读再试"。它**不用锁**，但**不是没有代价**：
 
 - 竞争激烈时大量线程在自旋，CPU 白烧；

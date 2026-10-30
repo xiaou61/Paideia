@@ -11,6 +11,23 @@ status: published
 
 `synchronized` 锁的是**一个对象**，不是一段代码：
 
+```sketch
+{
+  "title": "锁的是对象，不是代码块",
+  "rows": [
+    [
+      { "id": "obj", "title": "同一把锁", "sub": "谁先拿到谁进", "tone": "blue" },
+      { "id": "other", "title": "锁不同对象", "sub": "等于没互斥，各走各的", "tone": "amber" },
+      { "id": "rule", "title": "先想清楚锁是谁", "sub": "this / 类 / 专用对象", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "obj", "to": "other" },
+    { "from": "other", "to": "rule" }
+  ]
+}
+```
+
 - 加在实例方法上 → 锁 `this`；
 - 加在静态方法上 → 锁 `Class` 对象；
 - `synchronized (obj)` → 锁 `obj`。

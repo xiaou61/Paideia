@@ -11,6 +11,23 @@ status: published
 
 `volatile` 只做两件事：
 
+```sketch
+{
+  "title": "volatile 只保证看得见，不保证不被打断",
+  "rows": [
+    [
+      { "id": "see", "title": "写立刻对其他线程可见", "sub": "不走缓存副本", "tone": "blue" },
+      { "id": "order", "title": "禁止指令重排", "sub": "写它前后不越界", "tone": "blue" },
+      { "id": "noatom", "title": "但不保证原子", "sub": "i++ 仍然会丢更新", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "see", "to": "order" },
+    { "from": "order", "to": "noatom" }
+  ]
+}
+```
+
 1. **可见性**：一个线程写了，别的线程立刻能看到最新值；
 2. **禁止特定重排序**：挡住它前后那几条指令被编译器/CPU 调换顺序。
 
