@@ -15,14 +15,15 @@ import {
   AlertDescription,
   AlertTitle,
   AppShell,
+  Button,
   PageHeader,
   Spinner,
   extractQuizzes,
 } from '@paideia/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useAssistantContext } from '@paideia/assistant'
+import { attachmentUri, useAssistantContext } from '@paideia/assistant'
 import { ArrowLeft, ArrowRight, ChevronLeft, ListTree } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 
 import { api } from '../api'
@@ -51,7 +52,9 @@ export function KnowledgeEntryPage() {
   const fromTrack = location.state as
     | { fromTrackSlug?: string; fromTrackName?: string }
     | null
-  const { setEntry, ask } = useAssistantContext()
+  const { setEntry, ask, attach, revealAssistant } = useAssistantContext()
+  /** 选区太短时的提示（WORK-058）：不静默吞掉，否则用户会以为按钮坏了。 */
+  const [selectionHint, setSelectionHint] = useState<string | null>(null)
 
   /**
    * 源码解读的双向入口（WORK-014）：内容里的「问 AI」把一句话交给助手输入框，
@@ -209,6 +212,30 @@ export function KnowledgeEntryPage() {
     },
   })
 
+  /**
+   * 把正文里选中的一段递给助手（WORK-058）。
+   *
+   * <p>选区在按钮**按下**时就会被浏览器清掉，所以按钮的 `onMouseDown` 要 `preventDefault`
+   * （见下面的 Button）；键盘触发没有选区问题，照常可用。
+   */
+  const attachSelection = () => {
+    if (entry.data === undefined) {
+      return
+    }
+    const text = window.getSelection()?.toString().trim() ?? ''
+    if (text.length < 4) {
+      setSelectionHint('先用鼠标选中正文里的一段，再点这里')
+      return
+    }
+    setSelectionHint(null)
+    attach({
+      uri: attachmentUri('entry', `${entry.data.id}/selection`),
+      label: `${entry.data.title} · 选中片段`,
+      excerpt: text,
+    })
+    revealAssistant()
+  }
+
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
       <Link
@@ -265,6 +292,24 @@ export function KnowledgeEntryPage() {
               </Link>
             )}
             <PageHeader title={entry.data.title} />
+
+            {/* 选中一段递给助手（WORK-058）：整条条目已经在上下文里，这里补的是"我正在读的这一段" */}
+            <div className="mb-6 flex flex-wrap items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="entry-attach-selection"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={attachSelection}
+              >
+                把选中这段问助手
+              </Button>
+              {selectionHint === null ? null : (
+                <span className="text-muted-foreground text-xs" role="status">
+                  {selectionHint}
+                </span>
+              )}
+            </div>
 
             {/*
               来源链接（WORK-025）：抓来的面经帖标出原帖，让读者能回原处核对。

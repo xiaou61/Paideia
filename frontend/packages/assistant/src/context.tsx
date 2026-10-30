@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 
+import { putAttachment, removeAttachment, type Attachment } from './attachments'
+
 /** 一次对话的公共行为（WORK-020 起新增 tutor）。 */
 export type AssistantHarness = 'assistant' | 'interview' | 'tutor' | 'planner'
 
@@ -26,6 +28,13 @@ export interface AssistantContextValue {
    * 语义完全不同；混用会让条目页的清理逻辑（`setEntry(null)`）把 SQL 上下文一起清掉。
    */
   pageContext: PageContext | null
+  /**
+   * 用户递给助手的**对象附件**（WORK-058）。
+   *
+   * <p>与 `pageContext` 的分工：`pageContext` 是"这一页的整体场景"（学习记录快照、SQL 工作台），
+   * 附件是"某一个具体对象"（这一关、这条笔记、这段选中）。两者可以同时有，序列化时拼在一起。
+   */
+  attachments: Attachment[]
 }
 
 /**
@@ -97,6 +106,18 @@ interface AssistantContextApi extends AssistantContextValue {
   setOnlyMine: (onlyMine: boolean) => void
   /** 设置/清除页面场景。传 null 清除（离开页面时调）。 */
   setPageContext: (context: PageContext | null) => void
+  /** 递一个对象给助手（同 uri 覆盖，超过 5 条丢最旧）。 */
+  attach: (attachment: Attachment) => void
+  /** 取下一条附件。 */
+  detach: (uri: string) => void
+  /**
+   * 打开面板并切到对话页的次数。
+   *
+   * <p>**为什么需要一个计数器而不是布尔**：连点两次「问助手」时布尔值第二次不变，
+   * 外壳的 effect 不会跑。计数器每次加一，每次都生效。
+   */
+  revealSeq: number
+  revealAssistant: () => void
   pendingPrompt: PendingPrompt | null
   /** 打开助手并把这句话填进输入框；**不发送**。 */
   ask: (text: string) => void
@@ -128,6 +149,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const [harness, setHarness] = useState<AssistantHarness>('assistant')
   const [onlyMine, setOnlyMine] = useState(false)
   const [pageContext, setPageContext] = useState<PageContext | null>(null)
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [revealSeq, setRevealSeq] = useState(0)
   const [pendingPrompt, setPendingPrompt] = useState<PendingPrompt | null>(null)
   const [pendingSql, setPendingSql] = useState<PendingPrompt | null>(null)
 
@@ -164,6 +187,18 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     setPendingSql((current) => (current?.id === id ? null : current))
   }, [])
 
+  const attach = useCallback((attachment: Attachment) => {
+    setAttachments((current) => putAttachment(current, attachment))
+  }, [])
+
+  const detach = useCallback((uri: string) => {
+    setAttachments((current) => removeAttachment(current, uri))
+  }, [])
+
+  const revealAssistant = useCallback(() => {
+    setRevealSeq((current) => current + 1)
+  }, [])
+
   const value = useMemo<AssistantContextApi>(
     () => ({
       entryId,
@@ -171,9 +206,14 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       harness,
       onlyMine,
       pageContext,
+      attachments,
       setEntry,
       setOnlyMine,
       setPageContext,
+      attach,
+      detach,
+      revealSeq,
+      revealAssistant,
       pendingPrompt,
       ask,
       clearPendingPrompt,
@@ -187,7 +227,12 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       harness,
       onlyMine,
       pageContext,
+      attachments,
       setEntry,
+      attach,
+      detach,
+      revealSeq,
+      revealAssistant,
       pendingPrompt,
       ask,
       clearPendingPrompt,

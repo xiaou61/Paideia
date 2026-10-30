@@ -1,8 +1,12 @@
 import { Alert, AlertDescription, AlertTitle, Button, Markdown, Spinner } from '@paideia/ui'
-import { History, Plus, Send, ThumbsDown, ThumbsUp } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { History, Plus, Send, ThumbsDown, ThumbsUp, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import type { AssistantApi } from './client'
+import { parseAttachmentUri, serializeAttachments, type Attachment } from './attachments'
+import { linkifyCitations } from './citation'
+import { CitationLink } from './citation-link'
+import { findMention, stripMention } from './mention'
 import { useAssistantContext } from './context'
 import { extractSqlBlock, serializePageContext } from './page-context'
 import { readStoredConversation, storeConversation } from './session-store'
@@ -30,11 +34,23 @@ import type { ChatMessage, ConversationView, NoteDraftInput } from './types'
 export function ConversationPanel({
   api,
   onSaveNote,
+  onOpenUri,
+  searchObjects,
 }: {
   api: AssistantApi
   onSaveNote?: (note: NoteDraftInput, entryId: number | null) => Promise<unknown>
+  /**
+   * 打开一条被附着的对象（WORK-058）。**路由由应用决定**：本包不认识 `/knowledge/entries/123`
+   * 这类地址，只把 uri 交出去。
+   */
+  onOpenUri?: (uri: string) => void
+  /**
+   * `@` 引用的搜索（WORK-058）。**业务接口也由应用决定**：本包不认识知识库与笔记的检索端点，
+   * 只要求"给个关键词、还一组可附着的对象"。不传就不显示 `@` 提示。
+   */
+  searchObjects?: (query: string) => Promise<Attachment[]>
 }) {
-  const { entryId, entryTitle, harness, pageContext, applySql, pendingPrompt, clearPendingPrompt } =
+  const { entryId, entryTitle, harness, pageContext, attachments, attach, detach, applySql, pendingPrompt, clearPendingPrompt } =
     useAssistantContext()
   const [conversationId, setConversationId] = useState<number | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -43,6 +59,11 @@ export function ConversationPanel({
   /** 正在从服务端恢复历史——期间不显示"问点什么吧"的空态，否则会闪一下"没有对话"。 */
   const [restoring, setRestoring] = useState(true)
   const [input, setInput] = useState('')
+  /** `@` 引用（WORK-058）：`mention` 为 null 表示光标当前不在引用里。 */
+  const [mention, setMention] = useState<{ start: number; query: string } | null>(null)
+  const [candidates, setCandidates] = useState<Attachment[]>([])
+  const [activeCandidate, setActiveCandidate] = useState(0)
+  const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [savedIndexes, setSavedIndexes] = useState<number[]>([])
@@ -247,6 +268,89 @@ export function ConversationPanel({
       previous.map((message, index) => (index === previous.length - 1 ? patch(message) : message)),
     )
 
+  /**
+   * 这一轮要带上的上下文：页面场景 + 对象附件（WORK-058）。
+   *
+   * <p>两者拼成**一段文本**发给服务端，不改成结构化数组：服务端只把它拼进提示词，改数组要动
+   * DTO、SSE 与历史回放三处，收益只是"更好看"（见 WORK-058 的 IC-002）。
+   */
+  const turnContext = [serializePageContext(pageContext), serializeAttachments(attachments)]
+    .filter((part): part is string => part !== undefined)
+    .join('\n\n')
+
+  /** 引用链接的文字优先用附件标签（WORK-058）：`[[entry:123]]` 显示成"第 13 关 异常"。 */
+  const citationLabels = useMemo(
+    () => new Map(attachments.map((item) => [item.uri, item.label])),
+    [attachments],
+  )
+
+  /**
+   * 接住 `paideia:` 协议的链接（WORK-058）：渲染层只说"这是一条引用"，跳到哪由应用决定。
+   *
+   * <p>**必须是稳定引用**：它变了会让上游的块级记忆化失效，流式输出时每个 token 都重解析整篇。
+   */
+  const markdownComponents = useMemo(
+    () =>
+      ({
+        a: ({ href, children }: { href?: string; children?: ReactNode }) => (
+          <CitationLink href={href} onOpenUri={onOpenUri}>
+            {children}
+          </CitationLink>
+        ),
+      }) as unknown as Parameters<typeof Markdown>[0]['components'],
+    [onOpenUri],
+  )
+
+  /** 光标一变就重算"是否正在引用"：点选、方向键移动、输入都走同一条规则。 */
+  const syncMention = (value: string) => {
+    if (searchObjects === undefined) {
+      return
+    }
+    const caret = inputRef.current?.selectionStart ?? value.length
+    setMention(findMention(value, caret))
+  }
+
+  useEffect(() => {
+    if (mention === null || searchObjects === undefined) {
+      setCandidates([])
+      return
+    }
+    let alive = true
+    // 每敲一个字都会重建 mention：短延迟一次，别把接口打成逐字请求
+    const timer = setTimeout(() => {
+      searchObjects(mention.query)
+        .then((list) => {
+          if (!alive) {
+            return
+          }
+          setCandidates(list.slice(0, 8))
+          setActiveCandidate(0)
+        })
+        .catch(() => {
+          // 搜不到就是没候选：不报错，用户继续打字即可
+          if (alive) {
+            setCandidates([])
+          }
+        })
+    }, 180)
+    return () => {
+      alive = false
+      clearTimeout(timer)
+    }
+  }, [mention, searchObjects])
+
+  /** 选中候选：把 `@查询` 从输入里删掉，对象进附件栈。 */
+  const pickCandidate = (candidate: Attachment) => {
+    if (mention === null) {
+      return
+    }
+    const caret = inputRef.current?.selectionStart ?? input.length
+    setInput(stripMention(input, mention.start, caret))
+    setMention(null)
+    setCandidates([])
+    attach(candidate)
+  }
+
   const send = async () => {
     const text = input.trim()
     if (text === '' || busy) {
@@ -297,8 +401,8 @@ export function ConversationPanel({
           }
         },
         controller.signal,
-        // 页面场景：只在这一轮进提示词，不落库（WORK-035 T-15）
-        serializePageContext(pageContext),
+        // 页面场景与附件：只在这一轮进提示词，不落库（WORK-035 T-15 / WORK-058）
+        turnContext === '' ? undefined : turnContext,
       )
       // 这一轮落库了，列表里的更新时间跟着变——顺手刷新，免得列表显示的时间是旧的
     } catch (cause) {
@@ -326,7 +430,12 @@ export function ConversationPanel({
     <div className="flex min-h-0 flex-1 flex-col gap-2" data-testid="conversation-panel">
       <div className="flex items-center justify-between gap-2">
         <p className="text-muted-foreground min-w-0 flex-1 truncate text-xs" data-testid="conversation-context">
-          {entryId === null ? '没有条目上下文，可直接提问。' : `上下文：${entryTitle ?? ''}`}
+          {[
+            entryId === null ? '没有条目上下文，可直接提问。' : `上下文：${entryTitle ?? ''}`,
+            attachments.length === 0 ? null : `附着 ${attachments.length} 个对象`,
+          ]
+            .filter((part) => part !== null)
+            .join(' · ')}
         </p>
         <Button
           variant="ghost"
@@ -420,9 +529,10 @@ export function ConversationPanel({
                  */
                 <>
                   <Markdown
-                    markdown={message.content}
+                    markdown={linkifyCitations(message.content, citationLabels)}
                     streaming={busy && index === messages.length - 1}
                     className="text-sm leading-6"
+                    components={markdownComponents}
                   />
                   {/* 生成中的那条不给反馈按钮：回答还没长完，评价它没有意义 */}
                   {busy && index === messages.length - 1 ? null : (
@@ -592,6 +702,71 @@ export function ConversationPanel({
         </p>
       )}
 
+      {/* 已附着的对象：随时可取下。放在输入框正上方，因为它是"这一条要带上的东西" */}
+      {attachments.length === 0 ? null : (
+        <div className="flex flex-wrap gap-1.5" data-testid="conversation-attachments">
+          {attachments.map((item) => (
+            <span
+              key={item.uri}
+              className="border-border bg-muted/40 inline-flex max-w-full items-center gap-1 rounded-full border py-0.5 pr-1 pl-2 text-[11px]"
+            >
+              {/* 能定位的对象可点回去；合成对象（如关卡）没有路由就保持纯文本 */}
+              {onOpenUri === undefined || parseAttachmentUri(item.uri) === null ? (
+                <span className="truncate" title={item.uri}>
+                  {item.label}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="truncate underline-offset-2 hover:underline"
+                  title={`打开 ${item.uri}`}
+                  data-testid={`open-${item.uri.replace(/[/:]/g, '-')}`}
+                  onClick={() => onOpenUri(item.uri)}
+                >
+                  {item.label}
+                </button>
+              )}
+              <button
+                type="button"
+                aria-label={`取下 ${item.label}`}
+                data-testid={`detach-${item.uri.replace(/[/:]/g, '-')}`}
+                onClick={() => detach(item.uri)}
+                className="hover:bg-accent rounded-full p-0.5"
+              >
+                <X className="size-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* `@` 引用的候选：方向键选、回车确定、Esc 关掉 */}
+      {mention === null || candidates.length === 0 ? null : (
+        <ul
+          role="listbox"
+          aria-label="可附着的对象"
+          data-testid="mention-list"
+          className="border-border bg-popover max-h-56 space-y-0.5 overflow-y-auto rounded-lg border p-1.5 shadow-sm"
+        >
+          {candidates.map((item, index) => (
+            <li key={item.uri} role="option" aria-selected={index === activeCandidate}>
+              <button
+                type="button"
+                data-testid={`mention-${index}`}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => pickCandidate(item)}
+                className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs ${
+                  index === activeCandidate ? 'bg-accent' : 'hover:bg-accent/50'
+                }`}
+              >
+                <span className="truncate">{item.label}</span>
+                <span className="text-muted-foreground ml-auto shrink-0 text-[10px]">{item.uri}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
       <form
         className="border-border bg-background focus-within:border-ring focus-within:ring-ring/40 flex items-end gap-2 rounded-xl border p-2 transition-colors focus-within:ring-3"
         onSubmit={(event) => {
@@ -600,10 +775,41 @@ export function ConversationPanel({
         }}
       >
         <textarea
+          ref={inputRef}
           value={input}
-          onChange={(event) => setInput(event.target.value)}
+          onChange={(event) => {
+            setInput(event.target.value)
+            syncMention(event.target.value)
+          }}
+          // 点选与方向键移动不触发 change，但同样会改变"是否还在引用"
+          onClick={(event) => syncMention(event.currentTarget.value)}
+          onKeyUp={(event) => syncMention(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if (mention === null || candidates.length === 0) {
+              return
+            }
+            if (event.key === 'ArrowDown') {
+              event.preventDefault()
+              setActiveCandidate((current) => (current + 1) % candidates.length)
+            } else if (event.key === 'ArrowUp') {
+              event.preventDefault()
+              setActiveCandidate((current) => (current - 1 + candidates.length) % candidates.length)
+            } else if (event.key === 'Enter') {
+              const pick = candidates[activeCandidate]
+              if (pick !== undefined) {
+                // 回车选中，而不是把半截 `@查询` 发出去
+                event.preventDefault()
+                pickCandidate(pick)
+              }
+            } else if (event.key === 'Escape') {
+              event.preventDefault()
+              setMention(null)
+            }
+          }}
           rows={2}
-          placeholder="问点什么…"
+          placeholder={
+            searchObjects === undefined ? '问点什么…' : '问点什么…（输入 @ 引用笔记或条目）'
+          }
           data-testid="conversation-input"
           className="placeholder:text-muted-foreground min-h-0 flex-1 resize-none bg-transparent px-1.5 py-1 text-sm leading-6 outline-none"
         />

@@ -10,6 +10,7 @@ import io.github.xiaou61.ai.Harness;
 import io.github.xiaou61.ai.NoteDraft;
 import io.github.xiaou61.ai.TokenUsage;
 import io.github.xiaou61.ai.internal.billing.CreditService;
+import io.github.xiaou61.ai.internal.conversation.AttachmentUris;
 import io.github.xiaou61.ai.internal.conversation.ConversationService;
 import io.github.xiaou61.ai.internal.conversation.HarnessPrompts;
 import io.github.xiaou61.ai.internal.memory.MemoryExtractionService;
@@ -200,6 +201,11 @@ class AssistantConversationController {
         run.attribute("memoryHits", turn.memorySnippets().size());
         run.attribute("entryChars", turn.entryBody() == null ? 0 : turn.entryBody().length());
         run.attribute("learningSummaryChars", turn.learningSummary() == null ? 0 : turn.learningSummary().length());
+        // 这一轮带了哪些对象（WORK-058）：排查"它为什么答错"时要能看到它当时手里有什么
+        java.util.List<String> contextUris = AttachmentUris.of(turn.pageContext());
+        if (!contextUris.isEmpty()) {
+            run.attribute("contextUris", contextUris);
+        }
         run.attribute("reqChars", turn.userMessage() == null ? 0 : turn.userMessage().length());
         run.attribute("httpTraceId", MDC.get(TRACE_MDC_KEY));
         return run;

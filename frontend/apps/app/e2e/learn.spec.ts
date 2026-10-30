@@ -171,4 +171,25 @@ test.describe('从零开始', () => {
     )
     expect(overflow).toBeLessThanOrEqual(1)
   })
+
+  test('每一关都能递给助手：点「问助手」后上下文里出现这一关（WORK-058）', async ({ page }) => {
+    await page.goto('/#/learn')
+    await firstTrack(page).click()
+    await expect(page.getByTestId('track-map')).toBeVisible({ timeout: 15_000 })
+
+    // 关卡格本身仍是 <a>；「问助手」按钮是它的兄弟节点（按钮套在链接里是嵌套可交互内容）
+    const row = page.locator('[data-testid^="stage-"][data-status]').first().locator('..')
+    await row.getByRole('button', { name: '问助手' }).click()
+
+    // 点了就打开面板并把这一关放进上下文条；**不发消息**，所以不烧积分、也不依赖上游
+    await expect(page.getByTestId('assistant-shell')).toBeVisible()
+    await expect(page.getByTestId('conversation-context')).toContainText('附着 1 个对象')
+    const chips = page.getByTestId('conversation-attachments')
+    await expect(chips).toBeVisible()
+    await expect(chips).toContainText('关')
+
+    // 再取下：从**面板上的附件条**撤（面板是浮层，会挡住关卡右侧那颗按钮——这正是浮窗的常态）
+    await page.locator('[data-testid^="detach-"]').first().click()
+    await expect(page.getByTestId('conversation-context')).toHaveText('没有条目上下文，可直接提问。')
+  })
 })

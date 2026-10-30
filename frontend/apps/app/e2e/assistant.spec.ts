@@ -271,3 +271,26 @@ test('WORK-011：窄视口下面板覆盖而不占位——正文列不被压窄
   }
 })
 
+
+/**
+ * `@` 引用（WORK-058）：从对话里凭空引用一条内容。
+ *
+ * <p>附着与打开面板在 learn.spec 里验过，这里只验"搜得到、选得中、`@` 被吃掉、对象进附件条"。
+ * **不发送消息**，所以不需要上游，也不花钱。
+ */
+test('WORK-058：输入 @ 弹出候选，选中后进附件条且 @ 被删掉', async ({ page }) => {
+  await signIn(page)
+  await page.goto('/#/knowledge')
+  await page.getByTestId('assistant-launcher').click()
+
+  const input = page.getByTestId('conversation-input')
+  await input.click()
+  await input.pressSequentially('@')
+
+  // 候选来自真实检索：空关键词给最近的内容（本地库一定有已发布条目）
+  await expect(page.getByTestId('mention-list')).toBeVisible({ timeout: 10_000 })
+  await page.getByTestId('mention-0').click()
+
+  await expect(page.getByTestId('conversation-attachments')).toBeVisible()
+  await expect(input).toHaveValue('')
+})

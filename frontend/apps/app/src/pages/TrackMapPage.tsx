@@ -1,3 +1,4 @@
+import { Attach } from '@paideia/assistant'
 import { createLearningApi, type TrackStage } from '@paideia/knowledge'
 import {
   Alert,
@@ -234,45 +235,59 @@ function StageCell({
   const level = levelMeta(stage.level)
 
   return (
-    <Link
-      to={`/knowledge/entries/${stage.entryId}`}
-      // 带上来源：正文页据此把"返回知识库"换成"返回这条轨道的关卡地图"
-      state={{ fromTrackSlug: trackSlug, fromTrackName: trackName }}
-      className={`group relative flex items-center gap-3 py-2.5 transition-colors ${
-        done ? '' : 'hover:bg-accent/50 -mx-2 rounded-lg px-2'
-      }`}
-      data-testid={`stage-${stage.seq}`}
-      data-status={stage.status}
-    >
-      {/* 节点：压在脊线上。ring 用背景色是为了"切断"脊线，让节点看起来在线上而不是被线穿过。
-          尺寸 36px（原 40px）：节点之间的空隙是脊线唯一露出来的地方，节点越大空隙越小——
-          实测 40px + py-1.5 时节点间只剩 2px，脊线完全看不见。 */}
-      <span
-        className={`relative z-10 flex size-9 shrink-0 items-center justify-center rounded-full ring-[3px] ring-background transition-transform group-hover:scale-105 ${
-          done
-            ? 'bg-success text-success-foreground'
-            : 'bg-primary text-primary-foreground shadow-md'
+    // 外层是 div：里面要放「问助手」按钮（WORK-058），按钮套在链接里是嵌套可交互内容。
+    // 关卡格本身仍是 <a>（e2e 与键盘都靠这一点），只是按钮成了它的兄弟节点。
+    <div className="group relative flex items-center gap-3 py-2.5">
+      <Link
+        to={`/knowledge/entries/${stage.entryId}`}
+        // 带上来源：正文页据此把"返回知识库"换成"返回这条轨道的关卡地图"
+        state={{ fromTrackSlug: trackSlug, fromTrackName: trackName }}
+        className={`flex min-w-0 flex-1 items-center gap-3 transition-colors ${
+          done ? '' : 'hover:bg-accent/50 -mx-2 rounded-lg px-2'
         }`}
-        data-testid={`stage-state-${stage.seq}`}
+        data-testid={`stage-${stage.seq}`}
+        data-status={stage.status}
       >
-        {done ? <Check className="size-3.5" /> : <Play className="size-3.5" />}
-      </span>
-
-      <span className="min-w-0 flex-1 py-1.5">
-        <span className="flex flex-wrap items-center gap-2">
-          <span className={`text-sm ${done ? 'text-muted-foreground' : 'font-medium'}`}>
-            <span className="text-muted-foreground tabular-nums">{stage.seq}.</span> {stage.title}
-          </span>
-          <span
-            className={`rounded border px-1.5 py-0.5 text-[10px] leading-none ${level.tone}`}
-            data-testid={`stage-level-${stage.seq}`}
-            title={level.hint}
-          >
-            {level.label}
-          </span>
-          {done ? <span className="text-success text-[11px]">已通关</span> : null}
+        {/* 节点：压在脊线上。ring 用背景色是为了"切断"脊线，让节点看起来在线上而不是被线穿过。
+            尺寸 36px（原 40px）：节点之间的空隙是脊线唯一露出来的地方，节点越大空隙越小——
+            实测 40px + py-1.5 时节点间只剩 2px，脊线完全看不见。 */}
+        <span
+          className={`relative z-10 flex size-9 shrink-0 items-center justify-center rounded-full ring-[3px] ring-background transition-transform group-hover:scale-105 ${
+            done
+              ? 'bg-success text-success-foreground'
+              : 'bg-primary text-primary-foreground shadow-md'
+          }`}
+          data-testid={`stage-state-${stage.seq}`}
+        >
+          {done ? <Check className="size-3.5" /> : <Play className="size-3.5" />}
         </span>
-      </span>
-    </Link>
+
+        <span className="min-w-0 flex-1 py-1.5">
+          <span className="flex flex-wrap items-center gap-2">
+            <span className={`text-sm ${done ? 'text-muted-foreground' : 'font-medium'}`}>
+              <span className="text-muted-foreground tabular-nums">{stage.seq}.</span> {stage.title}
+            </span>
+            <span
+              className={`rounded border px-1.5 py-0.5 text-[10px] leading-none ${level.tone}`}
+              data-testid={`stage-level-${stage.seq}`}
+              title={level.hint}
+            >
+              {level.label}
+            </span>
+            {done ? <span className="text-success text-[11px]">已通关</span> : null}
+          </span>
+        </span>
+      </Link>
+
+      {/* 这一关可以被单独递给助手：不用先点进去——"卡在第 13 关"这类问题在选关时就有 */}
+      <Attach
+        type="level"
+        id={`${trackSlug}/${stage.seq}`}
+        label={`${trackName} · 第 ${stage.seq} 关 ${stage.title}`}
+        excerpt={`难度：${level.label}；状态：${done ? '已通关' : '未通关'}`}
+        compact
+        className="shrink-0"
+      />
+    </div>
   )
 }

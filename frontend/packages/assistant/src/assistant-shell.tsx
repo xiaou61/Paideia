@@ -3,6 +3,7 @@ import { Sparkles, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 
 import type { AssistantApi } from './client'
+import type { Attachment } from './attachments'
 import { ConversationPanel } from './conversation-panel'
 import { CreditsPanel } from './credits-panel'
 import { MemoryPanel } from './memory-panel'
@@ -143,12 +144,18 @@ function storePanelState(state: PanelState): void {
 export function AssistantShell({
   api,
   onSaveNote,
+  onOpenUri,
+  searchObjects,
 }: {
   api: AssistantApi
   /** 由应用注入：本包不认识笔记，只负责把"这一段话"交出去。 */
   onSaveNote?: (note: NoteDraftInput, entryId: number | null) => Promise<unknown>
+  /** 由应用注入：把被附着的对象打开（WORK-058）。本包不认识路由。 */
+  onOpenUri?: (uri: string) => void
+  /** 由应用注入：`@` 引用的搜索（WORK-058）。本包不认识业务检索端点。 */
+  searchObjects?: (query: string) => Promise<Attachment[]>
 }) {
-  const { entryId, entryTitle, onlyMine, setOnlyMine, pendingPrompt } = useAssistantContext()
+  const { entryId, entryTitle, onlyMine, setOnlyMine, pendingPrompt, revealSeq } = useAssistantContext()
   const [panel, setPanel] = useState<PanelState>(readPanelState)
   const [credential, setCredential] = useState<CredentialView | null>(null)
   const [view, setView] = useState<SummaryView | null>(null)
@@ -198,6 +205,22 @@ export function AssistantShell({
     setPanel((current) => (current.open ? current : { ...current, open: true }))
     setTab('chat')
   }, [pendingPrompt])
+
+  /**
+   * 递了对象之后把面板打开并切到对话页（WORK-058）。
+   *
+   * <p>只附着不打开的话用户看不到任何变化，会以为"点了没反应"。与 `pendingPrompt` 同一条纪律：
+   * 打开 + 切页，**不发送**——附着不等于替用户花钱问一句。
+   */
+  useEffect(() => {
+    if (revealSeq === 0) {
+      return
+    }
+    markHintSeen()
+    preloadMarkdown()
+    setPanel((current) => (current.open ? current : { ...current, open: true }))
+    setTab('chat')
+  }, [revealSeq])
 
   /**
    * 关闭面板。三种入口（按钮 / Esc / 窄屏遮罩）共用，**关闭后焦点回到启动按钮**：
@@ -465,7 +488,12 @@ export function AssistantShell({
 
       <div className="safe-b flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
         {tab === 'chat' ? (
-          <ConversationPanel api={api} onSaveNote={onSaveNote} />
+          <ConversationPanel
+            api={api}
+            onSaveNote={onSaveNote}
+            onOpenUri={onOpenUri}
+            searchObjects={searchObjects}
+          />
         ) : tab === 'memory' ? (
           <MemoryPanel api={api} />
         ) : tab === 'credits' ? (
