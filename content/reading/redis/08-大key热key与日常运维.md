@@ -11,6 +11,21 @@ status: published
 
 Redis 的线上故障，**大多数不是"Redis 不够快"，而是这四类**：
 
+```sketch
+{
+  "title": "线上故障多半不是「不够快」",
+  "rows": [
+    [
+      { "id": "big", "title": "大 key", "sub": "删的时候会阻塞", "tone": "amber" },
+      { "id": "hot", "title": "热 key", "sub": "一个键打满一个核", "tone": "amber" },
+      { "id": "pipe", "title": "pipeline 当时务", "sub": "中间失败不回滚", "tone": "amber" },
+      { "id": "mon", "title": "MONITOR 常开", "sub": "它自己就拖慢 Redis", "tone": "amber" }
+    ]
+  ],
+  "arrows": []
+}
+```
+
 | 问题 | 典型症状 | 先看什么 |
 | --- | --- | --- |
 | 大 key | 偶发卡顿、网络抖动、删除时阻塞 | `redis-cli --bigkeys`、`MEMORY USAGE` |
