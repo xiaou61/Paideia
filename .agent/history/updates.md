@@ -8837,3 +8837,12 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 本地提交：`feat/work-057-source` 分支 15 笔。**未合并 master**：主树有并发会话未提交的改动（WORK-058 与 updates.md），
   且对方的 `content(reading): 源码解读线计费篇补 1 张图` 改了本项已删除的文件，会产生 modify/delete 冲突；等并发会话收尾后再合
 - 远端推送：未执行
+
+## 2026-10-30 16:20 +0800 · 交付 · WORK-057 分支已推送
+
+- 类型：delivery
+- 变更：`feat/work-057-source` 已推到 origin（本地 16 笔，含快照、24 关内容、代码与验证报告）。
+- 未合并 master：主树仍有并发会话未提交的改动（WORK-058 与 `updates.md`），且对方给已删除的
+  「源码解读线计费篇」补过一次图，合并会出现 modify/delete 冲突。等并发会话收尾后再合，
+  **在那之前不要从 master 发版**（会把 `/source` 回滚）。
+- 远端推送：已执行
