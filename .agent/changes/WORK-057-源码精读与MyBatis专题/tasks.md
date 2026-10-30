@@ -21,7 +21,7 @@ approver_role: CTO
 **全局约束**：不新增后端表/端点/迁移；不改 `code-tour` 契约；源码只从同源相对路径读取；
 每笔提交只含本次范围。
 
-### TASK-001 | pending | 源码快照与许可
+### TASK-001 | done | 源码快照与许可
 
 - 对应：REQ-004 / REQ-007；AC-003、AC-010
 - 修改：`frontend/apps/app/public/source/mybatis-3.5.19/**`（新增）
@@ -31,7 +31,7 @@ approver_role: CTO
   3. 在快照根写 `SOURCE.md`：仓库、tag、commit、许可证、拷贝日期。
 - 验证：`find` 计数与 `du -sh` 记录；`git rev-parse HEAD` 记下 commit。
 
-### TASK-002 | pending | `source-walk` 契约与纯函数
+### TASK-002 | done | `source-walk` 契约与纯函数
 
 - 对应：REQ-003 / REQ-004 / REQ-005；AC-007
 - 修改：`frontend/packages/ui/src/markdown/renderers/schema.ts`、`schema.test.ts`、`renderers/index.ts`、`ui/src/index.ts`
@@ -42,7 +42,7 @@ approver_role: CTO
   4. `parsePredict` 复用（已导出即可，不导出就把逻辑保持在同一文件）。
 - 验证：`pnpm --filter @paideia/ui test`；用例覆盖合法、缺字段、越界、绝对路径、`..`、未知 control。
 
-### TASK-003 | pending | `source-walk` 组件
+### TASK-003 | done | `source-walk` 组件
 
 - 对应：REQ-003 / REQ-004 / REQ-005 / REQ-009；AC-002、AC-011、AC-012、AC-013
 - 修改：`frontend/packages/ui/src/markdown/renderers/source-walk.tsx`（新增）、`blocks.tsx`（如需新 Pill）
@@ -56,7 +56,7 @@ approver_role: CTO
   7. 进度写 `ProgressPort.tours[walk.id]`。
 - 验证：组件测试（两文件、两步骤、一个 toggle）；`pnpm --filter @paideia/ui test`。
 
-### TASK-004 | pending | 页面、路由与导航
+### TASK-004 | done | 页面、路由与导航
 
 - 对应：REQ-001 / REQ-002 / REQ-003；AC-001、AC-005、AC-006
 - 修改：`frontend/apps/app/src/pages/Source{Projects,Project,Chapter}Page.tsx`、`router.tsx`、`components/LearnerHeader.tsx`
@@ -67,7 +67,7 @@ approver_role: CTO
   4. 导航加 `source` 项（`knowledge` 组）。
 - 验证：本地起前后端，手动走三条路由；`pnpm --filter app typecheck`。
 
-### TASK-005 | pending | 静态放行
+### TASK-005 | done | 静态放行
 
 - 对应：REQ-008；AC-008
 - 修改：`backend/paideia-security/.../SecurityConfiguration.java`
@@ -85,14 +85,14 @@ approver_role: CTO
   3. 复查计数与 `/learn` 列表。
 - 验证：AC-015 的四个计数；`rg` 无残留引用（历史工件除外）。
 
-### TASK-007 | pending | 内容校验脚本
+### TASK-007 | done | 内容校验脚本
 
 - 对应：REQ-007；AC-009
 - 修改：`scripts/check-source-walks.mjs`（新增）
 - 步骤：扫描 `.md` → 提取 `source-walk` 块 → 解析 JSON → 校验字段/行号/文件存在/答案下标 → 汇总。
 - 验证：对 24 篇退出码 0；故意改坏一条得到非 0 与具体位置。
 
-### TASK-008 | pending | 篇一 · 起步（4 关）
+### TASK-008 | done | 篇一 · 起步（4 关）
 
 - 对应：REQ-007 / REQ-010；AC-014
 - 内容：01 总览与全链路、02 工厂与解析、03 Configuration、04 MappedStatement

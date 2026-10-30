@@ -8793,3 +8793,22 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：回读 frontmatter：approved_by=xiaou61，1 个工件同批签署
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
+
+## 2026-10-30 15:20 +0800 · 实现 · WORK-057 引擎、入口与首四关
+
+- 类型：implementation
+- 变更：
+  - 新围栏块 `source-walk`：整文件 + 绝对行区间 + 开关/分支（`visibleSteps` 纯函数）+
+    状态三组（调用栈/变量/注册表）+ 跨文件 refs + 预测；只从同源相对路径取文件。
+  - MyBatis 3.5.19 快照 69 个 Java 文件（13k 行，644 KB）+ LICENSE/NOTICE/SOURCE.md。
+  - `/source`、`/source/:project`、`/source/:project/:entryId` 三条路由与页面；导航加「源码精读」。
+  - `GET /source/**` 静态白名单（只 GET）。
+  - `scripts/check-source-walks.mjs`：JSON、文件存在、行号越界、答案下标、同 base 的 commit 一致。
+  - 篇一 4 关：总览、配置文件解析、Configuration、MappedStatement。
+- 验证：
+  - `vitest` 三个新文件 37 条通过（schema 33 / 组件 3 / 真实内容回归 1）。
+  - `vite build` 成功（45s）；`mvn -pl paideia-security -am -DskipTests compile` 成功。
+  - `node scripts/check-source-walks.mjs content/source/mybatis` → 4 块通过。
+- 未做：篇二～篇六 20 关；旧内容清理；e2e；导入与部署（都未开始）。
+- 本地提交：worktree 分支 `feat/work-057-source` 三笔（块与快照 / 页面与内容 / 文档）
+- 远端推送：未执行
