@@ -8812,3 +8812,28 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 未做：篇二～篇六 20 关；旧内容清理；e2e；导入与部署（都未开始）。
 - 本地提交：worktree 分支 `feat/work-057-source` 三笔（块与快照 / 页面与内容 / 文档）
 - 远端推送：未执行
+
+## 2026-10-30 16:05 +0800 · 实现 · WORK-057 源码精读上线（24 关 MyBatis）
+
+- 类型：implementation
+- 变更：
+  - 线上新增独立「源码精读」：`/source`、`/source/:project`、`/source/:project/:entryId`；
+    导航加「源码精读」，`GET /source/**` 静态放行（只 GET）。
+  - 新围栏块 `source-walk`：整文件 + 绝对行区间 + 开关/分支（`visibleSteps` 纯函数）+
+    状态三组 + 跨文件 refs + 预测；只从同源相对路径取文件。
+  - MyBatis 3.5.19 快照 70 个文件 + LICENSE/NOTICE/SOURCE.md。
+  - 24 关内容（6 篇 × 4 关）：每章 1 个开关/分支、≥2 处预测、1 道排序/填空、每步有状态。
+  - 删除旧「源码解读 / 读代码实战」：线上 7 条正文、分类 16/43、轨道 2 条；仓库内容源与首页卡一并删。
+- 验证：
+  - UI 全量 253 passed / 1 failed（既有 `tokens.test.ts`：admin AnalyticsPage 硬编码颜色，与本次无关）；
+    新增 schema 9 条 + 组件 5 条 + 内容回归 1 条全绿。
+  - 后端 `scripts/test-db.sh mvn -B -T 1C -pl '!paideia-app' test`：769 运行 / 0 失败 / 16 跳过（live 探针与 S3 分支）。
+  - 线上 e2e 7/7（含 24 章逐章打开、跨浏览器上下文「已读完」、375px 无溢出）。
+  - `GET /source/<file>` 200、`POST` 401；导入幂等 `created 0 / updated 0`。
+  - 清理复查：分类 16/43 与两条轨道 0 行；`git` 分类 8 条完好；`leftover_progress=0`。
+- 订正：`--no-track` 的线走默认 COURSE 规则（动手题与小测都要 ≥80%）。首版只有小测，
+  e2e 的「已读完」用例暴露后，给每章补了一道非选择题。
+- 已知未验：GitHub 原文页没在浏览器里打开（本机与线上访问 github.com 均超时）；只验了文件在该 commit 存在。
+- 本地提交：`feat/work-057-source` 分支 15 笔。**未合并 master**：主树有并发会话未提交的改动（WORK-058 与 updates.md），
+  且对方的 `content(reading): 源码解读线计费篇补 1 张图` 改了本项已删除的文件，会产生 modify/delete 冲突；等并发会话收尾后再合
+- 远端推送：未执行
