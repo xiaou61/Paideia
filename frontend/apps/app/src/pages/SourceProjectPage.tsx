@@ -39,7 +39,8 @@ const learning = createLearningApi(api)
  * 的第一个 `source-walk` 块里读（repo / ref / commit / license）——不另存一份会漂移的数据。
  */
 export function SourceProjectPage() {
-  const { slug = '' } = useParams<{ slug: string }>()
+  // 路由参数叫 `:project`；这里改名只是为了下面读起来像"项目 slug"
+  const { project: slug = '' } = useParams<{ project: string }>()
   const categories = useQuery({
     queryKey: ['knowledge-categories'],
     queryFn: () => knowledge.categories(),

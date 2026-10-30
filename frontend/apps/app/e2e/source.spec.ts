@@ -20,7 +20,7 @@ test.describe('源码精读', () => {
     await clickNav(page, 'learner-nav-source')
 
     await expect(page).toHaveURL(/#\/source/)
-    await expect(page.getByRole('heading', { name: '源码精读' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '源码精读', exact: true })).toBeVisible()
     const card = page.getByTestId('source-project-mybatis-source')
     await expect(card).toBeVisible({ timeout: 15_000 })
     await expect(card).toContainText('MyBatis')
