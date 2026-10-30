@@ -15,6 +15,23 @@ status: published
 **结论先说**：证书用 ACME 自动续期并加到期告警；负载均衡用 `upstream` + 被动健康检查；
 限流用 `limit_req` 的**漏桶**，先设成"能接受的上限"，而不是"看起来合理"。
 
+```sketch
+{
+  "title": "证书、分流、限流，三件事各管一段",
+  "rows": [
+    [
+      { "id": "cert", "title": "证书到期", "sub": "半夜整站打不开", "tone": "amber" },
+      { "id": "up", "title": "两台后端", "sub": "一台重启还有一台", "tone": "blue" },
+      { "id": "limit", "title": "漏桶限流", "sub": "超了排队或拒绝", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "cert", "to": "up" },
+    { "from": "up", "to": "limit" }
+  ]
+}
+```
+
 ## 先对齐几个词
 
 - **证书链**：不是一张证书，是一串（你的 + 中间 CA）。少一张浏览器就报"不安全"。

@@ -15,6 +15,23 @@ status: published
 **结论先说**：Nginx 的行为由**两条规则**决定——`location` 的**匹配顺序**，和 `proxy_pass`
 **末尾有没有斜杠**。把这两条吃透，绝大多数"为什么请求没到我的服务"都有确定答案。
 
+```sketch
+{
+  "title": "404 是路径没配上，502 是后端没起",
+  "rows": [
+    [
+      { "id": "req", "title": "浏览器请求", "sub": "域名 + 路径", "tone": "gray" },
+      { "id": "loc", "title": "location 配对", "sub": "斜杠差一个就 404", "tone": "amber" },
+      { "id": "up", "title": "proxy_pass 转过去", "sub": "后端没起就是 502", "tone": "blue" }
+    ]
+  ],
+  "arrows": [
+    { "from": "req", "to": "loc" },
+    { "from": "loc", "to": "up" }
+  ]
+}
+```
+
 ## 先对齐几个词
 
 - **root / index**：`root` 是"文件在哪"，`index` 是"直接访问目录时给哪个文件"。

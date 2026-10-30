@@ -15,6 +15,23 @@ status: published
 **结论先说**：把进程交给 **systemd**——它负责开机自启、崩了重启、日志进 journald、
 停止时先发 SIGTERM 让应用收尾。一个 20 行的 unit 文件换掉一整套手工作业。
 
+```sketch
+{
+  "title": "一个 unit 文件里最关键的几行",
+  "rows": [
+    [
+      { "id": "exec", "title": "ExecStart", "sub": "java 与 jar 都写绝对路径", "tone": "blue" },
+      { "id": "restart", "title": "Restart=always", "sub": "崩了自己起来", "tone": "blue" },
+      { "id": "term", "title": "SIGTERM 收尾", "sub": "别让进程被直接砍", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "exec", "to": "restart" },
+    { "from": "restart", "to": "term" }
+  ]
+}
+```
+
 ## 先对齐几个词
 
 - **unit**：systemd 的一个配置文件，描述"这个服务怎么启动、怎么停、挂了怎么办"。
