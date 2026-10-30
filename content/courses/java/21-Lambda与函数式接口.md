@@ -52,6 +52,23 @@ name -> name.toUpperCase()
 
 Lambda **本身没有类型**，它的类型由"赋值目标"决定。那个目标必须是一个**函数式接口**——只有一个抽象方法的接口。
 
+```sketch
+{
+  "title": "lambda 自己没有类型，由赋值目标定",
+  "rows": [
+    [
+      { "id": "fn", "title": "(a, b) -> a + b", "sub": "单看它说不上什么类型", "tone": "gray" },
+      { "id": "iface", "title": "函数式接口", "sub": "只有一个抽象方法", "tone": "blue" },
+      { "id": "type", "title": "推断成 Calculator", "sub": "参数和返回值对上了", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "fn", "to": "iface" },
+    { "from": "iface", "to": "type" }
+  ]
+}
+```
+
 ```java
 @FunctionalInterface
 interface Calculator {

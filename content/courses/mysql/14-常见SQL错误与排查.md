@@ -40,6 +40,25 @@ status: published
 
 **先确定是哪一类，再改一行验证一次。** 一次改五处，出了新问题就不知道是哪一处造成的。
 
+```sketch
+{
+  "title": "先归类，再决定第一条命令",
+  "rows": [
+    [ { "id": "sym", "title": "看到的现象", "sub": "先别急着改 SQL", "tone": "gray" } ],
+    [
+      { "id": "rows", "title": "行数不对", "sub": "去掉聚合看明细", "tone": "blue" },
+      { "id": "num", "title": "数值不对", "sub": "COUNT 换成 DISTINCT", "tone": "blue" },
+      { "id": "slow", "title": "慢或卡住", "sub": "EXPLAIN / PROCESSLIST", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "sym", "to": "rows" },
+    { "from": "sym", "to": "num" },
+    { "from": "sym", "to": "slow" }
+  ]
+}
+```
+
 ### 错误一：`WHERE` 与 `HAVING` 混用
 
 错误写法：

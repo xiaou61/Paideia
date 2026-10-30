@@ -84,6 +84,23 @@ point:7
 
 `instanceof Point(int x, int y)` 的意思是：先确认它是 `Point`，再把 `x`、`y` 两个组件取出来。嵌套的 record 还能继续拆，比如 `Point(Point(int x, int y), int z)`。
 
+```sketch
+{
+  "title": "匹配成功就直接拿到变量，不用再强转",
+  "rows": [
+    [
+      { "id": "old", "title": "老写法", "sub": "instanceof 再手动强转", "tone": "amber" },
+      { "id": "pat", "title": "模式匹配", "sub": "instanceof String s", "tone": "green" },
+      { "id": "rec", "title": "记录模式", "sub": "Point(int x, int y) 直接拆", "tone": "blue" }
+    ]
+  ],
+  "arrows": [
+    { "from": "old", "to": "pat" },
+    { "from": "pat", "to": "rec" }
+  ]
+}
+```
+
 ### `instanceof` 与 `null`
 
 ```text
