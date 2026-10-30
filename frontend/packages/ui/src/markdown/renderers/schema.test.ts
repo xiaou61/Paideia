@@ -12,8 +12,12 @@ import {
   parseCodeTour,
   parseLearningPath,
   parseQuiz,
+  parseSourceWalk,
   permalinkOf,
   scoreQuiz,
+  visibleSteps,
+  walkDefaults,
+  walkPermalink,
 } from './schema'
 
 /**
@@ -292,5 +296,126 @@ describe('parseCodeChallenge · run（WORK-015）', () => {
     const strict = { name: 't', expected: '42', trim: false }
     expect(judgeRun(strict, { stdout: '42\n', exitCode: 0, timedOut: false, outOfMemory: false })).toBe(false)
     expect(judgeRun(strict, { stdout: '42', exitCode: 0, timedOut: false, outOfMemory: false })).toBe(true)
+  })
+})
+
+/* ---------------------------------------------------------------- 源码精读（WORK-057） */
+
+const WALK = {
+  id: 'demo-walk',
+  repo: 'mybatis/mybatis-3',
+  ref: 'mybatis-3.5.19',
+  commit: 'ee0d4f4831ffdd311b0183c202f4ad6492a3f404',
+  license: 'Apache-2.0',
+  base: 'source/mybatis-3.5.19',
+  files: [
+    { path: 'org/apache/ibatis/binding/MapperProxy.java', label: 'MapperProxy' },
+    { path: 'org/apache/ibatis/binding/MapperMethod.java', label: 'MapperMethod' },
+  ],
+  controls: [
+    { id: 'cache', type: 'toggle', label: '开启一级缓存', default: true },
+    {
+      id: 'method',
+      type: 'select',
+      label: '调哪个方法',
+      default: 'byId',
+      options: [
+        { value: 'byId', label: '查 id' },
+        { value: 'byName', label: '查 name' },
+      ],
+    },
+  ],
+  steps: [
+    { title: '入口', file: 'org/apache/ibatis/binding/MapperProxy.java', line: 62, lines: 8, explain: '入口。' },
+    {
+      title: '缓存命中',
+      file: 'org/apache/ibatis/binding/MapperProxy.java',
+      line: 70,
+      lines: 4,
+      explain: '走缓存。',
+      when: { cache: true },
+    },
+    {
+      title: '查 id',
+      file: 'org/apache/ibatis/binding/MapperMethod.java',
+      line: 40,
+      lines: 6,
+      explain: '按 id。',
+      when: { method: 'byId' },
+    },
+    {
+      title: '查 name',
+      file: 'org/apache/ibatis/binding/MapperMethod.java',
+      line: 50,
+      lines: 6,
+      explain: '按 name。',
+      when: { method: 'byName' },
+      refs: [{ label: '回到代理', file: 'org/apache/ibatis/binding/MapperProxy.java', line: 62 }],
+    },
+  ],
+}
+
+describe('parseSourceWalk（WORK-057）', () => {
+  it('合法输入解析出文件、控件与步骤', () => {
+    const parsed = parseSourceWalk(JSON.stringify(WALK))
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.value.files).toHaveLength(2)
+    expect(parsed.value.controls).toHaveLength(2)
+    expect(parsed.value.repoPath).toBe('src/main/java')
+  })
+
+  it('缺 files 或步骤指向未声明的文件都拒绝', () => {
+    expect(parseSourceWalk(JSON.stringify({ ...WALK, files: [] })).ok).toBe(false)
+    const bad = { ...WALK, steps: [{ ...WALK.steps[0], file: 'nope/Nope.java' }] }
+    expect(parseSourceWalk(JSON.stringify(bad)).ok).toBe(false)
+  })
+
+  it('只接受相对路径：绝对路径与 .. 都拒绝', () => {
+    expect(parseSourceWalk(JSON.stringify({ ...WALK, base: '/etc' })).ok).toBe(false)
+    expect(parseSourceWalk(JSON.stringify({ ...WALK, base: 'source/../../etc' })).ok).toBe(false)
+  })
+
+  it('when 只能引用已声明的控件，且类型要一致', () => {
+    const unknown = { ...WALK, steps: [{ ...WALK.steps[0], when: { nope: true } }] }
+    expect(parseSourceWalk(JSON.stringify(unknown)).ok).toBe(false)
+    const wrongType = { ...WALK, steps: [{ ...WALK.steps[0], when: { cache: 'yes' } }] }
+    expect(parseSourceWalk(JSON.stringify(wrongType)).ok).toBe(false)
+  })
+
+  it('select 的默认值必须在 options 里', () => {
+    const bad = {
+      ...WALK,
+      controls: [{ ...WALK.controls[1], default: 'byAge' }],
+    }
+    expect(parseSourceWalk(JSON.stringify(bad)).ok).toBe(false)
+  })
+
+  it('行区间必须为正数', () => {
+    const bad = { ...WALK, steps: [{ ...WALK.steps[0], lines: 0 }] }
+    expect(parseSourceWalk(JSON.stringify(bad)).ok).toBe(false)
+  })
+})
+
+describe('visibleSteps（WORK-057）', () => {
+  const walk = parseSourceWalk(JSON.stringify(WALK))
+  if (!walk.ok) throw new Error(walk.error)
+
+  it('默认值下：缓存步与 byId 分支可见，byName 不可见', () => {
+    const steps = visibleSteps(walk.value, walkDefaults(walk.value))
+    expect(steps.map((step) => step.title)).toEqual(['入口', '缓存命中', '查 id'])
+  })
+
+  it('关掉缓存后步骤真的变少；切到 byName 后分支真的换掉', () => {
+    const noCache = visibleSteps(walk.value, { cache: false, method: 'byId' })
+    expect(noCache.map((step) => step.title)).toEqual(['入口', '查 id'])
+    const byName = visibleSteps(walk.value, { cache: true, method: 'byName' })
+    expect(byName.map((step) => step.title)).toEqual(['入口', '缓存命中', '查 name'])
+  })
+
+  it('permalink 拼上 repoPath 与行区间', () => {
+    expect(walkPermalink(walk.value, 'org/apache/ibatis/binding/MapperProxy.java', 62, 8)).toBe(
+      'https://github.com/mybatis/mybatis-3/blob/ee0d4f4831ffdd311b0183c202f4ad6492a3f404/src/main/java/org/apache/ibatis/binding/MapperProxy.java#L62-L69',
+    )
   })
 })

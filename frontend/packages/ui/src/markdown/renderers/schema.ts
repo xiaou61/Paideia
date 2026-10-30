@@ -41,6 +41,13 @@ const LIMITS = {
   sketchNodes: 12,
   sketchArrows: 16,
   sketchLabel: 12,
+  // 源码精读（WORK-057）
+  walkFiles: 12,
+  walkSteps: 60,
+  walkLineSpan: 200,
+  walkControls: 4,
+  walkRefs: 8,
+  walkStateItems: 20,
 } as const
 
 class BadInput extends Error {}
@@ -340,6 +347,260 @@ export function parseCodeTour(code: string): ParseResult<CodeTour> {
       steps,
     }
   })
+}
+
+/* ------------------------------------------------------------------ 源码精读（WORK-057） */
+
+/**
+ * 整文件走读块。
+ *
+ * <p>与 `code-tour` 的区别只有一条但很关键：**步骤不自带 code**，只声明「哪个文件、哪几行」。
+ * 代码由整份文件提供，读者看得到方法前后的上下文。代价是运行时要多取一次静态文件，
+ * 所以路径校验必须在这里做完：只接受相对路径，且只接受块里声明过的文件。
+ */
+
+export interface WalkFile {
+  path: string
+  label?: string
+}
+
+export interface WalkControlOption {
+  value: string
+  label: string
+}
+
+export interface WalkToggle {
+  id: string
+  type: 'toggle'
+  label: string
+  default: boolean
+}
+
+export interface WalkSelect {
+  id: string
+  type: 'select'
+  label: string
+  default: string
+  options: WalkControlOption[]
+}
+
+export type WalkControl = WalkToggle | WalkSelect
+
+/** 控件当前值：toggle 是布尔，select 是选项的 value。 */
+export type WalkControlValues = Record<string, boolean | string>
+
+export interface WalkState {
+  stack?: string[]
+  vars?: StateVar[]
+  tables?: StateVar[]
+}
+
+export interface WalkRef {
+  label: string
+  file: string
+  line: number
+}
+
+export interface WalkStep {
+  title: string
+  file: string
+  line: number
+  /** 覆盖的行数，从 `line` 起算。 */
+  lines: number
+  explain: string
+  when?: WalkControlValues
+  state?: WalkState
+  refs?: WalkRef[]
+  predict?: Predict
+}
+
+export interface SourceWalk {
+  id: string
+  title?: string
+  repo: string
+  ref: string
+  commit: string
+  license: string
+  /** 前端静态路径前缀，例如 `source/mybatis-3.5.19`。 */
+  base: string
+  /** 仓库里源码所在的目录，用来拼 GitHub 原文链接；省略按 `src/main/java`。 */
+  repoPath: string
+  files: WalkFile[]
+  controls: WalkControl[]
+  steps: WalkStep[]
+}
+
+function asRelativePath(value: unknown, where: string, max: number): string {
+  const path = asText(value, where, max)
+  need(!path.startsWith('/'), `${where} 必须是相对路径，不能以 / 开头`)
+  need(!path.includes('..'), `${where} 不能包含 ..`)
+  need(/^[A-Za-z0-9._/-]+$/.test(path), `${where} 只能包含字母、数字、点、下划线、斜杠与连字符`)
+  return path
+}
+
+function parseStateItems(value: unknown, where: string): StateVar[] {
+  return asArray(value, where, 0, LIMITS.walkStateItems).map((item, index) => {
+    const variable = asObject(item, `${where}[${index}]`)
+    return {
+      name: asText(variable['name'], `${where}[${index}].name`, 60),
+      value: asText(variable['value'], `${where}[${index}].value`, 200),
+    }
+  })
+}
+
+function parseWalkState(value: unknown, where: string): WalkState {
+  const raw = asObject(value, where)
+  return {
+    stack: raw['stack'] === undefined ? undefined : asStringArray(raw['stack'], `${where}.stack`, 0, LIMITS.walkStateItems, 200),
+    vars: raw['vars'] === undefined ? undefined : parseStateItems(raw['vars'], `${where}.vars`),
+    tables: raw['tables'] === undefined ? undefined : parseStateItems(raw['tables'], `${where}.tables`),
+  }
+}
+
+function parseWalkControl(value: unknown, where: string, ids: Set<string>): WalkControl {
+  const raw = asObject(value, where)
+  const id = asText(raw['id'], `${where}.id`, 32)
+  need(!ids.has(id), `${where}.id 与前面的控件重复：${id}`)
+  ids.add(id)
+  const label = asText(raw['label'], `${where}.label`, 40)
+  if (raw['type'] === 'toggle') {
+    need(typeof raw['default'] === 'boolean', `${where}.default 必须是布尔`)
+    return { id, type: 'toggle', label, default: raw['default'] as boolean }
+  }
+  need(raw['type'] === 'select', `${where}.type 只能是 toggle 或 select`)
+  const options = asArray(raw['options'], `${where}.options`, 2, 4).map((item, index) => {
+    const option = asObject(item, `${where}.options[${index}]`)
+    return {
+      value: asText(option['value'], `${where}.options[${index}].value`, 40),
+      label: asText(option['label'], `${where}.options[${index}].label`, 40),
+    }
+  })
+  const values = new Set(options.map((option) => option.value))
+  need(values.size === options.length, `${where}.options 的 value 不能重复`)
+  const fallback = asText(raw['default'], `${where}.default`, 40)
+  need(values.has(fallback), `${where}.default 必须是 options 里的一个 value`)
+  return { id, type: 'select', label, default: fallback, options }
+}
+
+export function parseSourceWalk(code: string): ParseResult<SourceWalk> {
+  return parseWith(code, (input) => {
+    const raw = asObject(input, '源码精读')
+    const repo = asText(raw['repo'], 'repo', LIMITS.repo)
+    need(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo), 'repo 必须是 owner/name 形式')
+    const commit = asText(raw['commit'], 'commit', 40)
+    need(/^[0-9a-f]{7,40}$/.test(commit), 'commit 必须是 7–40 位小写十六进制（固定 commit，不跟分支）')
+
+    const files = asArray(raw['files'], 'files', 1, LIMITS.walkFiles).map((item, index) => {
+      const file = asObject(item, `files[${index}]`)
+      const path = asRelativePath(file['path'], `files[${index}].path`, LIMITS.file)
+      need(/\.(java|xml)$/.test(path), `files[${index}].path 只支持 .java 与 .xml`)
+      return { path, label: optionalText(file['label'], `files[${index}].label`, 40) }
+    })
+    const paths = new Set(files.map((file) => file.path))
+    need(paths.size === files.length, 'files 里不能有重复路径')
+
+    const controlIds = new Set<string>()
+    const controls = asArray(raw['controls'] ?? [], 'controls', 0, LIMITS.walkControls).map((item, index) =>
+      parseWalkControl(item, `controls[${index}]`, controlIds),
+    )
+    const controlTypes = new Map(controls.map((control) => [control.id, control.type]))
+
+    const steps = asArray(raw['steps'], 'steps', 1, LIMITS.walkSteps).map((item, index) => {
+      const where = `steps[${index}]`
+      const step = asObject(item, where)
+      const file = asRelativePath(step['file'], `${where}.file`, LIMITS.file)
+      need(paths.has(file), `${where}.file 不在 files 里：${file}`)
+      const line = asInteger(step['line'], `${where}.line`, 1, 100_000_000)
+      const lines = asInteger(step['lines'], `${where}.lines`, 1, LIMITS.walkLineSpan)
+
+      let when: WalkControlValues | undefined
+      if (step['when'] !== undefined) {
+        const rawWhen = asObject(step['when'], `${where}.when`)
+        when = {}
+        for (const [key, value] of Object.entries(rawWhen)) {
+          const type = controlTypes.get(key)
+          need(type !== undefined, `${where}.when 引用了未声明的控件：${key}`)
+          need(
+            type === 'toggle' ? typeof value === 'boolean' : typeof value === 'string',
+            `${where}.when.${key} 的类型与控件 ${type} 不一致`,
+          )
+          when[key] = value as boolean | string
+        }
+      }
+
+      const refs = step['refs'] === undefined
+        ? undefined
+        : asArray(step['refs'], `${where}.refs`, 0, LIMITS.walkRefs).map((ref, position) => {
+            const entry = asObject(ref, `${where}.refs[${position}]`)
+            const refFile = asRelativePath(entry['file'], `${where}.refs[${position}].file`, LIMITS.file)
+            need(paths.has(refFile), `${where}.refs[${position}].file 不在 files 里：${refFile}`)
+            return {
+              label: asText(entry['label'], `${where}.refs[${position}].label`, 60),
+              file: refFile,
+              line: asInteger(entry['line'], `${where}.refs[${position}].line`, 1, 100_000_000),
+            }
+          })
+
+      return {
+        title: asText(step['title'], `${where}.title`, LIMITS.title),
+        file,
+        line,
+        lines,
+        explain: asText(step['explain'], `${where}.explain`, LIMITS.explain),
+        when,
+        state: step['state'] === undefined ? undefined : parseWalkState(step['state'], `${where}.state`),
+        refs,
+        predict: step['predict'] === undefined ? undefined : parsePredict(step['predict'], `${where}.predict`),
+      }
+    })
+
+    return {
+      id: asText(raw['id'], 'id', LIMITS.id),
+      title: optionalText(raw['title'], 'title', LIMITS.title),
+      repo,
+      ref: asText(raw['ref'], 'ref', 40),
+      commit,
+      license: asText(raw['license'], 'license', LIMITS.license),
+      base: asRelativePath(raw['base'], 'base', LIMITS.file),
+      repoPath: raw['repoPath'] === undefined ? 'src/main/java' : asRelativePath(raw['repoPath'], 'repoPath', LIMITS.file),
+      files,
+      controls,
+      steps,
+    }
+  })
+}
+
+/** 控件的初始值：全部取声明里的 default。 */
+export function walkDefaults(walk: SourceWalk): WalkControlValues {
+  const values: WalkControlValues = {}
+  for (const control of walk.controls) {
+    values[control.id] = control.default
+  }
+  return values
+}
+
+/** 这一步在当前控件组合下是否可见。`when` 为空恒可见。 */
+export function stepVisible(step: WalkStep, values: WalkControlValues): boolean {
+  if (step.when === undefined) {
+    return true
+  }
+  return Object.entries(step.when).every(([key, expected]) => values[key] === expected)
+}
+
+/**
+ * 当前控件组合下可见的步骤。
+ *
+ * <p>纯函数，单测直接盯它：开关切换后"链路真的变了"这件事，必须在这里可断言，
+ * 不能只靠界面看起来不一样。
+ */
+export function visibleSteps(walk: SourceWalk, values: WalkControlValues): WalkStep[] {
+  return walk.steps.filter((step) => stepVisible(step, values))
+}
+
+/** GitHub 原文链接：文件路径 = 快照里的相对路径 + `repoPath` 前缀。 */
+export function walkPermalink(walk: SourceWalk, file: string, line: number, lines: number): string {
+  const end = line + lines - 1
+  return `https://github.com/${walk.repo}/blob/${walk.commit}/${walk.repoPath}/${file}#L${line}-L${end}`
 }
 
 /* ------------------------------------------------------------------ 动手练习 */
