@@ -88,6 +88,23 @@ WHERE created_at >= '2026-01-01' AND created_at < '2026-02-01'
 
 SQL 的比较结果是三种：真、假、**未知**。`NULL` 参与任何比较，结果都是"未知"，而 `WHERE` 只保留"真"的行。
 
+```sketch
+{
+  "title": "跟 NULL 比，结果既不是真也不是假",
+  "rows": [
+    [
+      { "id": "cmp", "title": "age > 18", "sub": "这一行的 age 是 NULL", "tone": "gray" },
+      { "id": "unk", "title": "结果是 UNKNOWN", "sub": "不是 TRUE 也不是 FALSE", "tone": "amber" },
+      { "id": "filter", "title": "WHERE 只留 TRUE", "sub": "这一行被过滤掉", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "cmp", "to": "unk" },
+    { "from": "unk", "to": "filter" }
+  ]
+}
+```
+
 所以：
 
 ```sql

@@ -38,6 +38,23 @@ ROLLBACK;            -- 全部撤销
 
 注意 MySQL 默认是**自动提交**（`autocommit = 1`）：不写 `BEGIN` 时，每一条语句自己就是一个事务，执行完立刻生效。所以"忘了写 BEGIN"不会有任何提示，只是你的三条语句变成了三个独立事务。
 
+```sketch
+{
+  "title": "不写 BEGIN，每条语句自己就是一个事务",
+  "rows": [
+    [
+      { "id": "s1", "title": "第一条语句", "sub": "自动提交，立刻生效", "tone": "amber" },
+      { "id": "s2", "title": "第二条失败了", "sub": "第一条已经改完了", "tone": "amber" },
+      { "id": "begin", "title": "用 BEGIN 包起来", "sub": "这时才谈得上回滚", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "s1", "to": "s2" },
+    { "from": "s2", "to": "begin" }
+  ]
+}
+```
+
 ### ACID 各自防什么
 
 | 字母 | 名字 | 一句话 | 破坏它会怎样 |
