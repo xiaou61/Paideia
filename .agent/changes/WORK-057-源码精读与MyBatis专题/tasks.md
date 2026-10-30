@@ -74,7 +74,7 @@ approver_role: CTO
 - 步骤：GET 白名单加 `"/source/**"`（只这一条）。
 - 验证：`curl` 未登录 GET 200；POST 非 200；后端切片测试或现有安全测试补一条断言。
 
-### TASK-006 | pending | 清理现有源码线
+### TASK-006 | done | 清理现有源码线
 
 - 对应：REQ-011；AC-015、AC-017
 - 修改：删 `content/reading/source/`、`content/reading/code-reading/`；`HomePage.tsx`、`LearnPage.tsx`
@@ -98,32 +98,32 @@ approver_role: CTO
 - 内容：01 总览与全链路、02 工厂与解析、03 Configuration、04 MappedStatement
 - 验证：`check-source-walks.mjs` + 本地渲染逐关点开。
 
-### TASK-009 | pending | 篇二 · SQL 的诞生（4 关）
+### TASK-009 | done | 篇二 · SQL 的诞生（4 关）
 
 - 内容：05 注解方式、06 动态 SQL（SqlNode）、07 SqlSource/BoundSql、08 参数名
 - 验证：同上。
 
-### TASK-010 | pending | 篇三 · 接口变成调用（4 关）
+### TASK-010 | done | 篇三 · 接口变成调用（4 关）
 
 - 内容：09 Registry/Factory、10 MapperProxy、11 MapperMethod、12 SqlSession
 - 验证：同上。
 
-### TASK-011 | pending | 篇四 · 执行（4 关）
+### TASK-011 | done | 篇四 · 执行（4 关）
 
 - 内容：13 Executor 家族、14 一级缓存、15 StatementHandler/ParameterHandler、16 主键与批量
 - 验证：同上。
 
-### TASK-012 | pending | 篇五 · 结果与缓存（4 关）
+### TASK-012 | done | 篇五 · 结果与缓存（4 关）
 
 - 内容：17 ResultSetHandler、18 TypeHandler、19 延迟加载、20 二级缓存
 - 验证：同上。
 
-### TASK-013 | pending | 篇六 · 扩展与底座（4 关）
+### TASK-013 | done | 篇六 · 扩展与底座（4 关）
 
 - 内容：21 插件、22 数据源、23 事务与日志、24 反射与元数据
 - 验证：同上。
 
-### TASK-014 | pending | e2e
+### TASK-014 | done | e2e
 
 - 对应：AC-002、AC-004、AC-006、AC-011、AC-013
 - 修改：`frontend/e2e/source.spec.ts`（新增）
@@ -131,7 +131,7 @@ approver_role: CTO
   375px 断言 `scrollWidth <= clientWidth`。
 - 验证：`playwright test e2e/source.spec.ts`。
 
-### TASK-015 | pending | 导入、部署与线上验证
+### TASK-015 | done | 导入、部署与线上验证
 
 - 对应：AC-001、AC-003、AC-008、AC-016、AC-017
 - 步骤：

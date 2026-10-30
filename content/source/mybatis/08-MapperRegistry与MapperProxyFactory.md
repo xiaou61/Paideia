@@ -23,9 +23,18 @@ status: published
   "license": "Apache-2.0",
   "base": "source/mybatis-3.5.19",
   "files": [
-    { "path": "org/apache/ibatis/binding/MapperRegistry.java", "label": "MapperRegistry" },
-    { "path": "org/apache/ibatis/binding/MapperProxyFactory.java", "label": "MapperProxyFactory" },
-    { "path": "org/apache/ibatis/binding/MapperProxy.java", "label": "MapperProxy" }
+    {
+      "path": "org/apache/ibatis/binding/MapperRegistry.java",
+      "label": "MapperRegistry"
+    },
+    {
+      "path": "org/apache/ibatis/binding/MapperProxyFactory.java",
+      "label": "MapperProxyFactory"
+    },
+    {
+      "path": "org/apache/ibatis/binding/MapperProxy.java",
+      "label": "MapperProxy"
+    }
   ],
   "controls": [
     {
@@ -34,8 +43,14 @@ status: published
       "label": "被调用的方法属于谁",
       "default": "mapper",
       "options": [
-        { "value": "mapper", "label": "你自己的 Mapper 方法" },
-        { "value": "object", "label": "toString / equals / hashCode" }
+        {
+          "value": "mapper",
+          "label": "你自己的 Mapper 方法"
+        },
+        {
+          "value": "object",
+          "label": "toString / equals / hashCode"
+        }
       ]
     }
   ],
@@ -47,7 +62,25 @@ status: published
       "lines": 11,
       "explain": "`knownMappers.get(type)` 拿到的是 `MapperProxyFactory`，不是对象本身。没注册过就抛 `BindingException`——「Type xxx is not known to the MapperRegistry」这句就是这儿来的。",
       "state": {
-        "tables": [["knownMappers", "UserMapper → MapperProxyFactory"], ["返回", "代理对象"]]
+        "tables": [
+          [
+            "knownMappers",
+            "UserMapper → MapperProxyFactory"
+          ],
+          [
+            "返回",
+            "代理对象"
+          ]
+        ]
+      },
+      "predict": {
+        "question": "同一个接口两次 getMapper 得到？",
+        "options": [
+          "同一个代理",
+          "两个新代理对象"
+        ],
+        "answer": 1,
+        "reveal": "每次 newInstance 都新建 MapperProxy，并塞入当前 session。"
       }
     },
     {
@@ -57,7 +90,16 @@ status: published
       "lines": 4,
       "explain": "`new MapperProxy<>(sqlSession, mapperInterface, methodCache)` 把**当前 SqlSession** 塞进 handler。所以同一个 Mapper 在不同 session 里是两个不同的代理对象——这也是为什么 Mapper 不能跨 session 复用。",
       "state": {
-        "vars": [["sqlSession", "DefaultSqlSession@1"], ["mapperInterface", "UserMapper"]]
+        "vars": [
+          [
+            "sqlSession",
+            "DefaultSqlSession@1"
+          ],
+          [
+            "mapperInterface",
+            "UserMapper"
+          ]
+        ]
       }
     },
     {
@@ -68,12 +110,25 @@ status: published
       "explain": "JDK 动态代理只要求一个接口 + 一个 `InvocationHandler`。`MapperProxy` 就是那个 handler。",
       "predict": {
         "question": "为什么不用 CGLIB 生成子类？",
-        "options": ["因为 Mapper 是接口，JDK 代理够用", "因为 CGLIB 性能差", "因为 CGLIB 不支持 Java 25"],
+        "options": [
+          "因为 Mapper 是接口，JDK 代理够用",
+          "因为 CGLIB 性能差",
+          "因为 CGLIB 不支持 Java 25"
+        ],
         "answer": 0,
         "reveal": "Mapper 本来就是接口，JDK 代理零依赖、无需字节码库。MyBatis 只在延迟加载那种**类**的场景才用 Javassist/CGLIB。"
       },
       "state": {
-        "vars": [["interfaces", "[UserMapper]"], ["handler", "MapperProxy"]]
+        "vars": [
+          [
+            "interfaces",
+            "[UserMapper]"
+          ],
+          [
+            "handler",
+            "MapperProxy"
+          ]
+        ]
       }
     },
     {
@@ -83,8 +138,16 @@ status: published
       "lines": 10,
       "explain": "`toString` / `equals` / `hashCode` 的声明类是 `Object`，不能当成 SQL 去执行——直接 `method.invoke(this, args)`，作用在 handler 自己身上。**没有这段，打印一个 Mapper 代理就会去查库**。",
       "state": {
-        "stack": ["MapperProxy.invoke", "Object.equals"],
-        "vars": [["method", "toString()"]]
+        "stack": [
+          "MapperProxy.invoke",
+          "Object.equals"
+        ],
+        "vars": [
+          [
+            "method",
+            "toString()"
+          ]
+        ]
       }
     },
     {
@@ -93,9 +156,16 @@ status: published
       "line": 86,
       "lines": 1,
       "explain": "其余方法先按 `Method` 查缓存，拿到一个 invoker 再执行。缓存的是「方法 → 怎么执行」，不是返回值。",
-      "when": { "target": "mapper" },
+      "when": {
+        "target": "mapper"
+      },
       "state": {
-        "tables": [["methodCache", "selectById → PlainMethodInvoker"]]
+        "tables": [
+          [
+            "methodCache",
+            "selectById → PlainMethodInvoker"
+          ]
+        ]
       }
     },
     {
@@ -104,9 +174,16 @@ status: published
       "line": 83,
       "lines": 3,
       "explain": "这条分支在缓存之前就返回了，所以 `methodCache` 里永远不会有 `toString`。",
-      "when": { "target": "object" },
+      "when": {
+        "target": "object"
+      },
       "state": {
-        "tables": [["methodCache", "不记录 Object 方法"]]
+        "tables": [
+          [
+            "methodCache",
+            "不记录 Object 方法"
+          ]
+        ]
       }
     },
     {
@@ -116,7 +193,11 @@ status: published
       "lines": 4,
       "explain": "抽象方法的 invoker 只有一行：`mapperMethod.execute(sqlSession, args)`。到这儿，代理的活干完了，剩下的交给 `MapperMethod`。",
       "state": {
-        "stack": ["MapperProxy.invoke", "PlainMethodInvoker.invoke", "MapperMethod.execute"]
+        "stack": [
+          "MapperProxy.invoke",
+          "PlainMethodInvoker.invoke",
+          "MapperMethod.execute"
+        ]
       }
     }
   ]
@@ -127,6 +208,27 @@ status: published
 
 代理持有 `sqlSession`。`SqlSession` 不是线程安全的，生命周期通常是一次请求；把代理缓存起来跨 session 用，
 就会拿旧 session 去执行新请求的 SQL。**代理本身很轻**，建一个的成本远小于一个连接。
+
+```code-challenge
+{
+  "id": "ex-proxy",
+  "kind": "order",
+  "title": "排出 getMapper 的四步",
+  "lines": [
+    "MapperProxy.invoke 拦截方法",
+    "MapperRegistry.getMapper(type, session)",
+    "Proxy.newProxyInstance 生成代理",
+    "MapperProxyFactory.newInstance(session)"
+  ],
+  "answer": [
+    1,
+    3,
+    2,
+    0
+  ],
+  "explain": "查注册表拿工厂，工厂造 handler，再 newProxyInstance。"
+}
+```
 
 ```quiz
 {

@@ -144,11 +144,8 @@ test('阅读不请求 GitHub', async ({ page }) => {
   await expect(page.getByTestId('code-tour')).toContainText('MIT')
 })
 
-test('首页有「源码解读」入口', async ({ page }) => {
-  await signIn(page)
-  await page.goto('/#/')
-  await expect(page.getByTestId('home-entry-source-reading')).toBeVisible()
-})
+// 首页入口的用例已随 WORK-057 删除：源码解读分类下线，首页那张卡也一起删了。
+// 块本身的覆盖仍在下面这些用例里（样板条目由 db/devdata 播种，只存在于测试库）。
 
 test('窄屏 360px：不横向溢出，块按单列堆叠', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 720 })

@@ -27,10 +27,22 @@ status: published
   "license": "Apache-2.0",
   "base": "source/mybatis-3.5.19",
   "files": [
-    { "path": "org/apache/ibatis/executor/statement/RoutingStatementHandler.java", "label": "RoutingStatementHandler" },
-    { "path": "org/apache/ibatis/executor/statement/BaseStatementHandler.java", "label": "BaseStatementHandler" },
-    { "path": "org/apache/ibatis/executor/statement/PreparedStatementHandler.java", "label": "PreparedStatementHandler" },
-    { "path": "org/apache/ibatis/scripting/defaults/DefaultParameterHandler.java", "label": "DefaultParameterHandler" }
+    {
+      "path": "org/apache/ibatis/executor/statement/RoutingStatementHandler.java",
+      "label": "RoutingStatementHandler"
+    },
+    {
+      "path": "org/apache/ibatis/executor/statement/BaseStatementHandler.java",
+      "label": "BaseStatementHandler"
+    },
+    {
+      "path": "org/apache/ibatis/executor/statement/PreparedStatementHandler.java",
+      "label": "PreparedStatementHandler"
+    },
+    {
+      "path": "org/apache/ibatis/scripting/defaults/DefaultParameterHandler.java",
+      "label": "DefaultParameterHandler"
+    }
   ],
   "controls": [
     {
@@ -39,9 +51,18 @@ status: published
       "label": "statementType",
       "default": "PREPARED",
       "options": [
-        { "value": "PREPARED", "label": "PREPARED（默认）" },
-        { "value": "STATEMENT", "label": "STATEMENT" },
-        { "value": "CALLABLE", "label": "CALLABLE" }
+        {
+          "value": "PREPARED",
+          "label": "PREPARED（默认）"
+        },
+        {
+          "value": "STATEMENT",
+          "label": "STATEMENT"
+        },
+        {
+          "value": "CALLABLE",
+          "label": "CALLABLE"
+        }
       ]
     }
   ],
@@ -53,7 +74,12 @@ status: published
       "lines": 18,
       "explain": "`switch (ms.getStatementType())`：STATEMENT → `SimpleStatementHandler`，PREPARED → `PreparedStatementHandler`，CALLABLE → `CallableStatementHandler`。构造完就把一切委派给它。",
       "state": {
-        "tables": [["delegate", "PreparedStatementHandler"]]
+        "tables": [
+          [
+            "delegate",
+            "PreparedStatementHandler"
+          ]
+        ]
       }
     },
     {
@@ -63,7 +89,16 @@ status: published
       "lines": 22,
       "explain": "存 executor / ms / rowBounds，拿 TypeHandlerRegistry 与 ObjectFactory；`boundSql == null` 时先生成主键再取 BoundSql；最后建 `ParameterHandler` 与 `ResultSetHandler`。",
       "state": {
-        "tables": [["parameterHandler", "DefaultParameterHandler"], ["resultSetHandler", "DefaultResultSetHandler"]]
+        "tables": [
+          [
+            "parameterHandler",
+            "DefaultParameterHandler"
+          ],
+          [
+            "resultSetHandler",
+            "DefaultResultSetHandler"
+          ]
+        ]
       }
     },
     {
@@ -72,9 +107,26 @@ status: published
       "line": 46,
       "lines": 3,
       "explain": "默认就是它。SQL 里已经是 `?`，参数由 `ParameterHandler` 按位置绑。",
-      "when": { "statementType": "PREPARED" },
+      "when": {
+        "statementType": "PREPARED"
+      },
       "state": {
-        "tables": [["handler", "PreparedStatementHandler"]]
+        "tables": [
+          [
+            "handler",
+            "PreparedStatementHandler"
+          ]
+        ]
+      },
+      "predict": {
+        "question": "默认 statementType 是？",
+        "options": [
+          "STATEMENT",
+          "PREPARED",
+          "CALLABLE"
+        ],
+        "answer": 1,
+        "reveal": "默认 PREPARED，所以 #{} 才会变成 ?。"
       }
     },
     {
@@ -83,9 +135,20 @@ status: published
       "line": 42,
       "lines": 5,
       "explain": "`SimpleStatementHandler` 直接把 `BoundSql.getSql()` 交给 `Statement.execute`。`#{ }` 在这种模式下会被当成普通文本——所以不能混用。",
-      "when": { "statementType": "STATEMENT" },
+      "when": {
+        "statementType": "STATEMENT"
+      },
       "state": {
-        "tables": [["handler", "SimpleStatementHandler"], ["参数", "不绑定"]]
+        "tables": [
+          [
+            "handler",
+            "SimpleStatementHandler"
+          ],
+          [
+            "参数",
+            "不绑定"
+          ]
+        ]
       }
     },
     {
@@ -94,9 +157,20 @@ status: published
       "line": 49,
       "lines": 3,
       "explain": "`CallableStatementHandler` 额外处理 OUT 参数，`{call proc(?, ?)}` 这种写法就是它。",
-      "when": { "statementType": "CALLABLE" },
+      "when": {
+        "statementType": "CALLABLE"
+      },
       "state": {
-        "tables": [["handler", "CallableStatementHandler"], ["OUT 参数", "额外处理"]]
+        "tables": [
+          [
+            "handler",
+            "CallableStatementHandler"
+          ],
+          [
+            "OUT 参数",
+            "额外处理"
+          ]
+        ]
       }
     },
     {
@@ -106,7 +180,16 @@ status: published
       "lines": 20,
       "explain": "按 `resultSetType` / `resultSetConcurrency` 调 `connection.prepareStatement(...)`；配了 `keyProperty` 的 INSERT 还要带 `RETURN_GENERATED_KEYS`。语句超时也在这里设。",
       "state": {
-        "vars": [["sql", "select ... where id = ?"], ["generatedKeys", "true（INSERT）"]]
+        "vars": [
+          [
+            "sql",
+            "select ... where id = ?"
+          ],
+          [
+            "generatedKeys",
+            "true（INSERT）"
+          ]
+        ]
       }
     },
     {
@@ -116,7 +199,20 @@ status: published
       "lines": 3,
       "explain": "`parameterize` 把活全交给 `parameterHandler.setParameters(ps)`。职责切得很干净：StatementHandler 管 JDBC 语句，ParameterHandler 管值。",
       "state": {
-        "stack": ["PreparedStatementHandler.parameterize", "DefaultParameterHandler.setParameters"]
+        "stack": [
+          "PreparedStatementHandler.parameterize",
+          "DefaultParameterHandler.setParameters"
+        ]
+      },
+      "predict": {
+        "question": "parameterize 实际做了什么？",
+        "options": [
+          "自己遍历参数",
+          "转调 ParameterHandler",
+          "重新拼 SQL"
+        ],
+        "answer": 1,
+        "reveal": "只有一行：`parameterHandler.setParameters(ps)`。"
       }
     },
     {
@@ -126,7 +222,10 @@ status: published
       "lines": 5,
       "explain": "`ps.execute()` 然后 `resultSetHandler.handleResultSets(ps)`。到这里 JDBC 的部分结束，后面全是映射。",
       "state": {
-        "stack": ["ps.execute()", "ResultSetHandler.handleResultSets"]
+        "stack": [
+          "ps.execute()",
+          "ResultSetHandler.handleResultSets"
+        ]
       }
     },
     {
@@ -136,7 +235,16 @@ status: published
       "lines": 22,
       "explain": "遍历 `parameterMappings`：先从 additionalParameters 找（`__frch_*`），再判断参数本身、最后用 `MetaObject` 反射。取到值再交给 `typeHandler.setParameter`。",
       "state": {
-        "tables": [["#{id}", "LongTypeHandler"], ["#{user.name}", "StringTypeHandler"]]
+        "tables": [
+          [
+            "#{id}",
+            "LongTypeHandler"
+          ],
+          [
+            "#{user.name}",
+            "StringTypeHandler"
+          ]
+        ]
       }
     }
   ]
@@ -151,6 +259,27 @@ status: published
 | `StatementHandler` | 造语句、执行、拿 ResultSet | 参数值从哪来 |
 | `ParameterHandler` | 按 ParameterMapping 绑值 | 结果映射 |
 | `ResultSetHandler` | 结果集 → 对象 | SQL 与参数 |
+
+```code-challenge
+{
+  "id": "ex-statementhandler",
+  "kind": "order",
+  "title": "排出 JDBC 边界的四步",
+  "lines": [
+    "PreparedStatementHandler.parameterize 绑参数",
+    "RoutingStatementHandler 按 statementType 建 delegate",
+    "PreparedStatementHandler.query 执行并取结果集",
+    "BaseStatementHandler 构造 ParameterHandler 与 ResultSetHandler"
+  ],
+  "answer": [
+    1,
+    3,
+    0,
+    2
+  ],
+  "explain": "先选 handler，再由基类建两个子处理器，然后绑参、执行。"
+}
+```
 
 ```quiz
 {

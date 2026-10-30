@@ -24,10 +24,18 @@ SQL 回来了，`ResultSet` 里是一列一列的值，你要的是一个 `User`
   "license": "Apache-2.0",
   "base": "source/mybatis-3.5.19",
   "files": [
-    { "path": "org/apache/ibatis/executor/resultset/DefaultResultSetHandler.java", "label": "DefaultResultSetHandler" }
+    {
+      "path": "org/apache/ibatis/executor/resultset/DefaultResultSetHandler.java",
+      "label": "DefaultResultSetHandler"
+    }
   ],
   "controls": [
-    { "id": "camel", "type": "toggle", "label": "mapUnderscoreToCamelCase", "default": false }
+    {
+      "id": "camel",
+      "type": "toggle",
+      "label": "mapUnderscoreToCamelCase",
+      "default": false
+    }
   ],
   "steps": [
     {
@@ -37,7 +45,16 @@ SQL 回来了，`ResultSet` 里是一列一列的值，你要的是一个 `User`
       "lines": 40,
       "explain": "`handleResultSets` 按语句顺序处理多个 ResultSet，每个都调 `handleResultSet` → `handleRowValues` → `getRowValue`。一个语句返回两个结果集（存储过程）时，这里会走多轮。",
       "state": {
-        "vars": [["resultSets", "1"], ["resultMap", "com.example.UserMapper.userMap"]]
+        "vars": [
+          [
+            "resultSets",
+            "1"
+          ],
+          [
+            "resultMap",
+            "com.example.UserMapper.userMap"
+          ]
+        ]
       }
     },
     {
@@ -47,7 +64,16 @@ SQL 回来了，`ResultSet` 里是一列一列的值，你要的是一个 `User`
       "lines": 52,
       "explain": "`getRowValue` 先 `createResultObject`（构造器/工厂），然后依次：`applyPropertyMappings`（显式 resultMap）→ `applyAutomaticMappings`（自动映射）→ 嵌套结果/关联对象 → 延迟加载登记。",
       "state": {
-        "tables": [["显式映射", "resultMap 里写了的列"], ["自动映射", "没写但同名的列"]]
+        "tables": [
+          [
+            "显式映射",
+            "resultMap 里写了的列"
+          ],
+          [
+            "自动映射",
+            "没写但同名的列"
+          ]
+        ]
       }
     },
     {
@@ -57,7 +83,25 @@ SQL 回来了，`ResultSet` 里是一列一列的值，你要的是一个 `User`
       "lines": 52,
       "explain": "遍历 `resultMappings`，按 `column` 取列、按 `property` 写属性，类型转换交给 `typeHandler`。**显式映射优先**，同名属性不会被自动映射覆盖。",
       "state": {
-        "tables": [["<id column=\"id\" property=\"id\">", "已处理"], ["<result column=\"user_name\" property=\"userName\">", "已处理"]]
+        "tables": [
+          [
+            "<id column=\"id\" property=\"id\">",
+            "已处理"
+          ],
+          [
+            "<result column=\"user_name\" property=\"userName\">",
+            "已处理"
+          ]
+        ]
+      },
+      "predict": {
+        "question": "显式 resultMap 与自动映射谁先执行？",
+        "options": [
+          "显式映射",
+          "自动映射"
+        ],
+        "answer": 0,
+        "reveal": "先 applyPropertyMappings，自动映射只处理剩下的列。"
       }
     },
     {
@@ -67,7 +111,25 @@ SQL 回来了，`ResultSet` 里是一列一列的值，你要的是一个 `User`
       "lines": 46,
       "explain": "`createAutomaticMappings` 把 ResultSet 里**没被 resultMap 用过**的列拿出来，按列名找属性。`autoMappingBehavior=PARTIAL`（默认）时，有嵌套结果映射就不做自动映射。",
       "state": {
-        "tables": [["未映射列", "age, email"], ["候选属性", "age, email"]]
+        "tables": [
+          [
+            "未映射列",
+            "age, email"
+          ],
+          [
+            "候选属性",
+            "age, email"
+          ]
+        ]
+      },
+      "predict": {
+        "question": "PARTIAL 模式下什么时候不做自动映射？",
+        "options": [
+          "没有嵌套映射",
+          "有嵌套结果映射"
+        ],
+        "answer": 1,
+        "reveal": "有 association/collection 时跳过自动映射。"
       }
     },
     {
@@ -76,9 +138,20 @@ SQL 回来了，`ResultSet` 里是一列一列的值，你要的是一个 `User`
       "line": 580,
       "lines": 45,
       "explain": "`applyAutomaticMappings` 里对列名做 `configuration.isMapUnderscoreToCamelCase()` 判断：开着就把 `user_name` 转成 `userName` 再找；关着就按原样找，找不到就跳过（`autoMappingUnknownColumnBehavior` 默认 NONE，不报错）。",
-      "when": { "camel": true },
+      "when": {
+        "camel": true
+      },
       "state": {
-        "tables": [["列 user_name", "→ userName（命中）"], ["未映射列", "0"]]
+        "tables": [
+          [
+            "列 user_name",
+            "→ userName（命中）"
+          ],
+          [
+            "未映射列",
+            "0"
+          ]
+        ]
       }
     },
     {
@@ -87,9 +160,20 @@ SQL 回来了，`ResultSet` 里是一列一列的值，你要的是一个 `User`
       "line": 580,
       "lines": 45,
       "explain": "默认是关的。列 `user_name` 找不到属性 `user_name`，于是被静默跳过——对象上 `userName` 还是 null。**这就是「为什么我的字段是 null」最常见的原因**。",
-      "when": { "camel": false },
+      "when": {
+        "camel": false
+      },
       "state": {
-        "tables": [["列 user_name", "找不到属性（跳过）"], ["userName", "null"]]
+        "tables": [
+          [
+            "列 user_name",
+            "找不到属性（跳过）"
+          ],
+          [
+            "userName",
+            "null"
+          ]
+        ]
       }
     }
   ]
@@ -101,6 +185,30 @@ SQL 回来了，`ResultSet` 里是一列一列的值，你要的是一个 `User`
 - 显式 `<association>` / `<collection>` 的列会先被消费，自动映射不会再碰。
 - `fetchType="lazy"` 时，此行不查关联对象，而是登记一个 `ResultLoader`，访问属性时才查。
 - `autoMappingBehavior` 改成 `FULL` 时，即使有嵌套结果映射也做自动映射——方便，也更容易撞上意料之外的字段。
+
+```code-challenge
+{
+  "id": "ex-resultset",
+  "kind": "fill",
+  "title": "补列名与属性名的桥",
+  "template": "列 `user_name` 要映射到 `userName`，需要开启 `{{0}}`；显式 resultMap 的映射{{1}}自动映射。",
+  "options": [
+    [
+      "mapUnderscoreToCamelCase",
+      "useActualParamName"
+    ],
+    [
+      "优先于",
+      "晚于"
+    ]
+  ],
+  "answers": [
+    0,
+    0
+  ],
+  "explain": "驼峰开关默认关；显式映射先跑，自动映射只处理剩下的列。"
+}
+```
 
 ```quiz
 {

@@ -27,7 +27,10 @@ status: published
   "license": "Apache-2.0",
   "base": "source/mybatis-3.5.19",
   "files": [
-    { "path": "org/apache/ibatis/session/Configuration.java", "label": "Configuration" }
+    {
+      "path": "org/apache/ibatis/session/Configuration.java",
+      "label": "Configuration"
+    }
   ],
   "controls": [
     {
@@ -36,9 +39,18 @@ status: published
       "label": "默认执行器",
       "default": "SIMPLE",
       "options": [
-        { "value": "SIMPLE", "label": "SIMPLE" },
-        { "value": "REUSE", "label": "REUSE" },
-        { "value": "BATCH", "label": "BATCH" }
+        {
+          "value": "SIMPLE",
+          "label": "SIMPLE"
+        },
+        {
+          "value": "REUSE",
+          "label": "REUSE"
+        },
+        {
+          "value": "BATCH",
+          "label": "BATCH"
+        }
       ]
     }
   ],
@@ -50,7 +62,20 @@ status: published
       "lines": 7,
       "explain": "`environment` 之外是一排布尔开关。它们不是「全局配置文档」里的摆设——每一个都会被某个执行路径读到，比如 `mapUnderscoreToCamelCase` 直接决定结果集映射时列名 `user_name` 能不能对上属性 `userName`。",
       "state": {
-        "vars": [["mapUnderscoreToCamelCase", "false（默认）"], ["cacheEnabled", "true"], ["useActualParamName", "true"]]
+        "vars": [
+          [
+            "mapUnderscoreToCamelCase",
+            "false（默认）"
+          ],
+          [
+            "cacheEnabled",
+            "true"
+          ],
+          [
+            "useActualParamName",
+            "true"
+          ]
+        ]
       }
     },
     {
@@ -60,7 +85,30 @@ status: published
       "lines": 9,
       "explain": "`localCacheScope=SESSION`、`defaultExecutorType=SIMPLE`、`autoMappingBehavior=PARTIAL`——这三个默认值几乎解释了初学者遇到的一半「为什么和我以为的不一样」。",
       "state": {
-        "vars": [["localCacheScope", "SESSION"], ["defaultExecutorType", "SIMPLE"], ["autoMappingBehavior", "PARTIAL"]]
+        "vars": [
+          [
+            "localCacheScope",
+            "SESSION"
+          ],
+          [
+            "defaultExecutorType",
+            "SIMPLE"
+          ],
+          [
+            "autoMappingBehavior",
+            "PARTIAL"
+          ]
+        ]
+      },
+      "predict": {
+        "question": "不写 autoMappingBehavior 时默认是？",
+        "options": [
+          "NONE",
+          "PARTIAL",
+          "FULL"
+        ],
+        "answer": 1,
+        "reveal": "PARTIAL：只有没有嵌套结果映射时才自动映射。"
       }
     },
     {
@@ -69,9 +117,16 @@ status: published
       "line": 132,
       "lines": 1,
       "explain": "`defaultExecutorType` 只是被 `DefaultSqlSessionFactory.openSession` 读一次。选 SIMPLE 就是每次新建一个 `SimpleExecutor`，没有花活。",
-      "when": { "executor": "SIMPLE" },
+      "when": {
+        "executor": "SIMPLE"
+      },
       "state": {
-        "tables": [["openSession → executor", "SimpleExecutor"]]
+        "tables": [
+          [
+            "openSession → executor",
+            "SimpleExecutor"
+          ]
+        ]
       }
     },
     {
@@ -80,9 +135,20 @@ status: published
       "line": 132,
       "lines": 1,
       "explain": "同一个 SqlSession 里，相同 SQL 的 `PreparedStatement` 会被复用。省的是 prepare 的开销，代价是 Statement 一直占着连接资源。",
-      "when": { "executor": "REUSE" },
+      "when": {
+        "executor": "REUSE"
+      },
       "state": {
-        "tables": [["openSession → executor", "ReuseExecutor"], ["statement 缓存", "按 SQL 文本复用"]]
+        "tables": [
+          [
+            "openSession → executor",
+            "ReuseExecutor"
+          ],
+          [
+            "statement 缓存",
+            "按 SQL 文本复用"
+          ]
+        ]
       }
     },
     {
@@ -91,9 +157,20 @@ status: published
       "line": 132,
       "lines": 1,
       "explain": "`BatchExecutor` 把 update 攒起来，直到 `flushStatements()` 或提交。批量插入用它，但**查不到未提交的数据**，写一读一的时候别开。",
-      "when": { "executor": "BATCH" },
+      "when": {
+        "executor": "BATCH"
+      },
       "state": {
-        "tables": [["openSession → executor", "BatchExecutor"], ["待执行", "攒到 flush 才发"]]
+        "tables": [
+          [
+            "openSession → executor",
+            "BatchExecutor"
+          ],
+          [
+            "待执行",
+            "攒到 flush 才发"
+          ]
+        ]
       }
     },
     {
@@ -103,7 +180,20 @@ status: published
       "lines": 3,
       "explain": "`mapperRegistry` 记「哪个接口有哪些方法」；`interceptorChain` 是插件链；`typeHandlerRegistry` 负责 Java 类型 ↔ JDBC 类型。它们都是**启动期填满、运行期只读**。",
       "state": {
-        "tables": [["mapperRegistry", "com.example.UserMapper"], ["interceptorChain", "0 个（没配插件）"], ["typeHandlerRegistry", "内置 30+ 个"]]
+        "tables": [
+          [
+            "mapperRegistry",
+            "com.example.UserMapper"
+          ],
+          [
+            "interceptorChain",
+            "0 个（没配插件）"
+          ],
+          [
+            "typeHandlerRegistry",
+            "内置 30+ 个"
+          ]
+        ]
       }
     },
     {
@@ -114,12 +204,25 @@ status: published
       "explain": "所有解析出来的语句都进 `mappedStatements`，键是 `namespace.id`。它用 `StrictMap`：重复键不是覆盖，而是抛异常并把两个来源文件都打出来——所以「两个 Mapper 写了同一条 id」会在启动时报错，不会静默生效。",
       "predict": {
         "question": "两个 XML 里写了同一个 namespace + id，会发生什么？",
-        "options": ["后一个覆盖前一个", "启动时报重复 id 异常", "随机用一个"],
+        "options": [
+          "后一个覆盖前一个",
+          "启动时报重复 id 异常",
+          "随机用一个"
+        ],
         "answer": 1,
         "reveal": "`StrictMap` 的冲突消息会指出两个资源文件。这也解释了为什么 Mapper 的 namespace 必须写全限定接口名。"
       },
       "state": {
-        "tables": [["mappedStatements", "com.example.UserMapper.selectById"], ["resultMaps", "com.example.UserMapper.userMap"]]
+        "tables": [
+          [
+            "mappedStatements",
+            "com.example.UserMapper.selectById"
+          ],
+          [
+            "resultMaps",
+            "com.example.UserMapper.userMap"
+          ]
+        ]
       }
     },
     {
@@ -129,7 +232,10 @@ status: published
       "lines": 3,
       "explain": "Configuration 自己不维护接口表，直接转给 `MapperRegistry`。下一关会看 Registry 里到底存了什么。",
       "state": {
-        "stack": ["Configuration.addMapper(type)", "MapperRegistry.addMapper(type)"]
+        "stack": [
+          "Configuration.addMapper(type)",
+          "MapperRegistry.addMapper(type)"
+        ]
       }
     }
   ]
@@ -141,6 +247,31 @@ status: published
 - `localCacheScope=SESSION`：同一个 SqlSession 里两次相同查询第二次不走库。跨请求没影响，但在**长事务**里会读到旧值。
 - `autoMappingBehavior=PARTIAL`：没有嵌套结果映射时才自动映射。写了 `<association>` 之后，不显式配 `resultMap` 的列会悄悄不映射。
 - `cacheEnabled=true`：一级缓存默认就开，关它要显式 `localCacheScope=STATEMENT` 或 `flushCache`。
+
+```code-challenge
+{
+  "id": "ex-configuration",
+  "kind": "fill",
+  "title": "补两个默认值",
+  "template": "localCacheScope 默认是 {{0}}；defaultExecutorType 默认是 {{1}}。",
+  "options": [
+    [
+      "SESSION",
+      "STATEMENT"
+    ],
+    [
+      "SIMPLE",
+      "REUSE",
+      "BATCH"
+    ]
+  ],
+  "answers": [
+    0,
+    0
+  ],
+  "explain": "这两个默认值决定了「重复查询走不走库」与「openSession 用哪种执行器」。"
+}
+```
 
 ```quiz
 {

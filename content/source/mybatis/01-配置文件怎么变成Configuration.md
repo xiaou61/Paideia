@@ -24,8 +24,14 @@ status: published
   "license": "Apache-2.0",
   "base": "source/mybatis-3.5.19",
   "files": [
-    { "path": "org/apache/ibatis/builder/xml/XMLConfigBuilder.java", "label": "XMLConfigBuilder" },
-    { "path": "org/apache/ibatis/session/SqlSessionFactoryBuilder.java", "label": "SqlSessionFactoryBuilder" }
+    {
+      "path": "org/apache/ibatis/builder/xml/XMLConfigBuilder.java",
+      "label": "XMLConfigBuilder"
+    },
+    {
+      "path": "org/apache/ibatis/session/SqlSessionFactoryBuilder.java",
+      "label": "SqlSessionFactoryBuilder"
+    }
   ],
   "controls": [
     {
@@ -34,8 +40,14 @@ status: published
       "label": "解析顺序",
       "default": "standard",
       "options": [
-        { "value": "standard", "label": "标准顺序（先别名后 mappers）" },
-        { "value": "mappersFirst", "label": "先把 mappers 提到最前" }
+        {
+          "value": "standard",
+          "label": "标准顺序（先别名后 mappers）"
+        },
+        {
+          "value": "mappersFirst",
+          "label": "先把 mappers 提到最前"
+        }
       ]
     }
   ],
@@ -47,7 +59,26 @@ status: published
       "lines": 8,
       "explain": "`parsed` 是个一次性闸门：第二次调用直接抛 `BuilderException`。Configuration 一构建完就当只读用，重复解析会让映射表被写两遍。",
       "state": {
-        "vars": [["parsed", "false → true"], ["root", "/configuration 节点"]]
+        "vars": [
+          [
+            "parsed",
+            "false → true"
+          ],
+          [
+            "root",
+            "/configuration 节点"
+          ]
+        ]
+      },
+      "predict": {
+        "question": "同一个 XMLConfigBuilder 第二次 parse() 会？",
+        "options": [
+          "重新解析并合并",
+          "抛 BuilderException",
+          "静默忽略"
+        ],
+        "answer": 1,
+        "reveal": "`parsed` 闸门直接抛异常。"
       }
     },
     {
@@ -57,8 +88,15 @@ status: published
       "lines": 5,
       "explain": "`propertiesElement` 排在最前，因为后面所有 `${...}` 占位符都要靠它。源码里那句 `issue #117` 就是当年顺序写反留下的注释。",
       "state": {
-        "stack": ["XMLConfigBuilder.parseConfiguration(root)"],
-        "tables": [["variables", "从 <properties> 读入的键值"]]
+        "stack": [
+          "XMLConfigBuilder.parseConfiguration(root)"
+        ],
+        "tables": [
+          [
+            "variables",
+            "从 <properties> 读入的键值"
+          ]
+        ]
       }
     },
     {
@@ -68,7 +106,12 @@ status: published
       "lines": 3,
       "explain": "先 `settingsAsProperties` 把 `<settings>` 读成键值，再 `loadCustomVfsImpl` / `loadCustomLogImpl`——因为 vfs 与日志实现要先于其它对象创建。真正写进 Configuration 是在第 126 行的 `settingsElement`。",
       "state": {
-        "vars": [["settings", "mapUnderscoreToCamelCase → true 之类"]]
+        "vars": [
+          [
+            "settings",
+            "mapUnderscoreToCamelCase → true 之类"
+          ]
+        ]
       }
     },
     {
@@ -78,7 +121,16 @@ status: published
       "lines": 10,
       "explain": "typeAliases、plugins、objectFactory、reflectorFactory、typeHandlers 全在这段。它们决定「一个类名怎么变成 Class」「一个 Java 类型怎么变成 JDBC 参数」，而 mappers 解析时就要用。",
       "state": {
-        "tables": [["typeAliasRegistry", "user → com.example.User"], ["typeHandlerRegistry", "LocalDateTime → LocalDateTimeTypeHandler"]]
+        "tables": [
+          [
+            "typeAliasRegistry",
+            "user → com.example.User"
+          ],
+          [
+            "typeHandlerRegistry",
+            "LocalDateTime → LocalDateTimeTypeHandler"
+          ]
+        ]
       }
     },
     {
@@ -89,7 +141,11 @@ status: published
       "explain": "`mappersElement` 是最后一行。它一执行就会去解析每个 Mapper XML，而 Mapper 里 `resultType=\"User\"` 这种写法依赖别名表已经建好。",
       "predict": {
         "question": "把 mappers 提到 typeAliases 前面，最先坏的是哪一步？",
-        "options": ["properties 读不到", "Mapper 里的别名解析失败", "数据库连不上"],
+        "options": [
+          "properties 读不到",
+          "Mapper 里的别名解析失败",
+          "数据库连不上"
+        ],
         "answer": 1,
         "reveal": "`resolveClass(\"User\")` 找不到别名会抛 `TypeException`，构建直接失败。properties 与别名无关，数据库要等 openSession 才连。"
       }
@@ -100,9 +156,20 @@ status: published
       "line": 121,
       "lines": 1,
       "explain": "这条分支在真实代码里不存在，是给你做对照的：把 mappers 提到这里，`typeAliasRegistry` 里只有内置别名（`string`、`int` 这些），自定义的 `User` 找不到，Mapper 解析在 `resolveClass` 处失败。",
-      "when": { "order": "mappersFirst" },
+      "when": {
+        "order": "mappersFirst"
+      },
       "state": {
-        "tables": [["typeAliasRegistry", "只有内置别名"], ["mappers", "解析到一半失败"]]
+        "tables": [
+          [
+            "typeAliasRegistry",
+            "只有内置别名"
+          ],
+          [
+            "mappers",
+            "解析到一半失败"
+          ]
+        ]
       }
     },
     {
@@ -111,9 +178,20 @@ status: published
       "line": 121,
       "lines": 1,
       "explain": "同样一行，在标准顺序下执行到这里时，`typeAliasesElement` 已经跑过，`User` 能解析成 Class。**行号没变，状态变了**——这就是顺序的意义。",
-      "when": { "order": "standard" },
+      "when": {
+        "order": "standard"
+      },
       "state": {
-        "tables": [["typeAliasRegistry", "内置别名 + user → com.example.User"], ["mappers", "可以开始解析"]]
+        "tables": [
+          [
+            "typeAliasRegistry",
+            "内置别名 + user → com.example.User"
+          ],
+          [
+            "mappers",
+            "可以开始解析"
+          ]
+        ]
       }
     },
     {
@@ -123,7 +201,20 @@ status: published
       "lines": 1,
       "explain": "`environmentsElement` 选出默认环境，把 `TransactionFactory` 与 `DataSource` 装进 `Environment`。注意：这一步只是**建数据源对象**，还没连库——连接要等第一次执行 SQL。",
       "state": {
-        "tables": [["environment", "development"], ["transactionFactory", "JdbcTransactionFactory"], ["dataSource", "PooledDataSource（未连）"]]
+        "tables": [
+          [
+            "environment",
+            "development"
+          ],
+          [
+            "transactionFactory",
+            "JdbcTransactionFactory"
+          ],
+          [
+            "dataSource",
+            "PooledDataSource（未连）"
+          ]
+        ]
       }
     }
   ]
@@ -135,6 +226,29 @@ status: published
 1. **Configuration 是「构建期对象」**：`parse()` 完成后它就被当成只读。运行期再往里加 Mapper 不是常规用法。
 2. **报错信息会包一层**：`parseConfiguration` 的 catch 把任何异常包成 `BuilderException("Error parsing SQL Mapper Configuration...")`，
    所以你看到的顶层错误往往是这句话，真正原因在 `cause` 里。
+
+```code-challenge
+{
+  "id": "ex-config",
+  "kind": "order",
+  "title": "排出 XMLConfigBuilder 的解析顺序",
+  "lines": [
+    "mappersElement(root)",
+    "propertiesElement(root)",
+    "typeHandlersElement(root)",
+    "settingsElement(settings)",
+    "typeAliasesElement(root)"
+  ],
+  "answer": [
+    1,
+    3,
+    4,
+    2,
+    0
+  ],
+  "explain": "properties 最先（占位符），别名与类型处理器在 mappers 之前。"
+}
+```
 
 ```quiz
 {

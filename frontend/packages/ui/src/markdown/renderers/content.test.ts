@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { parseSourceWalk } from './schema'
+import { parseCodeChallenge, parseQuiz, parseSourceWalk } from './schema'
 
 /**
  * 真实内容回归（WORK-057）：`content/source/**` 里的每一块都必须能过 TS 侧的校验。
@@ -40,8 +40,8 @@ function markdownFiles(dir: string): string[] {
   return out
 }
 
-describe('content/source 的 source-walk 块（WORK-057）', () => {
-  it('每一块都能被 parseSourceWalk 接受', () => {
+describe('content/source 的围栏块（WORK-057）', () => {
+  it('source-walk / code-challenge / quiz 每一块都能被解析', () => {
     if (!fs.existsSync(ROOT)) {
       return
     }
@@ -49,13 +49,20 @@ describe('content/source 的 source-walk 块（WORK-057）', () => {
     let blocks = 0
     for (const file of markdownFiles(ROOT)) {
       const markdown = fs.readFileSync(file, 'utf8')
-      const regex = /```source-walk[^\n]*\n([\s\S]*?)\n```/g
+      const regex = /```(source-walk|code-challenge|quiz)[^\n]*\n([\s\S]*?)\n```/g
       let match: RegExpExecArray | null
       while ((match = regex.exec(markdown)) !== null) {
         blocks += 1
-        const parsed = parseSourceWalk(match[1] ?? '')
+        const fence = match[1]
+        const body = match[2] ?? ''
+        const parsed =
+          fence === 'source-walk'
+            ? parseSourceWalk(body)
+            : fence === 'code-challenge'
+              ? parseCodeChallenge(body)
+              : parseQuiz(body)
         if (!parsed.ok) {
-          failures.push(`${path.relative(ROOT, file)}：${parsed.error}`)
+          failures.push(`${path.relative(ROOT, file)}（${fence}）：${parsed.error}`)
         }
       }
     }

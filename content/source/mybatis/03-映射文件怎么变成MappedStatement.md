@@ -24,12 +24,26 @@ Mapper XML 里写的是 `<select id="selectById" resultType="User">`，运行期
   "license": "Apache-2.0",
   "base": "source/mybatis-3.5.19",
   "files": [
-    { "path": "org/apache/ibatis/builder/xml/XMLMapperBuilder.java", "label": "XMLMapperBuilder" },
-    { "path": "org/apache/ibatis/builder/xml/XMLStatementBuilder.java", "label": "XMLStatementBuilder" },
-    { "path": "org/apache/ibatis/builder/MapperBuilderAssistant.java", "label": "MapperBuilderAssistant" }
+    {
+      "path": "org/apache/ibatis/builder/xml/XMLMapperBuilder.java",
+      "label": "XMLMapperBuilder"
+    },
+    {
+      "path": "org/apache/ibatis/builder/xml/XMLStatementBuilder.java",
+      "label": "XMLStatementBuilder"
+    },
+    {
+      "path": "org/apache/ibatis/builder/MapperBuilderAssistant.java",
+      "label": "MapperBuilderAssistant"
+    }
   ],
   "controls": [
-    { "id": "generatedKeys", "type": "toggle", "label": "useGeneratedKeys", "default": true }
+    {
+      "id": "generatedKeys",
+      "type": "toggle",
+      "label": "useGeneratedKeys",
+      "default": true
+    }
   ],
   "steps": [
     {
@@ -39,7 +53,16 @@ Mapper XML 里写的是 `<select id="selectById" resultType="User">`，运行期
       "lines": 10,
       "explain": "`isResourceLoaded` 防重复；解析完记一笔。后面三行处理「解析时引用了还没解析到的东西」——ResultMap、cache-ref、语句都允许延后重试，这就是 `IncompleteElementException` 的用途。",
       "state": {
-        "vars": [["resource", "mapper/UserMapper.xml"], ["namespace", "com.example.UserMapper"]]
+        "vars": [
+          [
+            "resource",
+            "mapper/UserMapper.xml"
+          ],
+          [
+            "namespace",
+            "com.example.UserMapper"
+          ]
+        ]
       }
     },
     {
@@ -49,7 +72,16 @@ Mapper XML 里写的是 `<select id="selectById" resultType="User">`，运行期
       "lines": 17,
       "explain": "`namespace` 先写进 `builderAssistant`，之后所有 id 都会自动加上前缀。接着按依赖顺序解析：缓存、参数映射、结果映射、`<sql>` 片段，最后才是语句——因为语句会引用前四者。",
       "state": {
-        "tables": [["currentNamespace", "com.example.UserMapper"], ["sqlFragments", "Base_Column_List"]]
+        "tables": [
+          [
+            "currentNamespace",
+            "com.example.UserMapper"
+          ],
+          [
+            "sqlFragments",
+            "Base_Column_List"
+          ]
+        ]
       }
     },
     {
@@ -59,8 +91,17 @@ Mapper XML 里写的是 `<select id="selectById" resultType="User">`，运行期
       "lines": 13,
       "explain": "循环里对每个 `<select|insert|update|delete>` 建一个 `XMLStatementBuilder`。注意 catch 的是 `IncompleteElementException`——解析失败不一定是错，可能是引用了后面才定义的东西，先记进 `incompleteStatements` 等重试。",
       "state": {
-        "stack": ["XMLMapperBuilder.parse()", "buildStatementFromContext(list)", "XMLStatementBuilder.parseStatementNode()"],
-        "vars": [["statements", "4 条"]]
+        "stack": [
+          "XMLMapperBuilder.parse()",
+          "buildStatementFromContext(list)",
+          "XMLStatementBuilder.parseStatementNode()"
+        ],
+        "vars": [
+          [
+            "statements",
+            "4 条"
+          ]
+        ]
       }
     },
     {
@@ -70,7 +111,16 @@ Mapper XML 里写的是 `<select id="selectById" resultType="User">`，运行期
       "lines": 7,
       "explain": "`databaseIdMatchesCurrent` 不匹配就直接 return——同一个 id 可以按数据库写多份，只有匹配当前 `databaseId` 的那份会被装配。",
       "state": {
-        "vars": [["id", "selectById"], ["databaseId", "null（没配）"]]
+        "vars": [
+          [
+            "id",
+            "selectById"
+          ],
+          [
+            "databaseId",
+            "null（没配）"
+          ]
+        ]
       }
     },
     {
@@ -81,12 +131,29 @@ Mapper XML 里写的是 `<select id="selectById" resultType="User">`，运行期
       "explain": "`<select>` → SELECT，`<insert>` → INSERT。接着三个默认值：`flushCache` 对写语句默认 true、`useCache` 对查询默认 true。**这两个默认值就是一级缓存行为的一半**。",
       "predict": {
         "question": "一条 <update> 默认会清缓存吗？",
-        "options": ["会，flushCache 默认 true", "不会，要手动写 flushCache", "取决于数据库"],
+        "options": [
+          "会，flushCache 默认 true",
+          "不会，要手动写 flushCache",
+          "取决于数据库"
+        ],
         "answer": 0,
         "reveal": "写语句默认 `flushCache=true`，所以更新之后同一 SqlSession 的查询会重新走库。反过来，<select> 默认不清缓存。"
       },
       "state": {
-        "vars": [["sqlCommandType", "SELECT"], ["flushCache", "false"], ["useCache", "true"]]
+        "vars": [
+          [
+            "sqlCommandType",
+            "SELECT"
+          ],
+          [
+            "flushCache",
+            "false"
+          ],
+          [
+            "useCache",
+            "true"
+          ]
+        ]
       }
     },
     {
@@ -96,7 +163,12 @@ Mapper XML 里写的是 `<select id="selectById" resultType="User">`，运行期
       "lines": 4,
       "explain": "`<include refid=\"...\">` 先把 `<sql>` 片段拼进当前节点，后面 `createSqlSource` 看到的才是完整的 SQL。反过来做的话，动态 SQL 里会残留一个 `<include>` 节点。",
       "state": {
-        "tables": [["sqlFragments", "Base_Column_List → id, name, age"]]
+        "tables": [
+          [
+            "sqlFragments",
+            "Base_Column_List → id, name, age"
+          ]
+        ]
       }
     },
     {
@@ -105,9 +177,20 @@ Mapper XML 里写的是 `<select id="selectById" resultType="User">`，运行期
       "line": 87,
       "lines": 10,
       "explain": "先看有没有 `<selectKey>`（那会生成一个独立的 SelectKeyGenerator）；否则看 `useGeneratedKeys`：开着且是 INSERT，就用 `Jdbc3KeyGenerator` 把自增主键回填到对象上。",
-      "when": { "generatedKeys": true },
+      "when": {
+        "generatedKeys": true
+      },
       "state": {
-        "tables": [["keyGenerator", "Jdbc3KeyGenerator"], ["回填字段", "id"]]
+        "tables": [
+          [
+            "keyGenerator",
+            "Jdbc3KeyGenerator"
+          ],
+          [
+            "回填字段",
+            "id"
+          ]
+        ]
       }
     },
     {
@@ -116,9 +199,20 @@ Mapper XML 里写的是 `<select id="selectById" resultType="User">`，运行期
       "line": 87,
       "lines": 10,
       "explain": "同一个分支，`useGeneratedKeys=false` 时拿到 `NoKeyGenerator`：插入照常，但对象上的 id 还是 null。**很多人以为「插完就有 id」是框架默认，其实要靠这个开关**。",
-      "when": { "generatedKeys": false },
+      "when": {
+        "generatedKeys": false
+      },
       "state": {
-        "tables": [["keyGenerator", "NoKeyGenerator"], ["回填字段", "无"]]
+        "tables": [
+          [
+            "keyGenerator",
+            "NoKeyGenerator"
+          ],
+          [
+            "回填字段",
+            "无"
+          ]
+        ]
       }
     },
     {
@@ -128,7 +222,20 @@ Mapper XML 里写的是 `<select id="selectById" resultType="User">`，运行期
       "lines": 12,
       "explain": "`langDriver.createSqlSource` 决定了「这张 SQL 是静态的还是带 `<if>` 的动态 SQL」；`resultType` / `resultMap` 二选一，两个都没写时才去猜方法返回类型。",
       "state": {
-        "vars": [["sqlSource", "DynamicSqlSource"], ["statementType", "PREPARED"], ["resultType", "com.example.User"]]
+        "vars": [
+          [
+            "sqlSource",
+            "DynamicSqlSource"
+          ],
+          [
+            "statementType",
+            "PREPARED"
+          ],
+          [
+            "resultType",
+            "com.example.User"
+          ]
+        ]
       }
     },
     {
@@ -138,8 +245,29 @@ Mapper XML 里写的是 `<select id="selectById" resultType="User">`，运行期
       "lines": 17,
       "explain": "`applyCurrentNamespace(id, false)` 补上 `com.example.UserMapper.` 前缀，然后用 Builder 把十几个字段一次设完，最后 `configuration.addMappedStatement(statement)`。到这里，一条 XML 语句才真正可执行。",
       "state": {
-        "stack": ["MapperBuilderAssistant.addMappedStatement(...)"],
-        "tables": [["mappedStatements", "com.example.UserMapper.selectById"], ["statement.parameterMap", "自动生成"]]
+        "stack": [
+          "MapperBuilderAssistant.addMappedStatement(...)"
+        ],
+        "tables": [
+          [
+            "mappedStatements",
+            "com.example.UserMapper.selectById"
+          ],
+          [
+            "statement.parameterMap",
+            "自动生成"
+          ]
+        ]
+      },
+      "predict": {
+        "question": "addMappedStatement 会把 id 补成什么？",
+        "options": [
+          "selectById",
+          "接口全限定名.方法名",
+          "namespace:方法名"
+        ],
+        "answer": 1,
+        "reveal": "`applyCurrentNamespace` 拼上 namespace，所以 XML 的 namespace 要写接口全名。"
       }
     }
   ]
@@ -151,6 +279,29 @@ Mapper XML 里写的是 `<select id="selectById" resultType="User">`，运行期
 - 你终于知道 `namespace` 与 `id` 是怎么拼成 `statement id` 的——`IllegalArgumentException: Mapped Statements collection does not contain value for ...` 十有八九是这里拼错。
 - `flushCache` / `useCache` 的默认值是**按语句类型**给的，不是全局一个值。
 - 主键回填不是自动的：`useGeneratedKeys` 或 `<selectKey>` 二选一。
+
+```code-challenge
+{
+  "id": "ex-statement",
+  "kind": "order",
+  "title": "排出 <select> 的装配顺序",
+  "lines": [
+    "MapperBuilderAssistant.addMappedStatement(...)",
+    "XMLMapperBuilder.parse()",
+    "XMLStatementBuilder.parseStatementNode()",
+    "configurationElement() 解析 cache/resultMap/sql",
+    "buildStatementFromContext() 遍历语句"
+  ],
+  "answer": [
+    1,
+    3,
+    4,
+    2,
+    0
+  ],
+  "explain": "先 namespace 下的公共部分，再逐条语句，最后统一由 Assistant 入库。"
+}
+```
 
 ```quiz
 {

@@ -22,8 +22,14 @@ status: published
   "license": "Apache-2.0",
   "base": "source/mybatis-3.5.19",
   "files": [
-    { "path": "org/apache/ibatis/binding/MapperRegistry.java", "label": "MapperRegistry" },
-    { "path": "org/apache/ibatis/builder/annotation/MapperAnnotationBuilder.java", "label": "MapperAnnotationBuilder" }
+    {
+      "path": "org/apache/ibatis/binding/MapperRegistry.java",
+      "label": "MapperRegistry"
+    },
+    {
+      "path": "org/apache/ibatis/builder/annotation/MapperAnnotationBuilder.java",
+      "label": "MapperAnnotationBuilder"
+    }
   ],
   "controls": [
     {
@@ -32,8 +38,14 @@ status: published
       "label": "这条语句写在哪",
       "default": "annotation",
       "options": [
-        { "value": "annotation", "label": "注解" },
-        { "value": "xml", "label": "XML" }
+        {
+          "value": "annotation",
+          "label": "注解"
+        },
+        {
+          "value": "xml",
+          "label": "XML"
+        }
       ]
     }
   ],
@@ -45,7 +57,16 @@ status: published
       "lines": 20,
       "explain": "`knownMappers.put(type, new MapperProxyFactory<>(type))` 发生在解析**之前**。注释写得很清楚：先把类型登记上，解析器才不会又去 bind 一次。解析失败时 finally 把它移除，避免留下半个 Mapper。",
       "state": {
-        "tables": [["knownMappers", "UserMapper → MapperProxyFactory"], ["解析状态", "进行中"]]
+        "tables": [
+          [
+            "knownMappers",
+            "UserMapper → MapperProxyFactory"
+          ],
+          [
+            "解析状态",
+            "进行中"
+          ]
+        ]
       }
     },
     {
@@ -55,7 +76,26 @@ status: published
       "lines": 27,
       "explain": "`loadXmlResource()` 排在最前：`com.example.UserMapper` 会去找 `com/example/UserMapper.xml`。也就是说**注解与 XML 可以混用**，XML 先装配，注解后装配。",
       "state": {
-        "vars": [["resource", "com/example/UserMapper"], ["xml", "UserMapper.xml（可选）"]]
+        "vars": [
+          [
+            "resource",
+            "com/example/UserMapper"
+          ],
+          [
+            "xml",
+            "UserMapper.xml（可选）"
+          ]
+        ]
+      },
+      "predict": {
+        "question": "接口旁边没有同名 XML 会怎样？",
+        "options": [
+          "启动失败",
+          "忽略，继续用注解",
+          "抛异常"
+        ],
+        "answer": 1,
+        "reveal": "`inputStream == null` 时静默跳过，注解-only 项目很常见。"
       }
     },
     {
@@ -65,7 +105,16 @@ status: published
       "lines": 21,
       "explain": "资源名是接口全限定名换斜杠加 `.xml`。找不到不算错（注解-only 的项目很常见）；找到就交给 `XMLMapperBuilder` 正常解析，走的还是上一关那条装配线。",
       "state": {
-        "tables": [["classpath", "com/example/UserMapper.xml"], ["xmlParser", "XMLMapperBuilder"]]
+        "tables": [
+          [
+            "classpath",
+            "com/example/UserMapper.xml"
+          ],
+          [
+            "xmlParser",
+            "XMLMapperBuilder"
+          ]
+        ]
       }
     },
     {
@@ -75,7 +124,16 @@ status: published
       "lines": 10,
       "explain": "`mappedStatementId = type.getName() + \".\" + method.getName()\"`——和 XML 的 `namespace.id` 是同一个规则。bridge 方法与 default 方法直接跳过（`canHaveStatement`）。",
       "state": {
-        "vars": [["mappedStatementId", "com.example.UserMapper.selectById"], ["sqlCommandType", "SELECT"]]
+        "vars": [
+          [
+            "mappedStatementId",
+            "com.example.UserMapper.selectById"
+          ],
+          [
+            "sqlCommandType",
+            "SELECT"
+          ]
+        ]
       }
     },
     {
@@ -86,12 +144,25 @@ status: published
       "explain": "INSERT/UPDATE 才看主键：先找 `@SelectKey`，再找 `@Options`，都没有才用全局的 `useGeneratedKeys`。和 XML 那条分支（上一关的第 87 行）是同一套规则的两种写法。",
       "predict": {
         "question": "一个 @Insert 方法，全局 useGeneratedKeys=false，但方法上写了 @Options(useGeneratedKeys=true)，会回填 id 吗？",
-        "options": ["会，方法级优先", "不会，全局说了算", "两者冲突直接报错"],
+        "options": [
+          "会，方法级优先",
+          "不会，全局说了算",
+          "两者冲突直接报错"
+        ],
         "answer": 0,
         "reveal": "@Options 是方法级配置，优先于全局。这也是为什么同一个项目里可以有的表回填、有的不回填。"
       },
       "state": {
-        "tables": [["keyGenerator", "Jdbc3KeyGenerator"], ["keyProperty", "id"]]
+        "tables": [
+          [
+            "keyGenerator",
+            "Jdbc3KeyGenerator"
+          ],
+          [
+            "keyProperty",
+            "id"
+          ]
+        ]
       }
     },
     {
@@ -101,7 +172,16 @@ status: published
       "lines": 14,
       "explain": "`@Select` / `@Insert` 的 `value()` 是 String[]，拼起来交给 `LanguageDriver.createSqlSource`。注意**这里也能用动态 SQL**：`<script>` 包一段 XML，注解里就能写 `<if>`。",
       "state": {
-        "vars": [["annotation", "@Select"], ["sql", "select * from user where id = #{id}"]]
+        "vars": [
+          [
+            "annotation",
+            "@Select"
+          ],
+          [
+            "sql",
+            "select * from user where id = #{id}"
+          ]
+        ]
       }
     },
     {
@@ -111,7 +191,12 @@ status: published
       "lines": 8,
       "explain": "`assistant.addMappedStatement(...)` 与 XML 完全同一条路。所以注解与 XML 的差别只在**从哪读文本**，装配规则一份。",
       "state": {
-        "tables": [["mappedStatements", "com.example.UserMapper.selectById"]]
+        "tables": [
+          [
+            "mappedStatements",
+            "com.example.UserMapper.selectById"
+          ]
+        ]
       }
     },
     {
@@ -120,9 +205,16 @@ status: published
       "line": 282,
       "lines": 1,
       "explain": "这条走的是「遍历接口方法 → 读注解 → 建语句」。",
-      "when": { "via": "annotation" },
+      "when": {
+        "via": "annotation"
+      },
       "state": {
-        "tables": [["来源", "@Select 注解"]]
+        "tables": [
+          [
+            "来源",
+            "@Select 注解"
+          ]
+        ]
       }
     },
     {
@@ -131,9 +223,20 @@ status: published
       "line": 152,
       "lines": 1,
       "explain": "这条走的是「同名 XML → XMLMapperBuilder」。两种写法可以同时存在于一个 Mapper，但**同一个 id 只能有一个来源**：重复会在 StrictMap 处抛异常。",
-      "when": { "via": "xml" },
+      "when": {
+        "via": "xml"
+      },
       "state": {
-        "tables": [["来源", "UserMapper.xml"], ["同 id 重复", "启动失败"]]
+        "tables": [
+          [
+            "来源",
+            "UserMapper.xml"
+          ],
+          [
+            "同 id 重复",
+            "启动失败"
+          ]
+        ]
       }
     }
   ]
@@ -145,6 +248,30 @@ status: published
 - **注解**：语句短、无动态片段。优点是离方法近；缺点是复杂 SQL 会变成一坨字符串。
 - **XML**：语句长、动态片段多、要复用 `<sql>`。缺点是文件和接口分离。
 - **混用**：常见于老项目——主查询在 XML，简单的 count/delete 用注解。知道它们走同一条装配线，就不会被"哪个优先级高"绕住。
+
+```code-challenge
+{
+  "id": "ex-annotation",
+  "kind": "fill",
+  "title": "补语句 id 的组成",
+  "template": "注解 Mapper 的语句 id 由 {{0}} + \".\" + {{1}} 组成。",
+  "options": [
+    [
+      "接口全限定名",
+      "XML 文件名"
+    ],
+    [
+      "方法名",
+      "参数名"
+    ]
+  ],
+  "answers": [
+    0,
+    0
+  ],
+  "explain": "与 XML 的 namespace.id 是同一个规则。"
+}
+```
 
 ```quiz
 {

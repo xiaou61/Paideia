@@ -22,7 +22,10 @@ status: published
   "license": "Apache-2.0",
   "base": "source/mybatis-3.5.19",
   "files": [
-    { "path": "org/apache/ibatis/binding/MapperMethod.java", "label": "MapperMethod" }
+    {
+      "path": "org/apache/ibatis/binding/MapperMethod.java",
+      "label": "MapperMethod"
+    }
   ],
   "controls": [
     {
@@ -31,9 +34,18 @@ status: published
       "label": "方法返回什么",
       "default": "one",
       "options": [
-        { "value": "one", "label": "单个对象" },
-        { "value": "list", "label": "List" },
-        { "value": "void", "label": "void / int" }
+        {
+          "value": "one",
+          "label": "单个对象"
+        },
+        {
+          "value": "list",
+          "label": "List"
+        },
+        {
+          "value": "void",
+          "label": "void / int"
+        }
       ]
     }
   ],
@@ -45,7 +57,16 @@ status: published
       "lines": 4,
       "explain": "`SqlCommand` 决定「执行哪条语句、什么类型」；`MethodSignature` 决定「返回值长什么样、参数怎么转」。两个都在构造期算完，执行期只做 switch。",
       "state": {
-        "tables": [["command.name", "com.example.UserMapper.selectById"], ["signature.returnsMany", "false"]]
+        "tables": [
+          [
+            "command.name",
+            "com.example.UserMapper.selectById"
+          ],
+          [
+            "signature.returnsMany",
+            "false"
+          ]
+        ]
       }
     },
     {
@@ -55,7 +76,16 @@ status: published
       "lines": 17,
       "explain": "`mapperInterface.getName() + \".\" + methodName` 就是要去 `Configuration` 里查的 id。查不到且没有 `@Flush`，直接抛 `Invalid bound statement (not found)`——这是 MyBatis 最常见的一条报错。",
       "state": {
-        "vars": [["statementId", "com.example.UserMapper.selectById"], ["type", "SELECT"]]
+        "vars": [
+          [
+            "statementId",
+            "com.example.UserMapper.selectById"
+          ],
+          [
+            "type",
+            "SELECT"
+          ]
+        ]
       }
     },
     {
@@ -66,12 +96,21 @@ status: published
       "explain": "如果当前接口里没有这条语句，会沿父接口递归找。所以把 Mapper 拆成 `BaseMapper<T>` + 子接口时，父接口的方法也能绑上。",
       "predict": {
         "question": "方法定义在父接口 BaseMapper 上，MappedStatement 的 id 应该怎么写？",
-        "options": ["父接口全名 + 方法名", "子接口全名 + 方法名", "都可以"],
+        "options": [
+          "父接口全名 + 方法名",
+          "子接口全名 + 方法名",
+          "都可以"
+        ],
         "answer": 0,
         "reveal": "`SqlCommand` 先用子接口名查，查不到再递归父接口，用父接口全名作为 id。XML 的 namespace 要与声明方法的接口一致。"
       },
       "state": {
-        "tables": [["查找顺序", "子接口 → 父接口递归"]]
+        "tables": [
+          [
+            "查找顺序",
+            "子接口 → 父接口递归"
+          ]
+        ]
       }
     },
     {
@@ -81,7 +120,20 @@ status: published
       "lines": 19,
       "explain": "`returnsMany`（集合/数组）、`returnsMap`、`returnsCursor`、`returnsOptional`、`returnsVoid` 都在这里算。还会找 `RowBounds` 与 `ResultHandler` 参数的位置，以及创建 `ParamNameResolver`。",
       "state": {
-        "tables": [["returnsMany", "false"], ["returnsMap", "false"], ["rowBoundsIndex", "-1"]]
+        "tables": [
+          [
+            "returnsMany",
+            "false"
+          ],
+          [
+            "returnsMap",
+            "false"
+          ],
+          [
+            "rowBoundsIndex",
+            "-1"
+          ]
+        ]
       }
     },
     {
@@ -91,7 +143,10 @@ status: published
       "lines": 34,
       "explain": "`INSERT/UPDATE/DELETE` 都走 `rowCountResult`；`SELECT` 再按返回类型细分。**没有魔法**：编译期不知道的东西，运行期用一个枚举 switch 补上。",
       "state": {
-        "stack": ["MapperMethod.execute", "switch(command.getType())"]
+        "stack": [
+          "MapperMethod.execute",
+          "switch(command.getType())"
+        ]
       }
     },
     {
@@ -100,9 +155,30 @@ status: published
       "line": 85,
       "lines": 6,
       "explain": "返回单个对象时调 `selectOne`；返回 `Optional` 时把 null 包成 `Optional.empty()`。",
-      "when": { "returnType": "one" },
+      "when": {
+        "returnType": "one"
+      },
       "state": {
-        "tables": [["调用", "sqlSession.selectOne"], ["Optional", "null → Optional.empty"]]
+        "tables": [
+          [
+            "调用",
+            "sqlSession.selectOne"
+          ],
+          [
+            "Optional",
+            "null → Optional.empty"
+          ]
+        ]
+      },
+      "predict": {
+        "question": "selectOne 查到 0 条返回什么？",
+        "options": [
+          "null",
+          "空列表",
+          "异常"
+        ],
+        "answer": 0,
+        "reveal": "0 条返回 null，多条才抛 TooManyResultsException。"
       }
     },
     {
@@ -111,9 +187,20 @@ status: published
       "line": 140,
       "lines": 16,
       "explain": "`executeForMany` 调 `selectList`，再按返回类型做集合/数组转换（`issue #510` 就是返回数组时的兼容）。",
-      "when": { "returnType": "list" },
+      "when": {
+        "returnType": "list"
+      },
       "state": {
-        "tables": [["调用", "sqlSession.selectList"], ["返回", "List / 数组"]]
+        "tables": [
+          [
+            "调用",
+            "sqlSession.selectList"
+          ],
+          [
+            "返回",
+            "List / 数组"
+          ]
+        ]
       }
     },
     {
@@ -122,9 +209,24 @@ status: published
       "line": 106,
       "lines": 16,
       "explain": "写语句的影响行数会按方法返回类型转：`void → null`、`int → rowCount`、`long → (long)`、`boolean → rowCount > 0`。返回别的类型直接抛「unsupported return type」。",
-      "when": { "returnType": "void" },
+      "when": {
+        "returnType": "void"
+      },
       "state": {
-        "tables": [["rowCount", "3"], ["boolean 返回", "true"], ["void 返回", "null"]]
+        "tables": [
+          [
+            "rowCount",
+            "3"
+          ],
+          [
+            "boolean 返回",
+            "true"
+          ],
+          [
+            "void 返回",
+            "null"
+          ]
+        ]
       }
     }
   ]
@@ -136,6 +238,27 @@ status: published
 `MapperMethod` 的构造发生在**第一次调用**（`cachedInvoker` 的 `computeIfAbsent`），不是在 `getMapper` 时。
 所以「Invalid bound statement」这类错误，第一次调到才会报——启动时 `@Mapper` 扫描不会替你验一遍。
 （Spring 集成里有 `MapperScannerConfigurer`，但那是另一个仓库的事。）
+
+```code-challenge
+{
+  "id": "ex-mappermethod",
+  "kind": "order",
+  "title": "排出 MapperMethod 的解析与分派",
+  "lines": [
+    "sqlSession.selectOne(command.getName(), param)",
+    "new SqlCommand(...) 解析语句 id 与类型",
+    "new MethodSignature(...) 解析返回类型",
+    "MapperMethod.execute 按 command 类型 switch"
+  ],
+  "answer": [
+    1,
+    2,
+    3,
+    0
+  ],
+  "explain": "构造期把命令与签名算好，执行期只做 switch。"
+}
+```
 
 ```quiz
 {

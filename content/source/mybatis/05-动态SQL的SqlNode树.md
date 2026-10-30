@@ -23,10 +23,22 @@ status: published
   "license": "Apache-2.0",
   "base": "source/mybatis-3.5.19",
   "files": [
-    { "path": "org/apache/ibatis/scripting/xmltags/XMLScriptBuilder.java", "label": "XMLScriptBuilder" },
-    { "path": "org/apache/ibatis/scripting/xmltags/IfSqlNode.java", "label": "IfSqlNode" },
-    { "path": "org/apache/ibatis/scripting/xmltags/ForEachSqlNode.java", "label": "ForEachSqlNode" },
-    { "path": "org/apache/ibatis/scripting/xmltags/TrimSqlNode.java", "label": "TrimSqlNode" }
+    {
+      "path": "org/apache/ibatis/scripting/xmltags/XMLScriptBuilder.java",
+      "label": "XMLScriptBuilder"
+    },
+    {
+      "path": "org/apache/ibatis/scripting/xmltags/IfSqlNode.java",
+      "label": "IfSqlNode"
+    },
+    {
+      "path": "org/apache/ibatis/scripting/xmltags/ForEachSqlNode.java",
+      "label": "ForEachSqlNode"
+    },
+    {
+      "path": "org/apache/ibatis/scripting/xmltags/TrimSqlNode.java",
+      "label": "TrimSqlNode"
+    }
   ],
   "controls": [
     {
@@ -35,9 +47,18 @@ status: published
       "label": "条件该怎么收尾",
       "default": "where",
       "options": [
-        { "value": "where", "label": "<where>" },
-        { "value": "trim", "label": "<trim>" },
-        { "value": "none", "label": "什么都不包" }
+        {
+          "value": "where",
+          "label": "<where>"
+        },
+        {
+          "value": "trim",
+          "label": "<trim>"
+        },
+        {
+          "value": "none",
+          "label": "什么都不包"
+        }
       ]
     }
   ],
@@ -49,7 +70,26 @@ status: published
       "lines": 10,
       "explain": "`parseScriptNode` 只做一个决定：树里有动态节点就是 `DynamicSqlSource`，否则 `RawSqlSource`。**没有 `<if>` 的 SQL 只解析一次**，这是性能上的关键分叉。",
       "state": {
-        "vars": [["isDynamic", "true"], ["rootSqlNode", "MixedSqlNode"]]
+        "vars": [
+          [
+            "isDynamic",
+            "true"
+          ],
+          [
+            "rootSqlNode",
+            "MixedSqlNode"
+          ]
+        ]
+      },
+      "predict": {
+        "question": "一条没有任何动态标签的 SQL 用哪种 SqlSource？",
+        "options": [
+          "DynamicSqlSource",
+          "RawSqlSource",
+          "StaticSqlSource"
+        ],
+        "answer": 1,
+        "reveal": "没有动态节点走 RawSqlSource，构建期解析一次。"
       }
     },
     {
@@ -59,7 +99,20 @@ status: published
       "lines": 27,
       "explain": "文本节点先看 `${}`：有就是 `TextSqlNode`（动态），没有就是 `StaticTextSqlNode`；元素节点查 `nodeHandlerMap`，找不到就抛「Unknown element」。**拼错标签名在这里就报错**，不会拖到运行期。",
       "state": {
-        "tables": [["混合节点", "StaticTextSqlNode"], ["if", "IfSqlNode"], ["where", "WhereSqlNode"]]
+        "tables": [
+          [
+            "混合节点",
+            "StaticTextSqlNode"
+          ],
+          [
+            "if",
+            "IfSqlNode"
+          ],
+          [
+            "where",
+            "WhereSqlNode"
+          ]
+        ]
       }
     },
     {
@@ -69,7 +122,16 @@ status: published
       "lines": 7,
       "explain": "`evaluator.evaluateBoolean(test, bindings)` 用 OGNL 求值；为真才 `contents.apply(context)`。注意它返回 boolean——父节点（比如 `<trim>`）据此判断有没有内容。",
       "state": {
-        "vars": [["test", "name != null"], ["结果", "true"]]
+        "vars": [
+          [
+            "test",
+            "name != null"
+          ],
+          [
+            "结果",
+            "true"
+          ]
+        ]
       }
     },
     {
@@ -79,7 +141,20 @@ status: published
       "lines": 17,
       "explain": "集合为空直接返回；否则先追加 `open`（比如 `(`），再逐个元素用 `PrefixedContext` 加分隔符。每个元素有唯一编号，用来生成 `__frch_item_0` 这种绑定名。",
       "state": {
-        "vars": [["collection", "ids"], ["separator", ","], ["uniqueNumber", "0、1、2…"]]
+        "vars": [
+          [
+            "collection",
+            "ids"
+          ],
+          [
+            "separator",
+            ","
+          ],
+          [
+            "uniqueNumber",
+            "0、1、2…"
+          ]
+        ]
       }
     },
     {
@@ -89,7 +164,16 @@ status: published
       "lines": 15,
       "explain": "元素是 `Map.Entry` 时，key 当下标、value 当元素；否则下标就是循环序号。最后 `contents.apply` 时用 `FilteredDynamicContext` 把 `#{item}` 换成 `#{__frch_item_0}`。",
       "state": {
-        "tables": [["#{item}", "#{__frch_item_1}"], ["#{index}", "1"]]
+        "tables": [
+          [
+            "#{item}",
+            "#{__frch_item_1}"
+          ],
+          [
+            "#{index}",
+            "1"
+          ]
+        ]
       }
     },
     {
@@ -99,7 +183,26 @@ status: published
       "lines": 6,
       "explain": "`apply` 先用 `FilteredDynamicContext` 收集内容，再 `applyAll()` 统一裁剪前后缀。`<where>` 就是「前缀 WHERE、去掉开头的 AND/OR」；`<set>` 是「前缀 SET、去掉结尾的逗号」。",
       "state": {
-        "vars": [["prefix", "WHERE"], ["prefixOverrides", "AND | OR"]]
+        "vars": [
+          [
+            "prefix",
+            "WHERE"
+          ],
+          [
+            "prefixOverrides",
+            "AND | OR"
+          ]
+        ]
+      },
+      "predict": {
+        "question": "<where> 去掉的是什么？",
+        "options": [
+          "结尾的逗号",
+          "开头的 AND/OR",
+          "所有括号"
+        ],
+        "answer": 1,
+        "reveal": "prefix=WHERE，prefixOverrides=AND|OR。"
       }
     },
     {
@@ -108,9 +211,20 @@ status: published
       "line": 56,
       "lines": 6,
       "explain": "第一个 `<if>` 不成立、第二个成立时，拼出来是 `WHERE AND age > 18`。`<where>` 会把开头的 `AND` 去掉——这就是它存在的全部意义。",
-      "when": { "clause": "where" },
+      "when": {
+        "clause": "where"
+      },
       "state": {
-        "tables": [["拼出来", "WHERE AND age > 18"], ["最终", "WHERE age > 18"]]
+        "tables": [
+          [
+            "拼出来",
+            "WHERE AND age > 18"
+          ],
+          [
+            "最终",
+            "WHERE age > 18"
+          ]
+        ]
       }
     },
     {
@@ -119,9 +233,24 @@ status: published
       "line": 56,
       "lines": 6,
       "explain": "`prefix` / `prefixOverrides` / `suffix` / `suffixOverrides` 四个属性，`<where>` 与 `<set>` 都是它的特例。自定义时最容易踩的是覆写词要**大写并用 | 分隔**。",
-      "when": { "clause": "trim" },
+      "when": {
+        "clause": "trim"
+      },
       "state": {
-        "tables": [["prefix", "WHERE"], ["prefixOverrides", "AND | OR"], ["suffix", "（空）"]]
+        "tables": [
+          [
+            "prefix",
+            "WHERE"
+          ],
+          [
+            "prefixOverrides",
+            "AND | OR"
+          ],
+          [
+            "suffix",
+            "（空）"
+          ]
+        ]
       }
     },
     {
@@ -130,9 +259,20 @@ status: published
       "line": 56,
       "lines": 6,
       "explain": "直接 `WHERE` 后面跟 `<if>`，第一个条件不成立就得到 `WHERE AND age > 18`，数据库报语法错。动态 SQL 的坑一半在这：**你看到的是模板，数据库看到的是拼完的字符串**。",
-      "when": { "clause": "none" },
+      "when": {
+        "clause": "none"
+      },
       "state": {
-        "tables": [["拼出来", "WHERE AND age > 18"], ["数据库", "SQLSyntaxErrorException"]]
+        "tables": [
+          [
+            "拼出来",
+            "WHERE AND age > 18"
+          ],
+          [
+            "数据库",
+            "SQLSyntaxErrorException"
+          ]
+        ]
       }
     }
   ]
@@ -144,6 +284,27 @@ status: published
 - 树在建 `SqlSessionFactory` 时就固定了；每次查询只是 `rootSqlNode.apply(context)` 走一遍。
 - 动态判断用 OGNL，所以 `test="name != null and name != ''"` 是**表达式**，不是字符串比较。
 - `${}` 是文本替换（有注入风险），`#{}` 是占位符 + 参数绑定。两者在这一层就分开了。
+
+```code-challenge
+{
+  "id": "ex-dynamicsql",
+  "kind": "order",
+  "title": "排出动态 SQL 的建树与执行",
+  "lines": [
+    "IfSqlNode.apply(context) 求值 test",
+    "XMLScriptBuilder.parseDynamicTags(node)",
+    "MixedSqlNode 依次 apply 子节点",
+    "XMLScriptBuilder.parseScriptNode()"
+  ],
+  "answer": [
+    3,
+    1,
+    0,
+    2
+  ],
+  "explain": "先建树（parseScriptNode → parseDynamicTags），执行时再逐个 apply。"
+}
+```
 
 ```quiz
 {

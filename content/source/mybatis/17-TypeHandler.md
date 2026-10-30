@@ -24,8 +24,14 @@ status: published
   "license": "Apache-2.0",
   "base": "source/mybatis-3.5.19",
   "files": [
-    { "path": "org/apache/ibatis/type/TypeHandlerRegistry.java", "label": "TypeHandlerRegistry" },
-    { "path": "org/apache/ibatis/type/BaseTypeHandler.java", "label": "BaseTypeHandler" }
+    {
+      "path": "org/apache/ibatis/type/TypeHandlerRegistry.java",
+      "label": "TypeHandlerRegistry"
+    },
+    {
+      "path": "org/apache/ibatis/type/BaseTypeHandler.java",
+      "label": "BaseTypeHandler"
+    }
   ],
   "controls": [
     {
@@ -34,8 +40,14 @@ status: published
       "label": "参数值",
       "default": "normal",
       "options": [
-        { "value": "normal", "label": "有值" },
-        { "value": "null", "label": "null" }
+        {
+          "value": "normal",
+          "label": "有值"
+        },
+        {
+          "value": "null",
+          "label": "null"
+        }
       ]
     }
   ],
@@ -47,7 +59,16 @@ status: published
       "lines": 4,
       "explain": "`getTypeHandler(Class)` 查一张 `Map<Class, TypeHandler>`。内置的 `String`、`Long`、`LocalDateTime` 都在启动时注册好了；找不到就返回 null，调用方再决定用什么兜底。",
       "state": {
-        "tables": [["Long", "LongTypeHandler"], ["String", "StringTypeHandler"]]
+        "tables": [
+          [
+            "Long",
+            "LongTypeHandler"
+          ],
+          [
+            "String",
+            "StringTypeHandler"
+          ]
+        ]
       }
     },
     {
@@ -57,7 +78,26 @@ status: published
       "lines": 4,
       "explain": "`getTypeHandler(type, jdbcType)` 先按精确的 (Java 类型, JDBC 类型) 找，找不到再退回只按 Java 类型。所以 `#{createdAt,jdbcType=TIMESTAMP}` 能选到更合适的 handler。",
       "state": {
-        "tables": [["(LocalDateTime, TIMESTAMP)", "LocalDateTimeTypeHandler"], ["回退", "只按 Java 类型"]]
+        "tables": [
+          [
+            "(LocalDateTime, TIMESTAMP)",
+            "LocalDateTimeTypeHandler"
+          ],
+          [
+            "回退",
+            "只按 Java 类型"
+          ]
+        ]
+      },
+      "predict": {
+        "question": "精确匹配不到 (Java 类型, jdbcType) 时？",
+        "options": [
+          "抛异常",
+          "回退按 Java 类型找",
+          "返回 null"
+        ],
+        "answer": 1,
+        "reveal": "先精确、后回退。"
       }
     },
     {
@@ -67,7 +107,16 @@ status: published
       "lines": 20,
       "explain": "`register(Class<T> javaType, TypeHandler<? extends T> handler)` 把 handler 放进两张表：按 Java 类型、按 (Java 类型, jdbcType)。自定义 handler 也是同一个入口。",
       "state": {
-        "tables": [["注册表", "按 Java 类型 + 按 JDBC 类型"], ["自定义", "同一入口"]]
+        "tables": [
+          [
+            "注册表",
+            "按 Java 类型 + 按 JDBC 类型"
+          ],
+          [
+            "自定义",
+            "同一入口"
+          ]
+        ]
       }
     },
     {
@@ -76,9 +125,15 @@ status: published
       "line": 70,
       "lines": 12,
       "explain": "`setParameter` 判断 null 之后，非 null 调抽象方法 `setNonNullParameter`——每个子类只实现这一句 JDBC 调用。",
-      "when": { "value": "normal" },
+      "when": {
+        "value": "normal"
+      },
       "state": {
-        "stack": ["BaseTypeHandler.setParameter", "LongTypeHandler.setNonNullParameter", "ps.setLong"]
+        "stack": [
+          "BaseTypeHandler.setParameter",
+          "LongTypeHandler.setNonNullParameter",
+          "ps.setLong"
+        ]
       }
     },
     {
@@ -87,15 +142,30 @@ status: published
       "line": 59,
       "lines": 12,
       "explain": "`parameter == null && jdbcType == null` 时抛 `TypeException`：驱动不知道 null 该按哪种 JDBC 类型发。所以可空参数建议写成 `#{name,jdbcType=VARCHAR}`，或配全局 `jdbcTypeForNull`。",
-      "when": { "value": "null" },
+      "when": {
+        "value": "null"
+      },
       "predict": {
         "question": "为什么 null 需要 jdbcType，而有值的时候不需要？",
-        "options": ["驱动无法从 null 推断类型", "MyBatis 偷懒", "数据库要求"],
+        "options": [
+          "驱动无法从 null 推断类型",
+          "MyBatis 偷懒",
+          "数据库要求"
+        ],
         "answer": 0,
         "reveal": "有值时 Java 类型能推断 JDBC 类型；null 没有类型信息，只能显式指定或走全局默认（OTHER）。"
       },
       "state": {
-        "tables": [["ps.setNull", "需要 TypeCode"], ["全局默认", "jdbcTypeForNull = OTHER"]]
+        "tables": [
+          [
+            "ps.setNull",
+            "需要 TypeCode"
+          ],
+          [
+            "全局默认",
+            "jdbcTypeForNull = OTHER"
+          ]
+        ]
       }
     },
     {
@@ -105,7 +175,11 @@ status: published
       "lines": 8,
       "explain": "`getResult(rs, columnName)` 调 `getNullableResult`，把 SQL 异常包成 `ResultMapException` 并带上列名——排查「哪一列转换失败」时这条信息很关键。",
       "state": {
-        "stack": ["BaseTypeHandler.getResult", "getNullableResult", "rs.getTimestamp"]
+        "stack": [
+          "BaseTypeHandler.getResult",
+          "getNullableResult",
+          "rs.getTimestamp"
+        ]
       }
     }
   ]
@@ -120,6 +194,26 @@ status: published
 
 注册方式：`<typeHandlers><typeHandler handler="..."/></typeHandlers>`，或在 `Configuration` 里
 `typeHandlerRegistry.register(...)`。**注意它只影响绑定/取值，不影响 SQL 生成**。
+
+```code-challenge
+{
+  "id": "ex-typehandler",
+  "kind": "fill",
+  "title": "补 null 的类型信息",
+  "template": "参数为 null 且没有指定 `{{0}}` 时，BaseTypeHandler 会抛 TypeException。",
+  "options": [
+    [
+      "jdbcType",
+      "javaType",
+      "typeHandler"
+    ]
+  ],
+  "answers": [
+    0
+  ],
+  "explain": "null 没有 Java 类型可供推断，必须显式给 jdbcType 或走全局默认。"
+}
+```
 
 ```quiz
 {

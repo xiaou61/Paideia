@@ -59,6 +59,21 @@ test.describe('源码精读', () => {
     await expect(steps.filter({ hasText: 'BATCH' })).toHaveCount(1)
   })
 
+  test('24 章逐章都能打开并渲染出源码块', async ({ page }) => {
+    await page.goto('/#/source/mybatis-source')
+    const links = page.locator('[data-testid^="source-chapter-"]')
+    await expect(links.first()).toBeVisible({ timeout: 15_000 })
+    const hrefs = await links.evaluateAll((nodes) =>
+      nodes.map((node) => (node as HTMLAnchorElement).getAttribute('href') ?? ''),
+    )
+    expect(hrefs.length).toBe(24)
+    for (const href of hrefs) {
+      await page.goto(`/${href}`)
+      await expect(page.getByTestId('source-walk')).toBeVisible({ timeout: 15_000 })
+      await expect(page.getByTestId('source-walk-focus-line').first()).toBeVisible()
+    }
+  })
+
   test('375px 下正文没有横向溢出', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 })
     await page.goto('/#/source/mybatis-source')
