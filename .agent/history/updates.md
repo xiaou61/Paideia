@@ -9005,3 +9005,117 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
   「源码解读线计费篇」补过一次图，合并会出现 modify/delete 冲突。等并发会话收尾后再合，
   **在那之前不要从 master 发版**（会把 `/source` 回滚）。
 - 远端推送：已执行
+
+## 2026-10-30 · WORK-058 · 二期：工具吃 URI + 附件可点回去（并更正一处判断）
+
+- 类型：implementation
+- 变更：`paideia-platform` 新增 `ToolUri.numericId`（数字前缀；`entry:123/selection` → 123）；
+  `knowledge_get_entry` / `note_get` 加可选 `uri`（优先于裸 id）；附件条上 entry/note/track/book/resume
+  变成可点，路由映射在 `frontend/apps/app/src/main.tsx` 的 `openAttachment`，助手包只交出 uri。
+- **更正**：内部助手本来就是只读的（`ToolQuery.internal` 固定 `readOnly=true` / `scopes={READ}`，
+  WORK-006 的"自主只建议不动作"）。此前"助手能静默改自评"的说法是错的——写工具只在外部 MCP 的
+  write 视图中，且需要用户自己签发带 `write` scope 的凭据。TASK-007（补确认闸）因此取消，
+  改为登记"将来给内部助手开写前必须先补确认闸"。
+- 验证：`ToolUriTest` 3/3、`KnowledgeToolsTest` 8/8、`BUILD SUCCESS`（独占库自动删）；
+  `@paideia/assistant` typecheck + 55 tests；`@paideia/app` typecheck 通过。
+- 仍未做：`@` 选择器（REQ-004）、回答正文里的 `[[uri]]` 引用解析、附件 URI 落 `ai_runs.attrs`。
+- 本地提交：`5e3511b`（工作树内；未合并）
+- 远端推送：未执行
+
+## 2026-10-30 · WORK-058 · 三期：对话里 `@` 引用笔记与条目
+
+- 类型：implementation
+- 变更：新增 `mention.ts`（`findMention` / `stripMention`）：取光标前最后一个 `@`（行首或空白后，
+  邮箱里的不算，查询串含空白或超 40 字不弹）；面板里 `@` 弹候选（180ms 防抖、方向键/回车/Esc、
+  选中即进附件栈且**不发送**、只删 `@查询`）；搜索来源由应用注入——笔记本地过滤、条目走
+  `knowledge.entries({q})`，两边 `allSettled` 互不拖累。
+- 验证：assistant 包 61 tests（mention 6 条）；assistant + app typecheck；
+  `assistant.spec.ts` 11/11（含新增一条 @ 流程）
+- 已知限制：候选只有笔记与知识条目；关卡/书籍没有检索来源，只能从页面入口附着。
+- 本地提交：`92b1b91`（工作树内；未合并）
+- 远端推送：未执行
+
+## 2026-10-30 · WORK-058 · 四期：引用可点 + 附件落观测（REQ 全项落地）
+
+- 类型：implementation
+- 变更：
+  ① 提示词升到 `assistant-chat-v3`：约定 `[[entry:123]]` / `[[note:45]]` 引用，并明写"只引用见过的 id"；
+  ② `linkifyCitations` 只替换完整的 `[[...]]`（流式到一半不变形），链接文字优先用附件标签；
+  ③ `CitationLink` 接住占位前缀，点一下把 uri 交回应用；**自定义协议 `paideia:` 会被渲染器拦成
+     `entry:1 [blocked]`（实测），改用 `https://paideia.invalid/`（RFC 2606 保留域，永不解析）**；
+  ④ 附件序列化首行加 `附着对象：a, b`，服务端 `AttachmentUris` 解析后写 `ai_runs.attrs.contextUris`。
+- 验证：assistant 包 70 tests（citation 5 + CitationLink 3）；assistant/app 两处 typecheck；
+  `ConversationPromptTest` 4/4、`AttachmentUrisTest` 3/3、`BUILD SUCCESS`。
+- 验证缺口：引用这一层没有 e2e——正文渲染器是 `lazy()` 引入的，在包级测试里只停在占位；
+  尝试用 page.route 喂桩消息的 e2e 也没跑通（面板未渲染，原因未查明，已撤掉）。
+  模型会不会写对 uri 只能人工抽查。
+- 本地提交：`6c3b417`（工作树内；未合并）
+- 远端推送：未执行
+
+## 2026-10-30 · WORK-058 · 合并到 master 并部署上线
+
+- 类型：maintenance（合并 + 发版）
+- 变更：`git merge --no-ff feat/assistant-objects` → master `61faf8b`（32 文件 / +1346 −82）；
+  工作树与分支已删（`git worktree remove --force` + `git branch -d`）。
+- 验证：合并后 `@paideia/app` typecheck 通过、assistant 包 70 tests 通过；
+  `powershell -File scripts/release.ps1` 完成，261.3 秒（后端 75s / 前端 83s / 打包 43s / 上传 29s /
+  重启 3.5s / 健康检查 21.7s），变化 44 个文件、删除 0；发版标记已写。
+- 线上冒烟：`/actuator/health` = UP；`index.html` 200；下载主 bundle 后确认含
+  `paideia.invalid`（引用占位前缀）、`附着对象`（附件序列化首行）、`输入 @ 引用笔记或条目`（三期占位文案）——
+  确认线上跑的是这次的前端产物。
+- 未做：**没有 push**（未授权）。`origin/master..master` 现有 5 笔待推（4 个切片 + 合并提交）。
+- 未做：没有对线上跑 e2e；也没有人工在浏览器里点过一遍（冒烟只到产物级）。
+
+## 2026-10-30 · 简历版式与预览（三套模板 + `/resume/:id/preview`）
+
+- 类型：implementation
+- 背景：开源简历产品调研（许可已核）：Reactive Resume MIT 45k★、OpenResume AGPL-3.0（不能进本仓库）、
+  JSON Resume 主题生态 MIT（Node 端 `render() → HTML`，标签全英文）、Resume Matcher Apache-2.0。
+  结论：**照 Reactive Resume 的版式设计自己实现**，不搬代码——它 v5 的模板已是 `@react-pdf` 专用体系，
+  中文还要内嵌 CJK 字体（5MB+），而浏览器"打印/存为 PDF"本来就负责 A4 分页。
+- 变更：`@paideia/resume` 新增 `templates.tsx`（简洁 / 侧栏 / 紧凑三套版式 + `read/saveResumeTemplate`，
+  存 localStorage `paideia:resume-template`）；新增 `/resume/:id/preview` 与共享的 `ResumePaperView`
+  （工具栏 + A4 纸面 + 打印规则），打印页改为复用；编辑器头部加「预览」入口。
+- 顺带修三处：教育 `highlights` 在打印视图里从来没渲染过；纸张改固定白底黑字（深色主题下原来
+  打印会是白字白纸）；助手浮标/浮窗加 `data-print-hide`（原来会被一起印到纸上）。
+- 验证：`@paideia/resume` 20 tests（新增 `templates.test.tsx` 5 条）+ typecheck；`@paideia/assistant`
+  70 tests + typecheck；`@paideia/app` typecheck + `vite build` 通过（确认 `58mm`/`11.5px` 等任意值类
+  进了产物 CSS）；e2e `resume.spec.ts` 2/2（独占库 `paideia_run_1030164111_23592` 自动删，
+  端口 8188/5288）；三套版式各出一份 PDF = **1 页 / 209.9×297mm / 正文全黑**，逐页看过。
+- 未做：版式只记在 localStorage，不随简历或版本落库；没做 JSON Resume 导入导出；
+  e2e 未覆盖真正的打印对话框（只验到打印媒体下助手隐藏）。
+- 本地提交：`3a0a830`
+- 远端推送：未执行
+
+## 2026-10-30 · 动手练习的代码编辑器：语法高亮 + 补全
+
+- 变更：`run` 题型的纯 `<textarea>` 换成 CodeMirror（新目录 `packages/ui/src/code-editor/`）——
+  Java/Python 语法高亮、行号、括号自动闭合、补全（Java = 本文档里的标识符 + 关键字；
+  Python 用 `@codemirror/lang-python` 自带的局部名与内置名）。
+- 复用：配色与高亮规则从 `sql-editor.tsx` 抽成 `@paideia/ui/code-editor-theme`，SQL 编辑器
+  改为引用同一份（两个编辑区会并排出现在同一条条目里，各留一套必漂移）；顺手修了补全面板
+  在深色主题下是白板（默认样式写死浅灰 + 蓝色选中行）。
+- 懒加载：`run-challenge.tsx` 用 `lazy()` + `Suspense`（fallback 仍是可编辑 textarea），
+  沙箱探测时顺手预热 chunk。编辑器 chunk 115.0 kB gzip（门槛 160），入口只动态引用它。
+- 验证：`@paideia/ui` 256/257，`@paideia/sql-workbench` 44/44；两个包 typecheck；
+  `vite build` + `check-lazy-editor.mjs` 通过；真浏览器（临时页 + Playwright/chrome）确认
+  77 个高亮 span、关键字是品牌靛蓝、输入 `cont` 弹出 `container / continue / Container`。
+- 已知无关的既有红灯：`tokens.test.ts`（别的会话在飞的 `ResumePaperView` / `AnalyticsPage`
+  硬编码颜色）、`source-walk.test.tsx` 缺 `CustomRendererProps` 两字段（WORK-057 遗留）。
+- 未做：`shell` 判题题型仍是 textarea（单行命令）；不引语言服务器，补全只到"文档词 + 关键字"。
+- 本地提交：未执行；远端推送：未执行
+
+## 2026-10-30 · 简历版式上线（从干净 worktree 发版）
+
+- 类型：deployment
+- 原因：主工作区带着**另一个会话未提交**的 code-editor 改动（sql-workbench / ui / pnpm-lock），
+  而 `release.ps1` 是从工作区构建的 —— 直接从主树发版会把别人的半成品一起发上去。
+- 做法：`git worktree add --detach .worktrees/deploy-resume 3a0a830` → `pnpm install --frozen-lockfile`
+  (29s) → 在该树执行 `release.ps1 -WithWeb`。发完 `git worktree remove --force`（已删，主树仍在 master）。
+- 结果：241.9 秒（后端 96.9s 冷编 / 前端 49.0s / 打包压缩 41.4s / 上传 19.1s+4.5s / 重启 2.3s /
+  健康检查 24.2s）；变化 44 个文件、删除 0；`/actuator/health` = 200。
+- 线上核验：主 bundle `index-DsUHEADn.js` 内含 `paideia:resume-template` 与打印提示文案
+  「打印时在对话框里关掉…」→ 确认跑的是这次的前端产物（带 `?v=<ts>` 穿透缓存取的）。
+- 线上 e2e：`E2E_BASE_URL` 打部署实例，`resume.spec.ts` **2 passed / 13.7 秒**（含新增的预览/版式那条）。
+- 清理：线上 `e2e-learner` 名下积压的 `e2e-*` 简历 **31 份已删**（含本轮 2 份与历史遗留）。
+- 未做：没有 push；管理端没动，未重跑其 e2e；没人工点一遍（冒烟到 e2e 级）。
