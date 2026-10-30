@@ -7,6 +7,7 @@ import { CodeTour } from './code-tour'
 import { LearningPath } from './learning-path'
 import { Quiz } from './quiz'
 import { Sketch } from './sketch'
+import { SourceWalk } from './source-walk'
 
 /**
  * 源码解读的块注册表（WORK-014）。
@@ -23,6 +24,8 @@ export const SourceReadingPath = guard('学习路径', LearningPath)
 export const SourceReadingChallenge = guard('动手练习', CodeChallenge)
 export const SourceReadingQuiz = guard('小测', Quiz)
 export const DocumentSketch = guard('手绘图', Sketch)
+/** 整文件源码走读（WORK-057）：步骤只声明行区间，代码取自静态快照。 */
+export const DocumentSourceWalk = guard('源码精读', SourceWalk)
 
 export const documentRenderers: CustomRenderer[] = [
   { language: ['code-tour', 'tour'], component: SourceReadingTour },
@@ -31,6 +34,7 @@ export const documentRenderers: CustomRenderer[] = [
   { language: ['code-challenge', 'challenge'], component: SourceReadingChallenge },
   { language: ['quiz'], component: SourceReadingQuiz },
   { language: ['sketch'], component: DocumentSketch },
+  { language: ['source-walk'], component: DocumentSourceWalk },
 ]
 
 export { SourceReadingProvider, useSourceReading } from './context'

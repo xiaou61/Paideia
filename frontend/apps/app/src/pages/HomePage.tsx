@@ -9,7 +9,7 @@ import { configFor, createIdentityApi } from '@paideia/identity'
 import { AppShell, Button, Card, Input, Section, Spinner } from '@paideia/ui'
 import { useAuth } from '@paideia/auth'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, BookOpen, Container, Database, Dumbbell, FileQuestion, GraduationCap, Layers, MessagesSquare, Network, Newspaper, NotebookPen, Search, Sparkles, Target, Terminal } from 'lucide-react'
+import { ArrowRight, BookOpen, Container, Database, Dumbbell, FileQuestion, GraduationCap, Layers, MessagesSquare, Network, Newspaper, NotebookPen, Search, Target, Terminal } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 
@@ -48,7 +48,7 @@ const QUICK_LINKS: {
   {
     // Linux / Docker 的直达卡（2026-10-29 用户要求）：它们是「从零开始」里的轨道，
     // 但在进阶栏里排得偏后，首页给一个一次点击的入口。key 为 null —— 与岗位无关，
-    // 不参与身份排序（它与 `learn` 共用 key 会被排序丢掉一张，见下面「源码解读」的注释）。
+    // 不参与身份排序（它与 `learn` 共用 key 会被排序时丢掉一张）。
     key: null,
     to: '/learn/linux-from-zero',
     testId: 'home-entry-linux',
@@ -114,17 +114,6 @@ const QUICK_LINKS: {
     icon: BookOpen,
     title: '知识库',
     description: '按分类浏览、按关键词检索，打开条目阅读。',
-  },
-  {
-    // 源码解读是知识库里的一个分类；总览条目由作者发布后挂在这里。
-    // **它不参与身份排序**（key 为 null）：与"知识库"共用同一个 key 会让排序时只取到
-    // 知识库那张卡、把这张整个丢掉（实测：首页入口消失，e2e 直接红）。
-    key: null,
-    to: '/knowledge/entries?q=源码解读',
-    testId: 'home-entry-source-reading',
-    icon: Sparkles,
-    title: '源码解读',
-    description: '跟着架构地图一步步读真实开源代码，边猜边练。',
   },
   {
     key: 'notes' as const,

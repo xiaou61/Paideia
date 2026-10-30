@@ -69,6 +69,9 @@ const NAV = [
   // 书籍详解（WORK-046）：按书读，和"按主题查"并列的第二条轴。
   // 不进 preferredNav —— 它靠组内排后，不靠身份推荐。
   { key: 'books' as const, group: 'knowledge' as const, to: '/books', label: '书籍详解', testId: 'learner-nav-books' },
+  // 源码精读（WORK-057）：读第三方项目源码的独立入口，和知识库浏览是两条路。
+  // 不进 preferredNav —— 与 books 同理，靠组内排位。
+  { key: 'source' as const, group: 'knowledge' as const, to: '/source', label: '源码精读', testId: 'learner-nav-source' },
   { key: 'graph' as const, group: 'knowledge' as const, to: '/graph', label: '知识图谱', testId: 'learner-nav-graph' },
   { key: 'notes' as const, group: 'knowledge' as const, to: '/notes', label: '我的笔记', testId: 'learner-nav-notes' },
   { key: 'sql-practice' as const, group: 'practice' as const, to: '/practice/sql', label: 'SQL 练习', testId: 'learner-nav-sql-practice' },

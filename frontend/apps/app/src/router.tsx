@@ -31,6 +31,9 @@ import { ResumeListPage, ResumeCreatePage } from './pages/ResumeListPage'
 import { ResumeOptimizePage } from './pages/ResumeOptimizePage'
 import { ResumePrintPage } from './pages/ResumePrintPage'
 import { SharedNotePage } from './pages/SharedNotePage'
+import { SourceChapterPage } from './pages/SourceChapterPage'
+import { SourceProjectPage } from './pages/SourceProjectPage'
+import { SourceProjectsPage } from './pages/SourceProjectsPage'
 
 /**
  * 使用 Hash 路由：桌面壳从自定义协议加载页面，基于浏览器历史的路径路由在那种来源下会失效。
@@ -119,6 +122,33 @@ export const router = createHashRouter([
     element: (
       <RequireAuth>
         <BookChaptersPage />
+      </RequireAuth>
+    ),
+  },
+
+  // 源码精读（WORK-057）：独立入口，读第三方项目。slug 与 entryId 都放在地址里，
+  // 与书籍详解同形；章节正文仍是知识库条目。
+  {
+    path: '/source',
+    element: (
+      <RequireAuth>
+        <SourceProjectsPage />
+      </RequireAuth>
+    ),
+  },
+  {
+    path: '/source/:project',
+    element: (
+      <RequireAuth>
+        <SourceProjectPage />
+      </RequireAuth>
+    ),
+  },
+  {
+    path: '/source/:project/:entryId',
+    element: (
+      <RequireAuth>
+        <SourceChapterPage />
       </RequireAuth>
     ),
   },

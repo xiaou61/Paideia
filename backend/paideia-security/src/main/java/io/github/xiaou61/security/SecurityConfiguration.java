@@ -232,7 +232,10 @@ public class SecurityConfiguration {
                                 "/workbox-*.js",
                                 "/registerSW.js",
                                 "/pwa-*.png",
-                                "/apple-touch-icon.png")
+                                "/apple-touch-icon.png",
+                                // 源码精读的静态快照（WORK-057）。只放 GET：它只是第三方
+                                // Apache-2.0 源码的副本，不含任何用户数据，与 /assets/** 同性质。
+                                "/source/**")
                         .permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(resourceServer -> resourceServer
