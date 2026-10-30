@@ -11,6 +11,23 @@ status: published
 
 **模板里的 `|` 不是 shell 管道，是"把左边作为最后一个参数传给右边"。** 这解释了两件事：为什么 `default` 的参数顺序反直觉，以及为什么有些函数在管道里"看起来不工作"。
 
+```sketch
+{
+  "title": "管道不是 shell 管道，是「塞到最后一个参数」",
+  "rows": [
+    [
+      { "id": "left", "title": "左边的值", "sub": "不是第一个参数", "tone": "gray" },
+      { "id": "pipe", "title": "|", "sub": "作为最后一个实参传过去", "tone": "blue" },
+      { "id": "why", "title": "所以 default 顺序反直觉", "sub": "默认值在前、值在后", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "left", "to": "pipe" },
+    { "from": "pipe", "to": "why" }
+  ]
+}
+```
+
 ## 管道到底是什么
 
 ```go

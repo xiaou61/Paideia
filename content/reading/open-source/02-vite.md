@@ -11,6 +11,23 @@ status: published
 
 **Vite 把"开发时"和"打包时"拆成两套东西**：开发时用浏览器原生 ESM 按需编译，打包时用 Rollup 做真正的打包。
 
+```sketch
+{
+  "title": "开发一套，打包另一套",
+  "rows": [
+    [
+      { "id": "dev", "title": "开发：浏览器原生 ESM", "sub": "改哪个文件编译哪个", "tone": "blue" },
+      { "id": "build", "title": "打包：Rollup", "sub": "真正摇树、分块、压缩", "tone": "blue" },
+      { "id": "why", "title": "所以开发热更新快", "sub": "但产物和开发时不是一条路", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "dev", "to": "build" },
+    { "from": "build", "to": "why" }
+  ]
+}
+```
+
 ## 它解决什么问题
 
 Webpack 时代的痛点是：**项目越大，`npm start` 越慢。** 一个中型项目启动要 30 秒到几分钟，改一行代码热更新又要等几秒。等待时间随着项目规模增长——这很荒诞：你只想改一个按钮的颜色，却要等整个应用重新构建。

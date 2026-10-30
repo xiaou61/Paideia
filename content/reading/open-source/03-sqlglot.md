@@ -11,6 +11,23 @@ status: published
 
 **SQLGlot 是一个纯 Python 的 SQL 解析器与转译器**：把 SQL 解析成语法树，你可以遍历、改写，再生成回 SQL——包括换成另一种方言。
 
+```sketch
+{
+  "title": "SQL 当成树来改，再生成回去",
+  "rows": [
+    [
+      { "id": "parse", "title": "解析成语法树", "sub": "不是字符串替换", "tone": "blue" },
+      { "id": "edit", "title": "遍历与改写节点", "sub": "按结构改，不怕格式", "tone": "blue" },
+      { "id": "gen", "title": "生成另一种方言", "sub": "同一棵树换输出", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "parse", "to": "edit" },
+    { "from": "edit", "to": "gen" }
+  ]
+}
+```
+
 ## 它解决什么问题
 
 只要你的系统要处理"用户写的 SQL"，就会撞上三类需求：

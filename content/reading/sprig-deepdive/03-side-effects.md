@@ -11,6 +11,23 @@ status: published
 
 **模板函数看起来是"纯函数"，但 Sprig 里有一批不是**：`now`、`randAlpha`、`uuidv4`、`env`、`getHostByName`。它们的共同点是——**同样的模板、同样的输入，输出会变**。这让"渲染结果可复现"这件事直接失效。
 
+```sketch
+{
+  "title": "有一批函数会让渲染结果不可复现",
+  "rows": [
+    [
+      { "id": "pure", "title": "纯函数", "sub": "同样输入，同样输出", "tone": "green" },
+      { "id": "impure", "title": "有副作用的函数", "sub": "now / rand / uuid / env", "tone": "amber" },
+      { "id": "cost", "title": "渲染不可复现", "sub": "排障与对比都变难", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "pure", "to": "impure" },
+    { "from": "impure", "to": "cost" }
+  ]
+}
+```
+
 ## 三类副作用
 
 ### 1. 读时钟：`now`、`date`、`ago`

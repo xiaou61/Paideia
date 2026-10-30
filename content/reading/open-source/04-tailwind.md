@@ -11,6 +11,23 @@ status: published
 
 **Tailwind 不提供组件，只提供"单一职责的工具类"**：`flex`、`p-4`、`text-sm` 各管一件事，你在 HTML 里把它们拼出来。
 
+```sketch
+{
+  "title": "不给组件，给一堆只管一件事的类",
+  "rows": [
+    [
+      { "id": "util", "title": "工具类", "sub": "flex / p-4 / text-sm", "tone": "blue" },
+      { "id": "compose", "title": "在 HTML 里拼", "sub": "样式跟着标记走", "tone": "blue" },
+      { "id": "cost", "title": "代价是类名很长", "sub": "换来的是没有命名负担", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "util", "to": "compose" },
+    { "from": "compose", "to": "cost" }
+  ]
+}
+```
+
 ## 它解决什么问题
 
 传统 CSS 的核心痛点是**命名与作用域**：

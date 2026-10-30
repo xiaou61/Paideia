@@ -11,6 +11,23 @@ status: published
 
 **模板的能力上限，应该等于"把数据排版成目标格式"，而不是"实现业务规则"。** 一旦你在模板里写条件分支处理业务语义，就已经走错了——Sprig 让这件事变得太容易，这才是它真正的风险。
 
+```sketch
+{
+  "title": "模板只负责排版，别往里塞业务",
+  "rows": [
+    [
+      { "id": "layout", "title": "排版", "sub": "字段摆在哪、怎么格式化", "tone": "green" },
+      { "id": "business", "title": "业务判断", "sub": "该不该显示、算不算通过", "tone": "amber" },
+      { "id": "risk", "title": "写进模板就没人测得动", "sub": "逻辑藏在字符串里", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "layout", "to": "business" },
+    { "from": "business", "to": "risk" }
+  ]
+}
+```
+
 ## 一个判断清单
 
 看到一个模板，用这四条问：

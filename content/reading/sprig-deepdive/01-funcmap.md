@@ -11,6 +11,23 @@ status: published
 
 **Go 模板引擎本身不认识任何函数（除了几个内建判断）；所有函数都来自一张 `FuncMap`——一个「名字 → 函数」的 map，在解析模板之前交给引擎。**
 
+```sketch
+{
+  "title": "模板里的函数，全靠一张表",
+  "rows": [
+    [
+      { "id": "map", "title": "FuncMap", "sub": "名字 → 函数", "tone": "blue" },
+      { "id": "inject", "title": "解析模板前交进去", "sub": "交晚了就认不出", "tone": "blue" },
+      { "id": "use", "title": "模板里按名字调", "sub": "引擎自己不认任何函数", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "map", "to": "inject" },
+    { "from": "inject", "to": "use" }
+  ]
+}
+```
+
 Sprig 的全部内容，就是一张很大的 `FuncMap`：
 
 ```go

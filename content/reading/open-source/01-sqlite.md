@@ -11,6 +11,23 @@ status: published
 
 **SQLite 不是一个"轻量版 MySQL"，而是一个库**：它没有服务端进程、没有网络协议，你的程序直接读写一个文件。
 
+```sketch
+{
+  "title": "它是库，不是服务",
+  "rows": [
+    [
+      { "id": "mysql", "title": "MySQL", "sub": "独立进程 + 网络协议", "tone": "gray" },
+      { "id": "sqlite", "title": "SQLite", "sub": "链接进你的程序", "tone": "blue" },
+      { "id": "file", "title": "直接读写一个文件", "sub": "所以没有账号、没有端口", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "mysql", "to": "sqlite" },
+    { "from": "sqlite", "to": "file" }
+  ]
+}
+```
+
 ## 它解决什么问题
 
 大部分应用并不需要独立的数据库进程。它们需要的是：**能存结构化数据、能写 SQL 查询、事务可靠、零运维。**
