@@ -25,7 +25,7 @@ verified_commit: 0f6e561
 | --- | --- |
 | 线上 | `codenest-online`（36.212.5.130:8081），JDK 25 / MySQL 8 |
 | 内容 | `mybatis/mybatis-3` @ `mybatis-3.5.19` = commit `ee0d4f48…`，Apache-2.0 |
-| 快照 | `/opt/paideia-app/web/source/mybatis-3.5.19/`（69 个 Java 文件 + LICENSE/NOTICE） |
+| 快照 | `/opt/paideia-app/web/source/mybatis-3.5.19/`（71 个 Java 文件 + LICENSE/NOTICE） |
 | 本机 | Windows / Git Bash；Playwright 1.64（浏览器 1223 以 junction 映射到 1248 路径） |
 
 ## 验收矩阵

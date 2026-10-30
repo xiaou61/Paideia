@@ -8821,7 +8821,7 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
     导航加「源码精读」，`GET /source/**` 静态放行（只 GET）。
   - 新围栏块 `source-walk`：整文件 + 绝对行区间 + 开关/分支（`visibleSteps` 纯函数）+
     状态三组 + 跨文件 refs + 预测；只从同源相对路径取文件。
-  - MyBatis 3.5.19 快照 70 个文件 + LICENSE/NOTICE/SOURCE.md。
+  - MyBatis 3.5.19 快照 71 个文件 + LICENSE/NOTICE/SOURCE.md。
   - 24 关内容（6 篇 × 4 关）：每章 1 个开关/分支、≥2 处预测、1 道排序/填空、每步有状态。
   - 删除旧「源码解读 / 读代码实战」：线上 7 条正文、分类 16/43、轨道 2 条；仓库内容源与首页卡一并删。
 - 验证：
