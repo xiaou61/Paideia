@@ -11,6 +11,23 @@ status: published
 
 LRU（Least Recently Used）：容量满了，淘汰**最久没被使用**的那个。难点不在"存"，在"最近使用"要被 `get` 和 `put` 同时更新——只用一个 `HashMap` 存得下所有 key，却完全不知道谁该走。
 
+```sketch
+{
+  "title": "LRU：哈希表定位，链表管顺序",
+  "rows": [
+    [
+      { "id": "map", "title": "HashMap", "sub": "key → 节点，O(1) 找到", "tone": "blue" },
+      { "id": "list", "title": "双向链表", "sub": "头部最新，尾部最旧", "tone": "blue" },
+      { "id": "evict", "title": "满了砍尾部", "sub": "get 与 put 都要挪到头部", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "map", "to": "list" },
+    { "from": "list", "to": "evict" }
+  ]
+}
+```
+
 **目标**：实现 `LRUCache`——构造时给容量；`get(key)` 不存在返回 `-1`；`put(key, value)` 在 key 已存在时只更新值并把它变成最近使用；容量超出时淘汰最久未使用的那个。
 
 你的文件固定叫 `Main.java`，所以缓存类写成 `Main` 的静态内部类 `Main.LRUCache`；测试入口 `TestMain.java` 是**只读**的，它直接 `new Main.LRUCache(...)`，逐条打印 `ok: <用例名>` 或 `fail: <用例名>`。
