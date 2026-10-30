@@ -11,6 +11,23 @@ status: published
 
 RAG（Retrieval-Augmented Generation）= **先检索资料，再把资料和问题一起交给模型生成**。
 
+```sketch
+{
+  "title": "RAG：先查，再一起交给模型",
+  "rows": [
+    [
+      { "id": "q", "title": "问题", "sub": "模型本来不知道", "tone": "gray" },
+      { "id": "ret", "title": "检索资料", "sub": "向量或关键词", "tone": "blue" },
+      { "id": "gen", "title": "资料 + 问题一起生成", "sub": "答案有出处可查", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "q", "to": "ret" },
+    { "from": "ret", "to": "gen" }
+  ]
+}
+```
+
 它解决的核心问题只有一个：**模型不知道你的私有数据，且不会因为对话而学会**。
 
 它没解决的问题：检索不到就还是会编；检索到了但资料本身错，也会照着错的说；多段资料冲突时不会自动裁决。

@@ -11,6 +11,23 @@ status: published
 
 模型不是按"字"处理文本，而是按 **token**。token 是词表里的一个片段，可能是一个字、一个词、半个词。
 
+```sketch
+{
+  "title": "计价和窗口都按 token 算",
+  "rows": [
+    [
+      { "id": "text", "title": "一段文本", "sub": "你看到的是字", "tone": "gray" },
+      { "id": "token", "title": "切成 token", "sub": "一个字 / 一个词 / 半个词", "tone": "blue" },
+      { "id": "cost", "title": "窗口与账单都按它算", "sub": "中文通常更费", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "text", "to": "token" },
+    { "from": "token", "to": "cost" }
+  ]
+}
+```
+
 三件事由它决定：
 
 1. **花多少钱**：计费按输入 + 输出 token 数；

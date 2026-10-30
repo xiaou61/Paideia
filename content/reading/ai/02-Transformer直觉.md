@@ -19,6 +19,23 @@ status: published
 
 ## 注意力解决的是什么问题
 
+```sketch
+{
+  "title": "直觉三句：变向量、看前文、猜下一个",
+  "rows": [
+    [
+      { "id": "vec", "title": "token 变向量", "sub": "表示它在这个语境里的意思", "tone": "gray" },
+      { "id": "attn", "title": "注意力看前面全部", "sub": "按相关程度加权", "tone": "blue" },
+      { "id": "next", "title": "预测下一个 token", "sub": "所以目标是「最像」不是「最对」", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "vec", "to": "attn" },
+    { "from": "attn", "to": "next" }
+  ]
+}
+```
+
 考虑这句话：
 
 > 小明把书放进背包，因为它太重了。
