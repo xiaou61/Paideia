@@ -202,8 +202,9 @@ def check_blocks(path: Path, body: str) -> None:
                     if not isinstance(answer, int) or not 0 <= answer < len(options[index]):
                         fail(path, f"动手块 {block_id}：answers[{index}] 越界")
         if kind == "run":
-            if data.get("language") not in ("java", "python"):
-                fail(path, f"动手块 {block_id}：run 的 language 只能是 java 或 python")
+            # spring 是 WORK-055 的小项目沙箱（一次编译整个 Maven 工程），shell 走独立端点不在这里
+            if data.get("language") not in ("java", "python", "spring"):
+                fail(path, f"动手块 {block_id}：run 的 language 只能是 java / python / spring")
             cases = data.get("cases")
             if not isinstance(cases, list) or not cases:
                 fail(path, f"动手块 {block_id}：run 至少要一个用例")

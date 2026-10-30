@@ -25,6 +25,23 @@ status: published
 改完点运行：容器会编译整个项目、起一次 Spring 上下文、打一次真实的 HTTP 请求。
 两条测试全绿就算过。失败时输出里会点名是哪一条没过。
 
+```sketch
+{
+  "title": "判分是真跑一遍：编译、起上下文、发请求",
+  "rows": [
+    [
+      { "id": "compile", "title": "编译整个项目", "sub": "改的类先要能过", "tone": "gray" },
+      { "id": "ctx", "title": "起一次上下文", "sub": "Bean 都装起来", "tone": "blue" },
+      { "id": "http", "title": "真的发一次请求", "sub": "/hello/zoe 看返回", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "compile", "to": "ctx" },
+    { "from": "ctx", "to": "http" }
+  ]
+}
+```
+
 ```code-challenge
 {
   "id": "sp-project-01",
