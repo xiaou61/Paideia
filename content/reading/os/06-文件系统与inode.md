@@ -11,6 +11,23 @@ status: published
 
 **文件由两部分组成：inode 和名字。名字不是文件本身。**
 
+```sketch
+{
+  "title": "名字是目录里的一条记录",
+  "rows": [
+    [
+      { "id": "name", "title": "名字", "sub": "目录里的一行", "tone": "gray" },
+      { "id": "inode", "title": "inode", "sub": "大小、权限、数据块位置", "tone": "blue" },
+      { "id": "unlink", "title": "删名字不等于删数据", "sub": "还有进程开着就还在", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "name", "to": "inode" },
+    { "from": "inode", "to": "unlink" }
+  ]
+}
+```
+
 - **inode** 存文件的元数据和数据块位置：多大、谁拥有、什么权限、改过几次、数据在磁盘的哪几块。它有一个编号，全文件系统唯一。
 - **目录项**（directory entry）是目录这个特殊文件里的一行，内容是"名字 → inode 编号"。你看到的文件名，只存在目录里，不在 inode 里。
 
