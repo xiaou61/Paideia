@@ -8763,3 +8763,167 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：回读 frontmatter：approved_by=xiaou61，1 个工件同批签署
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
+
+## 2026-10-30 17:50 +0800 · 内容 · Spring 从零线 20 课补 38 张手绘图并发布
+
+- 类型：docs（内容发布）
+- 变更：按"每篇 2–3 张、只放在有流程/结构的位置"的密度，给 `content/courses/spring/01..20` 补了 38 张 sketch：
+  HTTP 文本本质、启动注解三合一、三层与其判据、事务圈在 Service、四类参数注解、参数名擦除、状态码语义、
+  全 200 反模式、容器两个能力、接口当键、BeanDefinition 与延迟初始化、循环依赖与三级缓存、四种作用域、
+  逆序销毁、自动配置清单+条件、starter 两件套、代理边界与三种失效、AOP 五种通知、事务切面四步与两种根因、
+  异常映射表、校验与业务分界、JSON 转换链与双向关联、请求穿层顺序、404 无异常、配置优先级与宽松绑定、
+  连接池借还、N+1、mapper 代理、#{} 与 ${}、测试装载范围、启动检查链、部署成功三条。
+- 验证：`check_sketch` 38 张 0 问题；`verify_course.py --no-run` 21 个文件通过；线上导入 `updated 20`（`created 0`）；
+  线上截图核对两页（12 事务、07 循环依赖的回环箭头）渲染正常。
+- 踩到并修掉的一处：有一处用 Edit 把表格最后一行的锚点替换成了图，会把表格行吞掉——已补回。
+- 未做：`spring-boot-project`（2 篇）与 `spring-handmade`（6 篇）还没画；阅读线 236 篇仍是 0 张。
+- 本地提交：一笔；已 push
+
+## 2026-10-30 · WORK-058 · 起草 requirements.md（draft，未签）
+
+- 类型：docs（立项）
+- 变更：新建 `.agent/changes/WORK-058-助手对象化/requirements.md`（draft）。
+  项目定位：把助手的输入/输出统一到"对象附件（URI）"上，替掉"每种页面一种 PageContext kind"的做法；
+  一期铺 4 个页面（条目/关卡/笔记/复习），工具侧只加可选 `uri` 参数，写动作补确认闸。
+- 依据：本轮实测 32 条路由 / 上下文集只接在 3 处 / `PageContext` 2 种 kind /
+  `MAX_PAGE_CONTEXT_CHARS=4000` / 4 个学习者侧写工具无确认闸；调研 Continue、MCP Resources、
+  Obsidian Copilot、Moodle 4.5 四个来源（2026-10-30 联网核实）。
+- 验证：未做代码验证（工件阶段）；编号按 `.agent/changes` 现有最大号 +1 取 058，本机无 `brief` CLI 可核。
+- 本地提交：未提交
+- 远端推送：未执行
+
+## 2026-10-30 14:55:31 +0800 · WORK-058 · 签署 .agent/changes/WORK-058-助手对象化/requirements.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-058-助手对象化/requirements.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-058-助手对象化/requirements.md
+- 验证：回读 frontmatter：approved_by=xiaou61，1 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-10-30 18:40 +0800 · 内容 · 阅读线开工：Redis 与 Git 两条线补 19 张图
+
+- 类型：docs（内容发布）
+- 变更：按"每篇 1–2 张、贴在结论段或对应小节"的密度：
+  - Redis 8 篇 9 张：快的原因三条、单线程不等于原子、五种类型按操作选、过期不是定时器、RDB/AOF 丢多少、
+    穿透击穿雪崩、锁三条件、三种部署形态、四类线上故障；
+  - Git 7 篇 10 张：提交三层、三区、分支是指针、切分支不带改动、merge vs rebase、rebase 逐轮冲突、
+    撤销三命令、revert 是加一笔、force push 改别人历史、reflog 救援。
+- 验证：`check_sketch` 两条线 9 / 10 张 0 问题；线上导入 `updated 8 / 7`（`created 0`）。
+- 发现：`verify_course.py` 对阅读线不适用（它要求 code-challenge 与 quiz，是课程门禁）——阅读线只能用
+  `check_sketch` + 导入脚本自检，不要拿 verify_course 的红当作内容坏了。
+- 未做：`spring-boot-project` 的 01 关仍缺 quiz 块（verify_course 报的，既有问题，未处理）。
+- 本地提交：一笔；已 push
+
+## 2026-10-30 19:05 +0800 · 内容 · JVM 线 6 篇补图并发布
+
+- 类型：docs（内容发布）
+- 变更：JVM 线 6 篇各 1 张：OOM 四种形态指向哪块内存、GC 选型先看三个指标、GC 日志两个问题、
+  泄漏的引用链形状、jstack 快照、JIT 投机优化与去优化。
+- 同时修：spring 12 那张"四种失效两种根因"有三框一排、两条箭头都指向最后一框会跨框，改为无箭头。
+- 验证：`check_sketch` 6 张 0 问题；线上导入 `updated 6`，修完后 `updated 1`。
+- 踩到：`Direct buffer memory` 与 `unable to create native thread` 两个标题超 16 字上限，先导上线才被
+  `check_sketch` 抓出来——**导入前必须先跑 check**，否则线上会显示"格式有误"降级块。
+- 本地提交：一笔；已 push
+
+## 2026-10-30 19:35 +0800 · 内容 · 架构阅读线 10 篇补图并发布
+
+- 类型：docs（内容发布）
+- 变更：架构线 01–10 各 1 张：边界按改动原因划、模块=数据+用例+可替换实现、端口与适配器、
+  事务边界=不变式边界、解耦 vs 异步、横切放哪、可观测性三问、演进两条铁律、拓扑三件事、评审五问。
+- 验证：`check_sketch` 10 张 0 问题；线上导入 `updated 10`。
+- 进度：本次会话累计新增 81 张（spring 38、手写线 7、项目线 1、Redis 9、Git 10、JVM 6、架构 10）。
+- 未做：阅读线还剩 203 篇（docker 21、linux-from-zero 20、agents 15、network 11 等 22 条线）。
+- 本地提交：一笔；已 push
+
+## 2026-10-30 20:10 +0800 · 内容 · Docker 阅读线 20 篇补 20 张图并发布
+
+- 类型：docs（内容发布）
+- 变更：docker 01–20 各 1 张：容器是被隔离的进程、run 做四件事、镜像分层共用、指令顺序决定缓存、
+  可写层与卷、容器各自 localhost、Compose 收命令、镜像名三段、资源/重启/日志三件套、排查顺序、
+  构建→打包→编排三段、最坏能到什么程度、多阶段构建、缓存失效链、healthcheck 与启动顺序、
+  容器里 JVM 的堆≠上限、焊死容器的参数、tag vs digest、stdout 与日志轮转、编排解决三件事。
+- 验证：`check_sketch` 20 张 0 问题（其中 11 的 `compose 起 app + mysql` 超 16 字，改短后重导 `updated 1`）；
+  线上导入 `updated 20`。
+- 教训：校验与导入不能写在同一条 `&&` 里——这一轮和上一轮都是"先导上线、才被 check 抓到"。
+- 进度：本次会话累计新增 101 张；阅读线还剩 183 篇（linux-from-zero 20、agents 15、network 11 等 21 条线）。
+- 本地提交：一笔；已 push
+
+## 2026-10-30 20:55 +0800 · 内容 · Linux 从零线 19 篇补 19 张图并发布
+
+- 类型：docs（内容发布）
+- 变更：linux-from-zero 01–19 各 1 张：提示符三件事、一根目录树、cp 覆盖与 rm 无回收站、九个权限位、用户组与 sudo/su、
+  重定向顺序、grep/sed/awk 分工、负载高 CPU 低、-15 vs -9、PATH 从哪来、装两份跑旧的、nohup 到 systemd、
+  日志三个来源、三种满、连不上三层、SSH 四件事、脚本错后仍继续、cron vs timer、交付五条。
+- 验证：`check_sketch` 19 张 0 问题；线上导入 `updated 19`。
+- 插曲：commit 撞上 `.git/index.lock`（另一会话正在跑 git），等 10 秒锁释放后重试成功，没有手删锁文件。
+- 进度：本次会话累计新增 120 张；阅读线还剩约 160 篇（agents 15、network 11、ops 10 等 23 条线）。
+- 本地提交：一笔；已 push（`13b1aae..5e0c4e3`）
+
+## 2026-10-30 21:40 +0800 · 内容 · Agent 与网络两条线补 24 张图并发布
+
+- 类型：docs（内容发布）
+- 变更：
+  - Agent 线 01–14 各 1 张：Agent 的分界线、提示词八成、ReAct 回环、模型只出文本、API 无状态、
+    RAG 先查再塞、上下文工程、多智能体的代价、框架包同一个循环、流式先给一段、成本是乘法、
+    固定用例集评测、权限不在提示词里、排障四问；
+  - 网络线 01–10 各 1 张：首字节前四段等待、分层是排查工具、分层查表、三次握手对齐序号、
+    四次挥手与 TIME_WAIT、HTTP 报文四块、复用三级台阶、抓包对时间线、TLS 的位置、中间每一跳。
+- 验证：`check_sketch` 14 / 10 张 0 问题（agents 09 有一处标题超 16 字，改短）；线上导入 `updated 14 / 10`。
+- 进度：本次会话累计新增 144 张；内容内共约 205 张。阅读线还剩约 136 篇。
+- 本地提交：两笔；已 push（`5e0c4e3..6ed429b`）
+
+## 2026-10-30 22:50 +0800 · 内容 · 运维 / 设计模式 / 操作系统三条线补 23 张图并发布
+
+- 类型：docs（内容发布）
+- 变更：
+  - ops 01–09 各 1 张：404 与 502 的分界、证书/分流/限流、unit 关键几行、回滚前提是旧的还在、
+    备份只在恢复时体现价值、告警只对用户感知、五层排障顺序、K8s 最小闭环、Pod 状态名；
+  - patterns 01–07 各 1 张：三个引入信号、创建型藏细节、结构型包一层、三种坏味道对三个模式、
+    框架把模式藏进注解、模式是重构结果、把模式当风格就是过度设计；
+  - os 01–07 各 1 张：进程资源单位/线程调度单位、虚拟地址与页表、CPU 占用不区分算/等/切、
+    死锁与竞态、write 不等于落盘、inode 与名字、系统调用是受控入口。
+- 验证：`check_sketch` 9 / 7 / 7 张全 0 问题；线上导入 `updated 9 / 7 / 7`。
+- 进度：本次会话累计新增 167 张；阅读线还剩约 110 篇（algorithms 9、engineering 9、spring 9 等）。
+- 本地提交：三笔；已 push（`6ed429b..`）
+
+## 2026-10-30 23:50 +0800 · 内容 · 算法/并发/系统设计/Spring深入/Linux排障/AI 六条线补 41 张图
+
+- 类型：docs（内容发布）
+- 变更：algorithms 8、concurrency 6、system-design 6、spring(reading) 8、linux 7、ai 6，各 1 张；
+  全部先跑 `check_sketch` 再导入，线上 `updated` 合计 41（`created 0`）。
+- 判断：engineering 线 9 篇已有 11 张 mermaid，**不重复加手绘图**（同一套流程换风格画一遍等于装饰）。
+- 进度：本次会话累计新增 208 张；剩余约 52 篇（java-project 6、sql-practice 6、books-* 18、source 2 等）。
+- 本地提交：六笔；已 push（`b7126c8..063cb02`）
+
+## 2026-10-30 · WORK-058 · 一期实现：对象附件与四页接入
+
+- 类型：implementation
+- 变更（工作树 `.worktrees/assistant-objects`，分支 `feat/assistant-objects`）：
+  新增 `attachments.ts`（URI 规范 + 附件栈 + 序列化）与 `<Attach>` 组件；`context.tsx` 加附件状态与
+  `revealSeq`；面板显示附件条并随 `pageContext` 一起发送；四页接入（条目正文选区 / 关卡地图 /
+  笔记含草稿 / 到期复习）；注入边界措辞收口到 `ConversationPrompt` 并升到 `assistant-chat-v2`。
+- 决策：传输仍走一段文本（不改 DTO/SSE）；附件 5 条上限、单条 600 字符；附着即打开面板但不发送；
+  不建 AI 对象表，URI 只做标识。
+- 依据：`requirements.md`（已签）+ `proposal.md` / `design.md` / `tasks.md`（draft）；
+  实测现状 32 条路由 / AI 交互 ≤8 条 / 上下文只接在 3 处。
+- 验证：assistant 包 55 tests passed；`@paideia/app` typecheck 通过；`ConversationPromptTest` 3/3
+  （独占库 `paideia_run_1030150424_17039`，已删）；`learn.spec.ts` 9/9；全量桌面+mobile 一轮
+  128 passed / 4 skipped / 6 failed——4 条失败是每日速递在**空库**上没有日期数据（与本改动无关），
+  1 条 `source-reading` 练习题为既有状态问题，1 条是本轮新用例（面板浮层挡住第二次点击）已修复后单跑通过。
+- 已知缺口（未做）：`@` 选择器、回复引用可点、工具入参吃 URI、写动作确认闸、附件 URI 落 `ai_runs.attrs`。
+- 本地提交：`572c4bf`（工作树内；**未合并到 master**）
+- 远端推送：未执行
+
+## 2026-10-31 00:40 +0800 · 内容 · 剩余阅读线（项目/练习/源码/开源/Sprig/书籍/计费）补 33 张图
+
+- 类型：docs（内容发布）
+- 变更：java-project 5、sql-practice 5、code-reading 4、java-debug 4、open-source 4、sprig-deepdive 4、
+  books-clean-code 3、books-ddia 3、books-man-month 4、books-thinking 4、source 1。
+- 踩到两处：
+  1. `sql-practice` 第一次导入 `fetch failed`，重跑成功（`updated 5`），提交已在失败之后完成——**导入失败要单独重试**；
+  2. 四个 books 线声明了 `line_parent=books`，导入必须带 `--no-track`，不带会直接拒绝（脚本给的原因很清楚）。
+- 判断：`engineering` 9 篇已有 11 张 mermaid，不加手绘图；`source/00-React并发渲染入口` 正文是空的（草稿），跳过。
+- 进度：**阅读线除 engineering 与一篇草稿外全部覆盖**。本次会话累计新增约 246 张。
+- 本地提交：多笔；已 push
