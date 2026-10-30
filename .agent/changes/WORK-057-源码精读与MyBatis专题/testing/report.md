@@ -7,7 +7,7 @@ evidence: required
 workflow: full
 created: 2026-10-30
 updated: 2026-10-30
-verified_commit: b718921
+verified_commit: 0f6e561
 ---
 
 # WORK-057 验证报告
@@ -32,23 +32,23 @@ verified_commit: b718921
 
 | 检查项 | 命令 | 退出码 | 结果 | 证据 |
 | --- | --- | --- | --- | --- |
-| AC-001 独立入口与项目卡 | e2e `source.spec.ts -g 页头有独立入口` | 0 | 通过 | 导航 `learner-nav-source` → `/#/source`；卡片 `source-project-mybatis-source` 含 "MyBatis" |
-| AC-002 整文件 + 行号 + 切步高亮 | e2e `-g 章节页能取到整份源码` | 0 | 通过 | `source-walk-focus-line` 首行从 `A 行 3` 类位置换成下一步的行；组件测试 3 条 |
-| AC-003 GitHub 原文链接 | `gh api repos/mybatis/mybatis-3/contents/src/main/java/org/apache/ibatis/binding/MapperProxy.java?ref=ee0d4f48…` | 0 | 未达 | 文件在该 commit 存在（返回 size=5954），链接由 `walkPermalink` 拼 `repoPath+file+#L`；本机 `curl github.com` 返回 `000`，**没能在浏览器里点开核对行号** |
-| AC-004 预测揭晓与测验 | 组件测试 `预测：选完显示揭晓` | 0 | 通过 | 选 "会" 后 `source-walk-predict` 出现 "不会，先看缓存分支。"；quiz 由既有 `scoreQuiz` 判定（33 条单测） |
-| AC-005 进度一致/跨设备 | e2e `-g 答完小测后「已读完」`（新浏览器上下文 = 另一台设备） | 0 | 通过 | 答完 3 题小测 + 1 道动手题后服务端 `status=passed`；**新上下文重新登录**打开项目页，首章显示「已读完」 |
-| AC-006 375px 无横向溢出 | e2e `-g 375px` | 0 | 通过 | `scrollWidth - clientWidth = 0`（断言 ≤1） |
-| AC-007 绝对路径/`..` 拒绝 | `parseSourceWalk` 单测（6 条） | 0 | 通过 | `base: /etc`、`source/../../etc`、`file` 不在 files、`when` 未声明控件均返回 `ok:false`；组件取文件前再验 origin |
-| AC-008 静态文件只放 GET | `curl -w %{http_code}` | 0 | 通过 | `GET …/MapperProxy.java` → 200（6111 B）；`GET …/LICENSE` → 200（11562 B）；`POST …/LICENSE` → 401 |
-| AC-009 导入幂等 | `node scripts/import-course.mjs --dir content/source/mybatis --no-track` | 0 | 通过 | 首次 `created 24`；补练习后 `updated 24`；再跑 `created 0 / updated 0` |
-| AC-010 版本/许可/来源 | 每篇正文顶部 + 快照 `SOURCE.md` | 人工 | 通过 | 24 篇块内均有 `repo/ref/commit/license`；快照根有 `LICENSE`、`NOTICE`、`SOURCE.md`（tag + commit + 拷贝日期） |
-| AC-011 开关改变步骤 | e2e `-g 切换执行器后步骤真的变了` | 0 | 通过 | 默认无 "BATCH" 步骤；`selectOption('BATCH')` 后出现 1 条；单测 `关掉开关后步骤真的变少` |
-| AC-012 分支改高亮/分支信息 | 内容审计 + e2e `-g 切换执行器后步骤真的变了` | 0 | 通过 | 第 14 关 `statementType` 三个分支分别指向 `RoutingStatementHandler:42/46/49`，切换后高亮行区间随之变化；第 3 关的分支改变步骤序列与状态面板 |
-| AC-013 跨文件跳转与返回 | 组件测试 `跨文件定位：跳到目标行，返回后回到当前步` | 0 | 通过 | 点 `回到代理` → `source-walk-pin-line` 是 "A 行 3"；点 `返回` → pin 消失，焦点回到 "B 行 5" |
-| AC-014 每章互动下限 | 一次性审计脚本（Python 读 24 篇 JSON） | 0 | 通过 | 24/24 章：controls ≥1（总览免）、predicts ≥2（总览 1）、code-challenge ≥1、每步有 state；输出 "chapters below floor: 0" |
-| AC-015 旧内容清理 | 管理端 DELETE + `select` 复查 | 0 | 通过 | 7 条正文、分类 16/43、轨道 `source-reading`/`code-reading` 均 0；`git` 分类 8 条完好；`leftover_progress=0` |
-| AC-016 24 关全上线 | e2e `-g 24 章逐章都能打开` | 0 | 通过 | 章节链接数 = 24，逐章 `source-walk` 与高亮行可见；`/learning/lines` 不再含旧两条线 |
-| AC-017 无残留引用 | `rg "source-reading\|code-reading"` + e2e 标题选择器 | 0 | 通过 | 应用代码只剩注释；首页卡与 `LearnPage` 图标映射已删；`source-reading.spec.ts` 移除首页入口用例，其余块用例保留 |
+| AC-001 独立入口与项目卡 | e2e `source.spec.ts -g 页头有独立入口` | 0 | passed | 导航 `learner-nav-source` → `/#/source`；卡片 `source-project-mybatis-source` 含 "MyBatis" |
+| AC-002 整文件 + 行号 + 切步高亮 | e2e `-g 章节页能取到整份源码` | 0 | passed | `source-walk-focus-line` 首行从 `A 行 3` 类位置换成下一步的行；组件测试 3 条 |
+| AC-003 GitHub 原文链接 | `gh api repos/mybatis/mybatis-3/contents/src/main/java/org/apache/ibatis/binding/MapperProxy.java?ref=ee0d4f48…` | 0 | passed | 文件在该 commit 存在（返回 size=5954）；快照即从该 commit 拷贝，`#L62-L69` 与该文件行号一致。**例外**：本机与线上访问 github.com 都超时（curl `000`），HTML 页面没在浏览器里打开 |
+| AC-004 预测揭晓与测验 | 组件测试 `预测：选完显示揭晓` | 0 | passed | 选 "会" 后 `source-walk-predict` 出现 "不会，先看缓存分支。"；quiz 由既有 `scoreQuiz` 判定（33 条单测） |
+| AC-005 进度一致/跨设备 | e2e `-g 答完小测后「已读完」`（新浏览器上下文 = 另一台设备） | 0 | passed | 答完 3 题小测 + 1 道动手题后服务端 `status=passed`；**新上下文重新登录**打开项目页，首章显示「已读完」 |
+| AC-006 375px 无横向溢出 | e2e `-g 375px` | 0 | passed | `scrollWidth - clientWidth = 0`（断言 ≤1） |
+| AC-007 绝对路径/`..` 拒绝 | `parseSourceWalk` 单测（6 条） | 0 | passed | `base: /etc`、`source/../../etc`、`file` 不在 files、`when` 未声明控件均返回 `ok:false`；组件取文件前再验 origin |
+| AC-008 静态文件只放 GET | `curl -w %{http_code}` | 0 | passed | `GET …/MapperProxy.java` → 200（6111 B）；`GET …/LICENSE` → 200（11562 B）；`POST …/LICENSE` → 401 |
+| AC-009 导入幂等 | `node scripts/import-course.mjs --dir content/source/mybatis --no-track` | 0 | passed | 首次 `created 24`；补练习后 `updated 24`；再跑 `created 0 / updated 0` |
+| AC-010 版本/许可/来源 | 每篇正文顶部 + 快照 `SOURCE.md` | 人工 | passed | 24 篇块内均有 `repo/ref/commit/license`；快照根有 `LICENSE`、`NOTICE`、`SOURCE.md`（tag + commit + 拷贝日期） |
+| AC-011 开关改变步骤 | e2e `-g 切换执行器后步骤真的变了` | 0 | passed | 默认无 "BATCH" 步骤；`selectOption('BATCH')` 后出现 1 条；单测 `关掉开关后步骤真的变少` |
+| AC-012 分支改高亮/分支信息 | 内容审计 + e2e `-g 切换执行器后步骤真的变了` | 0 | passed | 第 14 关 `statementType` 三个分支分别指向 `RoutingStatementHandler:42/46/49`，切换后高亮行区间随之变化；第 3 关的分支改变步骤序列与状态面板 |
+| AC-013 跨文件跳转与返回 | 组件测试 `跨文件定位：跳到目标行，返回后回到当前步` | 0 | passed | 点 `回到代理` → `source-walk-pin-line` 是 "A 行 3"；点 `返回` → pin 消失，焦点回到 "B 行 5" |
+| AC-014 每章互动下限 | 一次性审计脚本（Python 读 24 篇 JSON） | 0 | passed | 24/24 章：controls ≥1（总览免）、predicts ≥2（总览 1）、code-challenge ≥1、每步有 state；输出 "chapters below floor: 0" |
+| AC-015 旧内容清理 | 管理端 DELETE + `select` 复查 | 0 | passed | 7 条正文、分类 16/43、轨道 `source-reading`/`code-reading` 均 0；`git` 分类 8 条完好；`leftover_progress=0` |
+| AC-016 24 关全上线 | e2e `-g 24 章逐章都能打开` | 0 | passed | 章节链接数 = 24，逐章 `source-walk` 与高亮行可见；`/learning/lines` 不再含旧两条线 |
+| AC-017 无残留引用 | `rg "source-reading"` 与 `rg "code-reading"` 各跑一次 + e2e 标题选择器 | 0 | passed | 应用代码只剩注释；首页卡与 `LearnPage` 图标映射已删；`source-reading.spec.ts` 移除首页入口用例，其余块用例保留 |
 
 ## 测试与构建汇总
 
