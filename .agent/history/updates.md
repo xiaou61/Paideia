@@ -9179,3 +9179,31 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 状态：WORK-058 `phase=completed / state=complete`，四件工件 + 测试报告全部 approved。
 - 本地提交：见下一次提交
 - 远端推送：未执行
+
+## 2026-11-01 11:05:33 +0800 · WORK-055 · 登记业务验收 .agent/changes/WORK-055-SpringBoot小项目沙箱真跑/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-055-SpringBoot小项目沙箱真跑/testing/report.md
+- 决策：审批人 xiaou61；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-055-SpringBoot小项目沙箱真跑/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-11-01 · WORK-055 结项（3 关上线 + 骨架入库 + 线上验收）
+
+- 类型：implementation
+- 内容：新增第 2 关「让接口返回 JSON」（record 序列化）、第 3 关「空名字要回 400」（`@ExceptionHandler`）；
+  第 1 关补 `<details>` 参考实现（原来学习者看不到答案）。
+- 骨架：`/opt/skeleton` 只存在于镜像 `paideia-spring:3`，仓库没有副本 → 捞回
+  `scripts/spring-project-skeleton/`，README 写明"改它必须重建镜像并同步 `sandbox.spring-image`"。
+- 校验：`scripts/verify_spring_project.py` 每关跑 starter 与参考实现（真 `mvn test`），
+  **starter 必编译通过但测试失败、参考实现必全绿**。本地 3 关全过。
+- 线上验收：导入内容（created 2 / updated 1，轨道 3 关）→ 沙箱 API 3 关 × 2 次
+  （参考实现 exit=0 / 15.2–17.9 秒；starter exit=1 并点名失败）→ 浏览器打开第 3 关，
+  CodeMirror 挂载、运行按钮可用、点运行返回 ✗ 与期望/实际。`DockerCommandTest` 21/21。
+- 踩坑：`TestRestTemplate` 把字符串 URL 当 URI 模板，`%20` 不解码 → 测试里改 `URI.create`；
+  第 2 关 `letters` 曾写 8（"hello zoe" 是 9），被验证脚本当场抓出。
+- 部署：`release.ps1` 189.1 秒（含前端 73.5s，master 带到 db295fc）。
+- 状态：WORK-055 `phase=completed / state=complete`，7/7 任务。
+- 未达：1 核 27 秒基线未复测（线上 2 核）；并发争用未测。

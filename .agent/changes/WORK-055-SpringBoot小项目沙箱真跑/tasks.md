@@ -78,21 +78,25 @@ approver_role: CTO
 - 测试：`schema.test.ts` / `blocks.test.tsx`
 - 验证：`pnpm --filter @paideia/ui test`
 
-### TASK-006 | in_progress | 内容 3 关 + 校验脚本
+### TASK-006 | done | 内容 3 关 + 校验脚本
 
 - 对应：`REQ-006`、`REQ-007`
 - 依赖：TASK-004、TASK-005
 - 新建：`content/courses/spring-boot-project/`（总览 + 3 关）、`scripts/verify_spring_project.py`
 - 验证：`verify_spring_project.py`（starter 必不绿、参考解必全绿）
-- 进度：第 1 关已完成并线上验过（正确实现 exit=0 / 15.1 秒；starter exit=1 且点名两条失败）。
-  第 2、3 关与校验脚本未做。
+- 进度：3 关全部完成。第 2 关「让接口返回 JSON」（record 序列化）、第 3 关「空名字要回 400」
+  （`@ExceptionHandler` → 400）；`scripts/verify_spring_project.py` 每关跑 starter 与 `<details>` 参考实现，
+  **starter 必编译通过但测试失败、参考实现必全绿**。骨架已从镜像捞回 `scripts/spring-project-skeleton/`。
+- 实测：本地 3 关 × 2 次全过；starter 失败原因分别是 2 failures / 2 errors / 1 failure。
 
-### TASK-007 | pending | 上线与验收记录
+### TASK-007 | done | 上线与验收记录
 
 - 对应：`AC-001`…`AC-007`
 - 依赖：全部
 - 修改：`testing/report.md`
 - 验证：线上 3 关各跑一次，记录耗时与判分
+- 进度：已完成。线上 API 3 关 × 2 次（参考实现 exit=0 / 15.2–17.9 秒；starter exit=1 并点名失败）；
+  浏览器里第 3 关 CodeMirror 挂载、运行按钮可用、点运行返回 ✗ 与期望/实际。报告见 `testing/report.md`。
 
 ## 完成条件
 
