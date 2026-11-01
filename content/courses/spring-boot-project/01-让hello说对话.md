@@ -70,3 +70,19 @@ status: published
 
 - `String.trim()` 去首尾空白；`toLowerCase()` 转小写——组合起来是链式调用；
 - 别在 `HelloController` 里改：那一层只负责把路径变量传下来，问题在 `Greeter`。
+
+<details>
+<summary>参考实现（先自己写，再对答案）</summary>
+
+```java
+package demo;
+
+public class Greeter {
+
+    public String greet(String name) {
+        return "hello " + name.trim().toLowerCase();
+    }
+}
+```
+
+</details>
