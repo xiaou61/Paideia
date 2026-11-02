@@ -31,6 +31,9 @@ class AiUserDeletionListener {
             {"ai_memories_text", "user_id"},
             // 候选（WORK-050）：待确认的提议也是这个人的数据，注销一并删
             {"ai_memory_candidates", "user_id"},
+            // 整理任务行（WORK-061）：待重试的切片边界也是这个人的数据；留着等于"注销后
+            // 中继还在替他重试整理"，既没意义也不对
+            {"ai_memory_extraction_jobs", "user_id"},
             // 三个开关（WORK-013）：注销就该一并消失，留着一行等于"这个人还在这里有个偏好"
             {"ai_user_settings", "user_id"},
             // 面试评估（WORK-010）：这个人留下的评分与弱项，注销就该一起消失

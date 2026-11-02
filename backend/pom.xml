@@ -29,6 +29,7 @@
     <module>paideia-ai</module>
     <module>paideia-sandbox</module>
     <module>paideia-mcp</module>
+    <module>paideia-ops</module>
     <module>paideia-app</module>
   </modules>
 
@@ -85,6 +86,11 @@
       <dependency>
         <groupId>io.github.xiaou61</groupId>
         <artifactId>paideia-mcp</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.github.xiaou61</groupId>
+        <artifactId>paideia-ops</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

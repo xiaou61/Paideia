@@ -1,6 +1,6 @@
 package io.github.xiaou61.ai.internal.web;
 
-import io.github.xiaou61.ai.SummaryVisibility;
+import io.github.xiaou61.ai.internal.summary.SummaryVisibility;
 import io.github.xiaou61.ai.internal.summary.SummaryService;
 import io.github.xiaou61.platform.ApiAccess;
 import io.github.xiaou61.platform.ApiResponse;

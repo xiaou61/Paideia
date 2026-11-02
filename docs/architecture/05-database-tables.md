@@ -6,8 +6,8 @@
 
 # 数据库表
 
-由 `backend/paideia-app/src/main/resources/db/migration/` 的 44 个迁移生成：
-共 **61 张表**，其中只有 **14 条外键**。
+由 `backend/paideia-app/src/main/resources/db/migration/` 的 45 个迁移生成：
+共 **62 张表**，其中只有 **14 条外键**。
 
 外键少是**刻意的**，不是遗漏：跨模块的关联（比如 `ai_memories_structured.user_id` → `users.id`）
 由应用层保证，不交给数据库。所以下面这张图只画**有真实外键约束**的关系，
@@ -55,6 +55,7 @@ flowchart LR
 | `ai_memories_structured` | `V6__create_memory_tables` | （无） |
 | `ai_memories_text` | `V6__create_memory_tables` | （无） |
 | `ai_memory_candidates` | `V20261028150000__memory_relevance_candidates_and_ttl` | （无） |
+| `ai_memory_extraction_jobs` | `V20261102200000__create_memory_extraction_jobs` | （无） |
 | `ai_messages` | `V5__create_assistant_tables` | （无） |
 | `ai_model_credentials` | `V4__create_ai_tables` | （无） |
 | `ai_run_payloads` | `V20261021181500__create_ai_run_payloads` | （无） |

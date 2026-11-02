@@ -13,7 +13,6 @@ import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.Model;
 import io.agentscope.core.model.ToolSchema;
 import io.agentscope.core.message.ToolResultMessage;
-import io.github.xiaou61.ai.AssistantAnswerer;
 import io.github.xiaou61.ai.Harness;
 import io.github.xiaou61.ai.ModelAccess;
 import io.github.xiaou61.ai.TokenUsage;

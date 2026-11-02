@@ -9438,4 +9438,77 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 依据：.agent/changes/WORK-062-重复代码收敛与共享工具提取/requirements.md、.agent/changes/WORK-062-重复代码收敛与共享工具提取/proposal.md、.agent/changes/WORK-062-重复代码收敛与共享工具提取/design.md、.agent/changes/WORK-062-重复代码收敛与共享工具提取/tasks.md
 - 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
 - 本地提交：待用户授权/未提交
+## 2026-11-02 19:05 +0800 · WORK-061 · TASK-001 守卫进入第二切片（首跑抓到既有缺陷）
+
+- 类型：implementation
+- 变更：`AGENTS.md` 第二切片命令加入 `ApiSurfaceTest,ApiContractTest,AuthorizationIsolationTest`（注记改为实测 66 秒 / 35 条；两条切片补「必须在 backend 目录下跑」说明——test-db.sh 带命令参数时不自己切目录）；`ApiAccess.Access` 新增 `LOCAL_ONLY` 级别；`OpsHookController` 补类级声明；`ApiContractTest` 新增 `declaredLocalOnlyReallyIsLocalOnly`（非回环 + 已认证 → 403；回环只有 JWT → 401），畸形体探测排除 LOCAL_ONLY
+- 决策：守卫首跑抓到的不是"忘了标"而是**分类缺位**——`/api/v1/ops/hooks/**` 走 `LocalOnlyAuthorizationManager`，而 `ApiAccess.Access` 四种级别里没有「只许回环」这一类，所以当初只能不声明。修分类（加 LOCAL_ONLY）而不是糊一个语义不对的现成级别；探测必须用「已认证 + 非回环」才能区分「规则在」与「规则没了」（匿名探测两种情况都返回 401）
+- 依据：requirements AC-001；本机实测：切片首跑 34 条红 1（`ApiSurfaceTest.everyEndpointDeclaresItsAccess` 报 `POST /api/v1/ops/hooks/grafana` 无 @ApiAccess），修复后 35 条 0 红 exit 0
+- 验证：切片命令 exit 0 / Tests run 35 / Failures 0 / Skipped 0 / 66 秒；三件守卫均有 Tests run 数字；工作区仅本片文件
+- 本地提交：本片提交
+- 远端推送：未执行
+
+## 2026-11-02 19:25 +0800 · WORK-061 · TASK-002 README 计数纳入 --check（顺带修 CRLF 假红）
+
+- 类型：implementation
+- 变更：`scripts/gen-arch-diagram.mjs` 的 `--check` 增加四项 README 计数断言（后端模块数 / 前端包数 / 表数与外键数 / 端点数与控制器数），生成模式不读写 README；比较正文前归一 CRLF
+- 决策：README 仍是人手维护的索引——**只校验、不改写**（它带散文明说存档"不包含什么"，生成化会把维护权一起拿走）；CRLF 归一也是刻意的：检查应当比内容，不比检出设置
+- 依据：requirements REQ-002 / AC-002；发现的既有坑——Windows `core.autocrlf` 检出为 CRLF、生成物为 LF，**任何新 worktree 里 `--check` 原来恒假红**（主树恰好是 LF 所以从没暴露）
+- 验证：正向 `--check` exit 0（8 个 ✓）；反向改错端点数 → exit 1「README=189/48，事实=190/48」；反向改错模块数 → exit 1「README=12，事实=11」；恢复后 exit 0、`git diff docs/architecture/README.md` 为空
+- 本地提交：本片提交
+- 远端推送：未执行
+
+## 2026-11-02 19:40 +0800 · WORK-061 · TASK-003 拆出 paideia-ops 模块（P2 断言首次真上岗）
+
+- 类型：implementation
+- 变更：新建 `backend/paideia-ops`（pom + 30 个类 `git mv`，**包名 `io.github.xiaou61.ops` 零改动**）；`backend/pom.xml` 的 modules 与 dependencyManagement 各补一项；`paideia-app/pom.xml` 引入 ops（只为类路径与组件扫描——app 里没有任何代码直接引用 ops，工具目录按 `PaideiaTool` 接口扫 Bean）；重生成 01/06 两张结构图；README 模块数 11 → 12
+- 决策：包名即 modulith 模块名，包名不变则模块图不变、只换 Maven 归属；ops 模块依赖面固定为 platform / persistence / security / ai（编译实测无意外依赖）；测试全部留在 app 级（它们本来就是应用级集成测试）
+- 依据：requirements REQ-003 / AC-003；design「P3 的 pom 依赖面」
+- 验证：`--check` 在加模块后**如实报红**（01/06 漂移 + README 11≠12），改 README 并重生成后 exit 0（12 个模块 / 38 条依赖，README 四项计数一致）；mermaid 语法 9 个图块全过；第二切片 35 条 0 红（ModularityTest 9.16s 通过）；app 级 ops 面 `-Dtest='Ops*,Analytics*,Tempo*,Loki*,ScheduledTaskMetrics*'` **117 条 / 0 失败 / 0 跳过 / exit 0**（含 OpsSummaryIntegrationTest 等 25 个类）
+- 已知项：`mvn -B -pl paideia-ops -am test` 无自带测试可跑（模块内 0 个测试类），其行为由 app 级 117 条覆盖；04/05 两张图只在检出层有 EOL 差异，已 `git checkout` 掉，避免无意义 diff
+- 本地提交：本片提交
+- 远端推送：未执行
+
+## 2026-11-02 20:15 +0800 · WORK-061 · TASK-004 记忆提取持久重试（关闭已登记缺口）
+
+- 类型：implementation
+- 变更：迁移 `V20261102200000__create_memory_extraction_jobs.sql`（62 张表）+ 校验和登记；新建 `MemoryExtractionJob`、`MemoryExtractionJobMapper`、`MemoryExtractionJobs`（入队/抢占/退避/回收）、`MemoryExtractionRelay`（@Scheduled 中继）；`ExtractionSlice` 增 `fromMessageId` + `ConversationService.materializeSlice`（重试按边界重读同一段）；`scheduleIfDue` 改为「同一事务抢游标+写任务行 → dispatch」；`MemoryProperties` 加 4 个参数；`AiUserDeletionListener` 与 `MemoryRetentionPurger` 各加一处；05 图与 README 随新表更新
+- 决策：①线程池满从**直接丢弃**改为**记一次失败、退避重排**（旧行为是游标已推进=永久丢失）；②四种"无意义"情形（记忆被关/没凭据/会话过期/欠费）收掉任务行而不重试——口径与旧行为一致但留痕；③每次尝试独立「预留→结算/退款」，重试不双扣；④不引 RabbitMQ（单实例下"表+进程内中继"语义等价，requirements 非目标已裁）；⑤新类 public 是给 app 级集成测试的（同仓既有做法，modulith 边界仍由 internal 包守住）
+- 依据：requirements REQ-004 / AC-004；原缺口见旧 `MemoryExtractionService` javadoc「抢到即推进游标 ⇒ 整理失败不重跑（设计 §10 已登记）」
+- 验证：`MemoryExtractionJobsIntegrationTest` 8 条（含唯一键故障注入的回滚原子性、抢占单飞、2 倍退避与上限、卡死回收、注销清零、保留回收、中继端到端重试成功）+ `MemoryAutoExtractionIntegrationTest` 13 条（失败用例口径已按新语义改写）+ `AccountDeletionCascadeIntegrationTest` 4 条 = **25 条 / 0 失败 / 0 跳过 / exit 0**；守卫切片 35 条 0 红（64 秒）；`--check` 在 README 表数 61≠62 时如实报红、改后 exit 0；9 个 mermaid 图块语法全过
+- 已知项：中继自身没接 `ScheduledTaskRecorder`（失败只进日志），运维可视性留作后续；线程池满的退避会消耗一次尝试（罕见路径，行为有界且可见）
+- 本地提交：本片提交
+- 远端推送：未执行
+
+## 2026-11-02 20:40 +0800 · WORK-061 · TASK-005 收紧 ai 公开面（4 移 4 留）
+
+- 类型：implementation
+- 变更：`AssistantAnswerer` → `ai/internal/conversation/`、`ContentClassification` 与 `ContentClassifier` → `ai/internal/decision/`、`SummaryVisibility` → `ai/internal/summary/`（各带 package 行改写与 13 处 import 修正；移出文件补了对根类型 `ModelAccess`/`TokenUsage`/`ConversationTurn` 的 import）；ai 根类型 30 → **26 个**
+- 决策：**`ConversationTurn`、`NoteDraft`、`RunKind`、`RunOutcome` 留在根**——它们被根公开契约的签名引用（`AssistantConversation`、`MemoryExtractor`、`RunRecorder`），移走等于让公开面暴露 internal 类型；design I-06 对这条情形的规定就是"留根并在报告注明"。不是没做，是按批准的口径做
+- 依据：requirements REQ-005 / AC-005 + design I-06 的兜底条款；全仓词边界扫描确认这 8 个类型在 ai 之外只被 app 测试引用（RunOutcome 被两个遥测集成测试引用，同样在"公开契约"范围内）
+- 验证：ai 模块 `mvn test` **385 条 / 0 失败 / 15 跳过（全部为环境门控用例）/ BUILD SUCCESS**（含移动类型的 `AskToolTest`、`TechEssayFilterTest`）；守卫切片 35 条 0 红；`gen-arch-diagram.mjs --check` exit 0；根类型清点 `ls .../ai/*.java` = 27 个文件（26 类型 + package-info）
+- 已知项：机械改造用的是一次性脚本（临时目录、未入库）；若将来还有同类搬迁，值得把"同包删 import / 异包改写"收进 shell 工具，但现在不值得
+- 本地提交：本片提交
+- 远端推送：未执行
+
+## 2026-11-02 21:05 +0800 · WORK-061 附带 · 修已上线的 line_kind 引用错误（全量跑抓出）
+
+- 类型：fix
+- 变更：`LearningProgressMapper.findVisibleByUser` 的 `e.line_kind` → `JOIN knowledge_categories c` + `c.line_kind`
+- 决策：这是**独立于 WORK-061 五片的窄修**（单文件、边界清楚，按项目入口规则不另建 WORK）。归因清楚：`61b005d1`（第七轮审查「TrackService 的 N+1 改成 JOIN 取 line_kind」）把列引用写到了 `knowledge_entries` 上，而 `line_kind` 自 `V17` 起就在**分类**上（`knowledge_categories`）——任何只跑迁移的环境执行该查询都报 `Unknown column`，`/learning/graph` 一系接口整片 500
+- 依据：WORK-061 全量跑 478 条中 12 条红，其中 8 条同一根因（ConceptGraph×3、CampMastery×3、LearningProgress×1、MasteryBkt×1），异常栈直指该 SQL；`61b005d1` 已是 `dc9db0c`（今天部署版）的祖先，**属线上缺陷**
+- 验证：修复前那 8 条红；修复后 `-Dtest='LearningProgressIntegrationTest,ConceptGraphIntegrationTest,CampMasteryIntegrationTest,MasteryBktFallbackIntegrationTest'` → **22 条 / 0 失败 / exit 0**
+- 已知项：全量仍有 4 条红，全部是别的项落地后未跟上的 stale 断言（沙箱配额 50→1000、学习者工具数 19→21、walkthrough 漏打 12 个新端点），已在报告「外部阻塞」列明归属，本片不动它们
+- 本地提交：本片提交
+- 远端推送：未执行
+
+## 2026-11-02 21:15 +0800 · WORK-061 · 验证与报告（TASK-006）
+
+- 类型：verification
+- 变更：`.agent/changes/WORK-061-架构守卫与模块治理/testing/report.md`（status: passed；五列证据矩阵覆盖 AC-001…006 + 附带修复 + 全量；`verified_commit=65a30c54`）
+- 决策：`passed` 只声明本项验证面；全量里 4 条外部 stale 红如实列进「外部阻塞」并在正文写清「passed 不等于 478 条全绿」，不为凑绿去改别人的断言
+- 依据：requirements AC-001…006；本会话全部实测（切片 35、ops 面 117、记忆面 25、ai 385、四类 22、全量 478）
+- 验证：矩阵行见报告；`validate` 待跑（本记录提交后一并核）
+- 已知项：中继未接 ScheduledTaskRecorder（运维可视性）；前端与 e2e 未跑（无前端改动）
+- 本地提交：本片提交
 - 远端推送：未执行

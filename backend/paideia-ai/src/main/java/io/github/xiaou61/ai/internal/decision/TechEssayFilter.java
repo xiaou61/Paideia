@@ -1,7 +1,5 @@
 package io.github.xiaou61.ai.internal.decision;
 
-import io.github.xiaou61.ai.ContentClassification;
-import io.github.xiaou61.ai.ContentClassifier;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;

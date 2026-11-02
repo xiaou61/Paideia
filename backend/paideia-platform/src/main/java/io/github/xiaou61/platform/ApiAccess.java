@@ -35,6 +35,11 @@ public @interface ApiAccess {
         PUBLIC_WRITE,
         /** 只要求已登录。 */
         AUTHENTICATED,
+        /**
+         * 只允许本机（回环）来源。机器到机器：Grafana 告警 webhook 这类端点。
+         * 没有 JWT——来源即身份，端点自身再校验共享令牌（没有令牌一律拒绝）。
+         */
+        LOCAL_ONLY,
         /** 要求 {@code ROLE_ADMIN}。 */
         ADMIN
     }

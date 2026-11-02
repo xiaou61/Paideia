@@ -7,8 +7,8 @@
  * 叙事性的图（请求链路、状态机、业务流程）才由 AI 写 mermaid。
  *
  * 用法：
- *   node scripts/gen-arch-diagram.mjs          # 重写 01 与 04 两个文件
- *   node scripts/gen-arch-diagram.mjs --check  # 只比对，不一致则退出码 1（防漂移）
+ *   node scripts/gen-arch-diagram.mjs          # 重写四张结构图（01/04/05/06）
+ *   node scripts/gen-arch-diagram.mjs --check  # 只比对：四张结构图 + README 的计数（防漂移）
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -105,7 +105,8 @@ function backendDoc() {
     lines.push(`| \`${module}\` | ${deps.length === 0 ? '（无）' : deps.map((d) => `\`${d}\``).join('、')} |`);
   }
   lines.push('');
-  return { output: lines.join('\n'), summary: `${modules.length} 个模块 / ${edges.length} 条依赖` };
+  return { output: lines.join('\n'), summary: `${modules.length} 个模块 / ${edges.length} 条依赖`,
+    readme: { label: '后端模块数', pattern: /后端 (\d+) 个 Maven 模块/, values: [modules.length] } };
 }
 
 // ── 前端：pnpm workspace 包 ─────────────────────────────────────────────────
@@ -185,7 +186,8 @@ function frontendDoc() {
   lines.push('`@paideia/desktop` 是 Electron 外壳，它的"依赖"是构建期的 app 产物（脚本里 `--filter @paideia/app build:desktop`），');
   lines.push('不是包依赖，所以图上没有边。');
   lines.push('');
-  return { output: lines.join('\n'), summary: `${rows.length} 个包 / ${edges.length} 条依赖` };
+  return { output: lines.join('\n'), summary: `${rows.length} 个包 / ${edges.length} 条依赖`,
+    readme: { label: '前端包数', pattern: /前端 (\d+) 个 workspace 包/, values: [rows.length] } };
 }
 
 // ── 数据库：表与外键 ────────────────────────────────────────────────────────
@@ -253,7 +255,8 @@ function databaseDoc() {
     lines.push(`| \`${table}\` | \`${tables.get(table).replace(/\.sql$/, '')}\` | ${desc} |`);
   }
   lines.push('');
-  return { output: lines.join('\n'), summary: `${tables.size} 张表 / ${fks.length} 条外键` };
+  return { output: lines.join('\n'), summary: `${tables.size} 张表 / ${fks.length} 条外键`,
+    readme: { label: '表数与外键数', pattern: /(\d+) 张表与 (\d+) 条真实外键/, values: [tables.size, fks.length] } };
 }
 
 // ── API 端点清单 ────────────────────────────────────────────────────────────
@@ -328,7 +331,8 @@ function apiDoc() {
     lines.push(`| \`${verb}\` | ${count} |`);
   }
   lines.push('');
-  return { output: lines.join('\n'), summary: `${total} 个端点 / ${rows.length} 个控制器` };
+  return { output: lines.join('\n'), summary: `${total} 个端点 / ${rows.length} 个控制器`,
+    readme: { label: '端点数与控制器数', pattern: /(\d+) 个端点 \/ (\d+) 个控制器/, values: [total, rows.length] } };
 }
 
 const targets = [
@@ -341,11 +345,16 @@ const targets = [
 const check = process.argv.includes('--check');
 let failed = false;
 mkdirSync(ARCH, { recursive: true });
+// 比较前先归一换行：Windows 上 core.autocrlf 会把检出变成 CRLF，而生成物是 LF——
+// 不归一的话每个新 worktree 里 --check 都会假红（2026-11-02 在 worktree 实测）。
+const normalizeEol = (text) => text.replace(/\r\n/g, '\n');
+const built = [];
 for (const target of targets) {
-  const { output, summary } = target.build();
+  const { output, summary, readme } = target.build();
+  built.push(readme);
   if (check) {
     const current = existsSync(target.file) ? readFileSync(target.file, 'utf8') : '';
-    if (current !== output) {
+    if (normalizeEol(current) !== normalizeEol(output)) {
       console.error(`✗ docs/architecture/${target.label} 已漂移（${target.kind}与声明不一致）。`);
       console.error('  跑 `node scripts/gen-arch-diagram.mjs` 重新生成，再连同代码一起提交。');
       failed = true;
@@ -357,6 +366,28 @@ for (const target of targets) {
     console.log(`✓ 已写出 docs/architecture/${target.label}（${summary}）。`);
   }
 }
+// README 是索引、不是生成物：这里只校验它的计数与事实一致，不改写它——
+// 它带着散文明说这份存档"不包含什么"，生成化会把维护权一起拿走。
+if (check) {
+  const readmePath = join(ARCH, 'README.md');
+  const readme = existsSync(readmePath) ? readFileSync(readmePath, 'utf8') : '';
+  for (const { label, pattern, values } of built) {
+    const matched = readme.match(pattern);
+    if (!matched) {
+      console.error(`✗ docs/architecture/README.md 里找不到「${label}」的计数（期望 ${values.join('/')}）。`);
+      failed = true;
+      continue;
+    }
+    const got = matched.slice(1).map(Number);
+    if (got.some((value, index) => value !== values[index])) {
+      console.error(`✗ docs/architecture/README.md 与事实不一致：${label} README=${got.join('/')}，事实=${values.join('/')}。改 README 的说明文字即可。`);
+      failed = true;
+    } else {
+      console.log(`✓ README 计数一致（${label} ${values.join('/')}）。`);
+    }
+  }
+}
+
 if (failed) {
   process.exit(1);
 }

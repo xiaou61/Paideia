@@ -1,5 +1,6 @@
-package io.github.xiaou61.ai;
+package io.github.xiaou61.ai.internal.decision;
 
+import io.github.xiaou61.ai.EntrySummarizer;
 import java.util.Optional;
 
 /**

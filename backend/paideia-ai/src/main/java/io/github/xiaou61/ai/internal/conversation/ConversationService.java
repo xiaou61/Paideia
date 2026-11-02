@@ -78,14 +78,18 @@ public class ConversationService {
     }
 
     /**
-     * 自动整理要用的一段增量（WORK-013）。
+     * 自动整理要用的一段增量（WORK-013；WORK-061 增加起点）。
      *
      * <p>它是**会话内部**（游标、消息表）与记忆那边之间的唯一交接物：记忆模块拿到的只有"哪几轮对话"
      * 与"整理到哪条为止"，不必也不该碰 {@code ConversationMapper} 这些内部件。
      *
+     * @param fromMessageId 切片起点（不含）：抢锁时读到的旧游标；重试按它重读同一段
      * @param upToMessageId 本次整理覆盖到的最后一条消息 id（也用它当流水的 ref，便于对账）
      */
-    public record ExtractionSlice(long conversationId, long upToMessageId, List<ConversationTurn> turns) {
+    public record ExtractionSlice(long conversationId,
+                                  long fromMessageId,
+                                  long upToMessageId,
+                                  List<ConversationTurn> turns) {
     }
 
     /**
@@ -112,8 +116,9 @@ public class ConversationService {
      *       抢到即推进游标——所以它天然单飞，也不需要分布式锁。</li>
      * </ol>
      *
-     * <p>**不加事务**：抢锁本身就是一条原子语句，而调用方紧接着要做的事（发模型调用、写记忆）必须在
-     * 事务之外，也不能因为后面失败而把游标回滚（回滚就意味着重跑，见设计的已知缺口）。
+     * <p>**抢锁本身不加事务**（它是单条原子语句）；调用方（{@code MemoryExtractionJobs}）会把
+     * "抢锁 + 写任务行"包进一个**小事务**，回滚时两者都不发生。模型调用与写记忆仍在事务之外，
+     * 失败也不会回滚游标——**重试的凭据是任务行，不再是游标**（WORK-061 关掉了原来的已知缺口）。
      */
     public Optional<ExtractionSlice> claimExtractionSlice(long userId, long conversationId, int rounds) {
         Instant now = Instant.now();
@@ -134,9 +139,35 @@ public class ConversationService {
         if (conversations.claimExtraction(conversationId, userId, upTo, cursor, now) == 0) {
             return Optional.empty();
         }
-        return Optional.of(new ExtractionSlice(conversationId, upTo, increment.stream()
+        return Optional.of(new ExtractionSlice(conversationId, cursor == null ? 0L : cursor, upTo,
+                increment.stream()
                 .map(it -> new ConversationTurn(ConversationTurn.Role.of(it.getRole()), it.getContent()))
                 .toList()));
+    }
+
+    /**
+     * 按任务行的边界重读一段切片（WORK-061 的重试路径）。
+     *
+     * <p>与抢锁那一刻读到的必须是同一段：切片上限固定，取 {@code from} 之后的同一批再按
+     * {@code <= to} 截断，结果一致。**只读，不推进游标**——游标在入队那次事务里就推到位了。
+     *
+     * @return 会话已过期/不存在，或这一段读不出任何消息时为空（调用方据此收掉任务行）
+     */
+    public Optional<ExtractionSlice> materializeSlice(long userId, long conversationId,
+                                                      long fromMessageId, long toMessageId) {
+        Instant now = Instant.now();
+        if (conversations.findActiveByIdAndUser(conversationId, userId, now).isEmpty()) {
+            return Optional.empty();
+        }
+        List<ConversationTurn> turns =
+                messages.selectAfter(conversationId, fromMessageId, MAX_EXTRACTION_MESSAGES).stream()
+                        .filter(it -> it.getId() <= toMessageId)
+                        .map(it -> new ConversationTurn(ConversationTurn.Role.of(it.getRole()), it.getContent()))
+                        .toList();
+        if (turns.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(new ExtractionSlice(conversationId, fromMessageId, toMessageId, turns));
     }
 
     /**

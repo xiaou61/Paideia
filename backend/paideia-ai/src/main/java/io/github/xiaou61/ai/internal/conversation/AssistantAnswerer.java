@@ -1,5 +1,9 @@
-package io.github.xiaou61.ai;
+package io.github.xiaou61.ai.internal.conversation;
 
+import io.github.xiaou61.ai.AssistantConversation;
+import io.github.xiaou61.ai.ConversationTurn;
+import io.github.xiaou61.ai.ModelAccess;
+import io.github.xiaou61.ai.TokenUsage;
 import java.util.List;
 import java.util.Optional;
 

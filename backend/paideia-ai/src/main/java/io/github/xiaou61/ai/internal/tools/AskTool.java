@@ -1,6 +1,6 @@
 package io.github.xiaou61.ai.internal.tools;
 
-import io.github.xiaou61.ai.AssistantAnswerer;
+import io.github.xiaou61.ai.internal.conversation.AssistantAnswerer;
 import io.github.xiaou61.ai.ModelAccess;
 import io.github.xiaou61.ai.TokenUsage;
 import io.github.xiaou61.ai.internal.billing.CreditService;

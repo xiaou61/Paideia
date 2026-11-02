@@ -44,41 +44,46 @@ approver_role: CTO
 
 ## 任务
 
-### TASK-001 | pending | P1 守卫进入第二切片
+### TASK-001 | done | P1 守卫进入第二切片
 
 - 对应：REQ-001、AC-001
 - 修改：`AGENTS.md` 测试节的第二切片命令，`-Dtest=` 列表加入 `ApiSurfaceTest,ApiContractTest,AuthorizationIsolationTest`；跑一次实测后把条数/耗时注记改成真实数字。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=... -Dsurefire.failIfNoSpecifiedTests=false test` → 0 failed 且三个类有 Tests run 数字。
+- 完成记录：首跑即红——`ApiSurfaceTest` 抓到 `POST /api/v1/ops/hooks/grafana` 从未声明访问级别。根因是 `ApiAccess.Access` 只有四种级别、缺「只许回环」这一类；补 `LOCAL_ONLY` + 给 `OpsHookController` 加类级声明 + `ApiContractTest` 新增「非回环 + 已认证 → 403、回环只有 JWT → 401」对照（先按 401 写错过一次，实测纠正）。最终实测 **35 条 / 66 秒 / exit 0**；顺带在 AGENTS.md 两条切片命令补了「必须在 backend 下跑」的说明。
 
-### TASK-002 | pending | P2 README 计数断言
+### TASK-002 | done | P2 README 计数断言
 
 - 对应：REQ-002、AC-002
 - 修改：`scripts/gen-arch-diagram.mjs` 的 `--check` 分支增加 README 六项计数断言（见 design）；生成模式不碰 README。
 - 验证：`--check` 通过；故意改错一个数字 → 退出 1 且指明项；改回 → 退出 0；`git diff docs/architecture/README.md` 为空。
+- 完成记录：顺带修掉一个既有坑——比较前归一 CRLF（Windows 检出是 CRLF、生成物是 LF，**任何新 worktree 里 `--check` 原来恒假红**，主树恰好 LF 所以从没暴露）。实测：正向 exit 0（8 个 ✓）；反向改错端点数/模块数各 exit 1 并指名；恢复后 exit 0、README 无 diff。
 
-### TASK-003 | pending | P3 拆出 paideia-ops 模块
+### TASK-003 | done | P3 拆出 paideia-ops 模块
 
 - 对应：REQ-003、AC-003
 - 修改：新建 `backend/paideia-ops/pom.xml`；`io/github/xiaou61/ops` 30 个类从 app 迁入；`backend/pom.xml` modules 加一项；`paideia-app/pom.xml` 加依赖；重生成结构图；README 模块数 11 → 12。
 - 依赖：TASK-002（README 断言先就位，模块数变化必须红→改绿，作为守卫的首个真实用例）。
 - 验证：`mvn -B -pl paideia-ops -am test`；第二切片（ModularityTest 起）；`node scripts/gen-arch-diagram.mjs --check`；`node scripts/check-diagrams.mjs`；app 相关集成测试（Ops 三件）。
+- 完成记录：30 个类 `git mv` 且**包名零改动**（包名即 modulith 模块名，模块图不变、只换 Maven 归属）；依赖面 = platform / persistence / security / ai（与设计一致，无意外依赖）；根 pom 还需补 `dependencyManagement`（第一次编译报 version missing，属于套件结构而非代码问题）。分片验证：**P2 断言第一次真上岗**——加模块后 `--check` 如实报 01/06 两图漂移 + README 模块数 11≠12，改 README、重生成后 exit 0；mermaid 语法 9 图块全过（借主树依赖跑 `check-diagrams.mjs .worktrees/work-061/docs`）；第二切片 35 条 0 红；app 级 ops 面 **117 条 / 0 失败 / 0 跳过**（含 OpsSummary 等集成件）。ops 模块自身无测试，测试都在 app 级。
 
-### TASK-004 | pending | P4 记忆提取持久重试
+### TASK-004 | done | P4 记忆提取持久重试
 
 - 对应：REQ-004、AC-004
 - 修改：迁移 `V2026...__create_memory_extraction_jobs.sql` + 校验和登记；`MemoryExtractionJobMapper`、`MemoryExtractionJobs`、`MemoryExtractionRelay` 新建；`MemoryExtractionService` 入队与失败处理改造；`MemoryProperties` 加参数；`AiUserDeletionListener` 与 `MemoryRetentionPurger` 扩展。
 - 接口：见 design「任务表」。
 - 测试：`MemoryExtractionJobsTest`（抢占/退避/上限/卡死回收/删除）；`MemoryExtractionServiceTest`（扩展：失败留行、线程池满留行、与游标同事务）；`AccountDeletionCascadeIntegrationTest`（扩展：任务行清零）。
-- 验证：`scripts/test-db.sh mvn -B -pl paideia-ai -am test` + 第二切片。
+- 完成记录：迁移 `V20261102200000`（62 张表，README 与 05 图同步更新，P2 断言再次如实报红→改绿）；`ExtractionSlice` 增 `fromMessageId` + `ConversationService.materializeSlice` 重试按边界重读；`scheduleIfDue` 改为「同一事务抢游标+入队→dispatch」；线程池满从**丢弃**改为**记一次失败退避重排**；无凭据/会话过期/欠费/记忆被关四种"无意义"情形收掉任务行（口径与旧行为一致，但留痕）。旧测试 `extractorFailureIsSwallowed` 的口径按新语义改写（这是 requirements 明示的变更，不是偷偷改绿）。实测：新套件 `MemoryExtractionJobsIntegrationTest` 8 条、`MemoryAutoExtractionIntegrationTest` 13 条、`AccountDeletionCascadeIntegrationTest` 4 条，合计 **25 条 / 0 失败 / 0 跳过**；守卫切片 35 条 0 红；`--check` 与 mermaid 语法全绿。
 
-### TASK-005 | pending | P5 收紧 ai 公开面
+### TASK-005 | done | P5 收紧 ai 公开面
 
 - 对应：REQ-005、AC-005
 - 修改：8 个类型按 design 的去向表移入 internal；如遇公开签名引用则留在根并在报告注明。
 - 验证：`ls` 包根剩 22 个类型（若全部可移）；受影响模块 test + app 集成测试 + ModularityTest。
+- 完成记录：**按 design I-06 的口径只移了 4 个**——`AssistantAnswerer` → internal/conversation、`ContentClassification`/`ContentClassifier` → internal/decision、`SummaryVisibility` → internal/summary（根类型 30 → 26 个）；`ConversationTurn`/`NoteDraft`/`RunKind`/`RunOutcome` **留在根**：它们被根公开契约的签名引用（`AssistantConversation`、`MemoryExtractor`、`RunRecorder`），移走会让公开面暴露 internal 类型，I-06 明文规定这种情形留根并在报告注明。机械改造用一个只做包名/import 替换的脚本完成；移出的文件补了对根类型的 import（原来在根包不用写）。实测：ai 模块 **385 条 / 0 失败 / 15 跳过**（BUILD SUCCESS）、守卫切片 35 条 0 红、`--check` exit 0。
 
-### TASK-006 | pending | 验证与报告
+### TASK-006 | done | 验证与报告
 
 - 对应：AC-001…006
 - 内容：跑齐全部自动化检查；写 `testing/report.md`（五列证据矩阵、覆盖全部 AC）；更新 `.agent/history/updates.md`；确认主树干净、未推送。
 - 依赖：TASK-001…005。
+- 完成记录：`testing/report.md` 已写（status: passed，verified_commit=65a30c54，15 行五列证据矩阵覆盖 AC-001…006 + 附带修复 + 全量）；全量 478 条跑过，12 红中 8 条根因 `e.line_kind`（本项附带修掉并复跑 22/0），余 4 条为外部 stale 断言，逐条列在报告「外部阻塞」；未部署、未推送。

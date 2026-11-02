@@ -1,4 +1,4 @@
-package io.github.xiaou61.ai;
+package io.github.xiaou61.ai.internal.summary;
 
 /**
  * 一次精简结果的可见性，**由生成者在生成时选择**（用户裁决）。

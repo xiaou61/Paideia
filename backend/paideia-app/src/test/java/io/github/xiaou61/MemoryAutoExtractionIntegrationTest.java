@@ -117,6 +117,7 @@ class MemoryAutoExtractionIntegrationTest {
         jdbcTemplate.update("DELETE FROM ai_memories_text");
         jdbcTemplate.update("DELETE FROM ai_user_settings");
         jdbcTemplate.update("DELETE FROM ai_memory_candidates");
+        jdbcTemplate.update("DELETE FROM ai_memory_extraction_jobs");
         jdbcTemplate.update("DELETE FROM ai_credit_ledger");
         jdbcTemplate.update("DELETE FROM ai_credit_accounts");
     }
@@ -227,19 +228,45 @@ class MemoryAutoExtractionIntegrationTest {
     }
 
     @Test
-    @DisplayName("AC-004：模型调用失败不写记忆、不影响下一次，且不重跑（游标已推进）")
-    void extractorFailureIsSwallowed() {
+    @DisplayName("AC-004（WORK-061 改口径）：模型调用失败不写记忆，但留下任务行退避重试——不再静默丢失")
+    void extractorFailureLeavesRetryableJob() {
         long conversationId = newConversationWithTurns(ROUNDS);
         when(extractor.extract(any(), any())).thenThrow(new IllegalStateException("上游炸了"));
 
         extraction.scheduleIfDue(user, conversationId);
-        awaitExtractorCalls(user, 1);
+        awaitJobFailedOnce();
 
         assertThat(memories.list(user, 0, 0)).isEmpty();
-        // 游标已推进 → 再触发一次不会重跑（这是登记过的取舍：失败不重试）
+        // 退避未到点：中继不会立刻重拾（默认 60 秒后）
+        java.sql.Timestamp next = jdbcTemplate.queryForObject(
+                "SELECT next_attempt_at FROM ai_memory_extraction_jobs WHERE user_id = ?",
+                java.sql.Timestamp.class, user);
+        assertThat(next.toInstant()).isAfter(java.time.Instant.now().plusSeconds(30));
+
+        // 游标已推进 + 任务行只此一条 → 再触发一次不会重复整理同一段
         extraction.scheduleIfDue(user, conversationId);
+        sleep();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ai_memory_extraction_jobs WHERE user_id = ?", Long.class, user))
+                .as("同一段切片只能有一行任务").isEqualTo(1L);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ai_memories_text WHERE user_id = ?", Long.class, user)).isZero();
+    }
+
+    /** 等"第一次尝试失败、已在退避中"落定。 */
+    private void awaitJobFailedOnce() {
+        long deadline = System.currentTimeMillis() + 10_000;
+        while (System.currentTimeMillis() < deadline) {
+            Integer failedOnce = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM ai_memory_extraction_jobs "
+                            + "WHERE user_id = ? AND status = 'pending' AND attempts = 1",
+                    Integer.class, user);
+            if (failedOnce != null && failedOnce == 1) {
+                return;
+            }
+            sleep();
+        }
+        throw new AssertionError("等第一次失败落定超时");
     }
 
     @Test

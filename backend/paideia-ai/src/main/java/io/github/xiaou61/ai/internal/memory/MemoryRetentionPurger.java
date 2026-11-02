@@ -29,15 +29,18 @@ public class MemoryRetentionPurger {
     private final MemoryStore memories;
     private final MemoryCandidateService candidates;
     private final MemoryProperties properties;
+    private final MemoryExtractionJobs jobs;
     /** 可空：测试切片与局部启动里没有这个 bean。 */
     private final ObjectProvider<ScheduledTaskRecorder> recorder;
 
     MemoryRetentionPurger(MemoryStore memories, MemoryCandidateService candidates,
                           MemoryProperties properties,
+                          MemoryExtractionJobs jobs,
                           ObjectProvider<ScheduledTaskRecorder> recorder) {
         this.memories = memories;
         this.candidates = candidates;
         this.properties = properties;
+        this.jobs = jobs;
         this.recorder = recorder;
     }
 
@@ -56,6 +59,12 @@ public class MemoryRetentionPurger {
             int dropped = candidates.dropExpired(now, 500);
             if (dropped > 0) {
                 log.info("ai.memory.candidates_dropped rows={}", dropped);
+            }
+            // 整理任务行（WORK-061）：failed 行留着是给诊断看的，超过保留期就回收
+            int jobsDropped = jobs.dropFailed(
+                    now.minus(Duration.ofDays(properties.getFailedJobRetentionDays())));
+            if (jobsDropped > 0) {
+                log.info("ai.memory.jobs_dropped rows={}", jobsDropped);
             }
             record(startedAt, null);
         } catch (RuntimeException failure) {
