@@ -10,6 +10,11 @@ import {
   AlertTitle,
   AppShell,
   Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
   Input,
   PageHeader,
   Spinner,
@@ -195,24 +200,17 @@ export function SqlPracticePage() {
    * <p>生成的 SQL 走**与手动上传完全相同的检查**（白名单 + 干跑）——后端不给 AI 开更宽松的路。
    * 成功后刷新数据集清单，新数据集会出现在选择器里。
    */
-  const [datasetTopic, setDatasetTopic] = useState('')
   // 助手产出的 SQL 要落到这里再保存（WORK-053）：不进编辑器，避免污染用户正在写的查询
   const [datasetSql, setDatasetSql] = useState('')
   const [datasetVisibility, setDatasetVisibility] = useState<'private' | 'public'>('private')
   const [datasetNameInput, setDatasetNameInput] = useState('')
   const [datasetMode, setDatasetMode] = useState<'new' | 'existing'>('new')
-  const [datasetPanelOpen, setDatasetPanelOpen] = useState(false)
+  const [datasetDialogOpen, setDatasetDialogOpen] = useState(false)
   const [addRows, setAddRows] = useState(5)
-  const datasetPanelRef = useRef<HTMLDetailsElement>(null)
 
-  /** 数据集名：用户填了名字就用名字；没填就用主题；都没有给个通用名。 */
+  /** 数据集名：用户填了名字就用名字；没填给个通用名。 */
   const datasetName = () =>
-    (datasetNameInput.trim() !== ''
-      ? datasetNameInput.trim()
-      : datasetTopic.trim() === ''
-        ? '我的数据集'
-        : datasetTopic.trim()
-    ).slice(0, 60)
+    (datasetNameInput.trim() === '' ? '我的数据集' : datasetNameInput.trim()).slice(0, 60)
 
   /** 保存前的预览：只数 `CREATE TABLE` 字面量，真实结构以保存时的沙箱干跑为准。 */
   const previewTables = useMemo(() => parseCreateTableNames(datasetSql), [datasetSql])
@@ -223,6 +221,7 @@ export function SqlPracticePage() {
       setError(null)
       setDatasetSql('')
       setDatasetNameInput('')
+      setDatasetDialogOpen(false)
       await status.refetch()
       void queryClient.invalidateQueries({ queryKey: ['sql-dataset-catalog'] })
       setDataset(created.key)
@@ -230,21 +229,19 @@ export function SqlPracticePage() {
     onError: (cause) => setError(cause instanceof Error ? cause.message : String(cause)),
   })
 
-  const createDataset = useMutation({
-    mutationFn: () =>
-      knowledge.generateSqlDataset(
-        datasetTopic.trim() === '' ? undefined : datasetTopic.trim(),
-        datasetVisibility,
-      ),
-    onSuccess: async (created) => {
-      setError(null)
-      setDatasetTopic('')
-      await status.refetch()
-      void queryClient.invalidateQueries({ queryKey: ['sql-dataset-catalog'] })
-      setDataset(created.key)
-    },
-    onError: (cause) => setError(cause instanceof Error ? cause.message : String(cause)),
-  })
+  /**
+   * 「让 AI 设计」（WORK-053；2026-11-02 改成直开助手）。
+   *
+   * <p>**不在页面上收集主题**：AI 自己会先问（要练什么、哪些表、多少行），用户回答即可。
+   * 生成的 SQL 经回答里的「存为数据集」回到弹窗（见上面的 `pendingDatasetSql` effect），
+   * 确认名字与可见性后才保存。
+   */
+  const askAiToDesign = () => {
+    setDatasetDialogOpen(false)
+    ask(
+      '帮我造一个 SQL 练习数据集。先问我三个问题：用来练什么、要哪些表、大概多少行，然后用 planner_build_dataset 把 SQL 拼出来。',
+    )
+  }
 
   /**
    * 题目载入后填进编辑器、切到它能用的数据集（WORK-035 T-14）。
@@ -316,11 +313,8 @@ export function SqlPracticePage() {
     }
     setDatasetSql(pendingDatasetSql.text)
     setDatasetMode('new')
-    setDatasetPanelOpen(true)
+    setDatasetDialogOpen(true)
     clearPendingDatasetSql(pendingDatasetSql.id)
-    window.requestAnimationFrame(() =>
-      datasetPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
-    )
   }, [pendingDatasetSql, clearPendingDatasetSql])
 
   return (
@@ -385,6 +379,18 @@ export function SqlPracticePage() {
               >
                 浏览数据集
               </Button>
+              {/* 造数据集走弹窗（2026-11-02 用户反馈）：自己写在弹窗里写，AI 设计则直开助手提问 */}
+              <Button
+                type="button"
+                size="sm"
+                data-testid="sql-create-dataset"
+                onClick={() => {
+                  setDatasetMode('new')
+                  setDatasetDialogOpen(true)
+                }}
+              >
+                造一个自己的数据集
+              </Button>
               {/*
                 配额不常驻显示（WORK-035 T-17）：500 次是熔断器不是预算，把大数字挂在页面上
                 只会让人紧张。只在**快到上限**（≤20）时提示——那时它才是有用的信息。
@@ -396,21 +402,22 @@ export function SqlPracticePage() {
               )}
             </div>
 
-            {/* 数据集工坊（WORK-035 T-13 / WORK-060）：新建或基于当前数据集改 */}
-            <details
-              ref={datasetPanelRef}
-              open={datasetPanelOpen}
-              onToggle={(event) => setDatasetPanelOpen(event.currentTarget.open)}
-              className="border-border rounded-lg border"
-              data-testid="sql-create-dataset"
-            >
-              <summary className="cursor-pointer px-3 py-2 text-sm">
-                造一个自己的数据集
-                <span className="text-muted-foreground ml-2 text-xs">
-                  （AI 生成，也可以自己粘贴 SQL）
-                </span>
-              </summary>
-              <div className="border-border space-y-3 border-t px-3 py-3">
+            {/*
+              数据集工坊（WORK-035 T-13 / WORK-060；2026-11-02 由展开面板改弹窗）：
+              「自己设计」= 在弹窗里直接写 SQL；「让 AI 设计」= 关弹窗、开助手，AI 先问问题，
+              再把 SQL 经回答里的「存为数据集」带回来。
+            */}
+            <Dialog open={datasetDialogOpen} onOpenChange={setDatasetDialogOpen}>
+              <DialogContent
+                className="max-h-[85vh] overflow-y-auto sm:max-w-2xl"
+                data-testid="sql-dataset-dialog"
+              >
+                <DialogHeader>
+                  <DialogTitle>造一个自己的数据集</DialogTitle>
+                  <DialogDescription>
+                    自己写一份建表与插数的 SQL 保存；不想自己写，也可以让 AI 先问你几个问题再拼 SQL。
+                  </DialogDescription>
+                </DialogHeader>
                 <div className="flex flex-wrap gap-2" role="group" aria-label="数据集模式">
                   <Button
                     type="button"
@@ -432,47 +439,78 @@ export function SqlPracticePage() {
 
                 {datasetMode === 'new' ? (
                   <>
-                    <Input
-                      value={datasetTopic}
-                      onChange={(event) => setDatasetTopic(event.target.value)}
-                      placeholder="想要什么样的数据？例如：一个小型图书馆（书、读者、借阅记录）"
-                      aria-label="数据集描述"
-                      data-testid="sql-dataset-topic"
+                    <textarea
+                      value={datasetSql}
+                      onChange={(event) => setDatasetSql(event.target.value)}
+                      rows={8}
+                      placeholder="自己写建表与插数 SQL，例如：CREATE TABLE books (id INT, title VARCHAR(60));"
+                      aria-label="数据集 SQL"
+                      data-testid="sql-dataset-sql"
+                      className="border-border bg-background focus-visible:border-ring w-full rounded-lg border p-2 font-mono text-xs"
                     />
+                    {previewTables.length === 0 ? null : (
+                      <p className="text-muted-foreground text-xs" data-testid="sql-dataset-preview">
+                        预计 {previewTables.length} 张表：{previewTables.join('、')}
+                        （保存时以沙箱实际执行为准）
+                      </p>
+                    )}
+                    <Input
+                      value={datasetNameInput}
+                      onChange={(event) => setDatasetNameInput(event.target.value)}
+                      placeholder="数据集名字（不填就用「我的数据集」）"
+                      aria-label="数据集名字"
+                      data-testid="sql-dataset-name"
+                    />
+                    <fieldset className="flex flex-wrap items-center gap-3">
+                      <legend className="sr-only">数据集可见性</legend>
+                      <label className="flex items-center gap-1 text-sm">
+                        <input
+                          type="radio"
+                          name="dataset-visibility"
+                          checked={datasetVisibility === 'private'}
+                          onChange={() => setDatasetVisibility('private')}
+                          data-testid="sql-dataset-private"
+                        />
+                        私有（仅自己）
+                      </label>
+                      <label className="flex items-center gap-1 text-sm">
+                        <input
+                          type="radio"
+                          name="dataset-visibility"
+                          checked={datasetVisibility === 'public'}
+                          onChange={() => setDatasetVisibility('public')}
+                          data-testid="sql-dataset-public"
+                        />
+                        公开（所有人可见）
+                      </label>
+                    </fieldset>
                     <div className="flex flex-wrap items-center gap-2">
-                      {/*
-                        主路径走助手（WORK-053 REQ-009）：助手先问清要什么，再调 `planner_build_dataset`
-                        把 SQL 拼出来。它只产出文本，保存仍由下面的按钮走上传接口（白名单 + 干跑）。
-                      */}
                       <Button
                         type="button"
                         size="sm"
-                        data-testid="sql-ask-dataset"
-                        onClick={() =>
-                          ask(
-                            datasetTopic.trim() === ''
-                              ? '帮我造一个 SQL 练习数据集。先问我三个问题：用来练什么、要哪些表、大概多少行。'
-                              : `帮我造一个 SQL 练习数据集，主题是「${datasetTopic.trim()}」。先问我还缺什么，再用 planner_build_dataset 把 SQL 拼出来。`,
-                          )
-                        }
+                        disabled={saveDataset.isPending || datasetSql.trim() === ''}
+                        data-testid="sql-save-dataset"
+                        onClick={() => saveDataset.mutate()}
                       >
-                        让 AI 设计
+                        {saveDataset.isPending ? '保存中…' : '确认保存为新数据集'}
                       </Button>
-                      {/* 降级：助手不可用（余额/上游）时仍然能一次性生成 */}
                       <Button
                         type="button"
                         size="sm"
                         variant="outline"
-                        disabled={createDataset.isPending}
-                        data-testid="sql-generate-dataset"
-                        onClick={() => createDataset.mutate()}
+                        data-testid="sql-ask-dataset"
+                        onClick={askAiToDesign}
                       >
-                        {createDataset.isPending ? '生成中…' : '直接生成并保存'}
+                        让 AI 设计
                       </Button>
-                      <span className="text-muted-foreground text-xs">
-                        只允许建表与插数；保存前会在沙箱里真跑一遍
-                      </span>
                     </div>
+                    <p className="text-muted-foreground text-xs">
+                      只允许建表与插数；保存前会在沙箱里真跑一遍，跑不通不会存。
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      不想自己写？点「让 AI 设计」——助手先问你要练什么、哪些表、多少行，再把 SQL
+                      带回来填进上面。
+                    </p>
                   </>
                 ) : (
                   <>
@@ -513,82 +551,25 @@ export function SqlPracticePage() {
                             variant="outline"
                             disabled={selected === null}
                             data-testid={`sql-dataset-add-${table.name}`}
-                            onClick={() =>
+                            onClick={() => {
+                              setDatasetDialogOpen(false)
                               ask(
                                 `当前数据集是 ${selected}。请先用 sql_read_dataset 读取它的完整 SQL，然后给表 ${table.name} 追加 ${addRows} 行数据，其他表保持不变。最后给出可以直接保存的完整 SQL。`,
                               )
-                            }
+                            }}
                           >
                             {table.name} +{addRows} 行
                           </Button>
                         ))}
                       </div>
                     )}
+                    <p className="text-muted-foreground text-xs">
+                      AI 会先读取完整 SQL 再追加；回答里点「存为数据集」就回到「新建数据集」里确认保存。
+                    </p>
                   </>
                 )}
-
-                <Input
-                  value={datasetNameInput}
-                  onChange={(event) => setDatasetNameInput(event.target.value)}
-                  placeholder="数据集名字（不填就用主题）"
-                  aria-label="数据集名字"
-                  data-testid="sql-dataset-name"
-                />
-                <textarea
-                  value={datasetSql}
-                  onChange={(event) => setDatasetSql(event.target.value)}
-                  rows={4}
-                  placeholder="把助手给出的 SQL 粘到这里（或自己写），再点保存"
-                  aria-label="数据集 SQL"
-                  data-testid="sql-dataset-sql"
-                  className="border-border bg-background focus-visible:border-ring w-full rounded-lg border p-2 font-mono text-xs"
-                />
-                {previewTables.length === 0 ? null : (
-                  <p className="text-muted-foreground text-xs" data-testid="sql-dataset-preview">
-                    预计 {previewTables.length} 张表：{previewTables.join('、')}
-                    （保存时以沙箱实际执行为准）
-                  </p>
-                )}
-                <fieldset className="flex flex-wrap items-center gap-3">
-                  <legend className="sr-only">数据集可见性</legend>
-                  <label className="flex items-center gap-1 text-sm">
-                    <input
-                      type="radio"
-                      name="dataset-visibility"
-                      checked={datasetVisibility === 'private'}
-                      onChange={() => setDatasetVisibility('private')}
-                      data-testid="sql-dataset-private"
-                    />
-                    私有（仅自己）
-                  </label>
-                  <label className="flex items-center gap-1 text-sm">
-                    <input
-                      type="radio"
-                      name="dataset-visibility"
-                      checked={datasetVisibility === 'public'}
-                      onChange={() => setDatasetVisibility('public')}
-                      data-testid="sql-dataset-public"
-                    />
-                    公开（所有人可见）
-                  </label>
-                </fieldset>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={saveDataset.isPending || datasetSql.trim() === ''}
-                    data-testid="sql-save-dataset"
-                    onClick={() => saveDataset.mutate()}
-                  >
-                    {saveDataset.isPending ? '保存中…' : '确认保存为新数据集'}
-                  </Button>
-                  <span className="text-muted-foreground text-xs">
-                    保存前会在沙箱里真跑一遍，跑不通不会存。
-                  </span>
-                </div>
-              </div>
-            </details>
+              </DialogContent>
+            </Dialog>
 
             <Suspense
               fallback={

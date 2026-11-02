@@ -308,7 +308,7 @@ test.describe('SQL 自由练习', () => {
     })
 
     await page.goto('/#/practice/sql')
-    await page.getByText('造一个自己的数据集').click()
+    await page.getByTestId('sql-create-dataset').click()
     await page.getByTestId('sql-dataset-sql').fill('CREATE TABLE t (id INT);\nCREATE TABLE u (id INT);')
     await expect(page.getByTestId('sql-dataset-preview')).toContainText('预计 2 张表')
     await expect(page.getByTestId('sql-dataset-private')).toBeChecked()
@@ -326,10 +326,27 @@ test.describe('SQL 自由练习', () => {
     await mockSchema(page)
 
     await page.goto('/#/practice/sql')
-    await page.getByText('造一个自己的数据集').click()
+    await page.getByTestId('sql-create-dataset').click()
     await page.getByRole('button', { name: '基于当前数据集改' }).click()
     await expect(page.getByTestId('sql-dataset-add-customers')).toContainText('+5 行')
     await expect(page.getByTestId('sql-dataset-add-orders')).toBeVisible()
+  })
+
+  /**
+   * 「让 AI 设计」直开助手（2026-11-02 用户反馈）。
+   *
+   * <p>断两件事：弹窗让位（关掉，不然会挡在助手面板前）、助手面板打开且输入框**预填**了提问。
+   * 不发送是刻意的（发送等于替用户花钱）——用户按回车才算数。
+   */
+  test('让 AI 设计：关掉弹窗并打开助手预填问题', async ({ page }) => {
+    await mockStatus(page)
+
+    await page.goto('/#/practice/sql')
+    await page.getByTestId('sql-create-dataset').click()
+    await page.getByTestId('sql-ask-dataset').click()
+
+    await expect(page.getByTestId('sql-dataset-dialog')).toHaveCount(0)
+    await expect(page.getByTestId('conversation-input')).toHaveValue(/先问我三个问题/)
   })
 })
 

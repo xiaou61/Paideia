@@ -9312,3 +9312,25 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 已知问题：`release.ps1` 的 ssh 通路此前因 `.ssh` ACL 过宽而不可用（11-01 之后被引入），期间任何发版都会失败；本文件第 7791 行含 1 个历史遗留 NUL 字节，使该文件被工具判为二进制
 - 本地提交：`.gitignore` 与本条未提交（等用户授权）
 - 远端推送：未执行
+
+## 2026-11-02 16:20:22 +0800 · 推送 WORK-059/WORK-060 并为线上发版（db295fc → 176aaea）
+
+- 类型：release
+- 变更：推送本地 master 6 条（WORK-059）→ 提交并推送 WORK-060 实现（`2e1dd4d`）与根目录误产物忽略（`176aaea`）→ `release.ps1` 全量发版（含前端重建）
+- 决策：发版前先提交，避免"从脏工作区构建"（线上制品与标记不一致）；迁移文件自 `db295fc` 起零改动，故不触发 Flyway 校验和风险
+- 依据：发版前 `git log --all -- backend/*/src/main/resources/db/migration` 与工作区 SQL 扫描（均无改动）
+- 验证：`release.ps1` 392.9 秒 exit 0（前端 119.5s / 上传 jar 51.7s / 重启 39.2s / 健康检查 40.8s）；服务器 `paideia_build_info{version="176aaea"}`、app.jar 2026-11-02 16:17:31、服务 16:18:29 启动、`/actuator/health` UP；jar 内新类实测命中 `SqlDatasetCatalogService`、`AccountDirectory`、`DatasetOwnerNames`、`LearningPlanService`(WORK-053)、`PlannerPrompt`；线上 bundle 实测命中「存为数据集」「基于当前数据集」「加入计划」「今天要做的事」「精简」，旧串 `paideia:resume-template` 仍在；learner/admin index.html 主 chunk 均已换名（前端确已重建）
+- 已知项：`FrontendChanged` 增量命中 6 个归档条目（4 个模块 jar + app classes），与改动规模一致
+- 本地提交：本记录未提交（等用户授权）；`2e1dd4d`、`176aaea` 已推送
+- 远端推送：`5f29485..b9bbe8b`、`b9bbe8b..176aaea` 均成功，origin/master = `176aaea`
+
+## 2026-11-02 16:58 +0800 · SQL 数据集工坊改弹窗：自己设计与 AI 设计分成两条路
+
+- 类型：implementation
+- 变更：`/practice/sql` 的「造一个自己的数据集」由页内展开面板改为弹窗——「新建数据集」= 直接写 SQL + 名字 + 可见性 + 保存，「基于当前数据集改」保留在弹窗内；「让 AI 设计」改为关弹窗并直开助手，预填「先问三个问题」的提问（不自动发送）；助手回答里的「存为数据集」回填后打开该弹窗；数据集选择行新增「造一个自己的数据集」按钮；删除「直接生成并保存」（一次性 AI 生成，与对话式重叠；前端不再调用 knowledge.generateSqlDataset，后端端点未动）
+- 决策：AI 造数据集一律走对话式（AI 先问、用户答），不做一步生成；保存仍走原上传接口（白名单 + 沙箱干跑），写库动作仍只有用户点「确认保存」
+- 依据：用户 2026-11-02 反馈 + 截图（「不要说只有一个让 AI 设计……有一个弹窗然后自己设计……AI 去问问题，用户来回答就可以了」）
+- 验证：app typecheck 通过；e2e/sql-practice.spec.ts 8 passed / 1 skipped（含新增「让 AI 设计：关掉弹窗并打开助手预填问题」）；人工截图确认页面 / 弹窗 / 助手三态（本机临时文件，未入库）
+- 已知项：「存为数据集」→ 弹窗回填链路的端到端（含真实 AI 调用）无自动化覆盖，仍是人工验证；scripts/release.ps1 的重写与 .agent/reviews/ 新增文件是别的会话的在飞改动，本提交未包含
+- 本地提交：待填
+- 远端推送：未执行
