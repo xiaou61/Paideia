@@ -2,7 +2,13 @@ import { createKnowledgeApi } from '@paideia/knowledge'
 import { useAssistantContext } from '@paideia/assistant'
 // 只引 schema 子入口：它是纯函数、不含 CodeMirror，静态引入不会把编辑器带进主 chunk。
 // 编辑器/结果表/执行计划/侧栏都走下面的 lazy()。
-import { parseSchema, parseCreateTableNames, toCompletionSchema } from '@paideia/sql-workbench/schema'
+import {
+  buildDatasetSql,
+  parseSchema,
+  parseCreateTableNames,
+  toCompletionSchema,
+  type DesignTable,
+} from '@paideia/sql-workbench/schema'
 import { useSearchParams } from 'react-router'
 import {
   Alert,
@@ -25,6 +31,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 
 import { api } from '../api'
 import { DatasetCatalogDialog } from '../components/DatasetCatalogDialog'
+import { DatasetDesigner } from '../components/DatasetDesigner'
 import { LearnerHeader } from '../components/LearnerHeader'
 
 const knowledge = createKnowledgeApi(api)/**
@@ -208,15 +215,35 @@ export function SqlPracticePage() {
   const [datasetDialogOpen, setDatasetDialogOpen] = useState(false)
   const [addRows, setAddRows] = useState(5)
 
+  /**
+   * 新建数据集的两种编辑方式（2026-11-02 用户要求可视化建表）：点着建表（默认）或直接写 SQL。
+   *
+   * <p>**两份内容各存各的**：点着建表每次改动都会重生成 SQL，如果和手写共用一块文本，
+   * 切回去就把用户手写的覆盖了。保存用当前页签那份（见 `effectiveSql`）。
+   */
+  const [designerTab, setDesignerTab] = useState<'visual' | 'sql'>('visual')
+  const [designTables, setDesignTables] = useState<DesignTable[]>(() => [
+    {
+      name: '',
+      columns: [
+        { name: 'id', type: 'INT', primaryKey: true },
+        { name: '', type: 'VARCHAR(50)', primaryKey: false },
+      ],
+    },
+  ])
+  const [designRows, setDesignRows] = useState(5)
+  const design = useMemo(() => buildDatasetSql(designTables, designRows), [designTables, designRows])
+  const effectiveSql = designerTab === 'visual' ? design.sql : datasetSql
+
   /** 数据集名：用户填了名字就用名字；没填给个通用名。 */
   const datasetName = () =>
     (datasetNameInput.trim() === '' ? '我的数据集' : datasetNameInput.trim()).slice(0, 60)
 
   /** 保存前的预览：只数 `CREATE TABLE` 字面量，真实结构以保存时的沙箱干跑为准。 */
-  const previewTables = useMemo(() => parseCreateTableNames(datasetSql), [datasetSql])
+  const previewTables = useMemo(() => parseCreateTableNames(effectiveSql), [effectiveSql])
 
   const saveDataset = useMutation({
-    mutationFn: () => knowledge.uploadSqlDataset(datasetName(), datasetSql, datasetVisibility),
+    mutationFn: () => knowledge.uploadSqlDataset(datasetName(), effectiveSql, datasetVisibility),
     onSuccess: async (created) => {
       setError(null)
       setDatasetSql('')
@@ -312,6 +339,8 @@ export function SqlPracticePage() {
       return
     }
     setDatasetSql(pendingDatasetSql.text)
+    // 助手给的是 SQL 文本：切到「写 SQL」页签，别让它落在点着建表的视图后面看不见
+    setDesignerTab('sql')
     setDatasetMode('new')
     setDatasetDialogOpen(true)
     clearPendingDatasetSql(pendingDatasetSql.id)
@@ -409,13 +438,13 @@ export function SqlPracticePage() {
             */}
             <Dialog open={datasetDialogOpen} onOpenChange={setDatasetDialogOpen}>
               <DialogContent
-                className="max-h-[85vh] overflow-y-auto sm:max-w-2xl"
+                className="max-h-[85vh] overflow-y-auto sm:max-w-4xl"
                 data-testid="sql-dataset-dialog"
               >
                 <DialogHeader>
                   <DialogTitle>造一个自己的数据集</DialogTitle>
                   <DialogDescription>
-                    自己写一份建表与插数的 SQL 保存；不想自己写，也可以让 AI 先问你几个问题再拼 SQL。
+                    点着建表就能造数据集，生成 SQL 后保存；也可以自己写 SQL，或让 AI 先问你几个问题再拼。
                   </DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-wrap gap-2" role="group" aria-label="数据集模式">
@@ -439,20 +468,54 @@ export function SqlPracticePage() {
 
                 {datasetMode === 'new' ? (
                   <>
-                    <textarea
-                      value={datasetSql}
-                      onChange={(event) => setDatasetSql(event.target.value)}
-                      rows={8}
-                      placeholder="自己写建表与插数 SQL，例如：CREATE TABLE books (id INT, title VARCHAR(60));"
-                      aria-label="数据集 SQL"
-                      data-testid="sql-dataset-sql"
-                      className="border-border bg-background focus-visible:border-ring w-full rounded-lg border p-2 font-mono text-xs"
-                    />
-                    {previewTables.length === 0 ? null : (
-                      <p className="text-muted-foreground text-xs" data-testid="sql-dataset-preview">
-                        预计 {previewTables.length} 张表：{previewTables.join('、')}
-                        （保存时以沙箱实际执行为准）
-                      </p>
+                    {/* 编辑方式（2026-11-02）：默认点着建表——不写 SQL 也能造数据集 */}
+                    <div className="flex flex-wrap gap-2" role="group" aria-label="编辑方式">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={designerTab === 'visual' ? 'secondary' : 'ghost'}
+                        data-testid="sql-dataset-mode-visual"
+                        onClick={() => setDesignerTab('visual')}
+                      >
+                        点着建表
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={designerTab === 'sql' ? 'secondary' : 'ghost'}
+                        data-testid="sql-dataset-mode-sql"
+                        onClick={() => setDesignerTab('sql')}
+                      >
+                        写 SQL
+                      </Button>
+                    </div>
+
+                    {designerTab === 'visual' ? (
+                      <DatasetDesigner
+                        tables={designTables}
+                        onTablesChange={setDesignTables}
+                        rows={designRows}
+                        onRowsChange={setDesignRows}
+                        result={design}
+                      />
+                    ) : (
+                      <>
+                        <textarea
+                          value={datasetSql}
+                          onChange={(event) => setDatasetSql(event.target.value)}
+                          rows={8}
+                          placeholder="自己写建表与插数 SQL，例如：CREATE TABLE books (id INT, title VARCHAR(60));"
+                          aria-label="数据集 SQL"
+                          data-testid="sql-dataset-sql"
+                          className="border-border bg-background focus-visible:border-ring w-full rounded-lg border p-2 font-mono text-xs"
+                        />
+                        {previewTables.length === 0 ? null : (
+                          <p className="text-muted-foreground text-xs" data-testid="sql-dataset-preview">
+                            预计 {previewTables.length} 张表：{previewTables.join('、')}
+                            （保存时以沙箱实际执行为准）
+                          </p>
+                        )}
+                      </>
                     )}
                     <Input
                       value={datasetNameInput}
@@ -488,7 +551,7 @@ export function SqlPracticePage() {
                       <Button
                         type="button"
                         size="sm"
-                        disabled={saveDataset.isPending || datasetSql.trim() === ''}
+                        disabled={saveDataset.isPending || effectiveSql.trim() === ''}
                         data-testid="sql-save-dataset"
                         onClick={() => saveDataset.mutate()}
                       >
@@ -508,8 +571,8 @@ export function SqlPracticePage() {
                       只允许建表与插数；保存前会在沙箱里真跑一遍，跑不通不会存。
                     </p>
                     <p className="text-muted-foreground text-xs">
-                      不想自己写？点「让 AI 设计」——助手先问你要练什么、哪些表、多少行，再把 SQL
-                      带回来填进上面。
+                      点「让 AI 设计」会打开助手：AI 先问你要练什么、哪些表、多少行，再把 SQL
+                      带回来填进「写 SQL」里。
                     </p>
                   </>
                 ) : (

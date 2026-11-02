@@ -96,3 +96,135 @@ export function toCompletionSchema(schema: DatasetSchema | null): Record<string,
 export function primaryKeys(table: SchemaTable): string[] {
   return table.columns.filter((column) => column.primaryKey).map((column) => column.name)
 }
+
+// ── 可视化建表（2026-11-02 用户要求：不写 SQL 也能造数据集）────────────────────
+
+/** 可视化建表的一列。主键用单选（每表一个）——多主键是复合键，这里不做。 */
+export interface DesignColumn {
+  name: string
+  type: string
+  primaryKey: boolean
+}
+
+export interface DesignTable {
+  name: string
+  columns: DesignColumn[]
+}
+
+/**
+ * 可视化建表给出的类型选项。
+ *
+ * <p>与 AI 工具 `planner_build_dataset` 同一套（INT / BIGINT / TINYINT / DECIMAL / VARCHAR /
+ * DATE / DATETIME）：不是服务端限制，而是两边产出的 SQL 保持一个样，用户对照着学不会迷惑。
+ */
+export const DESIGN_TYPES = [
+  'INT',
+  'BIGINT',
+  'TINYINT',
+  'DECIMAL(10,2)',
+  'VARCHAR(50)',
+  'VARCHAR(100)',
+  'DATE',
+  'DATETIME',
+] as const
+
+/** 标识符规则，与后端 `SqlDatasetBuildTools` 的 IDENTIFIER 逐字一致。 */
+const DESIGN_IDENTIFIER = /^[a-z][a-z0-9_]{0,29}$/
+
+export interface DesignResult {
+  /** 生成好的 CREATE TABLE + INSERT；输入还不足以生成时是空串。 */
+  sql: string
+  /** 填了但生成不了的项。**空表名/空列名不算**——那是"还没填完"，静默跳过不打扰。 */
+  problems: string[]
+}
+
+/**
+ * 按类型造一个确定性的样例值（列名 + 行号 → 值）。
+ *
+ * <p>**不用随机数**：同一个结构反复生成、以及"保存前在沙箱里干跑"看到的都是同一份 SQL，
+ * 出错了才能对着看。主键列必须唯一：DATE/DATETIME 从 2026-01-01 起按行号逐天走
+ * （最多 50 行，不会撞），TINYINT 主键用行号本身（非主键才用 0/1）。
+ */
+export function designValue(column: DesignColumn, row: number): string {
+  const type = column.type.toUpperCase()
+  if (type === 'TINYINT') {
+    return String(column.primaryKey ? row : row % 2)
+  }
+  if (type === 'INT' || type === 'BIGINT') {
+    return String(row)
+  }
+  if (type.startsWith('DECIMAL')) {
+    return (row * 10.5).toFixed(2)
+  }
+  if (type.startsWith('VARCHAR')) {
+    return `'${column.name}-${row}'`
+  }
+  const date = new Date(Date.UTC(2026, 0, 1) + (row - 1) * 86_400_000).toISOString().slice(0, 10)
+  return type === 'DATE' ? `'${date}'` : `'${date} 09:00:00'`
+}
+
+/** 输入框里的名字：trim + 转小写（大小写是最常见的手误，直接替用户改掉）。 */
+function designName(raw: string): string {
+  return raw.trim().toLowerCase()
+}
+
+/**
+ * 把可视化结构生成成可保存的 SQL。
+ *
+ * <p>产出只有 `CREATE TABLE` 与 `INSERT`（服务端白名单与"只允许建表与插数"口径一致）。
+ * 行数是**每张表**插入的行数，夹在 1–50（与 AI 工具的上限同档）。
+ *
+ * <p>不完整的草稿（还没起名的表、还没起名的列）静默跳过：用户是一边加表一边看 SQL 长出来的，
+ * 每次新加一行就跳一个红色错误会很难用。真的填错了（大写开头之外的中文/数字开头/超长）才报。
+ */
+export function buildDatasetSql(tables: DesignTable[], rows: number): DesignResult {
+  const problems: string[] = []
+  const blocks: string[] = []
+  const rowCount = Math.max(1, Math.min(50, Math.trunc(rows)))
+
+  for (const table of tables) {
+    const tableName = designName(table.name)
+    if (tableName === '') {
+      continue
+    }
+    if (!DESIGN_IDENTIFIER.test(tableName)) {
+      problems.push(`表名「${table.name.trim()}」不能用：要字母开头，只能用字母、数字、下划线，最多 30 个字符`)
+      continue
+    }
+
+    const columns: DesignColumn[] = []
+    for (const column of table.columns) {
+      const columnName = designName(column.name)
+      if (columnName === '') {
+        continue
+      }
+      if (!DESIGN_IDENTIFIER.test(columnName)) {
+        problems.push(`列名「${column.name.trim()}」不能用：要字母开头，只能用字母、数字、下划线，最多 30 个字符`)
+        continue
+      }
+      if (columns.some((existing) => existing.name === columnName)) {
+        problems.push(`表 ${tableName} 里列名「${column.name.trim()}」重复了`)
+        continue
+      }
+      columns.push({ name: columnName, type: column.type, primaryKey: column.primaryKey })
+    }
+    if (columns.length === 0) {
+      continue
+    }
+
+    const definitions = columns.map(
+      (column) => `  ${column.name} ${column.type}${column.primaryKey ? ' PRIMARY KEY' : ''}`,
+    )
+    const columnList = columns.map((column) => column.name).join(', ')
+    const values: string[] = []
+    for (let row = 1; row <= rowCount; row++) {
+      values.push('(' + columns.map((column) => designValue(column, row)).join(', ') + ')')
+    }
+    blocks.push(
+      `CREATE TABLE ${tableName} (\n${definitions.join(',\n')}\n);\n` +
+        `INSERT INTO ${tableName} (${columnList}) VALUES\n  ${values.join(',\n  ')};`,
+    )
+  }
+
+  return { sql: blocks.join('\n\n'), problems }
+}

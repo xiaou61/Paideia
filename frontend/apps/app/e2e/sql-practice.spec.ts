@@ -309,6 +309,8 @@ test.describe('SQL 自由练习', () => {
 
     await page.goto('/#/practice/sql')
     await page.getByTestId('sql-create-dataset').click()
+    // 默认页签是「点着建表」，手写 SQL 要先切过去（2026-11-02 加的可视化建表）
+    await page.getByTestId('sql-dataset-mode-sql').click()
     await page.getByTestId('sql-dataset-sql').fill('CREATE TABLE t (id INT);\nCREATE TABLE u (id INT);')
     await expect(page.getByTestId('sql-dataset-preview')).toContainText('预计 2 张表')
     await expect(page.getByTestId('sql-dataset-private')).toBeChecked()
@@ -330,6 +332,47 @@ test.describe('SQL 自由练习', () => {
     await page.getByRole('button', { name: '基于当前数据集改' }).click()
     await expect(page.getByTestId('sql-dataset-add-customers')).toContainText('+5 行')
     await expect(page.getByTestId('sql-dataset-add-orders')).toBeVisible()
+  })
+
+  /**
+   * 可视化建表（2026-11-02 用户要求）：点着建表实时生成 SQL，保存的就是生成的那份。
+   *
+   * <p>断到请求体：界面上有预览是一回事，真正保存的 SQL 是不是它生成的另一回事——
+   * 与「保存数据集」用例同一口径，用请求体才算数。
+   */
+  test('可视化建表：点着填表名列名，实时生成 SQL 并保存', async ({ page }) => {
+    await mockStatus(page)
+    const bodies: string[] = []
+    await page.route('**/api/v1/sql-datasets', async (route) => {
+      if (route.request().method() !== 'POST') {
+        await route.fallback()
+        return
+      }
+      bodies.push(route.request().postData() ?? '')
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 0, message: 'ok', traceId: null, data: { key: 'visual-key' } }),
+      })
+    })
+
+    await page.goto('/#/practice/sql')
+    await page.getByTestId('sql-create-dataset').click()
+    // 默认页签就是「点着建表」：第一列 id / INT / 主键已预置，只补表名与第二列
+    await page.getByTestId('sql-designer-table-0').fill('books')
+    await page.getByTestId('sql-designer-column-0-1').fill('title')
+
+    await expect(page.getByTestId('sql-designer-preview')).toContainText('CREATE TABLE books')
+    await expect(page.getByTestId('sql-designer-preview')).toContainText('INSERT INTO books')
+    await page.getByTestId('sql-designer-rows').fill('3')
+    await expect(page.getByTestId('sql-designer-preview')).toContainText("(3, 'title-3')")
+
+    await page.getByTestId('sql-dataset-name').fill('图书库')
+    await page.getByTestId('sql-save-dataset').click()
+
+    await expect.poll(() => bodies.length).toBeGreaterThan(0)
+    expect(bodies[0]).toContain('CREATE TABLE books')
+    expect(bodies[0]).toContain('"name":"图书库"')
   })
 
   /**
