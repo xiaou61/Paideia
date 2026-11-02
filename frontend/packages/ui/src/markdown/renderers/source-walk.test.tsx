@@ -78,7 +78,7 @@ afterEach(() => {
 function renderWalk() {
   return render(
     <SourceReadingProvider>
-      <SourceWalk code={JSON.stringify(WALK)} />
+      <SourceWalk code={JSON.stringify(WALK)} isIncomplete={false} language="source-walk" />
     </SourceReadingProvider>,
   )
 }

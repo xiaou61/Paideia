@@ -702,8 +702,16 @@ public final class KnowledgeAdminTools {
         return Map.of("type", "integer", "description", description);
     }
 
+    /**
+     * 这个字段有没有被**赋值**。
+     *
+     * <p>显式传 `null` 与"没传"同样处理：五处调用都是"传了就覆盖、没传就保持原值"，
+     * 而 `{"body": null}` 这种 JSON 用 `containsKey` 会判成"传了"，接着
+     * `orEmpty(stringOf(...))` 把正文清成空串——正是类注释说要避免的静默数据丢失
+     * （2026-11-02 审查抓到）。
+     */
     static boolean has(Map<String, Object> arguments, String key) {
-        return arguments != null && arguments.containsKey(key);
+        return arguments != null && arguments.get(key) != null;
     }
 
     static String stringOf(Map<String, Object> arguments, String key) {

@@ -329,7 +329,12 @@ class SandboxController {
      *
      * <p><b>为什么单独一个端点</b>：结论不是"输出等于什么"，而是"judge 退出码是不是 0"。
      * 塞进 {@code /run} 会把返回形状与判定语义都变成方言——`/run` 的契约是"只回实际输出，
-     * 判定在客户端"，而这里判定必须在服务端：**判定脚本不能发给客户端**。
+     * 判定在客户端"，而这里判定必须由服务端执行。
+     *
+     * <p>⚠️ 但 {@code judge} 目前是**客户端入参**，这里直接执行它：正文里的判定脚本会随正文
+     * 解析出来下发到浏览器，再原样回传，所以学习者可以自带一个恒为 0 的 judge 把任何题判成
+     * 通过（2026-11-02 审查核实）。要真正挡住，需要服务端按 {@code caseId} 从条目正文里
+     * 自己取判定脚本，届时这个字段该从请求契约里删掉。
      *
      * <p>与 `/run` 同一套并发闸、配额与审计；被判题需要的三样东西由这一个请求带齐。
      */
@@ -397,7 +402,8 @@ class SandboxController {
     record ShellRunRequest(@Positive Long entryId,
                            @Size(max = 64) String caseId,
                            @NotBlank @Size(max = 20_000) String code,
-                           // 判定脚本随题下发；它只进容器，不回传给客户端
+                           // 判定脚本随题下发，由客户端原样回传——**这是客户端入参，不是服务端持有的**，
+                           // 见 shellRun 的说明：自带一个恒为 0 的 judge 就能把题判成通过
                            @NotBlank @Size(max = 20_000) String judge,
                            @Size(max = 20) List<ProjectFile> seed) {
     }

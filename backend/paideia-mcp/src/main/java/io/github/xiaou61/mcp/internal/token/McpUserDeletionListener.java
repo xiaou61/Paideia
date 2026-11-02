@@ -1,6 +1,7 @@
 package io.github.xiaou61.mcp.internal.token;
 
 import io.github.xiaou61.platform.UserDeletedEvent;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -14,8 +15,12 @@ import org.springframework.transaction.event.TransactionalEventListener;
  *
  * <p>用 {@code BEFORE_COMMIT}：与账号删除在同一个事务里，不会出现"用户没了但凭据还能用"的
  * 中间状态——那种残留尤其危险，因为它是一条**能登录的**残留。
+ *
+ * <p><b>必须排在 `McpUsageUserDeletionListener` 之后</b>：用量表靠 JOIN 本表来定位行，
+ * 本表先删掉就等于用量永远删不掉。见那个类上的说明。
  */
 @Component
+@Order(10)
 class McpUserDeletionListener {
 
     private final PatService tokens;

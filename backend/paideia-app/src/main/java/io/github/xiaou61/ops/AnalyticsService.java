@@ -52,7 +52,7 @@ class AnalyticsService {
     private final ZoneId zone;
 
     AnalyticsService(AnalyticsQueries queries, OpsProperties properties,
-                     @Value("${paideia.digest.zone:Asia/Shanghai}") String zoneName) {
+                     @Value("${paideia.ai.digest.zone:Asia/Shanghai}") String zoneName) {
         this.queries = queries;
         this.properties = properties;
         this.prometheus = new PrometheusClient(properties.getPrometheusUrl(), properties.getQueryTimeoutMs());

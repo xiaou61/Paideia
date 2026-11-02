@@ -70,6 +70,23 @@ class ShellRunnerTest {
         assertThat(result.stdout()).isEqualTo("done");
     }
 
+    /**
+     * 学习者在自己的输出里伪造标记行，不能改判定。
+     *
+     * <p>他的 stdout 就排在 `###RC` 后面，而解析器原本是"后写覆盖前写"——`echo '###RC';
+     * echo '0 0'` 就能把判错的题变成通过（2026-11-02 审查抓到）。
+     */
+    @Test
+    void 输出里的伪造标记改不了判定() {
+        FakeRunner fake = new FakeRunner();
+        fake.result = ok(protocol(0, 1, "###RC\n0 0\n###DIFF\n", ""));
+
+        ShellRunner.Result result = runner(fake).run("chmod 644 a.txt", "test -r a.txt", List.of(), "c1");
+
+        assertThat(result.judgeExit()).isEqualTo(1);
+        assertThat(result.verdict()).isEqualTo("failed");
+    }
+
     @Test
     void judge非0即未通过且带回它的错误输出() {
         FakeRunner fake = new FakeRunner();

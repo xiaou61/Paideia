@@ -98,7 +98,14 @@ export function tierOf(role: RoleKey, slug: string): { tier: TrackTier; rank: nu
   return { tier: 'optional', rank: Number.MAX_SAFE_INTEGER }
 }
 
-/** 把任意字符串收敛成合法岗位。资料里存的是自由文本，不能直接当 RoleKey 用。 */
+/**
+ * 把任意字符串收敛成合法岗位。资料里存的是自由文本，不能直接当 RoleKey 用。
+ *
+ * <p>`label` 也认：资料页那个输入框是人手填的自由文本，而 LearnPage 选完岗位会把这个
+ * 字段当"用户的目标岗位"写回去（面试官读的也是它）。只认 key 的话，写进去的中文下次
+ * 读不回来，用户还会看到自己的岗位被改成 `backend`（2026-11-02 审查抓到）。
+ */
 export function normalizeRole(value: string | null | undefined): RoleKey {
-  return ROLES.some((role) => role.key === value) ? (value as RoleKey) : DEFAULT_ROLE
+  const hit = ROLES.find((role) => role.key === value || role.label === value)
+  return hit === undefined ? DEFAULT_ROLE : hit.key
 }

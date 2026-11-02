@@ -36,6 +36,18 @@ class OpsLogRedactorTest {
     }
 
     @Test
+    @DisplayName("JSON 式的带引号键与 Basic 凭据也要打掉")
+    void redactsJsonKeysAndBasicAuth() {
+        String input = "{\"password\":\"Hunter2\",\"api_key\": \"AKIA1234567890\"} "
+                + "Authorization: Basic dXNlcjpwYXNzd29yZA==";
+
+        String out = OpsLogRedactor.redact(input);
+
+        assertThat(out).doesNotContain("Hunter2", "AKIA1234567890", "dXNlcjpwYXNzd29yZA==");
+        assertThat(out).contains("***");
+    }
+
+    @Test
     @DisplayName("控制字符被替换、超长行被截断")
     void truncatesAndStripsControlChars() {
         String out = OpsLogRedactor.redact("a\u0000b\u001Fc" + "x".repeat(600));

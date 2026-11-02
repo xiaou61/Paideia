@@ -17,7 +17,8 @@ import org.springframework.stereotype.Component;
  * 不在它打印了什么。学习者脚本非 0 退出**不算失败**——很多题就是让他先看到"这条命令报错了"。
  *
  * <p><b>容器 stdout 只含协议块</b>：学习者的输出被 entry 脚本重定向进 `/tmp/.out`，
- * 所以他写 `echo '###RC'` 也伪造不了判定。
+ * 所以他没法直接把结论打进 stdout；而他在输出里**伪造标记行**这条路，由
+ * {@link #parse}「只认首次出现的标记」挡住。
  */
 @Component
 public class ShellRunner {
@@ -28,6 +29,10 @@ public class ShellRunner {
     private static final String JUDGE = "###JUDGE";
     private static final String JUDGE_ERR = "###JUDGEERR";
     private static final String DIFF = "###DIFF";
+
+    /** entry 脚本写标记的顺序，也是解析时唯一认的顺序。 */
+    private static final List<String> MARKER_ORDER =
+            List.of(RC, OUT, ERR, JUDGE, JUDGE_ERR, DIFF);
 
     private final CodeRunner runner;
     private final SandboxProperties properties;
@@ -89,23 +94,29 @@ public class ShellRunner {
      *
      * <p>按标记行切段，每段到下一个标记行为止。**缺 `###RC` 就返回 null**：它由 entry 在
      * 两段脚本都跑完之后才写，缺了说明容器没走到那一步（超时、被杀、镜像不对）。
+     *
+     * <p>**标记必须按固定顺序出现，乱序的一律当正文**：学习者的 stdout 被包在 `###OUT` 段里，
+     * 而该段排在 `###RC` 之后——他只要 `echo '###RC'; echo '0 0'`，后写覆盖前写就会把判错
+     * 的题改成通过（2026-11-02 审查抓到；"输出重定向到文件"只挡住了直接往 stdout 打，
+     * 挡不住这个）。按顺序匹配后，`###OUT` 里出现的任何标记都只是他自己打印的文本。
      */
     static Parsed parse(String output) {
         if (output == null || output.isEmpty()) {
             return null;
         }
         Map<String, StringBuilder> sections = new LinkedHashMap<>();
-        String current = null;
+        StringBuilder current = null;
+        int next = 0;
         for (String line : output.split("\n", -1)) {
             String trimmed = line.trim();
-            if (RC.equals(trimmed) || OUT.equals(trimmed) || ERR.equals(trimmed)
-                    || JUDGE.equals(trimmed) || JUDGE_ERR.equals(trimmed) || DIFF.equals(trimmed)) {
-                current = trimmed;
-                sections.put(current, new StringBuilder());
+            if (next < MARKER_ORDER.size() && MARKER_ORDER.get(next).equals(trimmed)) {
+                current = new StringBuilder();
+                sections.put(trimmed, current);
+                next++;
                 continue;
             }
             if (current != null) {
-                sections.get(current).append(line).append('\n');
+                current.append(line).append('\n');
             }
         }
         StringBuilder rcSection = sections.get(RC);

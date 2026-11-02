@@ -142,6 +142,10 @@ export function LearnPage() {
    *
    * <p>先本地再远端是刻意的：切岗位要**立刻**看到地图变化，不能等 PUT 回来。
    * 写回失败也不回滚——这次的选择仍然有效，只是下次进来会回到资料里的值。
+   *
+   * <p>写回的是**岗位名**不是 `RoleKey`：`targetRole` 是资料页那个自由文本输入框，
+   * 面试官读的也是它。写 `backend` 进去，用户会看到自己的目标岗位被改成了英文键值
+   * （2026-11-02 审查抓到）。`normalizeRole` 认 label，所以下次读得回来。
    */
   const [picked, setPicked] = useState<RoleKey | null>(null)
   const role = picked ?? normalizeRole(profile.data?.targetRole)
@@ -153,7 +157,7 @@ export function LearnPage() {
     if (current === undefined) {
       return
     }
-    void identity.saveProfile({ ...current, targetRole: next }).catch(() => undefined)
+    void identity.saveProfile({ ...current, targetRole: roleMeta(next).label }).catch(() => undefined)
   }
 
   const scored = useMemo(

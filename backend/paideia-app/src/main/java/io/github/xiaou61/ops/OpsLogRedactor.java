@@ -10,8 +10,8 @@ import java.util.regex.Pattern;
  * 漏掉一个令牌却是永久泄露。因此模式宁可宽一点（例如 32 位以上的十六进制整串打码），
  * 也不为"保留可读性"放行。
  *
- * <p>顺序有意义：先处理 `Bearer <token>`（它带一个空格，赋值模式只吃到 `Bearer` 就停），
- * 再处理 JWT、`password=…` 这类赋值，最后处理邮箱与长串。顺序反过来时
+ * <p>顺序有意义：先处理 `Authorization: Bearer/Basic <凭据>`（它带一个空格，赋值模式只吃到
+ * 方案名就停），再处理 JWT、`password=…` 这类赋值，最后处理邮箱与长串。顺序反过来时
  * `Authorization: Bearer abc` 会留下裸 token。
  */
 final class OpsLogRedactor {
@@ -19,9 +19,25 @@ final class OpsLogRedactor {
     /** 单行上限。超过就截断——日志原文不该成为提示词长度的主因。 */
     static final int MAX_LINE_CHARS = 500;
 
+    /**
+     * 赋值式脱敏。两处都要紧：
+     *
+     * <p>`["']?` 是给 JSON / 结构化日志留的——`"password":"secret"` 里键与冒号之间隔着引号，
+     * `\s*[=:]` 直接命中不了。值的部分也不能用 `\S+`：它会把 `"a","api_key": "b"` 里的
+     * `a","api_key` 当成一个值整段吃掉，于是**下一个键漏网**（2026-11-02 审查，两处都踩到了）。
+     * 带引号的值按引号收，裸值收到分隔符为止。
+     */
     private static final Pattern ASSIGNMENT = Pattern.compile(
-            "(?i)(password|passwd|pwd|token|secret|api[_-]?key|authorization)\\s*[=:]\\s*\\S+");
-    private static final Pattern BEARER = Pattern.compile("(?i)bearer\\s+[A-Za-z0-9._~+/=-]+");
+            "(?i)(password|passwd|pwd|token|secret|api[_-]?key|authorization)"
+                    + "\\s*[\"']?\\s*[=:]\\s*(?:\"[^\"]*\"|'[^']*'|[^\\s,;]+)");
+    /**
+     * `Authorization: Bearer x` / `Authorization: Basic <base64>`。
+     *
+     * <p>**两种方案都要在这里吃掉整段**：赋值式模式只吃到空格前的一个词，`Basic dXNlcjpwYXNz`
+     * 会留下裸 base64（`Bearer` 当初是特意加的，`Basic` 漏了）。
+     */
+    private static final Pattern AUTH_SCHEME = Pattern.compile(
+            "(?i)(bearer|basic)\\s+[A-Za-z0-9._~+/=-]+");
     private static final Pattern JWT = Pattern.compile(
             "eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}");
     private static final Pattern EMAIL = Pattern.compile(
@@ -37,7 +53,7 @@ final class OpsLogRedactor {
             return "";
         }
         String text = CONTROL.matcher(line).replaceAll(" ");
-        for (Pattern pattern : List.of(BEARER, JWT, ASSIGNMENT, EMAIL, LONG_HEX)) {
+        for (Pattern pattern : List.of(AUTH_SCHEME, JWT, ASSIGNMENT, EMAIL, LONG_HEX)) {
             text = pattern.matcher(text).replaceAll("***");
         }
         if (text.length() > MAX_LINE_CHARS) {

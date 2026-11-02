@@ -54,13 +54,7 @@ public final class SqlStatementGuard {
             return problems;
         }
         String withoutComments = stripComments(sql);
-        String normalized = withoutComments.toUpperCase(Locale.ROOT);
-
-        for (String forbidden : FORBIDDEN) {
-            if (normalized.contains(forbidden)) {
-                problems.add("不允许出现 " + forbidden + "：它会在别人执行时运行，或能读写宿主文件");
-            }
-        }
+        problems.addAll(forbiddenProblems(withoutComments));
 
         List<String> statements = splitStatements(withoutComments);
         if (statements.isEmpty()) {
@@ -71,6 +65,44 @@ public final class SqlStatementGuard {
             boolean allowed = ALLOWED.stream().anyMatch(head::startsWith);
             if (!allowed) {
                 problems.add("不支持的语句：" + firstLine(statement) + "（只允许建表/建索引/建视图/插入）");
+            }
+        }
+        return problems;
+    }
+
+    /**
+     * 检查**查询** SQL（AI 产出的参考解）。
+     *
+     * <p>和 {@link #check(String)} 分开是因为两者要挡的不是同一件事：那边挡"数据集里埋了
+     * 会在别人执行时跑起来的东西"，所以用语句类型白名单；参考解本身就是一条 `SELECT`，
+     * 套那个白名单会把所有合法参考解都拒掉。这里挡的仍是词法层那些**能读取宿主文件、
+     * 改权限或加载插件**的写法，外加多语句。
+     *
+     * <p>调用方必须判返回值：{@code check} 系列**只返回问题列表，不抛异常**
+     * （2026-11-02 审查：上一处调用把返回值丢了，门禁空转了一整轮）。
+     *
+     * @return 违规说明的列表；空表示通过
+     */
+    public static List<String> checkQuery(String sql) {
+        List<String> problems = new ArrayList<>();
+        if (sql == null || sql.isBlank()) {
+            problems.add("内容是空的");
+            return problems;
+        }
+        String withoutComments = stripComments(sql);
+        problems.addAll(forbiddenProblems(withoutComments));
+        if (splitStatements(withoutComments).size() > 1) {
+            problems.add("只允许一条语句：多语句里除第一条外都不受题目约束");
+        }
+        return problems;
+    }
+
+    private static List<String> forbiddenProblems(String withoutComments) {
+        List<String> problems = new ArrayList<>();
+        String normalized = withoutComments.toUpperCase(Locale.ROOT);
+        for (String forbidden : FORBIDDEN) {
+            if (normalized.contains(forbidden)) {
+                problems.add("不允许出现 " + forbidden + "：它会在别人执行时运行，或能读写宿主文件");
             }
         }
         return problems;

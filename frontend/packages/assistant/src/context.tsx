@@ -45,9 +45,9 @@ export interface AssistantContextValue {
  */
 export interface StudyLogPageContext {
   kind: 'study-log'
-  /** 各线进度：`Java 从零开始 3/37，下一关 循环与方法`。 */
+  /** 各线进度：`Java 从零开始 3/37；MyBatis 源码精读 12/24`。 */
   lines: string
-  /** 最近没拿满分的关卡：`第 12 关 数组与字符串（挑战 1/3）`。 */
+  /** 最近没拿满分的关卡：`数组与字符串（3 处未满分）`。 */
   failing: string
   /** 到期复习条目名。 */
   dueReviews: string

@@ -81,6 +81,11 @@ public class ResumeImportService {
         }
         long reserved = credits.reserve(userId, credits.estimate());
         io.github.xiaou61.ai.TokenUsage usage = null;
+        // 必须用一个显式标志，不能用 `usage == null` 反推"还没结算"：上游没给用量时
+        // `parsed.usage()` 就是 null，而那时结算**已经发生过**（按 0 用量全额退回），
+        // 再进 catch 就会对同一笔预留再退一次；反过来 settle 自己抛异常时 usage 又不是
+        // null，于是一分不退也不扣，预留永久留在账上（2026-11-02 审查抓到这两个方向）。
+        boolean settled = false;
         var run = recorder.begin(io.github.xiaou61.ai.RunSpec
                 .of(io.github.xiaou61.ai.RunKind.RESUME_IMPORT, userId)
                 .withModel(access.get().model())
@@ -92,6 +97,8 @@ public class ResumeImportService {
             int charged = credits.settleResume(userId, reserved, access.get().model(),
                     usage == null ? null : usage.inputTokens(),
                     usage == null ? null : usage.outputTokens(), null);
+            // 放在结算**之后**：settle 自己抛异常时它仍是 false，catch 才会去兜底
+            settled = true;
             run.tokens(usage == null ? 0 : usage.inputTokens(), usage == null ? 0 : usage.outputTokens(),
                     usage == null ? 0 : usage.cacheReadTokens());
             run.addCredits(charged);
@@ -104,9 +111,9 @@ public class ResumeImportService {
                     userId, text.length(), parsed.dropped(), parsed.truncated());
             return draft;
         } catch (RuntimeException failure) {
-            if (usage == null) {
-                // usage 为 null 说明还没结算（parsed 都没拿到），才该退款
-                refundOrSettleFailed(userId, reserved, access.get(), null);
+            if (!settled) {
+                // 还没结算才兜底；拿到用量就按用量扣，没拿到就全额退回
+                refundOrSettleFailed(userId, reserved, access.get(), usage);
             }
             run.finish(io.github.xiaou61.ai.RunOutcome.FAILED, "resume_import_failed");
             throw failure;

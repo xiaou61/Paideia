@@ -16,8 +16,10 @@ docker build -t "$TAG" .
 echo
 echo "已构建 $TAG"
 echo -n "digest: "
+# `.Id` 本身就带 `sha256:` 前缀，别再拼一个（否则得到 sha256:sha256:...）。
+# 本地 build 出来的镜像 `.RepoDigests` 是空的，所以实际总走这条兜底。
 docker inspect --format='{{index .RepoDigests 0}}' "$TAG" 2>/dev/null \
-  || docker inspect --format='sha256:{{.Id}}' "$TAG"
+  || docker inspect --format='{{.Id}}' "$TAG"
 echo
 echo "自检（用真实隔离参数跑一次，确认 GNU 工具与快照都在）："
 docker run --rm --network=none --read-only --tmpfs /tmp:rw,size=64m,exec \

@@ -65,11 +65,13 @@ export function ProgressPage() {
   const weakConcepts = useMemo(() => weakestConcepts(graph.data?.concepts ?? []), [graph.data])
 
   // 页面上下文：离开时清掉，与 entryId 那套分开清理。
+  // `lines` 必须自己拼：它是对象数组，`join` 只会给助手一串 `[object Object]`
+  // （2026-11-02 审查抓到）；`failing` 只给条数不给条目名的话，助手不知道人在哪卡住。
   useEffect(() => {
     setPageContext({
       kind: 'study-log',
-      lines: lines.join('；'),
-      failing: failing.map((item) => item.label).join('；'),
+      lines: lines.map((line) => `${line.name} ${line.passed}/${line.stage}`).join('；'),
+      failing: failing.map((item) => `${item.title}（${item.label}）`).join('；'),
       dueReviews: dueReviews.join('、'),
       weakConcepts: weakConcepts.map((concept) => `${concept.name} ${concept.score.toFixed(2)}`).join('；'),
     })

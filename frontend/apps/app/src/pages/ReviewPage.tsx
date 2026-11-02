@@ -147,7 +147,12 @@ export function ReviewPage() {
                     if (selected === null) {
                       return
                     }
-                    const next = [...answers, { itemId: current.itemId, choice: selected }]
+                    // 交卷失败重试时，这一题的答案**已经**在上面那次 setAnswers 里了：直接追加会多出
+                    // 一条同 itemId 的答案，后端按「数量相等 + 不重复」校验必然拒绝（2026-11-02 审查抓到）。
+                    const next = [
+                      ...answers.filter((answer) => answer.itemId !== current.itemId),
+                      { itemId: current.itemId, choice: selected },
+                    ]
                     setAnswers(next)
                     setSelected(null)
                     if (index + 1 < session.items.length) {

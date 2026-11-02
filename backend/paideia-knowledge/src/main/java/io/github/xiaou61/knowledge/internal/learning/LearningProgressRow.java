@@ -25,6 +25,14 @@ public class LearningProgressRow {
     private Instant updatedAt;
     /** 列表查询时 JOIN 出来的标题；其它查询不填。 */
     private String title;
+    /**
+     * 列表查询时 JOIN 出来的线标记（`course` / `reading` / …）；其它查询不填。
+     *
+     * <p>跟着标题一起取回来，是因为原先每行都要为它单发一次
+     * {@code entryMapper.findLineKindOfEntry}：列表上限提到 2000 之后，一次
+     * `/learn/tracks` 最多会多打两千次库（2026-11-02 审查抓到的 N+1）。
+     */
+    private String lineKind;
 
     public Long getId() {
         return id;
@@ -128,5 +136,13 @@ public class LearningProgressRow {
 
     public void setTitle(String title) {
         this.title = title;
+    }
+
+    public String getLineKind() {
+        return lineKind;
+    }
+
+    public void setLineKind(String lineKind) {
+        this.lineKind = lineKind;
     }
 }
