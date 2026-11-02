@@ -51,11 +51,12 @@ approver_role: CTO
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=... -Dsurefire.failIfNoSpecifiedTests=false test` → 0 failed 且三个类有 Tests run 数字。
 - 完成记录：首跑即红——`ApiSurfaceTest` 抓到 `POST /api/v1/ops/hooks/grafana` 从未声明访问级别。根因是 `ApiAccess.Access` 只有四种级别、缺「只许回环」这一类；补 `LOCAL_ONLY` + 给 `OpsHookController` 加类级声明 + `ApiContractTest` 新增「非回环 + 已认证 → 403、回环只有 JWT → 401」对照（先按 401 写错过一次，实测纠正）。最终实测 **35 条 / 66 秒 / exit 0**；顺带在 AGENTS.md 两条切片命令补了「必须在 backend 下跑」的说明。
 
-### TASK-002 | pending | P2 README 计数断言
+### TASK-002 | done | P2 README 计数断言
 
 - 对应：REQ-002、AC-002
 - 修改：`scripts/gen-arch-diagram.mjs` 的 `--check` 分支增加 README 六项计数断言（见 design）；生成模式不碰 README。
 - 验证：`--check` 通过；故意改错一个数字 → 退出 1 且指明项；改回 → 退出 0；`git diff docs/architecture/README.md` 为空。
+- 完成记录：顺带修掉一个既有坑——比较前归一 CRLF（Windows 检出是 CRLF、生成物是 LF，**任何新 worktree 里 `--check` 原来恒假红**，主树恰好 LF 所以从没暴露）。实测：正向 exit 0（8 个 ✓）；反向改错端点数/模块数各 exit 1 并指名；恢复后 exit 0、README 无 diff。
 
 ### TASK-003 | pending | P3 拆出 paideia-ops 模块
 

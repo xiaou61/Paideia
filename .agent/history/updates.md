@@ -9439,3 +9439,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：切片命令 exit 0 / Tests run 35 / Failures 0 / Skipped 0 / 66 秒；三件守卫均有 Tests run 数字；工作区仅本片文件
 - 本地提交：本片提交
 - 远端推送：未执行
+
+## 2026-11-02 19:25 +0800 · WORK-061 · TASK-002 README 计数纳入 --check（顺带修 CRLF 假红）
+
+- 类型：implementation
+- 变更：`scripts/gen-arch-diagram.mjs` 的 `--check` 增加四项 README 计数断言（后端模块数 / 前端包数 / 表数与外键数 / 端点数与控制器数），生成模式不读写 README；比较正文前归一 CRLF
+- 决策：README 仍是人手维护的索引——**只校验、不改写**（它带散文明说存档"不包含什么"，生成化会把维护权一起拿走）；CRLF 归一也是刻意的：检查应当比内容，不比检出设置
+- 依据：requirements REQ-002 / AC-002；发现的既有坑——Windows `core.autocrlf` 检出为 CRLF、生成物为 LF，**任何新 worktree 里 `--check` 原来恒假红**（主树恰好是 LF 所以从没暴露）
+- 验证：正向 `--check` exit 0（8 个 ✓）；反向改错端点数 → exit 1「README=189/48，事实=190/48」；反向改错模块数 → exit 1「README=12，事实=11」；恢复后 exit 0、`git diff docs/architecture/README.md` 为空
+- 本地提交：本片提交
+- 远端推送：未执行
