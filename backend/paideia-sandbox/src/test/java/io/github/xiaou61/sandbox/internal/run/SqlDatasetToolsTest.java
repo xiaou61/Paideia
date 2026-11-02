@@ -118,4 +118,44 @@ class SqlDatasetToolsTest {
         assertThat(tool.call(user(OWNER), Map.of()).error()).isTrue();
         assertThat(tool.call(user(OWNER), Map.of("key", "  ")).error()).isTrue();
     }
+
+    /** 改现有数据集要先看到原 SQL（WORK-060）。 */
+    @Test
+    void 读取公开数据集的完整SQL() {
+        SqlDatasetTools.ReadDatasetSql tool = new SqlDatasetTools.ReadDatasetSql(datasets());
+        ToolResult result = tool.call(user(OWNER), Map.of("key", "orders-public"));
+
+        assertThat(result.error()).isFalse();
+        assertThat(result.text()).contains("CREATE TABLE customers").contains("INSERT INTO customers");
+    }
+
+    /** 隐藏集不能靠读 SQL 绕过——否则模型猜到 key 就能把隐藏集整份拿走。 */
+    @Test
+    void 隐藏集不返回SQL() {
+        SqlDatasetTools.ReadDatasetSql tool = new SqlDatasetTools.ReadDatasetSql(datasets());
+        ToolResult result = tool.call(user(OWNER), Map.of("key", "orders-hidden-a"));
+
+        assertThat(result.error()).isFalse();
+        assertThat(result.text()).contains("没有找到");
+        assertThat(result.text()).doesNotContain("orders-hidden-a.sql");
+    }
+
+    @Test
+    void 别人的私人集不返回SQL() {
+        SqlDatasetTools.ReadDatasetSql tool = new SqlDatasetTools.ReadDatasetSql(datasets());
+        ToolResult result = tool.call(user(OWNER), Map.of("key", "their-private"));
+
+        assertThat(result.error()).isFalse();
+        assertThat(result.text()).contains("没有找到");
+        assertThat(result.text()).doesNotContain("secret");
+    }
+
+    @Test
+    void 读SQL工具也是只读() {
+        SqlDatasetTools.ReadDatasetSql tool = new SqlDatasetTools.ReadDatasetSql(datasets());
+
+        assertThat(tool.descriptor().readOnly()).isTrue();
+        assertThat(tool.descriptor().toolset()).isEqualTo("sql");
+        assertThat(tool.descriptor().name()).startsWith("sql_");
+    }
 }

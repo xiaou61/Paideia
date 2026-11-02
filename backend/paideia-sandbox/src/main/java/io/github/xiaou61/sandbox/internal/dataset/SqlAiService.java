@@ -94,12 +94,14 @@ public class SqlAiService {
     }
 
     /**
-     * 让 AI 造一个数据集并直接保存为私人数据集。
+     * 让 AI 造一个数据集并直接保存。
      *
      * <p>**必须过上传的同一套检查**（白名单 + 干跑）：复用 `SqlDatasetUploadService`，
      * 不为 AI 开一条更宽松的路。
+     *
+     * @param visibility `private`（缺省）或 `public`；由用户在保存前选择
      */
-    public String generateDataset(long userId, String topic) {
+    public String generateDataset(long userId, String topic, String visibility) {
         SqlDatasetGeneratorPort.Result generated =
                 generators.generate(new SqlDatasetGeneratorPort.Request(topic));
         if (generated.sql() == null || generated.sql().isBlank()) {
@@ -110,7 +112,7 @@ public class SqlAiService {
         String name = generated.name() == null || generated.name().isBlank()
                 ? "AI 生成的数据集"
                 : generated.name();
-        return uploads.upload(userId, name, generated.sql());
+        return uploads.upload(userId, name, generated.sql(), visibility);
     }
 
     private CodeRun.Result runOn(long userId, String datasetKey, String sql) {

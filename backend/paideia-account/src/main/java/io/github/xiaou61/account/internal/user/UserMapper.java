@@ -143,4 +143,24 @@ public interface UserMapper {
     /** 改角色。返回受影响行数，0 表示账号不存在。 */
     @Update("UPDATE users SET role = #{role}, updated_at = CURRENT_TIMESTAMP(3) WHERE id = #{id}")
     int updateRole(@Param("id") long id, @Param("role") String role);
+
+    /**
+     * 批量读用户名（WORK-060，社区内容展示用）。
+     *
+     * <p>**只选 id 与 username**：邮箱、角色、口令摘要从查询层面就不存在，避免调用方
+     * 顺手把整行带出去。空集合由调用方短路，不把 `IN ()` 发给 MySQL。
+     */
+    @Select("""
+            <script>
+            SELECT id, username FROM users WHERE id IN
+            <foreach collection="ids" item="id" open="(" separator="," close=")">
+              #{id}
+            </foreach>
+            </script>
+            """)
+    List<UsernameRow> findUsernames(@Param("ids") java.util.Collection<Long> ids);
+
+    /** 用户名目录的一行。 */
+    record UsernameRow(Long id, String username) {
+    }
 }

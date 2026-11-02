@@ -37,6 +37,8 @@ interface CommunityDataset {
   datasetKey: string
   name: string
   ownerUserId: number | null
+  /** 上传者用户名；作者注销后是「已注销用户」。 */
+  ownerName: string
   tableCount: number
   rowCount: number
   reportCount: number
@@ -172,6 +174,7 @@ export function SqlDatasetsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>名称</TableHead>
+                  <TableHead>上传者</TableHead>
                   <TableHead>规模</TableHead>
                   <TableHead>举报</TableHead>
                   <TableHead className="text-right">操作</TableHead>
@@ -181,6 +184,7 @@ export function SqlDatasetsPage() {
                 {rows.map((row) => (
                   <TableRow key={row.datasetKey} data-testid={`sql-dataset-row-${row.datasetKey}`}>
                     <TableCell className="max-w-xs truncate font-medium">{row.name}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs">{row.ownerName}</TableCell>
                     <TableCell className="text-muted-foreground text-xs">
                       {row.tableCount} 表 / {row.rowCount} 条插入语句
                     </TableCell>

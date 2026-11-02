@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { parseSchema, primaryKeys, toCompletionSchema } from './dataset-schema'
+import { parseCreateTableNames, parseSchema, primaryKeys, toCompletionSchema } from './dataset-schema'
 
 /**
  * 数据集结构（WORK-035 T-03）。
@@ -74,5 +74,26 @@ describe('primaryKeys', () => {
 
   it('没有主键时返回空数组', () => {
     expect(primaryKeys({ name: 't', columns: [{ name: 'a', type: 'int', nullable: true, primaryKey: false }] })).toEqual([])
+  })
+})
+
+describe('parseCreateTableNames（保存前预览）', () => {
+  it('数出标准生成的建表语句', () => {
+    const sql = `
+      CREATE TABLE customers (id INT PRIMARY KEY);
+      CREATE TABLE orders (id INT PRIMARY KEY);
+      CREATE TABLE order_items (id INT PRIMARY KEY);
+      INSERT INTO customers VALUES (1);
+    `
+    expect(parseCreateTableNames(sql)).toEqual(['customers', 'orders', 'order_items'])
+  })
+
+  it('认 IF NOT EXISTS、反引号与大小写', () => {
+    expect(parseCreateTableNames('create table if not exists `Orders` (id int);')).toEqual(['orders'])
+  })
+
+  it('没有建表语句时返回空数组', () => {
+    expect(parseCreateTableNames('SELECT * FROM customers;')).toEqual([])
+    expect(parseCreateTableNames('')).toEqual([])
   })
 })

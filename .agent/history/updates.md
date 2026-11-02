@@ -9271,3 +9271,44 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 复跑：`node scripts/ego/check-map.mjs` → 36/36 + 21/21；`--module home --read-only` → 3/3。
 - 本地提交：`e671b08`（合并）；本次复跑报告随后提交。
 - 远端推送：未执行
+
+## 2026-11-02 11:07:37 +0800 · WORK-060 · 签署 .agent/changes/WORK-060-数据集工坊与公开私有治理/requirements.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-060-数据集工坊与公开私有治理/requirements.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-060-数据集工坊与公开私有治理/requirements.md
+- 验证：回读 frontmatter：approved_by=xiaou61，1 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-11-02 11:10:58 +0800 · WORK-060 · 签署 .agent/changes/WORK-060-数据集工坊与公开私有治理/requirements.md、.agent/changes/WORK-060-数据集工坊与公开私有治理/proposal.md、.agent/changes/WORK-060-数据集工坊与公开私有治理/design.md、.agent/changes/WORK-060-数据集工坊与公开私有治理/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-060-数据集工坊与公开私有治理/requirements.md、.agent/changes/WORK-060-数据集工坊与公开私有治理/proposal.md、.agent/changes/WORK-060-数据集工坊与公开私有治理/design.md、.agent/changes/WORK-060-数据集工坊与公开私有治理/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-060-数据集工坊与公开私有治理/requirements.md、.agent/changes/WORK-060-数据集工坊与公开私有治理/proposal.md、.agent/changes/WORK-060-数据集工坊与公开私有治理/design.md、.agent/changes/WORK-060-数据集工坊与公开私有治理/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-11-02 14:04:37 +0800 · WORK-060 · 数据集工坊与公开私有治理：实现与验证完成
+
+- 类型：implementation
+- 变更：上传支持 visibility（默认私有）；作者可见性切换端点；数据集目录端点与学习端目录弹窗；上传者用户名只读目录端口；助手获得 planner_build_dataset 与新增 sql_read_dataset 两个只读工具；SQL 页数据集面板两模式（新建/基于当前数据集改）、保存前表数预览、公开/私有选择；助手回答新增「存为数据集」回填通道；管理端列表补上传者列；结构图重新生成
+- 决策：公开=community+published，私有=private+draft，不新增表/迁移；缺省私有；taken_down 由管理员优先，作者不能改；上传者名字走 AccountDirectory→DatasetOwnerNames 端口，不再冗余用户名
+- 依据：.agent/changes/WORK-060-数据集工坊与公开私有治理/{requirements,proposal,design,tasks,testing/report}.md
+- 验证：后端 sandbox+account 136/0/0、app 集成 SqlDatasetCatalogIntegrationTest 10/10、工具哨兵 13/13；前端 assistant 78/78、knowledge 93/93、sql-workbench 47/47、五包 typecheck 通过；e2e sql-practice 7 passed/1 skipped；结构图 check 全绿。MigrationChecksumTest 因另一会话未登记的迁移为红（非本项）
+- 本地提交：未提交（等用户授权）
+- 远端推送：未执行
+
+## 2026-11-02 16:10:11 +0800 · 线上版本核对 + ssh ACL 修复 + 根目录误产物忽略
+
+- 类型：maintenance
+- 变更：① `.gitignore` 增加根锚定的 `/package.json`、`/pnpm-lock.yaml`、`/.agent/html.rar`（三者在仓库根以未跟踪状态悬挂，一次 `git add -A` 即进公开仓库）；② 本机 `~/.ssh` 下各文件 `/inheritance:d` 后移除 `Everyone`(S-1-1-0) 与 `BUILTIN\Users`(S-1-5-32-545) 两条 ACE——沙箱的 DENY 条目转为显式并保留，未改 `C:\Users\Lenovo` 自身
+- 决策：ACL 只收窄到 `.ssh`，不动父目录；忽略规则一律锚定根路径，避免误伤 `frontend/pnpm-lock.yaml`（仍被跟踪）
+- 依据：`release.ps1` 的 `.last-release-commit`、服务器 `/var/lib/node_exporter/textfile/deploy.prom`、本文件的 2026-11-01 发版记录
+- 验证：线上 = `db295fc`（`paideia_build_info{version="db295fc"}`、app.jar 2026-11-01 11:03:37、服务自 11-01 11:03:45 起未重启、`/actuator/health` UP）；本地 master `b9bbe8b` 落后线上 14 条、origin/master `5f29485` 落后 8 条、本地领先远端 6 条未推送；`git check-ignore` 三条命中且 `frontend/pnpm-lock.yaml` 未被忽略；`connect.ps1 -Server codenest-online` 由 exit 255 恢复为 exit 0
+- 已知问题：`release.ps1` 的 ssh 通路此前因 `.ssh` ACL 过宽而不可用（11-01 之后被引入），期间任何发版都会失败；本文件第 7791 行含 1 个历史遗留 NUL 字节，使该文件被工具判为二进制
+- 本地提交：`.gitignore` 与本条未提交（等用户授权）
+- 远端推送：未执行

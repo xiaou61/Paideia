@@ -82,9 +82,10 @@ public class AgentToolBridge {
      */
     static Set<String> toolsetsOf(Harness harness) {
         return switch (harness) {
-            // sql 组（WORK-035）：只有 sql_describe_dataset 一个只读工具，让助手能看数据集结构。
-            // 它**不给执行能力**——跑一次 SQL 要 3 秒与一次配额，写操作还会真的落数据。
-            case ASSISTANT -> Set.of("knowledge", "note", "account", "assessment", "assistant", "sql");
+            // sql 组：sql_describe_dataset（结构）+ sql_read_dataset（改数据集时读完整 SQL）。
+            // planner 组：planner_build_dataset（只拼 SQL、不落库）。
+            // 三个都是只读工具；保存仍由页面按钮走白名单 + 沙箱干跑，模型不能替用户写库。
+            case ASSISTANT -> Set.of("knowledge", "note", "account", "assessment", "assistant", "sql", "planner");
             // 面试官与通用助手同样的读能力 + 草稿；它不该替用户写笔记，写工具本来也被只读过滤挡住。
             // **面试官不给 sql 组**：面试官不需要看你的 SQL 练习库。
             case INTERVIEW -> Set.of("knowledge", "assessment", "assistant");

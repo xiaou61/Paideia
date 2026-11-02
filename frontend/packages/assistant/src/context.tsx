@@ -129,6 +129,13 @@ interface AssistantContextApi extends AssistantContextValue {
   pendingSql: PendingPrompt | null
   applySql: (text: string) => void
   clearPendingSql: (id: number) => void
+  /**
+   * 助手给出的 SQL 送到「保存为数据集」面板（WORK-060）。与 `pendingSql` 同形：
+   * 只回填，不保存；唯一写库的动作仍是用户点「确认保存」。
+   */
+  pendingDatasetSql: PendingPrompt | null
+  applyDatasetSql: (text: string) => void
+  clearPendingDatasetSql: (id: number) => void
 }
 
 const AssistantContext = createContext<AssistantContextApi | null>(null)
@@ -153,6 +160,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const [revealSeq, setRevealSeq] = useState(0)
   const [pendingPrompt, setPendingPrompt] = useState<PendingPrompt | null>(null)
   const [pendingSql, setPendingSql] = useState<PendingPrompt | null>(null)
+  const [pendingDatasetSql, setPendingDatasetSql] = useState<PendingPrompt | null>(null)
 
   // setEntry 必须**稳定**：调用方（条目页）把它放进 useEffect 的依赖里，
   // 每次渲染都换一个新函数会让那个 effect 反复跑。
@@ -185,6 +193,18 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
   const clearPendingSql = useCallback((id: number) => {
     setPendingSql((current) => (current?.id === id ? null : current))
+  }, [])
+
+  const applyDatasetSql = useCallback((text: string) => {
+    const trimmed = text.trim()
+    if (trimmed === '') {
+      return
+    }
+    setPendingDatasetSql({ id: Date.now(), text: trimmed })
+  }, [])
+
+  const clearPendingDatasetSql = useCallback((id: number) => {
+    setPendingDatasetSql((current) => (current?.id === id ? null : current))
   }, [])
 
   const attach = useCallback((attachment: Attachment) => {
@@ -220,6 +240,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       pendingSql,
       applySql,
       clearPendingSql,
+      pendingDatasetSql,
+      applyDatasetSql,
+      clearPendingDatasetSql,
     }),
     [
       entryId,
@@ -239,6 +262,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       pendingSql,
       applySql,
       clearPendingSql,
+      pendingDatasetSql,
+      applyDatasetSql,
+      clearPendingDatasetSql,
     ],
   )
 

@@ -27,10 +27,13 @@ import org.springframework.web.bind.annotation.RestController;
 class SqlDatasetAdminController {
 
     private final SqlDatasetMapper mapper;
+    private final io.github.xiaou61.sandbox.DatasetOwnerNames owners;
 
-    SqlDatasetAdminController(SqlDatasetMapper mapper) {
+    SqlDatasetAdminController(SqlDatasetMapper mapper,
+                              io.github.xiaou61.sandbox.DatasetOwnerNames owners) {
         this.mapper = mapper;
-            }
+        this.owners = owners;
+    }
 
     /**
      * 社区数据集清单。
@@ -39,8 +42,20 @@ class SqlDatasetAdminController {
      */
     @GetMapping
     ApiResponse<List<CommunityView>> list(@RequestParam(required = false) String status) {
-        List<CommunityView> views = mapper.listCommunity(status, 200).stream()
+        List<SqlDatasetMapper.Summary> rows = mapper.listCommunity(status, 200);
+        java.util.Set<Long> ownerIds = new java.util.LinkedHashSet<>();
+        for (SqlDatasetMapper.Summary row : rows) {
+            if (row.ownerUserId() != null) {
+                ownerIds.add(row.ownerUserId());
+            }
+        }
+        java.util.Map<Long, String> names = ownerIds.isEmpty()
+                ? java.util.Map.of()
+                : owners.usernames(ownerIds);
+        List<CommunityView> views = rows.stream()
                 .map(row -> new CommunityView(row.datasetKey(), row.name(), row.ownerUserId(),
+                        io.github.xiaou61.sandbox.internal.dataset.SqlDatasetCatalogService.ownerName(
+                                row.ownerUserId(), names),
                         row.tableCount(), row.rowCount(), mapper.countReports(row.datasetKey())))
                 .toList();
         return ApiResponse.ok(views);
@@ -82,7 +97,7 @@ class SqlDatasetAdminController {
         }
     }
 
-    record CommunityView(String datasetKey, String name, Long ownerUserId,
+    record CommunityView(String datasetKey, String name, Long ownerUserId, String ownerName,
                          int tableCount, int rowCount, int reportCount) {
     }
 }

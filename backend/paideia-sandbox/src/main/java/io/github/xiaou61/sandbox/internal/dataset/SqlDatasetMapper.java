@@ -96,6 +96,18 @@ public interface SqlDatasetMapper {
             """)
     int promoteToCommunity(@Param("datasetKey") String datasetKey, @Param("now") Instant now);
 
+    /**
+     * 社区 → 私人（WORK-060）。
+     *
+     * <p>**只改来源与状态，不删内容**：作者把公开集收回私有后，别人立刻看不到，
+     * 但作者自己的数据还在，随时可以再公开。
+     */
+    @Update("""
+            UPDATE sql_datasets SET source = 'private', status = 'draft', updated_at = #{now}
+            WHERE dataset_key = #{datasetKey} AND source = 'community'
+            """)
+    int demoteToPrivate(@Param("datasetKey") String datasetKey, @Param("now") Instant now);
+
     @Delete("DELETE FROM sql_datasets WHERE dataset_key = #{datasetKey} AND owner_user_id = #{userId}")
     int deleteOwned(@Param("datasetKey") String datasetKey, @Param("userId") long userId);
 

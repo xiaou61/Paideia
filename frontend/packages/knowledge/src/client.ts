@@ -46,13 +46,37 @@ export interface KnowledgeApi {
   datasetSchema(key: string): Promise<string>
   /** 在数据集上现场出一道题（WORK-035 T-12）。期望结果集来自**真跑参考解**。 */
   generateSqlQuestion(key: string, goal?: string): Promise<GeneratedSqlQuestion>
-  /** 让 AI 造一个数据集并保存为私人数据集（WORK-035 T-13）。 */
-  uploadSqlDataset(name: string, sql: string): Promise<{ key: string }>
+  /** 保存一段 SQL 为数据集（WORK-053 / WORK-060）。可见性默认私有。 */
+  uploadSqlDataset(name: string, sql: string, visibility?: DatasetVisibility): Promise<{ key: string }>
 
-  generateSqlDataset(topic?: string): Promise<{ key: string }>
+  /** AI 造数据集并保存（WORK-035 T-13）；可见性由用户在保存前选择。 */
+  generateSqlDataset(topic?: string, visibility?: DatasetVisibility): Promise<{ key: string }>
+
+  /** 数据集目录（WORK-060）：内置公开集 + 我的私人集 + 已发布社区集。 */
+  datasetCatalog(): Promise<DatasetCatalogItem[]>
+
+  /** 作者切换自己的数据集公开/私有（WORK-060）。 */
+  setDatasetVisibility(key: string, visibility: DatasetVisibility): Promise<null>
+
   traceCode(input: RunCodeInput): Promise<TraceCodeResult>
   /** 记一次浏览（WORK-021）。旁路数据：失败不影响阅读。 */
   recordView(entryId: number): Promise<null>
+}
+
+/** 数据集可见性（WORK-060）。 */
+export type DatasetVisibility = 'private' | 'public'
+
+/** 目录的一行。**不含 schema、SQL 与数据行**。 */
+export interface DatasetCatalogItem {
+  key: string
+  name: string
+  visibility: DatasetVisibility
+  source: 'builtin' | 'private' | 'community'
+  ownerUserId: number | null
+  ownerName: string
+  tableCount: number
+  rowCount: number
+  mine: boolean
 }
 
 /** AI 生成的一道题。**期望结果集随题下发**，判题在客户端。 */
@@ -251,20 +275,32 @@ export function createKnowledgeApi(client: ApiClient): KnowledgeApi {
         },
       ),
 
-    /** 保存一段 SQL 为自己的数据集（WORK-053）：与手动上传同一条后端校验路径。 */
-    uploadSqlDataset: (name, sql) =>
+    /** 保存一段 SQL 为自己的数据集（WORK-053 / WORK-060）：与手动上传同一条后端校验路径。 */
+    uploadSqlDataset: (name, sql, visibility = 'private') =>
       client.requestEnvelope<{ key: string }>('/api/v1/sql-datasets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, sql }),
+        body: JSON.stringify({ name, sql, visibility }),
       }),
 
     /** AI 造数据集（WORK-035 T-13）：生成的 SQL 走与手动上传相同的检查。 */
-    generateSqlDataset: (topic) =>
+    generateSqlDataset: (topic, visibility = 'private') =>
       client.requestEnvelope<{ key: string }>('/api/v1/sql-datasets/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(topic === undefined ? {} : { topic }),
+        body: JSON.stringify({ ...(topic === undefined ? {} : { topic }), visibility }),
+      }),
+
+    /** 数据集目录（WORK-060）。 */
+    datasetCatalog: () =>
+      client.requestEnvelope<DatasetCatalogItem[]>('/api/v1/sql-datasets/catalog'),
+
+    /** 作者切换自己的数据集公开/私有（WORK-060）。 */
+    setDatasetVisibility: (key, visibility) =>
+      client.requestEnvelope<null>(`/api/v1/sql-datasets/${encodeURIComponent(key)}/visibility`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visibility }),
       }),
 
     /** 逐步录制（WORK-023）。不支持的语言由后端给可读原因，前端据此降级。 */

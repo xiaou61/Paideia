@@ -57,7 +57,7 @@ export function ConversationPanel({
    */
   searchObjects?: (query: string) => Promise<Attachment[]>
 }) {
-  const { entryId, entryTitle, harness, pageContext, attachments, attach, detach, applySql, pendingPrompt, clearPendingPrompt } =
+  const { entryId, entryTitle, harness, pageContext, attachments, attach, detach, applySql, applyDatasetSql, pendingPrompt, clearPendingPrompt } =
     useAssistantContext()
   const [conversationId, setConversationId] = useState<number | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -573,22 +573,44 @@ export function ConversationPanel({
                     **不执行**——用户点"运行"才算数，与"自主只建议不动作"一致。
                   */}
                   {pageContext?.kind !== 'sql-workbench' ? null : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      data-testid="conversation-apply-sql"
-                      onClick={() => {
-                        const sql = extractSqlBlock(message.content)
-                        if (sql === null) {
-                          setError('这条回答里没有 SQL 代码块，没法填入编辑器')
-                          return
-                        }
-                        setError(null)
-                        applySql(sql)
-                      }}
-                    >
-                      填入编辑器
-                    </Button>
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        data-testid="conversation-apply-sql"
+                        onClick={() => {
+                          const sql = extractSqlBlock(message.content)
+                          if (sql === null) {
+                            setError('这条回答里没有 SQL 代码块，没法填入编辑器')
+                            return
+                          }
+                          setError(null)
+                          applySql(sql)
+                        }}
+                      >
+                        填入编辑器
+                      </Button>
+                      {/*
+                        存为数据集（WORK-060）：只把 SQL 送进数据集面板，不保存。
+                        唯一写库的动作仍是用户在面板上点「确认保存」。
+                      */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        data-testid="conversation-apply-dataset"
+                        onClick={() => {
+                          const sql = extractSqlBlock(message.content)
+                          if (sql === null) {
+                            setError('这条回答里没有 SQL 代码块，没法存为数据集')
+                            return
+                          }
+                          setError(null)
+                          applyDatasetSql(sql)
+                        }}
+                      >
+                        存为数据集
+                      </Button>
+                    </>
                   )}
                   {onSaveNote === undefined ? null : (
                     <Button

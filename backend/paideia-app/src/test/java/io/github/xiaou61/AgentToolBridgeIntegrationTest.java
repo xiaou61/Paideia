@@ -149,7 +149,11 @@ class AgentToolBridgeIntegrationTest {
                         "knowledge_search", "knowledge_weak_concepts", "note_get", "note_list",
                         // WORK-035 的只读工具：给数据集 key 返回表/列/类型，**不返回数据行**，
                         // 声明的也是 ToolScope.READ。它出现在清单里不违反"自主只建议不动作"。
-                        "sql_describe_dataset");
+                        "sql_describe_dataset",
+                        // WORK-060：改现有数据集时读完整 SQL（含数据行）——只读，且只在用户点「加」时调用。
+                        "sql_read_dataset",
+                        // WORK-060：只拼 SQL、不落库；保存由用户在页面上点按钮。
+                        "planner_build_dataset");
     }
 
     @Test

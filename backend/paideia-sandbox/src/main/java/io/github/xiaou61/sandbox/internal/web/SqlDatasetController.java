@@ -35,15 +35,21 @@ class SqlDatasetController {
     private final SqlDatasetUploadService uploads;
     private final SqlAiService ai;
     private final SqlDatasetMapper mapper;
+    private final io.github.xiaou61.sandbox.internal.run.SqlDatasets datasets;
+    private final io.github.xiaou61.sandbox.internal.dataset.SqlDatasetCatalogService catalog;
 
-    SqlDatasetController(SqlDatasetUploadService uploads, SqlAiService ai, SqlDatasetMapper mapper) {
+    SqlDatasetController(SqlDatasetUploadService uploads, SqlAiService ai, SqlDatasetMapper mapper,
+                         io.github.xiaou61.sandbox.internal.run.SqlDatasets datasets,
+                         io.github.xiaou61.sandbox.internal.dataset.SqlDatasetCatalogService catalog) {
         this.uploads = uploads;
         this.ai = ai;
         this.mapper = mapper;
+        this.datasets = datasets;
+        this.catalog = catalog;
     }
 
     /**
-     * 上传一个私人数据集。
+     * 上传一个数据集。
      *
      * <p>用 JSON 而不是 multipart：前端已经把文件读成文本了（CodeMirror 里也能直接写），
      * multipart 会多一层解析，而这个"文件"本来就是一串文本。
@@ -51,7 +57,7 @@ class SqlDatasetController {
     @PostMapping
     ApiResponse<CreatedView> upload(@Valid @RequestBody UploadRequest body) {
         long userId = currentUserId();
-        String key = uploads.upload(userId, body.name(), body.sql());
+        String key = uploads.upload(userId, body.name(), body.sql(), body.visibility());
         return ApiResponse.ok(new CreatedView(key));
     }
 
@@ -64,6 +70,16 @@ class SqlDatasetController {
                         && row.ownerUserId() == userId)
                 .toList();
         return ApiResponse.ok(rows);
+    }
+
+    /**
+     * 数据集目录（WORK-060）：内置公开集 + 我的私人集 + 已发布社区集。
+     *
+     * <p>只返回展示需要的字段；不返回 schema、SQL 与数据行。
+     */
+    @GetMapping("/catalog")
+    ApiResponse<List<io.github.xiaou61.sandbox.internal.dataset.SqlDatasetCatalogService.CatalogItem>> catalog() {
+        return ApiResponse.ok(catalog.catalog(currentUserId()));
     }
 
     /** 删除自己的私人数据集。 */
@@ -81,23 +97,59 @@ class SqlDatasetController {
     /**
      * 发布为社区数据集（T-10）。
      *
-     * <p>**先发布后审核**：发布立刻可见，出问题靠举报下架。这与 `note_shares` 的治理手段一致
-     * （发布前人工审核会让上传变成瓶颈，而社区数据集的错误后果是"内容不当"，不是"系统损坏"）。
+     * <p>保留旧端点：它等价于 `visibility=public`。新前端用下面的通用端点，
+     * 两者共用同一段判定，避免「发布」与「切公开」两套规则漂移。
      */
     @PostMapping("/{key}/publish")
     ApiResponse<Void> publish(@PathVariable String key) {
-        long userId = currentUserId();
+        setVisibility(currentUserId(), key, true);
+        return ApiResponse.ok(null);
+    }
+
+    /**
+     * 作者切换公开/私有（WORK-060）。
+     *
+     * <p>**管理员下架优先**：`taken_down` 的数据集作者不能自行改回公开或私有——
+     * 否则下架就变成一次「作者点两下就能绕过」的动作。作者仍可以删除它。
+     */
+    @PostMapping("/{key}/visibility")
+    ApiResponse<Void> visibility(@PathVariable String key, @Valid @RequestBody VisibilityRequest body) {
+        boolean isPublic;
+        if ("public".equals(body.visibility())) {
+            isPublic = true;
+        } else if ("private".equals(body.visibility())) {
+            isPublic = false;
+        } else {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT, "visibility 只能是 private 或 public");
+        }
+        setVisibility(currentUserId(), key, isPublic);
+        return ApiResponse.ok(null);
+    }
+
+    private void setVisibility(long userId, String key, boolean isPublic) {
+        // 内置集不在这张表里：先给明确文案，而不是让它落到"没有这个数据集"
+        if (datasets.isBuiltin(key)) {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT, "内置数据集不能修改可见性");
+        }
         SqlDatasetMapper.Row row = mapper.findByKey(key)
                 .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "没有这个数据集"));
+        // 不是自己的、或不存在——同一句文案，不给出可枚举的差异
         if (row.ownerUserId() == null || row.ownerUserId() != userId) {
             throw new BizException(ErrorCode.NOT_FOUND, "没有这个数据集");
         }
-        if (!"private".equals(row.source())) {
-            throw new BizException(ErrorCode.INVALID_ARGUMENT, "只有私人数据集可以发布");
+        if ("taken_down".equals(row.status())) {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT, "已被管理员下架，不能修改可见性");
         }
-        // 一条 UPDATE 同时改来源与状态：分两步会在中间留下"来源已是社区但状态还是 draft"的形态
-        mapper.promoteToCommunity(key, java.time.Instant.now());
-        return ApiResponse.ok(null);
+        java.time.Instant now = java.time.Instant.now();
+        if (isPublic) {
+            if ("private".equals(row.source())) {
+                mapper.promoteToCommunity(key, now);
+            } else if ("community".equals(row.source()) && !"published".equals(row.status())) {
+                mapper.updateStatus(key, "published", now);
+            }
+        } else if ("community".equals(row.source())) {
+            mapper.demoteToPrivate(key, now);
+        }
     }
 
     /**
@@ -133,7 +185,7 @@ class SqlDatasetController {
     }
 
     /**
-     * 让 AI 造一个数据集并保存为私人数据集（WORK-035 T-13）。
+     * 让 AI 造一个数据集并保存（WORK-035 T-13）。
      *
      * <p>生成的 SQL 走**与手动上传完全相同的检查**（白名单 + 干跑）——
      * 不给 AI 开一条更宽松的路。
@@ -142,7 +194,8 @@ class SqlDatasetController {
     ApiResponse<CreatedView> generateDataset(@RequestBody(required = false) GenerateRequest body) {
         long userId = currentUserId();
         String topic = body == null ? null : body.topic();
-        return ApiResponse.ok(new CreatedView(ai.generateDataset(userId, topic)));
+        String visibility = body == null ? null : body.visibility();
+        return ApiResponse.ok(new CreatedView(ai.generateDataset(userId, topic, visibility)));
     }
 
     record CreatedView(String key) {
@@ -151,11 +204,15 @@ class SqlDatasetController {
     record QuestionRequest(@Size(max = 200) String goal) {
     }
 
-    record GenerateRequest(@Size(max = 200) String topic) {
+    record GenerateRequest(@Size(max = 200) String topic, String visibility) {
     }
 
     record UploadRequest(@NotBlank @Size(max = 100) String name,
-                         @NotBlank @Size(max = 600_000) String sql) {
+                         @NotBlank @Size(max = 600_000) String sql,
+                         String visibility) {
+    }
+
+    record VisibilityRequest(@NotBlank String visibility) {
     }
 
     record ReportRequest(@NotBlank @Size(max = 500) String reason) {

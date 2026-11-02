@@ -56,6 +56,26 @@ export function parseSchema(raw: string | null | undefined): DatasetSchema | nul
 }
 
 /**
+ * 从 SQL 里数出 `CREATE TABLE` 的表名（WORK-060，只用于保存前预览）。
+ *
+ * <p>**不是 SQL 解析器**：只认字面量，注释或字符串里出现同样字样也会被算进去。
+ * 真正的结构由保存时的沙箱干跑决定，这里只给用户一个「大概几张表」的确认感。
+ *
+ * shortcut: 正则不处理注释/字符串/临时表，结构以沙箱干跑为准；要精确预览时改成服务端 dry-run。
+ */
+export function parseCreateTableNames(sql: string): string[] {
+  const names: string[] = []
+  const pattern = /create\s+table\s+(?:if\s+not\s+exists\s+)?[`"[]?([A-Za-z_][A-Za-z0-9_]*)[`"\]]?/gi
+  for (const match of sql.matchAll(pattern)) {
+    const name = match[1]
+    if (name !== undefined) {
+      names.push(name.toLowerCase())
+    }
+  }
+  return names
+}
+
+/**
  * 转成 CodeMirror `@codemirror/lang-sql` 的 schema 形状：`{ 表名: [列名] }`。
  *
  * <p>它只吃列名，所以这里丢掉类型信息——类型留给表结构侧栏用。把类型也塞进去不会报错，

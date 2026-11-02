@@ -36,23 +36,28 @@ class SqlDatasetAdminControllerTest {
                 });
     }
 
+    private static SqlDatasetAdminController controller(String key, String source) {
+        return new SqlDatasetAdminController(mapperWith(key, source),
+                io.github.xiaou61.sandbox.DatasetOwnerNames.NONE);
+    }
+
     @Test
     void 社区数据集可以下架() {
         // 不抛就是通过：真实副作用（updateStatus）由 mapper 代理吃掉
-        new SqlDatasetAdminController(mapperWith("shared", "community")).takeDown("shared");
+        controller("shared", "community").takeDown("shared");
     }
 
     /** 私人集不能被管理员下架：它没经过审核，作者也不会知道。 */
     @Test
     void 私人数据集不能下架() {
-        assertThatThrownBy(() -> new SqlDatasetAdminController(mapperWith("mine", "private")).takeDown("mine"))
+        assertThatThrownBy(() -> controller("mine", "private").takeDown("mine"))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("只有社区数据集");
     }
 
     @Test
     void 未知数据集返回未找到() {
-        assertThatThrownBy(() -> new SqlDatasetAdminController(mapperWith("x", "community")).takeDown("nope"))
+        assertThatThrownBy(() -> controller("x", "community").takeDown("nope"))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("没有这个数据集");
     }
@@ -60,7 +65,7 @@ class SqlDatasetAdminControllerTest {
     /** 恢复上架同样只对社区集开放。 */
     @Test
     void 恢复也限社区集() {
-        assertThatThrownBy(() -> new SqlDatasetAdminController(mapperWith("mine", "private")).restore("mine"))
+        assertThatThrownBy(() -> controller("mine", "private").restore("mine"))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("只有社区数据集");
     }

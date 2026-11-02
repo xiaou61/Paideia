@@ -21,6 +21,8 @@ export type {
 } from './admin-client'
 export { createKnowledgeApi } from './client'
 export type {
+  DatasetCatalogItem,
+  DatasetVisibility,
   KnowledgeApi,
   ListEntriesOptions,
   RunCodeInput,

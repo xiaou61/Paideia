@@ -176,11 +176,12 @@ class AgentToolBridgeTest {
     }
 
     @Test
-    void plannerSeesOnlyReadOnlyGroups() {
-        // 规划场景与学习记录页配套：只给只读组，生成类工具单独放 planner 组，
-        // 免得通用助手（ASSISTANT）也能看到"生成数据集"这种会写库的入口。
+    void plannerAndAssistantSeeOnlyReadOnlyGroups() {
+        // 规划场景与学习记录页配套：只给只读组，生成类工具单独放 planner 组。
+        // 通用助手也要造数据集（WORK-060），所以它也看得到 planner；但组里只有
+        // planner_build_dataset（只拼 SQL、不落库），写库仍由页面按钮走上传校验。
         assertThat(AgentToolBridge.toolsetsOf(Harness.PLANNER))
                 .containsExactlyInAnyOrder("knowledge", "learning", "assessment", "assistant", "planner");
-        assertThat(AgentToolBridge.toolsetsOf(Harness.ASSISTANT)).doesNotContain("planner");
+        assertThat(AgentToolBridge.toolsetsOf(Harness.ASSISTANT)).contains("planner");
     }
 }

@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { useEffect, type ReactNode } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { AssistantApi } from './client'
@@ -254,5 +255,72 @@ describe('计划候选', () => {
 
     fireEvent.click(screen.getByTestId('plan-adopt'))
     await waitFor(() => expect(adopted).toEqual(['过第 3 关']))
+  })
+})
+
+/**
+ * 「存为数据集」（WORK-060）。
+ *
+ * <p>钉住的是**只回填、不保存**：SQL 工作台里点它，助手回答的第一个 SQL 代码块进
+ * `pendingDatasetSql`；面板包不认识数据集接口，所以这条路不可能写库。真正的保存
+ * 只能由页面上的「确认保存」按钮触发。
+ */
+describe('存为数据集', () => {
+  function SqlContext({ children }: { children: ReactNode }) {
+    const { setPageContext } = useAssistantContext()
+    useEffect(() => {
+      setPageContext({
+        kind: 'sql-workbench',
+        datasetKey: 'orders-public',
+        draftSql: 'SELECT 1;',
+        lastResult: '',
+      })
+      return () => setPageContext(null)
+    }, [setPageContext])
+    return <>{children}</>
+  }
+
+  function DraftReadout() {
+    const { pendingDatasetSql } = useAssistantContext()
+    return <span data-testid="dataset-draft">{pendingDatasetSql?.text ?? ''}</span>
+  }
+
+  it('把回答里的 SQL 交给数据集面板，而不是写库', async () => {
+    const api = {
+      conversations: async () => [],
+      messages: async () => [],
+      createConversation: async () => ({ id: 1 }),
+      settings: async () => ({
+        memoryEnabled: true,
+        referenceSavedMemories: true,
+        referenceChatHistory: true,
+      }),
+      sendMessage: async (
+        _id: number, _text: string,
+        onEvent: (event: Record<string, unknown>) => void,
+      ) => {
+        onEvent({ type: 'content', delta: '给你：\n```sql\nCREATE TABLE t (id INT);\n```' })
+        onEvent({ type: 'done', usage: null, empty: false, traceId: 'abc123' })
+      },
+    } as unknown as AssistantApi
+
+    render(
+      <AssistantProvider>
+        <SqlContext>
+          <ConversationPanel api={api} />
+          <DraftReadout />
+        </SqlContext>
+      </AssistantProvider>,
+    )
+
+    fireEvent.change(screen.getByTestId('conversation-input'), { target: { value: '造个库' } })
+    fireEvent.click(screen.getByTestId('conversation-send'))
+
+    const button = await screen.findByTestId('conversation-apply-dataset')
+    expect(screen.getByTestId('dataset-draft').textContent).toBe('')
+    fireEvent.click(button)
+    await waitFor(() =>
+      expect(screen.getByTestId('dataset-draft').textContent).toBe('CREATE TABLE t (id INT);'),
+    )
   })
 })

@@ -26,6 +26,9 @@ export function serializePageContext(context: PageContext | null): string | unde
       '```sql',
       truncateContext(context.draftSql, PAGE_CONTEXT_LIMITS.draftSql),
       '```',
+      '',
+      '如果用户要造新数据集：用 `planner_build_dataset` 拼 SQL，不要凭记忆写建表语句。',
+      '如果用户要改现有数据集：先用 `sql_read_dataset` 读它的完整 SQL，再在原 SQL 上改；保存由用户在页面上确认。',
     ]
     if (context.lastResult.trim() !== '') {
       parts.push('', '最近一次运行的结果：', truncateContext(context.lastResult, PAGE_CONTEXT_LIMITS.lastResult))

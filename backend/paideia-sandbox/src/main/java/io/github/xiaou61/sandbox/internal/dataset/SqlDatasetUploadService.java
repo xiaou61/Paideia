@@ -73,13 +73,18 @@ public class SqlDatasetUploadService {
             }
 
     /**
-     * 上传一个私人数据集。
+     * 上传一个数据集。
      *
+     * <p><b>公开/私有在插入时一次写完</b>：不先写 private 再调发布，避免中间态，
+     * 也避免两步之间失败留下「说是公开但其实是私有」的数据集。
+     *
+     * @param visibility `private`（缺省）或 `public`；其它值直接拒绝
      * @return 新数据集的 key
      */
     @Transactional
-    public String upload(long userId, String name, String sql) {
+    public String upload(long userId, String name, String sql, String visibility) {
         validateInput(name, sql);
+        boolean isPublic = parseVisibility(visibility);
 
         // 第 2 道：白名单（纯字符串，不起容器）
         List<String> problems = SqlStatementGuard.check(sql);
@@ -94,10 +99,26 @@ public class SqlDatasetUploadService {
         String storageId = storage.put(sql.getBytes(StandardCharsets.UTF_8), "application/sql");
         SqlDatasetSchemaCounts counts = SqlDatasetSchemaReader.count(schemaJson);
 
-        mapper.insert(key, name.trim(), "private", userId, storageId, schemaJson,
+        mapper.insert(key, name.trim(), isPublic ? "community" : "private", userId, storageId, schemaJson,
                 counts.tables(), countRows(sql), sql.getBytes(StandardCharsets.UTF_8).length,
-                "draft", java.time.Instant.now());
+                isPublic ? "published" : "draft", java.time.Instant.now());
         return key;
+    }
+
+    /**
+     * 可见性参数 → 是否公开。
+     *
+     * <p>**缺省按私有**：旧客户端与 AI 生成都不传这个字段；默认公开会让一次忘记传参
+     * 直接把内容推到社区，代价不可逆（别人可能已经拿去用了）。
+     */
+    static boolean parseVisibility(String visibility) {
+        if (visibility == null || visibility.isBlank() || "private".equals(visibility)) {
+            return false;
+        }
+        if ("public".equals(visibility)) {
+            return true;
+        }
+        throw new BizException(ErrorCode.INVALID_ARGUMENT, "visibility 只能是 private 或 public");
     }
 
     /**

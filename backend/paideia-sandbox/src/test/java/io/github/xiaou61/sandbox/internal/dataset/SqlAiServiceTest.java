@@ -225,18 +225,18 @@ class SqlAiServiceTest {
     @Test
     void 生成的数据集走上传流程() {
         SqlDatasetUploadService uploads = uploads();
-        when(uploads.upload(anyLong(), anyString(), anyString())).thenReturn("new-key");
+        when(uploads.upload(anyLong(), anyString(), anyString(), anyString())).thenReturn("new-key");
         SqlAiService service = service(
                 runner(result(List.of("id"), List.of(List.of("1")), 0)),
                 questionPort("SELECT id FROM t"),
                 generatorPort("CREATE TABLE t (id INT);", "小库"),
                 uploads);
 
-        String key = service.generateDataset(USER, "随便");
+        String key = service.generateDataset(USER, "随便", "private");
 
         assertThat(key).isEqualTo("new-key");
         // 白名单、干跑、抓结构都在 upload 里——复用而不是另开一条路
-        verify(uploads).upload(eq(USER), eq("小库"), eq("CREATE TABLE t (id INT);"));
+        verify(uploads).upload(eq(USER), eq("小库"), eq("CREATE TABLE t (id INT);"), eq("private"));
     }
 
     /** 生成失败（没有 SQL）时给可读错误，且**不写任何东西**。 */
@@ -249,9 +249,9 @@ class SqlAiServiceTest {
                 generatorPort(null, null),
                 uploads);
 
-        assertThatThrownBy(() -> service.generateDataset(USER, "随便"))
+        assertThatThrownBy(() -> service.generateDataset(USER, "随便", "private"))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("没有生成数据集");
-        verify(uploads, org.mockito.Mockito.never()).upload(anyLong(), anyString(), anyString());
+        verify(uploads, org.mockito.Mockito.never()).upload(anyLong(), anyString(), anyString(), anyString());
     }
 }

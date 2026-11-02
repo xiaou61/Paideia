@@ -245,4 +245,149 @@ test.describe('SQL 自由练习', () => {
     // 焦点还在编辑区：丢了的话后面的字符会打到 body 上，而内容刚好停在第一个字母
     expect(await editor.evaluate((node) => node.contains(document.activeElement))).toBe(true)
   })
+
+  /**
+   * 数据集目录与公开/私有（WORK-060）。
+   *
+   * <p>目录端点被 mock：线上是否已有社区数据集是环境状态，断言真实数据会让用例随环境漂移。
+   * 断的是「弹窗显示上传者与可见性」「使用后选择器真的切过去」这两件产品行为。
+   */
+  test('浏览数据集：显示上传者与可见性，选中后切换数据集', async ({ page }) => {
+    await mockStatus(page)
+    await page.route('**/api/v1/sql-datasets/catalog', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0,
+          message: 'ok',
+          traceId: null,
+          data: [
+            { key: 'orders-public', name: 'orders-public', visibility: 'public', source: 'builtin',
+              ownerUserId: null, ownerName: '平台内置', tableCount: 3, rowCount: 0, mine: false },
+            { key: 'shared', name: '共享库', visibility: 'public', source: 'community',
+              ownerUserId: 8, ownerName: 'alice', tableCount: 2, rowCount: 9, mine: false },
+            { key: 'mine', name: '我的库', visibility: 'private', source: 'private',
+              ownerUserId: 7, ownerName: 'lzf', tableCount: 1, rowCount: 3, mine: true },
+          ],
+        }),
+      })
+    })
+
+    await page.goto('/#/practice/sql')
+    await page.getByTestId('sql-open-dataset-catalog').click()
+    await expect(page.getByTestId('dataset-catalog-dialog')).toBeVisible()
+    await expect(page.getByTestId('dataset-catalog-item-orders-public')).toContainText('平台内置')
+    await expect(page.getByTestId('dataset-catalog-item-shared')).toContainText('alice')
+    await expect(page.getByTestId('dataset-catalog-item-mine')).toContainText('私有')
+
+    await page.getByTestId('dataset-catalog-item-shared').getByRole('button', { name: '使用' }).click()
+    await expect(page.getByTestId('sql-dataset')).toHaveValue('shared')
+  })
+
+  /**
+   * 保存前预览与默认私有（WORK-060）。
+   *
+   * <p>用请求体断言可见性：按钮点了但请求里没有 visibility 时，用户会以为存成私有、
+   * 实际却公开（或反之）。这比"按钮存在"有意义得多。
+   */
+  test('保存数据集：预览表数、默认私有、请求体带 visibility', async ({ page }) => {
+    await mockStatus(page)
+    const bodies: string[] = []
+    await page.route('**/api/v1/sql-datasets', async (route) => {
+      if (route.request().method() !== 'POST') {
+        await route.fallback()
+        return
+      }
+      bodies.push(route.request().postData() ?? '')
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 0, message: 'ok', traceId: null, data: { key: 'new-key' } }),
+      })
+    })
+
+    await page.goto('/#/practice/sql')
+    await page.getByText('造一个自己的数据集').click()
+    await page.getByTestId('sql-dataset-sql').fill('CREATE TABLE t (id INT);\nCREATE TABLE u (id INT);')
+    await expect(page.getByTestId('sql-dataset-preview')).toContainText('预计 2 张表')
+    await expect(page.getByTestId('sql-dataset-private')).toBeChecked()
+    await page.getByTestId('sql-dataset-name').fill('我的新库')
+    await page.getByTestId('sql-save-dataset').click()
+
+    await expect.poll(() => bodies.length).toBeGreaterThan(0)
+    expect(bodies[0]).toContain('"visibility":"private"')
+    expect(bodies[0]).toContain('"name":"我的新库"')
+  })
+
+  /** 基于当前数据集改：列出表，每张表一个「让 AI 加 N 行」按钮（WORK-060）。 */
+  test('基于当前数据集改：列出表并提供加行入口', async ({ page }) => {
+    await mockStatus(page)
+    await mockSchema(page)
+
+    await page.goto('/#/practice/sql')
+    await page.getByText('造一个自己的数据集').click()
+    await page.getByRole('button', { name: '基于当前数据集改' }).click()
+    await expect(page.getByTestId('sql-dataset-add-customers')).toContainText('+5 行')
+    await expect(page.getByTestId('sql-dataset-add-orders')).toBeVisible()
+  })
 })
+
+/** 沙箱可用的最小 status 响应（与文件里其它用例同一形状）。 */
+async function mockStatus(page: import('@playwright/test').Page): Promise<void> {
+  await page.route('**/api/v1/sandbox/status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        traceId: null,
+        data: {
+          enabled: true,
+          ready: true,
+          runtime: null,
+          languages: ['sql'],
+          dailyLimit: 50,
+          usedToday: 0,
+          sqlDailyLimit: 20,
+          sqlUsedToday: 0,
+          datasets: [
+            { key: 'orders-public', name: 'orders-public', source: 'builtin' },
+            { key: 'shared', name: '共享库', source: 'community' },
+            { key: 'mine', name: '我的库', source: 'private' },
+          ],
+          reason: null,
+        } satisfies SandboxStatus,
+      }),
+    })
+  })
+}
+
+/** 结构快照：customers + orders 两张真实存在的表。 */
+async function mockSchema(page: import('@playwright/test').Page): Promise<void> {
+  await page.route('**/api/v1/sandbox/datasets/*/schema', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        traceId: null,
+        data: JSON.stringify({
+          tables: [
+            {
+              name: 'customers',
+              columns: [
+                { name: 'id', type: 'int', nullable: false, primaryKey: true },
+                { name: 'name', type: 'varchar(20)', nullable: false, primaryKey: false },
+              ],
+            },
+            { name: 'orders', columns: [{ name: 'id', type: 'int', nullable: false, primaryKey: true }] },
+          ],
+          relations: [],
+        }),
+      }),
+    })
+  })
+}

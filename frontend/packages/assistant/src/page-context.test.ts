@@ -48,6 +48,14 @@ describe('serializePageContext', () => {
     expect(text).toContain('没提交')
   })
 
+  /** 造/改数据集的工具提示（WORK-060）：保存必须由用户确认，不能让模型以为它能写库。 */
+  it('提示助手用数据集工具，并说明保存由用户确认', () => {
+    const text = serializePageContext(CONTEXT) ?? ''
+    expect(text).toContain('planner_build_dataset')
+    expect(text).toContain('sql_read_dataset')
+    expect(text).toContain('保存由用户在页面上确认')
+  })
+
   it('没有结果时不写结果段', () => {
     expect(serializePageContext(CONTEXT)).not.toContain('最近一次运行的结果')
   })
