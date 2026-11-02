@@ -92,6 +92,9 @@ class AccountDeletionCascadeIntegrationTest {
             {"question_attempts", "user_id"},
             {"concept_mastery_state", "user_id"},
             {"review_sessions", "user_id"},
+            // 学习计划项（WORK-053）与搜索关键词（WORK-045）：两处都带用户原文，且都没有跨模块外键
+            {"learning_plan_items", "user_id"},
+            {"knowledge_search_log", "user_id"},
             // 回答反馈（WORK-036）：这个人点过的赞与踩
             {"ai_feedback", "user_id"},
             // AI 调用追踪（WORK-022）：轮次行带 user_id，步骤与载荷随 trace 走（listener 里先删）
@@ -359,6 +362,16 @@ class AccountDeletionCascadeIntegrationTest {
                     INSERT INTO review_sessions
                         (user_id, concept_ids_json, items_json, created_at, expires_at)
                     VALUES (?, '[]', '[]', UTC_TIMESTAMP(3), DATE_ADD(UTC_TIMESTAMP(3), INTERVAL 1 DAY))
+                    """, owner);
+            // WORK-053 / WORK-045：同样必须真种一条，否则新加的两行断言只会命中空表
+            jdbcTemplate.update("""
+                    INSERT INTO learning_plan_items
+                        (user_id, plan_date, goal, reason, created_at, updated_at)
+                    VALUES (?, CURRENT_DATE, '读完集合一节', '自评没过', UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))
+                    """, owner);
+            jdbcTemplate.update("""
+                    INSERT INTO knowledge_search_log (user_id, keyword, result_count, searched_at)
+                    VALUES (?, 'owner@example.com', 0, UTC_TIMESTAMP(3))
                     """, owner);
             if (conceptId != null) {
                 jdbcTemplate.update("""

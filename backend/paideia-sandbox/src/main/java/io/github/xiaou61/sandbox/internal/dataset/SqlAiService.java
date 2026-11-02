@@ -69,9 +69,14 @@ public class SqlAiService {
         }
         SqlQuestionPort.Question question = generated.questions().get(0);
 
-        // 参考解必须先过语句门禁再执行：这是模型产出的 SQL，和用户上传同一条信任边界。
-        // 门禁原本只在上传路径生效，这里不过就等于让模型绕过白名单直接跑任意语句。
-        SqlStatementGuard.check(question.referenceSql());
+        // 参考解必须先过语句门禁再执行：这是模型产出的 SQL，和用户上传同一条信任边界
+        // （用户能用 goal 影响模型输出）。用 `checkQuery` 而不是 `check`——参考解是 SELECT，
+        // 套数据集那份白名单会把所有合法参考解都拒掉。返回值必须判：它只返回问题列表。
+        List<String> problems = SqlStatementGuard.checkQuery(question.referenceSql());
+        if (!problems.isEmpty()) {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT,
+                    "AI 的参考解里有不能执行的写法：" + String.join("；", problems));
+        }
 
         // 参考解必须在同一个数据集上真跑：期望结果集只能来自实际执行
         CodeRun.Result result = runOn(userId, datasetKey, question.referenceSql());

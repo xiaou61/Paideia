@@ -9355,3 +9355,21 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 已知项：本机测量噪声大——同一天单次发版实测 122 / 140 / 155 / 206 秒，各阶段随负载漂移（后端打包 16→52s、解包 5→29s）；干净时预期含前端约 100~120s、纯后端约 70~80s。剩余固定成本：mvn 后端打包 ~16s、应用启动 23s、两次 SSH ~11s、上传 ~10s，本次未处理
 - 本地提交：c7df2ea（脚本）；本记录未提交
 - 远端推送：未执行
+## 2026-11-02 17:39:16  · 代码审查 · 第七轮区间审查 `c236b9e..4a37586`（329 个提交）：412 条，修掉 1 critical + 24 high
+
+- 类型：implementation
+- 变更：① 审基线之后的全部提交（1076 文件 / +134,067 −4,037 行），报告 `.agent/reviews/2026-11-02-c236b9e..4a37586.md`：**412 条（critical 1、high 28、medium 202、low 181）**，原始 461 条按同文件行号 ≤3 收敛。分 8 段跑，模型走本机 magpie 网关（主力 `opencode-go/deepseek-v4.1-flash`，`.agent/html` 那一段另用 `codearts/deepseek-v4.1-flash` 补跑一轮取并集）。② **critical 1 条必修**：`SqlAiService` 的参考解门禁把 `SqlStatementGuard.check(...)` 的返回值丢了——那个方法**只返回问题列表、不抛异常**，于是门禁整轮空转。新增 `checkQuery`（查询门禁：词法层危害 + 单语句，不套数据集白名单——参考解是 SELECT，套上去会把每条合法参考解都拒掉）。③ **high 24 条**（另 4 条见"决策"）：
+  - 安全/隐私 4：`ShellRunner` 的协议块解析是"后写覆盖"，学习者在自己的 stdout 里 `echo '###RC'` 就能把判定改成 passed（改为**标记必须按顺序出现**，乱序当正文）；`MemoryExtractionService` 的 PROPOSE 分支排在敏感信息过滤之前并 `continue`，带口令的提议绕过过滤写进候选表；`OpsLogRedactor` 漏掉 JSON 式带引号键（`"password":"x"`）与 `Authorization: Basic`，且原来的 `\S+` 会把 `a","api_key` 整段吃成一个值、导致下一个键漏网；`KnowledgeAdminTools.has()` 把"显式传 null"当成"传了"，`{"body": null}` 会把正文静默清成空串。
+  - 注销级联 2：`knowledge_search_log`（关键词可能含邮箱/手机号）与 `learning_plan_items`（`goal`/`reason` 是用户原文）都没进 `KnowledgeUserDeletionListener.USER_TABLES` 与级联集成测试清单；另修 `McpUsageUserDeletionListener` 与 `McpUserDeletionListener` 的**执行顺序依赖**（用量删除靠 JOIN 凭据表定位行，凭据先删则用量永远删不掉），用 `@Order` 显式定序。
+  - 钱 1：`ResumeImportService` 用 `usage == null` 反推"还没结算"两个方向都错（上游没给用量时结算已经发生过 → 重复退；settle 自己抛异常时 → 不退也不扣、预留永久留账）。改用显式 `settled` 标志。
+  - 构建门禁 1：三个迁移（V958 / V959 / V20261102120000）没登记进 `migration-checksums.txt`，`MigrationChecksumTest` 直接红（另一个会话当天的记录里也提到过这条红）。
+  - 正确性/性能 4：`DefaultRunRecorder.ALLOWED_ATTRS` 漏登记 `contextUris`（`attribute()` 只打一条 debug 日志，新埋点永远落不了库）；`AnalyticsService` 的时区配置键写成 `paideia.digest.zone`（真实键是 `paideia.ai.digest.zone`），带默认值所以 Spring 不报错、运维改了速递时区大屏也不跟；`TrackService` 的列表上限提到 2000 后放大既有 N+1（每行单发一次 `findLineKindOfEntry`），改为 JOIN 取 `line_kind`；`AttachmentUris` 只看前 8 行，而附着行排在前端拼的页面场景之后（SQL 工作台自己就 9 行），最常见的"SQL 工作台 + 附件"恒为空，且不校验 URI 形状。
+  - 前端 6：`ReviewPage` 交卷失败后重试会多出一条同 itemId 的答案、后端按"数量相等 + 不重复"必然拒绝（先剔除同题再追加）；`CampDetailPage` 与 `SourceProjectsPage` 在查询被 `enabled: false` 关掉时 `isPending` 永远为 true，页面卡在"加载中"且无出口；`ProgressPage` 给助手的是 `[object Object]`（对象数组直接 `join`）；`LearnPage` 把 `RoleKey` 写回自由文本字段 `targetRole`（资料页与面试官读的都是它）；`conversation-panel` 的搜索 effect 以 `mention` 对象为依赖，↑/↓ 移动会被 180ms 后的 `setActiveCandidate(0)` 打回第一条；`result-chart` 的 `safeX` 只用于推导默认 Y，渲染路径仍用原始 state。
+  - 文档 2：`.agent/html/05-learning-loop.html` 把**已修**的选题缺陷用现在时写成"当前有一条绿色测试断言它是错的"；`.agent/html/07-sql-sandbox.html` 的核心论述仍写"起一个一次性容器 / 不做常驻数据库"，而 `SqlContainerPool` 已默认启用（`sql.pool.size`=2，3.5–4.2 秒 → 约 120ms）。两处都按现状重写。
+  - 顺带：`packages/ui/src/markdown/renderers/source-walk.test.tsx` 少传 `isIncomplete` / `language`，使 master 上 `pnpm -r typecheck` 一直是红的（非本轮审查项，一行修掉）。
+- 决策：**29 条里 4 条不修**：① `Invocation.java` 的"白名单校验不是上游写法"是**误报**——用 firecrawl 取回快照里钉住的那个 commit（`ee0d4f4`）的上游原文，白名单本来就在上游，快照逐字一致；② ③ shell 题型的 `judge` 由客户端上传、后端直接执行（三处注释都写着"判定脚本不下发"，与实现相反）——**真缺口，但不是补丁能修的**：正解是服务端按 `caseId` 从条目正文里自己取判定脚本，需要新增一个服务端正文解析，属工作项；本轮只把三处失实注释改成事实并留下 `shortcut:` 标注。
+- 依据：`.agent/reviews/2026-11-02-c236b9e..4a37586.md`；用户 2026-11-02 指示"继续审查"并指定模型
+- 验证：**反向验证**——把 `ShellRunner.parse` 临时改回"后写覆盖"，新增用例 `输出里的伪造标记改不了判定` 报 `judgeExit` 期望 1 实得 0；还原后转绿。后端 `mvn -B -T 1C -pl '!paideia-app' test` **385 条 0 失败**；paideia-app 的 `MigrationChecksumTest` / `MigrationVersionFormatTest` / `MigrationSeedOverlapTest` / `ModularityTest` / `AccountDeletionCascadeIntegrationTest`（4 条）全绿，`OpsLogRedactorTest` 5/5。前端 `pnpm -r typecheck` **15 包全过**；`assistant 78`、`knowledge 93`、`sql-workbench 47`、`camp 7` 全过；`packages/ui` 256/257——唯一失败是 `tokens.test.ts`「颜色必须来自令牌」，12 处全在 `apps/admin/src/pages/AnalyticsPage.tsx`（另一会话的数据大屏，本工作树未改动）。**未跑 e2e**。
+- 已知问题：`digest_item_clicks` 与 `knowledge_search_log` 同类（带 `user_id`、无跨模块外键），但没进任何注销级联清单，也不在 `paideia-app` 任何 listener 里——本轮只修了审查点到的那两张表，这一张需要先定"大屏埋点是否随注销删除"的口径。
+- 本地提交：见本轮提交
+- 远端推送：未执行（等用户授权）

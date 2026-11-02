@@ -130,6 +130,20 @@ export function CampDetailPage() {
     },
   })
 
+  // `valid` 必须一起判：id 非法时 5 个 query 全被 `enabled: false` 关掉，而被禁用的
+  // query 不会变成 error，`isPending` 会永远为 true —— 之前这里会卡在"加载训练营…"
+  // 且没有任何出口（2026-11-02 审查抓到）。KnowledgeEntryPage 也是这个写法。
+  if (!valid) {
+    return (
+      <AppShell title="Paideia" actions={<LearnerHeader />} wide>
+        <PageHeader title="这个训练营看不到" />
+        <p className="text-muted-foreground text-sm">地址里的训练营编号不对。</p>
+        <Button className="mt-4" onClick={() => navigate('/camp')}>
+          回到列表
+        </Button>
+      </AppShell>
+    )
+  }
   if (camp.isPending) {
     return (
       <AppShell title="Paideia" actions={<LearnerHeader />} wide>

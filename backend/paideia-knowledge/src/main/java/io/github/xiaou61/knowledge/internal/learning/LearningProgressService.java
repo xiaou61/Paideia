@@ -106,7 +106,7 @@ public class LearningProgressService {
     public List<View> listMine(long userId, int limit) {
         return progressMapper.findVisibleByUser(userId).stream()
                 .limit(Math.max(1, Math.min(limit, 2000)))
-                .map(row -> toView(row, row.getTitle()))
+                .map(row -> toView(row, row.getTitle(), row.getLineKind()))
                 .toList();
     }
 
@@ -198,10 +198,6 @@ public class LearningProgressService {
     @Transactional
     public void reset(long userId, long entryId) {
         progressMapper.delete(userId, entryId);
-    }
-
-    private View toView(LearningProgressRow row, String title) {
-        return toView(row, title, entryMapper.findLineKindOfEntry(row.getEntryId()));
     }
 
     private View toView(LearningProgressRow row, String title, String lineKind) {

@@ -188,17 +188,20 @@ public class MemoryExtractionService {
         int proposed = 0;
         int filtered = 0;
         for (MemoryCandidate candidate : candidates) {
+            // 敏感信息先判：`PROPOSE` 的正文会写进 ai_memory_candidates，而那张表的正文
+            // 会被 `GET /memory/candidates` 渲染到面板上。原先这一支排在下面又 `continue`，
+            // 带口令/令牌的提议就绕过过滤原样落库了（2026-11-02 审查抓到）。
+            if (candidate.content() != null && SensitiveContent.find(candidate.content()).isPresent()) {
+                this.candidates.recordFiltered(userId, candidate.store(), candidate.content(),
+                        slice.conversationId(), slice.upToMessageId());
+                filtered++;
+                continue;
+            }
             if (candidate.action() == MemoryCandidate.Action.PROPOSE) {
                 this.candidates.propose(userId, candidate.store(), candidate.kind(), candidate.refId(),
                         candidate.content(), slice.conversationId(), slice.upToMessageId(),
                         candidate.reason());
                 proposed++;
-                continue;
-            }
-            if (candidate.content() != null && SensitiveContent.find(candidate.content()).isPresent()) {
-                this.candidates.recordFiltered(userId, candidate.store(), candidate.content(),
-                        slice.conversationId(), slice.upToMessageId());
-                filtered++;
                 continue;
             }
             direct.add(candidate);

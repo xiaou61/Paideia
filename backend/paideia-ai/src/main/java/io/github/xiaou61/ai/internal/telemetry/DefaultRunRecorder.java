@@ -40,7 +40,10 @@ final class DefaultRunRecorder implements RunRecorder {
     private static final Set<String> ALLOWED_ATTRS = Set.of(
             "httpTraceId", "historyMsgs", "memoryHits", "entryChars",
             "learningSummaryChars", "queued", "reqChars", "respChars",
-            "toolArgs", "toolResult");
+            "toolArgs", "toolResult",
+            // 这一轮手里的对象引用（WORK-058）。漏登记时 attribute() 只打一条 debug 日志，
+            // 于是"它当时能看到什么"永远查不到——2026-11-02 审查抓到。
+            "contextUris");
 
     private final RunWriteQueue queue;
     private final TelemetryProperties properties;

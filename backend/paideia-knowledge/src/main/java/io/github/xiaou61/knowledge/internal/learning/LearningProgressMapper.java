@@ -42,7 +42,8 @@ public interface LearningProgressMapper {
      */
     @Select("""
             SELECT p.id, p.user_id, p.entry_id, p.tour_step, p.challenges_json, p.quizzes_json, p.status,
-                   p.passed_at, p.review_stage, p.review_due_at, p.created_at, p.updated_at, e.title
+                   p.passed_at, p.review_stage, p.review_due_at, p.created_at, p.updated_at,
+                   e.title, e.line_kind
             FROM learning_progress p
             JOIN knowledge_entries e ON e.id = p.entry_id
             WHERE p.user_id = #{userId} AND e.status = 'published'

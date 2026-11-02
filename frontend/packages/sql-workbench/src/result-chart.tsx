@@ -56,7 +56,7 @@ export function ResultChart({ table }: { table: ResultTable }) {
 
   const points = table.rows
     .map((row) => ({
-      label: row[xColumn] === NULL_MARKER ? 'NULL' : (row[xColumn] ?? ''),
+      label: row[safeX] === NULL_MARKER ? 'NULL' : (row[safeX] ?? ''),
       value: effectiveY === null ? null : toNumber(row[effectiveY]),
     }))
     // 缺值的行不画：把 NULL 当 0 会在图上凭空造出一个数据点
@@ -93,7 +93,7 @@ export function ResultChart({ table }: { table: ResultTable }) {
           X 轴
           <select
             className="border-border bg-card rounded-md border px-2 py-1 text-sm"
-            value={xColumn}
+            value={safeX}
             onChange={(event) => setXColumn(Number(event.target.value))}
             data-testid="chart-x"
           >
@@ -143,7 +143,7 @@ export function ResultChart({ table }: { table: ResultTable }) {
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="border-border w-full rounded-lg border"
         role="img"
-        aria-label={`${table.columns[xColumn]} 对 ${table.columns[effectiveY]} 的${kind === 'bar' ? '柱状' : '折线'}图`}
+        aria-label={`${table.columns[safeX]} 对 ${table.columns[effectiveY]} 的${kind === 'bar' ? '柱状' : '折线'}图`}
       >
         {/* 零轴与顶部刻度：只画两条参考线，避免刻度线喧宾夺主 */}
         <line x1={PAD_L} y1={y(min)} x2={WIDTH - 12} y2={y(min)} stroke="var(--border)" />

@@ -344,7 +344,10 @@ export function ConversationPanel({
       alive = false
       clearTimeout(timer)
     }
-  }, [mention, searchObjects])
+    // 依赖只取查询词，不取 `mention` 对象本身：`syncMention` 每次按键都新建一个
+    // `{start, query}`，以对象为依赖会让"查询词没变"的操作（↑/↓ 在候选间移动）也重跑搜索，
+    // 180ms 后 `setActiveCandidate(0)` 把用户刚移上去的高亮打回第一条（2026-11-02 审查抓到）。
+  }, [mention?.query, searchObjects])
 
   /** 选中候选：把 `@查询` 从输入里删掉，对象进附件栈。 */
   const pickCandidate = (candidate: Attachment) => {

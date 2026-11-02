@@ -85,16 +85,16 @@
         <div class="link"></div>
         <div class="box">把掌握度换算成能力值：<code>1200 + (m − 0.5) × 400</code></div>
         <div class="link"></div>
-        <div class="box box--svc"><code>PracticeSelector</code> 挑难度≈能力的题<small>难度来自 <code>question_difficulty</code>，Elo 跨会话累积</small></div>
+        <div class="box box--svc"><code>PracticeSelector</code> 挑难度≈<b>能力 − 150 分</b>的题<small>不是贴能力，是压在能力下方（2026-10-23 改）；难度来自 <code>question_difficulty</code>，Elo 跨会话累积</small></div>
         <div class="link link--dashed"></div>
-        <div class="box box--fail">选出来的题又回到第一步——这就是缺陷所在</div>
+        <div class="box box--fail">选出来的题又回到第一步</div>
       </div>
     </div>
-    <figcaption><b>回路本身没错，错在参数。</b>难度永远贴着能力走，模型就永远拿不到「明显太难」或「明显太简单」的题。</figcaption>
+    <figcaption><b>回路本身没错，错在参数。</b>难度如果贴着能力走，模型就永远拿不到「明显太难」或「明显太简单」的题——所以目标是能力下方 <b>150 分</b>（答对率约 70%）。</figcaption>
   </figure>
 
   <div class="warn">
-    <b>这里有实测过的真缺陷，别当成理论。</b>用生产模型跑离线模拟：信息增益 <b>0.6303</b>，随机选题是 <b>0.7619</b>——<b>比随机低 17.3%</b>。根因是上面的回路：掌握度低 → 能力值低 → 挑简单题 → 答对 → 掌握度只微涨，于是系统长期在 50% 正确率附近震荡，爬不上去。这是一条<b>写成断言「当前是错的」的绿色测试</b>，不是漏测。
+    <b>这里记录的是已经修掉的一条真缺陷，不是理论。</b>修前用生产模型跑离线模拟：信息增益 <b>0.6303</b>，随机选题是 <b>0.7619</b>——<b>比随机低 17.3%</b>。根因是上面的回路：难度贴着能力 → 挑简单题 → 答对 → 掌握度只微涨，于是系统长期在 50% 正确率附近震荡，爬不上去。<b>2026-10-23 已修</b>：目标难度改为能力下方 <code>TARGET_GAP</code>=150 分，同一模拟下信息增益 <b>+23.3%</b>；<code>SelectionStrategyComparisonTest</code> 现在断言的是「信息增益比随机高 ≥20%」，不再是「记录当前是错的」。
   </div>
 
   <h3>训练营：把「学习计划」也做成一组成表的数据</h3>

@@ -116,4 +116,27 @@ class SqlStatementGuardTest {
         assertThat(SqlStatementGuard.check("CREATE  TRIGGER x BEFORE INSERT ON t FOR EACH ROW SET @a=1;"))
                 .isNotEmpty();
     }
+
+    /**
+     * 查询门禁：AI 产出的参考解。
+     *
+     * <p>**为什么不能直接复用 {@code check}**：参考解就是一条 `SELECT`，而数据集白名单里
+     * 根本没有 `SELECT`——套上去会把每一个合法参考解都拒掉，于是调用方只能把返回值丢掉，
+     * 门禁又变回空转（2026-11-02 审查抓到的正是这个状态）。
+     */
+    @Test
+    void 参考解只挡危险写法而不挡查询() {
+        assertThat(SqlStatementGuard.checkQuery("SELECT name FROM customers ORDER BY name;")).isEmpty();
+        assertThat(SqlStatementGuard.checkQuery("select count(*) from customers")).isEmpty();
+        assertThat(SqlStatementGuard.checkQuery("WITH t AS (SELECT 1 AS a) SELECT a FROM t;")).isEmpty();
+    }
+
+    @Test
+    void 参考解仍挡宿主文件与多语句() {
+        assertThat(SqlStatementGuard.checkQuery("SELECT 1 INTO OUTFILE '/tmp/x';")).isNotEmpty();
+        assertThat(SqlStatementGuard.checkQuery("SELECT LOAD_FILE('/etc/passwd');")).isNotEmpty();
+        assertThat(SqlStatementGuard.checkQuery("SELECT 1 FROM t; SELECT 2 FROM t;")).isNotEmpty();
+        assertThat(SqlStatementGuard.checkQuery(null)).isNotEmpty();
+        assertThat(SqlStatementGuard.checkQuery("   ")).isNotEmpty();
+    }
 }
