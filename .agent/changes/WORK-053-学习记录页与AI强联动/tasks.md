@@ -107,13 +107,16 @@ approver_role: CTO
 - 测试：`e2e/sql-practice.spec.ts`
 - 验证：e2e + 线上点一次
 
-### TASK-009 | pending | 计划落库（阶段二）
+### TASK-009 | done | 计划落库（阶段二）
 
 - 对应：`REQ-006`、`REQ-007`
 - 依赖：TASK-005
 - 修改：Flyway 迁移（14 位时间戳）+ `paideia-app` 或 `paideia-ai` 的计划端点 + 页面"今天要做的事"
 - 测试：后端切片 + `e2e/progress.spec.ts`（采用后刷新仍在；助手自称已加入但列表为空）
-- 验证：待开工
+- 验证：e2e `progress.spec.ts`「计划：添加一条 → 刷新仍在 → 勾选完成 → 刷新仍是已完成 → 删除」通过；
+  助手候选由 `plan.test.ts`（4 条）+ 面板接线测试（1 条）覆盖；写入只在用户点「加入计划」之后（REQ-007）。
+- 进度：已完成。表 `learning_plan_items` + `/api/v1/learning/plan-items`（GET/POST/PATCH/DELETE）；
+  `/progress` 新增「今天要做的事」卡（手动添加/勾选/删除）；助手回复里的 plan 块渲染成卡片。
 
 ### TASK-010 | pending | 迁移 #1 精简
 
