@@ -6,14 +6,14 @@ status: passed
 evidence: required
 created: 2026-11-02
 updated: 2026-11-02
-verified_commit: a7345db
+verified_commit: e671b08
 ---
 
 # 全站模块化自动化点击测试验证报告
 
 ## 验证环境
 
-- 代码：`a7345db`（`feat(ego): 全站模块化自动化点击框架与 18 个模块场景（WORK-059）`）
+- 代码：`a7345db`（`feat(ego): 全站模块化自动化点击框架与 18 个模块场景（WORK-059）`）；合并提交 `e671b08` 代码相同
 - 目标：线上实例（学习者端 `/`、管理端 `/admin/`）
 - 驱动：ego-browser v2.2.0（Windows），固定 `Profile 2`
 - 账号：`e2e-learner`（学习者）、`admin`（管理员）
