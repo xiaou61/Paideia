@@ -13,8 +13,10 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
@@ -69,6 +71,28 @@ public class GlobalExceptionHandler {
             HttpServletRequest request) {
         return ResponseEntity.badRequest()
                 .body(ApiResponse.<Void>failure(ErrorCode.INVALID_ARGUMENT, "请求体无法解析")
+                        .withTraceId(traceIdOf(request)));
+    }
+
+    /**
+     * 缺少必填参数 / 参数类型对不上。
+     *
+     * <p>必须显式处理：兜底会把它们兜成 500——调用方漏传或写错一个参数会被记成"服务端故障"，
+     * 监控与告警就数错了账（2026-11-03 线上冒烟实测：`/learning/plan-items` 不带 date 时 500）。
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingParameter(MissingServletRequestParameterException exception,
+            HttpServletRequest request) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.<Void>failure(ErrorCode.INVALID_ARGUMENT, "缺少必填参数：" + exception.getParameterName())
+                        .withTraceId(traceIdOf(request)));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleParameterTypeMismatch(MethodArgumentTypeMismatchException exception,
+            HttpServletRequest request) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.<Void>failure(ErrorCode.INVALID_ARGUMENT, "参数格式不正确：" + exception.getName())
                         .withTraceId(traceIdOf(request)));
     }
 

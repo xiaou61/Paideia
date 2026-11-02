@@ -70,6 +70,25 @@ class WebPipelineTest {
     }
 
     @Test
+    @DisplayName("缺少必填参数归为 400（曾经落进兜底变 500）")
+    void missingRequiredParamIsBadRequest() {
+        assertThat(mvc.get().uri("/probe/requires-param"))
+                .matches(status().isBadRequest())
+                .bodyText()
+                .contains("\"code\":40000")
+                .contains("date");
+    }
+
+    @Test
+    @DisplayName("参数类型对不上归为 400（date=abc，而不是 500）")
+    void malformedParamIsBadRequest() {
+        assertThat(mvc.get().uri("/probe/requires-param").param("date", "abc"))
+                .matches(status().isBadRequest())
+                .bodyText()
+                .contains("\"code\":40000");
+    }
+
+    @Test
     @DisplayName("控制器自己构造的响应不被二次包装，但同样会被补上追踪标识")
     void doesNotDoubleWrapButFillsTraceId() {
         assertThat(mvc.get().uri("/probe/wrapped"))

@@ -9673,3 +9673,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：见报告矩阵；**性能结论：无 ≥1s 接口（中位 53–351ms）**
 - 本地提交：本片提交
 - 远端推送：未执行
+
+## 2026-11-03 04:20 +0800 · 线上冒烟发现的错误分类缺陷修复
+
+- 类型：fix
+- 变更：GlobalExceptionHandler 显式处理 MissingServletRequestParameterException 与 MethodArgumentTypeMismatchException → 400（含探针端点与两条 WebPipelineTest 用例）
+- 决策：两者此前落进兜底报 500——调用方错误被记成服务端故障，监控数错账（线上冒烟实测 /learning/plan-items 缺 date 时 500；补 date 后 200/0.16s，端点本身健康）
+- 依据：2026-11-03 部署后冒烟 re-run 的输出与 journalctl 实证
+- 验证：paideia-web 14 条 0 失败（WebPipelineTest 7/7 含新增 2 条）；守卫切片 35 条 0 红
+- 本地提交：本笔提交
+- 远端推送：本次推送

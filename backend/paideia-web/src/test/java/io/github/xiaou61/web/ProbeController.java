@@ -5,10 +5,12 @@ import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import java.time.LocalDate;
 import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -41,6 +43,12 @@ class ProbeController {
     @PostMapping("/probe/validate")
     Map<String, Object> validate(@Valid @RequestBody ProbeRequest request) {
         return Map.of("name", request.name());
+    }
+
+    /** 缺参（不传 date）与类型不对（date=abc）都靠这一个端点驱动。 */
+    @GetMapping("/probe/requires-param")
+    Map<String, Object> requiresParam(@RequestParam("date") LocalDate date) {
+        return Map.of("date", date.toString());
     }
 
     record ProbeRequest(@NotBlank String name) {
