@@ -42,9 +42,10 @@ approver_role: CTO
 - 验证：受影响模块 test；守卫切片；消失判据 B1。
 - 完成记录：实际替换 10 块（8 块由机械脚本、sandbox 2 块形态不同单独改）+ 6 处裸解析 + knowledge 的 `require()` 改为委托；**knowledge 的 `orNull()` 按设计保留**（读路径要吞异常，不是逐字拷贝）。消失判据通过：文案只剩 `CurrentUser.java:42` 一处；`CurrentUser.subjectId()` 剩余 4 处均为"要字符串不要数字"的合法用法（MeController 回显、orNull、测试夹具、OAuth 身份绑定）。行为差异一处：sandbox 匿名请求文案由"未认证"统一为"令牌主体不是有效的账号标识"（HTTP 401 不变）。实测：非 app 单元切片 **805 条 / 0 失败 / exit 0（59 秒）**；守卫切片 35 条 0 红（66 秒）。
 
-### TASK-002 | pending | B2 SHA-256 收敛
+### TASK-002 | done | B2 SHA-256 收敛
 - 落点 `platform.Hashes.sha256Hex`；替换 9 处（account.Digest 改委托；ai×5；ops.OpsIncidentService；knowledge.QuestionCatalog；sandbox.SandboxQuotaService）；EssayCollectionService 的 catch-返回原值保留。
 - 验证：受影响模块 test；消失判据 B2。
+- 完成记录：实际替换 **10 处**——消失判据多抓到一处扫描漏网的同类拷贝（`mcp.PatService.hash`，手写 forDigit 形态）；EssayCollectionService 保留"失败退回原值"语义（委托调用包在原 try/catch 内）。消失判据：`MessageDigest.getInstance("SHA-256")` 全仓仅剩 `Hashes.java` 一处。实测：非 app 单元切片 805 条 0 失败（57 秒）；app 面 7 类 54 条中 1 红＝**已知外部项**（McpAdmin 工具数 19/21，061 报告「外部阻塞」已登记），其余 53 条全绿。
 
 ### TASK-003 | pending | B3 工具入参小工具收敛
 - 落点 `platform.ToolArgs`；替换 stringOf 12、longOf 7、messageOf 12、instantOf 2、分页 3-4；窄变体与 fallback 族保留。

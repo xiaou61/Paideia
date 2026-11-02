@@ -1,10 +1,9 @@
 package io.github.xiaou61.ai.internal.digest;
 
+import io.github.xiaou61.platform.Hashes;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
 import java.util.Set;
 
@@ -101,17 +100,6 @@ final class DigestFingerprint {
     }
 
     private static String sha256(String value) {
-        try {
-            byte[] hash = MessageDigest.getInstance("SHA-256")
-                    .digest(value.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hex = new StringBuilder(hash.length * 2);
-            for (byte b : hash) {
-                hex.append(Character.forDigit((b >> 4) & 0xF, 16))
-                        .append(Character.forDigit(b & 0xF, 16));
-            }
-            return hex.toString();
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("JVM 缺少 SHA-256", exception);
-        }
+        return Hashes.sha256Hex(value);
     }
 }

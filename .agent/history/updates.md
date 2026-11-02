@@ -9523,3 +9523,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：消失判据——`令牌主体不是有效的账号标识` 全仓只剩 `CurrentUser.java:42`；`Long.parseLong(CurrentUser.subjectId())` 为 0；剩余 4 处 `subjectId()` 均为合法字符串用法。非 app 单元切片 805 条 / 0 失败 / exit 0（59 秒）；守卫切片 35 条 / 0 红（66 秒）
 - 本地提交：本片提交
 - 远端推送：未执行
+
+## 2026-11-02 22:05 +0800 · WORK-062 · TASK-002 B2 SHA-256 收敛
+
+- 类型：implementation
+- 变更：新增 `platform.Hashes.sha256Hex`；account.Digest、ai（CampFingerprint/DigestFingerprint/EssayCollectionService/SummaryFingerprint/ReviewQuestionGenerator）、ops.OpsIncidentService、knowledge.QuestionCatalog、sandbox.SandboxQuotaService 共 **10 处**收敛（第 10 处 `mcp.PatService.hash` 是消失判据抓到的扫描漏网）；顺带清理各文件因替换而闲置的 import（`MessageDigest` 在 PatService 因恒定时间比较保留）
+- 决策：EssayCollectionService 的"失败退回原值保证不丢内容"是**有意语义**，委托调用保留在原 try/catch 内；异常文案统一为"JVM 缺少 SHA-256 实现"
+- 依据：WORK-062 requirements REQ-001 / design B2；三路扫描的第 2 条候选（扫描报 9 处，实际 10 处）
+- 验证：消失判据——`MessageDigest.getInstance("SHA-256")` 仅剩 Hashes.java:30；单元切片 805 条 / 0 失败 / exit 0（57 秒）；app 面 7 类 54 条：53 绿 + 1 已知外部红（McpAdmin 工具数 19/21）
+- 本地提交：本片提交
+- 远端推送：未执行

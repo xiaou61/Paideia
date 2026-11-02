@@ -4,8 +4,8 @@ import io.github.xiaou61.ai.ModelAccess;
 import io.github.xiaou61.ai.internal.credential.CredentialService;
 import io.github.xiaou61.ai.internal.decision.TechEssayFilter;
 import io.github.xiaou61.knowledge.KnowledgeApi;
+import io.github.xiaou61.platform.Hashes;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -194,15 +194,10 @@ public class EssayCollectionService {
 
     private static String sha256(String value) {
         try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(value.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hex = new StringBuilder(digest.length * 2);
-            for (byte b : digest) {
-                hex.append(String.format("%02x", b));
-            }
-            return hex.toString();
+            return Hashes.sha256Hex(value);
         } catch (Exception exception) {
             // SHA-256 必然存在；走到这里说明运行环境坏了，退回原值保证不丢内容
+            // （与共享件的抛异常口径刻意不同——保留）
             return value;
         }
     }

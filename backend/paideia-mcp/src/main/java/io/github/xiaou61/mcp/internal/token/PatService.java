@@ -2,10 +2,10 @@ package io.github.xiaou61.mcp.internal.token;
 
 import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
+import io.github.xiaou61.platform.Hashes;
 import io.github.xiaou61.platform.ToolScope;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
@@ -269,17 +269,7 @@ public class PatService {
 
     /** sha256 十六进制。不用加盐：token 本身是 32 字节随机，字典攻击没有意义。 */
     static String hash(String token) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hex = new StringBuilder(digest.length * 2);
-            for (byte value : digest) {
-                hex.append(Character.forDigit((value >> 4) & 0xF, 16));
-                hex.append(Character.forDigit(value & 0xF, 16));
-            }
-            return hex.toString();
-        } catch (NoSuchAlgorithmException impossible) {
-            // SHA-256 是 JDK 必须提供的算法；走到这里说明运行环境坏了，继续下去没有意义
-            throw new IllegalStateException("SHA-256 不可用", impossible);
-        }
+        // 收敛到共享件（WORK-062）：手写 forDigit 与 HexFormat 输出逐位一致
+        return Hashes.sha256Hex(token);
     }
 }

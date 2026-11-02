@@ -2,15 +2,13 @@ package io.github.xiaou61.sandbox.internal.audit;
 
 import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
+import io.github.xiaou61.platform.Hashes;
 import io.github.xiaou61.sandbox.internal.run.CodeRun;
 import io.github.xiaou61.sandbox.internal.run.SandboxProperties;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
-import java.util.HexFormat;
 import org.springframework.stereotype.Service;
 
 /**
@@ -128,12 +126,6 @@ public class SandboxQuotaService {
     }
 
     private static String sha256(String text) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(text.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException cause) {
-            // SHA-256 是 JDK 必备算法，走到这里说明运行环境坏了
-            throw new IllegalStateException("缺少 SHA-256", cause);
-        }
+        return Hashes.sha256Hex(text);
     }
 }

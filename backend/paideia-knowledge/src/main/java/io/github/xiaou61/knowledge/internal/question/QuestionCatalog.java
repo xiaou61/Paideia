@@ -1,16 +1,14 @@
 package io.github.xiaou61.knowledge.internal.question;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import io.github.xiaou61.platform.Hashes;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * 从条目正文里解析题目并给出稳定身份（WORK-033）。
@@ -100,12 +98,6 @@ final class QuestionCatalog {
             raw.append(option == null ? "" : option.strip()).append('\u0001');
         }
         raw.append(answerIndex);
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(raw.toString().getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException exception) {
-            // JDK 一定带 SHA-256；走到这里说明运行环境坏了
-            throw new IllegalStateException("缺少 SHA-256 实现", exception);
-        }
+        return Hashes.sha256Hex(raw.toString());
     }
 }

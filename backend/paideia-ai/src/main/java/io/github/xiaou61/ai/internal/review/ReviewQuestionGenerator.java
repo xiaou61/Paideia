@@ -18,12 +18,11 @@ import io.github.xiaou61.ai.internal.billing.CreditService;
 import io.github.xiaou61.ai.internal.credential.CredentialService;
 import io.github.xiaou61.ai.internal.provider.GuardedHttpTransport;
 import io.github.xiaou61.knowledge.ReviewQuestionPort;
+import io.github.xiaou61.platform.Hashes;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -232,11 +231,6 @@ class ReviewQuestionGenerator implements ReviewQuestionPort {
     }
 
     static String fingerprint(String stem) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(stem.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception exception) {
-            throw new IllegalStateException("缺少 SHA-256 实现", exception);
-        }
+        return Hashes.sha256Hex(stem);
     }
 }

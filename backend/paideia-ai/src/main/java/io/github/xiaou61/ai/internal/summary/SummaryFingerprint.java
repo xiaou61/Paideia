@@ -1,9 +1,7 @@
 package io.github.xiaou61.ai.internal.summary;
 
+import io.github.xiaou61.platform.Hashes;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 
 /**
  * 正文指纹：正文的 SHA-256（十六进制）。
@@ -18,13 +16,6 @@ final class SummaryFingerprint {
     }
 
     static String of(String body) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest((body == null ? "" : body).getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException exception) {
-            // SHA-256 是 JDK 必须提供的算法，走到这里说明运行环境坏了
-            throw new IllegalStateException("当前 JVM 没有 SHA-256", exception);
-        }
+        return Hashes.sha256Hex(body == null ? "" : body);
     }
 }
