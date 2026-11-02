@@ -41,6 +41,9 @@ $explodedLocal = Join-Path $repo 'backend\paideia-app\target\release-exploded'
 $manifestLocal = Join-Path $staging 'MANIFEST.MF'
 $manifestList = Join-Path $staging 'exploded.manifest'
 $patch = Join-Path $staging 'release-patch.tar.gz'
+$webPatch = Join-Path $staging 'web-patch.tar.gz'
+$webPatchDir = Join-Path $staging 'web-patch'
+$webManifestLocal = Join-Path $staging 'web.manifest'
 $bsdtar = Join-Path $env:SystemRoot 'System32\tar.exe'
 # 上一次成功发版时的 git 提交。用来判断"前端到底改没改"——它放在 target 里，不进仓库。
 $lastReleaseMarker = Join-Path $repo 'backend\paideia-app\target\.last-release-commit'
@@ -97,6 +100,58 @@ function Write-ManifestFile($map, [string]$path) {
     [System.IO.File]::WriteAllText($path, ($lines -join "`n") + "`n", [System.Text.UTF8Encoding]::new($false))
 }
 
+# 内容 SHA256（.NET 流式）。Get-FileHash 每次调用的 cmdlet 开销在近千个小文件上累积很明显。
+function Get-ContentHash([string]$path) {
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $fs = [System.IO.File]::OpenRead($path)
+        try { return [BitConverter]::ToString($sha.ComputeHash($fs)).Replace('-', '').ToLowerInvariant() }
+        finally { $fs.Dispose() }
+    } finally { $sha.Dispose() }
+}
+
+<#
+  web 清单（2026-11-02）：把两份 dist 映射到服务器上 web/ 的相对路径——学习者端在根、
+  管理端在 admin/。哈希用内容 SHA256，远端靠它做增量 diff：改一次前端只传变化的文件，
+  不再把 920 个文件（32 MB）整个重传、整个 rm -rf 替换。
+
+  为什么不照 jar 清单那样分"自家/第三方"两档：web 产物全是自家内容，没有"依赖不改"
+  这个前提可用；全量算下来不到一秒，没必要分层。
+#>
+function Get-WebManifest {
+    $map = @{}
+    foreach ($pair in @(
+            @{ Dir = (Join-Path $repo 'frontend\apps\app\dist'); Prefix = '' },
+            @{ Dir = (Join-Path $repo 'frontend\apps\admin\dist'); Prefix = 'admin/' })) {
+        if (-not (Test-Path $pair.Dir)) { throw "找不到前端产物目录：$($pair.Dir)（先构建，或别用 -SkipWeb）" }
+        foreach ($file in Get-ChildItem -LiteralPath $pair.Dir -Recurse -File) {
+            $rel = $pair.Prefix + $file.FullName.Substring($pair.Dir.Length + 1).Replace('\', '/')
+            $map[$rel] = Get-ContentHash $file.FullName
+        }
+    }
+    return $map
+}
+
+# web 相对路径 → 本地 dist 源文件（打增量补丁用）
+function Resolve-WebSource([string]$rel) {
+    if ($rel.StartsWith('admin/')) {
+        return Join-Path (Join-Path $repo 'frontend\apps\admin\dist') ($rel.Substring(6).Replace('/', '\'))
+    }
+    return Join-Path (Join-Path $repo 'frontend\apps\app\dist') ($rel.Replace('/', '\'))
+}
+
+# #v2 清单文本 → map（jar 清单与 web 清单同一格式，解析共用）
+function Parse-ManifestLines($lines) {
+    $map = @{}
+    if ($lines.Count -gt 0 -and $lines[0].Trim() -eq '#v2') {
+        foreach ($line in $lines) {
+            # TrimEnd：服务器上那份可能是别的行尾（CRLF），别让 \r 混进路径键
+            if ($line.TrimEnd() -match '^(size:\d+|[0-9a-f]{64})\s+(.+)$') { $map[$matches[2]] = $matches[1] }
+        }
+    }
+    return $map
+}
+
 function Upload([string]$local, [string]$remote) {
     $env:MSYS_NO_PATHCONV = '1'
     try {
@@ -128,6 +183,36 @@ function Test-FrontendChanged {
     return $false
 }
 
+<#
+  后端自上次发版以来有没有改过？与 Test-FrontendChanged 同一条纪律：**判断不了一律当作改过**。
+  但"没改过"只是跳过打包的必要条件之一——还要 target 里的 jar 与上次发出去的那份指纹一致
+  （别的会话跑过 mvn 就会覆盖 target，光看 git 看不出来）。见打包步骤前的 skipPackaging。
+#>
+function Test-BackendChanged {
+    if (-not (Test-Path $lastReleaseMarker)) { return $true }
+    $last = (Get-Content $lastReleaseMarker -Raw).Trim()
+    if ([string]::IsNullOrWhiteSpace($last)) { return $true }
+
+    $diff = & git -C $repo diff --name-only "$last..HEAD" -- backend 2>$null
+    if ($LASTEXITCODE -ne 0) { return $true }   # 提交不在历史里（rebase/换分支）：当作改过
+    if ($diff) { return $true }
+
+    $dirty = & git -C $repo status --porcelain -- backend 2>$null
+    if ($dirty) { return $true }
+    return $false
+}
+
+# 用 .NET 流式 SHA256：Get-FileHash 在 PS 5.1 上算 90 MB 要好几秒，这个不到一秒
+function Get-JarFingerprint([string]$path) {
+    if (-not (Test-Path $path)) { return '' }
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $fs = [System.IO.File]::OpenRead($path)
+        try { return [BitConverter]::ToString($sha.ComputeHash($fs)).Replace('-', '') }
+        finally { $fs.Dispose() }
+    } finally { $sha.Dispose() }
+}
+
 Write-Host "发版到 $Server（端口 $Port，目录 $RemoteDir）"
 
 if ($WithTests) {
@@ -139,23 +224,40 @@ if ($WithTests) {
     }
 }
 
-Step '后端打包（增量）' {
-    Push-Location (Join-Path $repo 'backend')
-    try {
-        Remove-Item (Join-Path $repo 'backend\paideia-app\target\classes\db') -Recurse -Force -ErrorAction SilentlyContinue
-        # **输出不吞**：原来 `| Out-Null` 让失败时只剩一句"退出码 1"，得再手跑一遍 mvn 才知道
-        # 是 jar 被占用还是编译错。现在只过滤到 ERROR 行，正常构建照样安静。
-        $build = & mvn -B package -DskipTests 2>&1
-        $code = $LASTEXITCODE
+$jarMarker = Join-Path (Split-Path $jar) '.last-release-jar'
+# 跳过打包的前提是"target 里的 jar 与上次发出去的那份逐字节一致"（指纹比对）：
+# 别的构建/会话覆盖过 target 时指纹对不上，会老老实实重打——不会把旧产物当新的发出去。
+# -WithTests 时 verify 必然重建 jar，直接照常打包。
+$skipPackaging = $false
+if (-not $WithTests -and -not (Test-BackendChanged)) {
+    $recorded = if (Test-Path $jarMarker) { (Get-Content $jarMarker -Raw).Trim() } else { '' }
+    $currentJar = Get-JarFingerprint $jar
+    if ($recorded -ne '' -and $currentJar -ne '' -and $currentJar -eq $recorded) {
+        $skipPackaging = $true
+    }
+}
+
+if ($skipPackaging) {
+    Write-Host '  （跳过后端打包：backend/ 自上次发版以来没有改动，且 target 里的 jar 与上次发出去的一致）'
+} else {
+    Step '后端打包（增量）' {
+        Push-Location (Join-Path $repo 'backend')
+        try {
+            Remove-Item (Join-Path $repo 'backend\paideia-app\target\classes\db') -Recurse -Force -ErrorAction SilentlyContinue
+            # **输出不吞**：原来 `| Out-Null` 让失败时只剩一句"退出码 1"，得再手跑一遍 mvn 才知道
+            # 是 jar 被占用还是编译错。现在只过滤到 ERROR 行，正常构建照样安静。
+            $build = & mvn -B package -DskipTests 2>&1
+            $code = $LASTEXITCODE
+            if ($code -ne 0) {
+                ($build | Select-String -Pattern 'ERROR' | Select-Object -First 20) | ForEach-Object { Write-Host "    $_" }
+            }
+        } finally { Pop-Location }
+        # 不检查的话：打包失败时 target 里仍是上一次的旧 JAR，Copy-Item 照样成功，
+        # 最后把旧产物当新版本发出去——"发版成功但线上没生效"
         if ($code -ne 0) {
-            ($build | Select-String -Pattern 'ERROR' | Select-Object -First 20) | ForEach-Object { Write-Host "    $_" }
+            # jar 被本地在跑的后端占着是这台机器上最常见的原因，直接点名怎么处理
+            throw "后端打包失败（退出码 $code）。若提示 Unable to rename *.jar：先关掉本机在跑的旧后端（netstat -ano | findstr :8080）"
         }
-    } finally { Pop-Location }
-    # 不检查的话：打包失败时 target 里仍是上一次的旧 JAR，Copy-Item 照样成功，
-    # 最后把旧产物当新版本发出去——"发版成功但线上没生效"
-    if ($code -ne 0) {
-        # jar 被本地在跑的后端占着是这台机器上最常见的原因，直接点名怎么处理
-        throw "后端打包失败（退出码 $code）。若提示 Unable to rename *.jar：先关掉本机在跑的旧后端（netstat -ano | findstr :8080）"
     }
 }
 
@@ -214,15 +316,27 @@ Step '解包 jar 并算清单' {
 $script:firstTime = $false
 $script:changed = @()
 $script:removed = @()
+$script:remoteWeb = @{}
+$script:webBaseline = $false
+$script:webLocal = @{}
+$script:webChanged = @()
+$script:webRemoved = @()
 Step '取远端基线' {
-    $remoteLines = @(RemoteOutput "cat $RemoteDir/exploded.manifest 2>/dev/null || true")
-    $remote = @{}
-    if ($remoteLines.Count -gt 0 -and $remoteLines[0].Trim() -eq '#v2') {
-        foreach ($line in $remoteLines) {
-            # TrimEnd：服务器上那份可能是别的行尾（CRLF），别让 \r 混进路径键
-            if ($line.TrimEnd() -match '^(size:\d+|[0-9a-f]{64})\s+(.+)$') { $remote[$matches[2]] = $matches[1] }
-        }
+    # 两份清单一次取回（中间用哨兵行分隔，省掉一次 5.7 秒的 SSH 握手）：
+    # exploded.manifest 管 jar 增量，web.manifest 管前端产物增量
+    $remoteLines = @(RemoteOutput "cat $RemoteDir/exploded.manifest 2>/dev/null || true; echo __WEB__; cat $RemoteDir/web.manifest 2>/dev/null || true")
+    $split = -1
+    for ($i = 0; $i -lt $remoteLines.Count; $i++) {
+        if ($remoteLines[$i].Trim() -eq '__WEB__') { $split = $i; break }
     }
+    $jarLines = if ($split -lt 0) { $remoteLines } elseif ($split -eq 0) { @() } else { @($remoteLines[0..($split - 1)]) }
+    $webLines = if ($split -ge 0 -and $split + 1 -lt $remoteLines.Count) { @($remoteLines[($split + 1)..($remoteLines.Count - 1)]) } else { @() }
+
+    $remote = Parse-ManifestLines $jarLines
+    # 别用 @() 包 hashtable——那会变成"含一个 hashtable 的单元素数组"，Count 与索引全错
+    $script:remoteWeb = Parse-ManifestLines $webLines
+    $script:webBaseline = $script:remoteWeb.Count -gt 0
+
     if ($remote.Count -eq 0) {
         $script:firstTime = $true
         Write-Host '  （首次或清单格式升级：整包上传，并在服务器建立增量基线）'
@@ -245,16 +359,44 @@ Step '打部署包' {
         if ($LASTEXITCODE -ne 0) { throw '打包增量失败' }
     }
 
-    # 前端只在真重建过时才进包；没重建时由远端自己检查"服务器上那份还在不在且完整"
-    if ($buildWeb) {
-        New-Item -ItemType Directory -Path (Join-Path $staging 'web\admin') -Force | Out-Null
-        Copy-Item (Join-Path $repo 'frontend\apps\app\dist\*') (Join-Path $staging 'web') -Recurse -Force
-        Copy-Item (Join-Path $repo 'frontend\apps\admin\dist\*') (Join-Path $staging 'web\admin') -Recurse -Force
-    }
-
     # 一个包、一次上传。原来 web 单独压一份 tar.gz 再单独传一次 = 多压一遍 + 多一次 SSH。
     $members = @()
-    if ($buildWeb) { $members += 'web' }
+    # 前端只在真重建过时才进包；没重建时由远端自己检查"服务器上那份还在不在且完整"。
+    # 重建时也不再全量：拿服务器上的 web.manifest 做 diff，只传变化的文件（2026-11-02）。
+    if ($buildWeb) {
+        $script:webLocal = Get-WebManifest
+        $script:webChanged = @($script:webLocal.Keys | Where-Object { $script:remoteWeb[$_] -ne $script:webLocal[$_] })
+        $script:webRemoved = @($script:remoteWeb.Keys | Where-Object { -not $script:webLocal.ContainsKey($_) })
+
+        if (-not $script:webBaseline) {
+            # 服务器上还没有 web 清单（首次/刚换上新逻辑）：只能全量替换，并在这次建立基线
+            New-Item -ItemType Directory -Path (Join-Path $staging 'web\admin') -Force | Out-Null
+            Copy-Item (Join-Path $repo 'frontend\apps\app\dist\*') (Join-Path $staging 'web') -Recurse -Force
+            Copy-Item (Join-Path $repo 'frontend\apps\admin\dist\*') (Join-Path $staging 'web\admin') -Recurse -Force
+            $members += 'web'
+            $members += 'web.manifest'
+            Write-Host ("  web 首次：全量 {0} 个文件（服务器上还没有 web 基线清单）" -f $script:webLocal.Count)
+        } elseif ($script:webChanged.Count -gt 0 -or $script:webRemoved.Count -gt 0) {
+            Remove-Item $webPatchDir -Recurse -Force -ErrorAction SilentlyContinue
+            New-Item -ItemType Directory -Path $webPatchDir -Force | Out-Null
+            foreach ($rel in $script:webChanged) {
+                $dst = Join-Path $webPatchDir ($rel.Replace('/', '\'))
+                New-Item -ItemType Directory -Path (Split-Path $dst) -Force | Out-Null
+                Copy-Item (Resolve-WebSource $rel) $dst -Force
+            }
+            Remove-Item $webPatch -Force -ErrorAction SilentlyContinue
+            & $bsdtar --options "gzip:compression-level=1" -czf $webPatch -C $webPatchDir .
+            if ($LASTEXITCODE -ne 0) { throw '打包前端增量失败' }
+            $members += 'web-patch.tar.gz'
+            $members += 'web.manifest'
+            Write-Host ("  web 变化 {0} 个文件 / 删除 {1} 个（共 {2}）" -f $script:webChanged.Count, $script:webRemoved.Count, $script:webLocal.Count)
+        } else {
+            Write-Host ("  （前端没有变化：{0} 个文件与服务器一致，不传 web）" -f $script:webLocal.Count)
+        }
+        if ($members -contains 'web.manifest') {
+            Write-ManifestFile $script:webLocal $webManifestLocal
+        }
+    }
     if ($script:firstTime) { $members += 'app-full.jar' }
     elseif ($script:changed.Count -gt 0) { $members += 'release-patch.tar.gz' }
     $members += 'exploded.manifest'
@@ -315,6 +457,10 @@ $deployB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($deployPro
 $removeCmd = if ($script:removed.Count -gt 0) {
     "( cd exploded && rm -f -- " + (($script:removed | ForEach-Object { "'$_'" }) -join ' ') + " )"
 } else { 'true' }
+# 前端增量的删除清单（web 相对路径，如 admin/assets/old.js）
+$webRemoveCmd = if ($script:webRemoved.Count -gt 0) {
+    "( cd web && rm -f -- " + (($script:webRemoved | ForEach-Object { "'$_'" }) -join ' ') + " )"
+} else { 'true' }
 # 没有任何变化时不必重打包：当前 app.jar 就是基线，直接复制成待切换文件
 $repackCmd = if ($script:changed.Count -eq 0 -and $script:removed.Count -eq 0) {
     'cp -f app.jar app.jar.new'
@@ -361,6 +507,8 @@ else
   __REPACK_CMD__
 fi
 mv -f deploy-in/exploded.manifest exploded.manifest.new
+# web 清单同样先放 .new：健康检查过了才推进，失败的部署不会让下一次误判"服务器已是最新"
+if [ -f deploy-in/web.manifest ]; then mv -f deploy-in/web.manifest web.manifest.new; fi
 echo "PHASE repack $(( $(date +%s) - t1 ))"
 
 # **先停服务再换文件**（见文件头约束 4）：应用在跑时换掉 app.jar 会让懒加载类找不到
@@ -370,6 +518,11 @@ cp -f app.jar app.jar.prev
 mv -f app.jar.new app.jar
 if [ -d deploy-in/web ]; then
   rm -rf web && mv -f deploy-in/web web
+elif [ -f deploy-in/web-patch.tar.gz ]; then
+  # 前端增量：只解变化的文件，再按 diff 删掉服务器上多出来的（清单推进在健康检查之后）
+  tar xzf deploy-in/web-patch.tar.gz -C web
+  __WEB_REMOVE_CMD__
+  rm -f deploy-in/web-patch.tar.gz
 fi
 rm -rf deploy-in
 echo "PHASE swap $(( $(date +%s) - t2 ))"
@@ -395,11 +548,12 @@ fi
 # 走到这里才算成功：推进基线清单 + 写发版标记
 t5=$(date +%s)
 mv -f exploded.manifest.new exploded.manifest
+if [ -f web.manifest.new ]; then mv -f web.manifest.new web.manifest; fi
 printf '%s' '__PROM_B64__' | base64 -d > /var/lib/node_exporter/textfile/deploy.prom.tmp && mv -f /var/lib/node_exporter/textfile/deploy.prom.tmp /var/lib/node_exporter/textfile/deploy.prom
 echo "PHASE marker $(( $(date +%s) - t5 ))"
 echo "DEPLOY_OK"
 '@
-$remoteScript = $remoteScript.Replace('__REMOTE_DIR__', $RemoteDir).Replace('__PORT__', "$Port").Replace('__REMOVE_CMD__', $removeCmd).Replace('__REPACK_CMD__', $repackCmd).Replace('__PROM_B64__', $deployB64)
+$remoteScript = $remoteScript.Replace('__REMOTE_DIR__', $RemoteDir).Replace('__PORT__', "$Port").Replace('__REMOVE_CMD__', $removeCmd).Replace('__WEB_REMOVE_CMD__', $webRemoveCmd).Replace('__REPACK_CMD__', $repackCmd).Replace('__PROM_B64__', $deployB64)
 # 工作区是 CRLF（git autocrlf），bash 会把行尾的 \r 当成命令的一部分。2026-11-02 第一次
 # 跑就是这么炸的：`cd: $'/opt/paideia-app\r': No such file or directory` + `set: -: invalid option`。
 $remoteScript = $remoteScript.Replace("`r`n", "`n")
@@ -435,6 +589,11 @@ $total.Stop()
 # git rev-parse 失败时留空，下次 Test-FrontendChanged 会当作"改过"而重建（安全方向）。
 if ($head) {
     Set-Content -Path $lastReleaseMarker -Value $head.Trim() -NoNewline
+}
+# jar 指纹：下次 backend/ 没改时靠它决定能否跳过打包（与 skippedPackaging 判定同一份算法）
+$finalJar = Get-JarFingerprint $jar
+if ($finalJar -ne '') {
+    Set-Content -Path $jarMarker -Value $finalJar -NoNewline
 }
 
 Write-Host ("完成：{0:N1} 秒" -f $total.Elapsed.TotalSeconds)
