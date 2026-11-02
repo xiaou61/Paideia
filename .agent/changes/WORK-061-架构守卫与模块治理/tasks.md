@@ -81,8 +81,9 @@ approver_role: CTO
 - 验证：`ls` 包根剩 22 个类型（若全部可移）；受影响模块 test + app 集成测试 + ModularityTest。
 - 完成记录：**按 design I-06 的口径只移了 4 个**——`AssistantAnswerer` → internal/conversation、`ContentClassification`/`ContentClassifier` → internal/decision、`SummaryVisibility` → internal/summary（根类型 30 → 26 个）；`ConversationTurn`/`NoteDraft`/`RunKind`/`RunOutcome` **留在根**：它们被根公开契约的签名引用（`AssistantConversation`、`MemoryExtractor`、`RunRecorder`），移走会让公开面暴露 internal 类型，I-06 明文规定这种情形留根并在报告注明。机械改造用一个只做包名/import 替换的脚本完成；移出的文件补了对根类型的 import（原来在根包不用写）。实测：ai 模块 **385 条 / 0 失败 / 15 跳过**（BUILD SUCCESS）、守卫切片 35 条 0 红、`--check` exit 0。
 
-### TASK-006 | pending | 验证与报告
+### TASK-006 | done | 验证与报告
 
 - 对应：AC-001…006
 - 内容：跑齐全部自动化检查；写 `testing/report.md`（五列证据矩阵、覆盖全部 AC）；更新 `.agent/history/updates.md`；确认主树干净、未推送。
 - 依赖：TASK-001…005。
+- 完成记录：`testing/report.md` 已写（status: passed，verified_commit=65a30c54，15 行五列证据矩阵覆盖 AC-001…006 + 附带修复 + 全量）；全量 478 条跑过，12 红中 8 条根因 `e.line_kind`（本项附带修掉并复跑 22/0），余 4 条为外部 stale 断言，逐条列在报告「外部阻塞」；未部署、未推送。

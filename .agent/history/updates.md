@@ -9493,3 +9493,14 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 已知项：全量仍有 4 条红，全部是别的项落地后未跟上的 stale 断言（沙箱配额 50→1000、学习者工具数 19→21、walkthrough 漏打 12 个新端点），已在报告「外部阻塞」列明归属，本片不动它们
 - 本地提交：本片提交
 - 远端推送：未执行
+
+## 2026-11-02 21:15 +0800 · WORK-061 · 验证与报告（TASK-006）
+
+- 类型：verification
+- 变更：`.agent/changes/WORK-061-架构守卫与模块治理/testing/report.md`（status: passed；五列证据矩阵覆盖 AC-001…006 + 附带修复 + 全量；`verified_commit=65a30c54`）
+- 决策：`passed` 只声明本项验证面；全量里 4 条外部 stale 红如实列进「外部阻塞」并在正文写清「passed 不等于 478 条全绿」，不为凑绿去改别人的断言
+- 依据：requirements AC-001…006；本会话全部实测（切片 35、ops 面 117、记忆面 25、ai 385、四类 22、全量 478）
+- 验证：矩阵行见报告；`validate` 待跑（本记录提交后一并核）
+- 已知项：中继未接 ScheduledTaskRecorder（运维可视性）；前端与 e2e 未跑（无前端改动）
+- 本地提交：本片提交
+- 远端推送：未执行
