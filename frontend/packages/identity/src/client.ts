@@ -1,6 +1,7 @@
 import type { ApiClient } from '@paideia/core'
 
 import type { Identity, LearnerProfile, LearnerProfileInput } from './types'
+import { JSON_HEADERS } from '@paideia/core'
 
 /**
  * 身份与画像的客户端（WORK-010）。
@@ -19,7 +20,7 @@ export function createIdentityApi(client: ApiClient): IdentityApi {
     saveProfile: (input) =>
       client.requestEnvelope<LearnerProfile>('/api/v1/account/profile', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify(input),
       }),
   }

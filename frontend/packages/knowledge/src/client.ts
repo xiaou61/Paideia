@@ -1,4 +1,5 @@
 import type { ApiClient } from '@paideia/core'
+import { JSON_HEADERS } from '@paideia/core'
 
 import type {
   AssessedItem,
@@ -229,7 +230,7 @@ export function createKnowledgeApi(client: ApiClient): KnowledgeApi {
     markSelfAssessment: (entryId, level) =>
       client.requestEnvelope<null>(`/api/v1/knowledge/entries/${entryId}/self-assessment`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify({ level }),
       }),
 
@@ -248,7 +249,7 @@ export function createKnowledgeApi(client: ApiClient): KnowledgeApi {
     runCode: (input) =>
       client.requestEnvelope<RunCodeResult>('/api/v1/sandbox/run', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify(input),
       }),
 
@@ -256,7 +257,7 @@ export function createKnowledgeApi(client: ApiClient): KnowledgeApi {
     runShell: (input) =>
       client.requestEnvelope<ShellRunResult>('/api/v1/sandbox/shell/run', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify(input),
       }),
 
@@ -270,7 +271,7 @@ export function createKnowledgeApi(client: ApiClient): KnowledgeApi {
         `/api/v1/sql-datasets/${encodeURIComponent(key)}/question`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: JSON_HEADERS,
           body: JSON.stringify(goal === undefined ? {} : { goal }),
         },
       ),
@@ -279,7 +280,7 @@ export function createKnowledgeApi(client: ApiClient): KnowledgeApi {
     uploadSqlDataset: (name, sql, visibility = 'private') =>
       client.requestEnvelope<{ key: string }>('/api/v1/sql-datasets', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify({ name, sql, visibility }),
       }),
 
@@ -287,7 +288,7 @@ export function createKnowledgeApi(client: ApiClient): KnowledgeApi {
     generateSqlDataset: (topic, visibility = 'private') =>
       client.requestEnvelope<{ key: string }>('/api/v1/sql-datasets/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify({ ...(topic === undefined ? {} : { topic }), visibility }),
       }),
 
@@ -299,7 +300,7 @@ export function createKnowledgeApi(client: ApiClient): KnowledgeApi {
     setDatasetVisibility: (key, visibility) =>
       client.requestEnvelope<null>(`/api/v1/sql-datasets/${encodeURIComponent(key)}/visibility`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify({ visibility }),
       }),
 
@@ -307,7 +308,7 @@ export function createKnowledgeApi(client: ApiClient): KnowledgeApi {
     traceCode: (input) =>
       client.requestEnvelope<TraceCodeResult>('/api/v1/sandbox/trace', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify(input),
       }),
 

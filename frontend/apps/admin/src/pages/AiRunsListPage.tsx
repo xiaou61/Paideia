@@ -24,6 +24,7 @@ import {
   TableRow,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
+import { formatDurationMs, formatLocalDateTime } from '@paideia/core'
 import { ListOrdered } from 'lucide-react'
 import { useState } from 'react'
 
@@ -131,18 +132,11 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 function ms(value: number | null): string {
-  if (value === null || value === undefined) {
-    return '—'
-  }
-  return value < 1000 ? `${value} ms` : `${(value / 1000).toFixed(1)} s`
+  return formatDurationMs(value)
 }
 
 function when(value: string | null): string {
-  if (value === null) {
-    return '—'
-  }
-  const at = new Date(value)
-  return Number.isNaN(at.getTime()) ? value : at.toLocaleString('zh-CN', { hour12: false })
+  return formatLocalDateTime(value)
 }
 
 /** 时间窗选项（WORK-030）。原先写死 7 天，改不了。 */

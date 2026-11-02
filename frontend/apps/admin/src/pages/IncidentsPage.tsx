@@ -24,7 +24,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { useState } from 'react'
 
 import { api } from '../api'
-import { errorMessage } from '@paideia/core'
+import { JSON_HEADERS, errorMessage, formatLocalDateTime } from '@paideia/core'
 
 interface Incident {
   id: number
@@ -143,7 +143,7 @@ export function IncidentsPage() {
     mutationFn: (message: string) =>
       api.requestEnvelope<IncidentDetail>(`/api/v1/ops/admin/incidents/${selectedId}/notes`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify({ message }),
       }),
     onSuccess: () => {
@@ -438,7 +438,6 @@ function grafanaLinks(incident: Incident): { panel: string; logs: string } {
 }
 
 function formatTime(value: string): string {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
+  return formatLocalDateTime(value)
 }
 

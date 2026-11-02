@@ -1,6 +1,7 @@
 import type { ApiClient } from '@paideia/core'
 
 import type { CategoryNode, PageResult } from './types'
+import { JSON_HEADERS } from '@paideia/core'
 
 /**
  * 管理端接口的客户端。
@@ -104,7 +105,6 @@ export interface ConceptInput {
   summary?: string | null
 }
 
-const JSON_HEADERS = { 'Content-Type': 'application/json' }
 
 export function createKnowledgeAdminApi(client: ApiClient): KnowledgeAdminApi {
   const base = '/api/v1/knowledge/admin'

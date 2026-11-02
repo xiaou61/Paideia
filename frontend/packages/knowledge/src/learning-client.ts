@@ -1,6 +1,7 @@
 import type { ApiClient } from '@paideia/core'
 
 import type { AdviceRequest, AdviceResult, AnsweredChoice, ConceptGraph, EntryProgressView, LearningLine, PlanItem, ProgressReport, ReviewDueList, ReviewSession, ReviewSubmitResult, TrackMap, TrackSummary } from './learning-types'
+import { JSON_HEADERS } from '@paideia/core'
 
 /**
  * 学习线 / 学习记录的客户端（WORK-020）。
@@ -22,7 +23,7 @@ export function createLearningApi(client: ApiClient) {
     advice: (input: AdviceRequest) =>
       client.requestEnvelope<AdviceResult>('/api/v1/learning/advice', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify(input),
       }),
 
@@ -37,7 +38,7 @@ export function createLearningApi(client: ApiClient) {
     report: (entryId: number, body: ProgressReport) =>
       client.requestEnvelope<EntryProgressView>(`/api/v1/learning/entries/${entryId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify(body),
       }),
 
@@ -59,7 +60,7 @@ export function createLearningApi(client: ApiClient) {
         `/api/v1/learning/reviews/sessions/${sessionId}/answers`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: JSON_HEADERS,
           body: JSON.stringify({ answers }),
         },
       ),
@@ -68,7 +69,7 @@ export function createLearningApi(client: ApiClient) {
     attempt: (input: { entryId: number; blockKey: string; questionKey: string; choice: number }) =>
       client.requestEnvelope<{ correct: boolean; fingerprint: string }>('/api/v1/learning/attempts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify(input),
       }),
 
@@ -88,14 +89,14 @@ export function createLearningApi(client: ApiClient) {
     addPlanItem: (item: { date: string; goal: string; reason: string }) =>
       client.requestEnvelope<PlanItem>('/api/v1/learning/plan-items', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify(item),
       }),
 
     setPlanItemDone: (id: number, done: boolean) =>
       client.requestEnvelope<null>(`/api/v1/learning/plan-items/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify({ done }),
       }),
 

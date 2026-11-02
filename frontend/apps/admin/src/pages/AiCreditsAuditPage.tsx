@@ -23,6 +23,7 @@ import {
   TableRow,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
+import { formatLocalDateTime } from '@paideia/core'
 import { useState } from 'react'
 import { Receipt } from 'lucide-react'
 
@@ -79,11 +80,7 @@ const KIND_FILTERS = [
 
 /** 时间按本机时区显示；解析不出来就原样显示，不显示 "Invalid Date"。 */
 function when(value: string | null): string {
-  if (value === null) {
-    return '—'
-  }
-  const at = new Date(value)
-  return Number.isNaN(at.getTime()) ? value : at.toLocaleString('zh-CN', { hour12: false })
+  return formatLocalDateTime(value)
 }
 
 /**

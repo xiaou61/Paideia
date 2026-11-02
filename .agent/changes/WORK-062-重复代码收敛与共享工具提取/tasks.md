@@ -87,9 +87,10 @@ approver_role: CTO
 - 验证：core 单测（新增 2-3 条）+ 相关包 typecheck；消失判据 F1。
 - 完成记录：新增 `core.errorMessage`（4 条单测）；通用替换 **A 30 处 + B 23 处 / 34 文件**（apps/app、apps/admin、packages/assistant），admin 两处私有函数删除并把 8 处调用补 `'未知错误'` 兜底（原来非 Error 会渲染 `undefined`，现给兜底），`auth.messageOf` 改一行委托（ApiError 是 Error 子类，原两分支等价），`conversation-panel`×6 等全部收拢。**白名单保留**：`packages/ui` 内 8 处与 `apps/desktop/electron/main.cjs` 1 处——ui 是设计系统刻意不依赖 core、desktop 主进程是 CJS 不能引 ESM 包（各一行理由入报告）。实测：core/auth/assistant/app/admin 五包 typecheck 全过；core 单测 26 条（含新增 4）全绿。
 
-### TASK-011 | pending | F2+F5+F6 core/ui 纯件（三件套 / 时间 / JSON 请求）
+### TASK-011 | in_progress | F2+F5+F6 core/ui 纯件（三件套 / 时间 / JSON 请求）
 - `ui` 新增 `query-state.tsx`；`core` 新增 `format.ts` 与 `api.ts` 增强；替换 ≈65 + 12 + 32 处；multipart 3 处与时间白名单保留。
 - 验证：ui/core 单测 + 两端 typecheck；消失判据 F2/F5/F6。
+- 进展：**F6 完成**——`core.JSON_HEADERS`（删 4 个局部常量 + 29 处内联替换 / 14 文件；残留仅 `auth.test.ts` 的断言夹具）；**F5 完成**——`core.formatLocalDateTime/formatDurationMs`（9+3 处替换；顺手给 KnowledgeEntriesPage 补了原本缺失的 Invalid Date 保护；AnalyticsPage 时分秒版与 AiRunsScreen 的 clock 按设计保留）；**F2 待做**。三个坑已修：多行 import 中间被插 import（4 文件，脚本加了"只在完整单行 import 后插入"的规则）、admin 两文件 import 漏补。实测：core 31 条单测全绿；九包 typecheck 全过。
 
 ### TASK-012 | pending | F3 ListPagination
 - `ui` 新增 `pagination.tsx`；替换 admin 5 处分页页脚（pageCount 上移）；sql-workbench 变体保留。

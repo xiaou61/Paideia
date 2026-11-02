@@ -42,7 +42,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 
 import { API_BASE_URL } from '../env'
 import { ConfirmDeleteDialog, Loading, admin, categoryGroups, flatten, type FlatCategory } from '../knowledge-shared'
-import { errorMessage } from '@paideia/core'
+import { errorMessage, formatLocalDateTime } from '@paideia/core'
 
 /** 每页条数。列表用前端分页：接口一次给一页（size=200），条目量到千级再改成服务端分页。 */
 const PAGE_SIZE = 10
@@ -68,7 +68,8 @@ const RELATION_TYPES = [
 
 /** 后端时间戳是 UTC 的 ISO 串，列表里按浏览器本地时区显示——后台是给人看的钟点，不是给机器的。 */
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString('zh-CN', { hour12: false })
+  // 收敛时顺手补上了保护（原实现遇到非法输入会渲染 Invalid Date；共享件按"原样返回"处理）
+  return formatLocalDateTime(iso)
 }
 
 /**

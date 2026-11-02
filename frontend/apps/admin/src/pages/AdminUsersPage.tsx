@@ -32,7 +32,7 @@ import { useEffect, useState } from 'react'
 
 import { api } from '../api'
 import { ConfirmDeleteDialog } from '../knowledge-shared'
-import { errorMessage } from '@paideia/core'
+import { errorMessage, formatLocalDateTime } from '@paideia/core'
 
 /**
  * 用户管理（WORK-030）。
@@ -89,11 +89,7 @@ function listUsers(query: string, role: string, page: number) {
 
 /** 时间按本机时区显示；解析不出来就原样显示。 */
 function when(value: string | null): string {
-  if (value === null) {
-    return '—'
-  }
-  const at = new Date(value)
-  return Number.isNaN(at.getTime()) ? value : at.toLocaleString('zh-CN', { hour12: false })
+  return formatLocalDateTime(value)
 }
 
 export function AdminUsersPage() {

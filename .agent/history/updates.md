@@ -9614,3 +9614,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：core/auth/assistant/app/admin 五包 typecheck 全过；`pnpm --filter @paideia/core test` **26 条）全绿（含新增 4 条 errorMessage 用例）**；B 形态的"非 Error 渲染 undefined"顺手修正并有了兜底语义
 - 本地提交：本片提交
 - 远端推送：未执行
+
+## 2026-11-03 02:05 +0800 · WORK-062 · TASK-011（上）：F6 JSON_HEADERS + F5 时间格式化
+
+- 类型：implementation
+- 变更：`core.JSON_HEADERS`（删 4 个局部同名常量 + 29 处内联 `headers: {...}` 替换，14 文件）；`core.formatLocalDateTime`/`formatDurationMs`（9 处 when/formatTime + 3 处 ms 改委托）；core 新增两个单测文件
+- 决策：**不做 `jsonRequest(body, method)` 包装**（设计里的另一半）——逐行替换 `headers: JSON_HEADERS` 风险最小，headers+body 成对改写只少一行、收益与风险不成比例；偏差记入报告。时间口径统一为"无值→fallback、解析失败→原样返回"，顺手修正 KnowledgeEntriesPage 原本会渲染 Invalid Date 的缺口；AnalyticsPage 时分秒版与 AiRunsScreen 的 clock 按设计保留
+- 依据：WORK-062 requirements REQ-003 / design F5/F6；扫描候选第 5/6 条
+- 验证：九包 typecheck 全过（修了 F6 首轮"多行 import 中间插行"的 4 个文件与 admin 两文件漏补 import）；core 单测 **31 条全绿**（含新增 5 条格式用例）；F6 残留仅 `auth.test.ts` 断言夹具
+- 本地提交：本片提交
+- 远端推送：未执行

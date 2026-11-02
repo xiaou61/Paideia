@@ -22,6 +22,7 @@ import {
   TableRow,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
+import { formatDurationMs } from '@paideia/core'
 import { Activity } from 'lucide-react'
 import { useState } from 'react'
 
@@ -120,10 +121,7 @@ const KIND_LABEL: Record<string, string> = {
 
 /** 毫秒显示：小于 1 秒给 ms，否则给秒（一位小数）。空值给破折号，不显示 null。 */
 function ms(value: number | null): string {
-  if (value === null || value === undefined) {
-    return '—'
-  }
-  return value < 1000 ? `${value} ms` : `${(value / 1000).toFixed(1)} s`
+  return formatDurationMs(value)
 }
 
 /** 百分比：一位小数。0 次调用时显示破折号而不是 0%，那会被读成"全是失败"。 */

@@ -15,7 +15,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 
 import { api } from '../api'
-import { errorMessage } from '@paideia/core'
+import { JSON_HEADERS, errorMessage } from '@paideia/core'
 
 /** 分享端点返回的形状。**没有作者、没有时间**——服务端就不给。 */
 interface SharedNote {
@@ -144,7 +144,7 @@ export function SharedNotePage() {
                         void api
                           .requestEnvelope<boolean>('/api/v1/reports', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: JSON_HEADERS,
                             body: JSON.stringify({ shareId, reason }),
                           })
                           .then(() => {

@@ -22,7 +22,7 @@ import { Activity, Database, HardDrive, RefreshCw, Server, ShieldAlert, Sparkles
 import { useState } from 'react'
 
 import { api } from '../api'
-import { errorMessage } from '@paideia/core'
+import { JSON_HEADERS, errorMessage, formatLocalDateTime } from '@paideia/core'
 
 /**
  * 运维面板（WORK-028）。
@@ -277,7 +277,7 @@ function DiagnosisSection() {
     mutationFn: (text: string) =>
       api.requestEnvelope<{ id: number }>('/api/v1/ops/admin/diagnoses', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify({ question: text.trim() === '' ? undefined : text.trim() }),
       }),
     onSuccess: (data) => {
@@ -395,7 +395,7 @@ function DiagnosisItem({
     mutationFn: (rating: number) =>
       api.requestEnvelope<Diagnosis>(`/api/v1/ops/admin/diagnoses/${item.id}/feedback`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify({ rating, note: note.trim() === '' ? undefined : note.trim() }),
       }),
     onSuccess: () => {
@@ -507,7 +507,6 @@ function DiagnosisItem({
 }
 
 function formatTime(value: string): string {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
+  return formatLocalDateTime(value)
 }
 

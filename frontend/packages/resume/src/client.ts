@@ -1,4 +1,5 @@
 import type { ApiClient } from '@paideia/core'
+import { JSON_HEADERS } from '@paideia/core'
 
 import type {
   Checkup,
@@ -74,14 +75,14 @@ export function createResumeApi(client: ApiClient): ResumeApi {
     create: (input) =>
       client.requestEnvelope<ResumeDocument>('/api/v1/ai/resumes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify(input),
       }),
     get: (id) => client.requestEnvelope<ResumeDocument>(`/api/v1/ai/resumes/${id}`),
     save: (id, input) =>
       client.requestEnvelope<ResumeDocument>(`/api/v1/ai/resumes/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify(input),
       }),
     remove: (id) =>
@@ -89,7 +90,7 @@ export function createResumeApi(client: ApiClient): ResumeApi {
     rename: (id, title) =>
       client.requestEnvelope<ResumeDocumentSummary>(`/api/v1/ai/resumes/${id}/title`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify({ title }),
       }),
     setDefault: (id) =>
@@ -110,7 +111,7 @@ export function createResumeApi(client: ApiClient): ResumeApi {
     createVersion: (documentId, input) =>
       client.requestEnvelope<number>(`/api/v1/ai/resumes/${documentId}/versions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify(input),
       }),
     listVersions: (documentId) =>
@@ -133,7 +134,7 @@ export function createResumeApi(client: ApiClient): ResumeApi {
     updateProposal: (proposalId, input) =>
       client.requestEnvelope<ResumeProposal>(`/api/v1/ai/proposals/${proposalId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify(input),
       }),
     finalize: (versionId) =>

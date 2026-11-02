@@ -23,6 +23,7 @@ import {
   TableRow,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
+import { formatLocalDateTime } from '@paideia/core'
 import { MessageSquareWarning } from 'lucide-react'
 import { useState } from 'react'
 
@@ -88,8 +89,7 @@ function windowParams(choice: string): string {
 }
 
 function when(value: string): string {
-  const at = new Date(value)
-  return Number.isNaN(at.getTime()) ? value : at.toLocaleString('zh-CN', { hour12: false })
+  return formatLocalDateTime(value)
 }
 
 export function AiFeedbackPage() {

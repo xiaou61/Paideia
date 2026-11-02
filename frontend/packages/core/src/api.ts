@@ -5,6 +5,14 @@ export interface ApiEnvelope<T> {
   traceId: string | null
 }
 
+/**
+ * JSON 请求头（WORK-062 收敛）：全仓原有 4 个同名局部常量 + 约 30 处内联字面量。
+ *
+ * <p>名字是复数、因为**只能整体当 headers 用**：multipart 上传刻意不能手设 Content-Type
+ * （写了会破坏 boundary），所以那三处不适用本常量。
+ */
+export const JSON_HEADERS: Record<string, string> = { 'Content-Type': 'application/json' }
+
 /** 后端错误契约的客户端表示：保留错误码与追踪标识，便于把界面报错和日志对上。 */
 export class ApiError extends Error {
   readonly code: number

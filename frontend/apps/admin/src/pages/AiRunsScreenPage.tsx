@@ -11,6 +11,7 @@ import {
   Spinner,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
+import { formatDurationMs, formatLocalDateTime } from '@paideia/core'
 import { Maximize2, Minimize2, Monitor, Pause, Play, RotateCcw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 
@@ -158,10 +159,7 @@ function windowQuery(range: '24h' | '7d'): string {
 }
 
 function ms(value: number | null): string {
-  if (value === null || value === undefined) {
-    return '—'
-  }
-  return value < 1000 ? `${value} ms` : `${(value / 1000).toFixed(1)} s`
+  return formatDurationMs(value)
 }
 
 function num(value: number): string {
@@ -169,8 +167,7 @@ function num(value: number): string {
 }
 
 function when(iso: string): string {
-  const at = new Date(iso)
-  return Number.isNaN(at.getTime()) ? iso : at.toLocaleString('zh-CN', { hour12: false })
+  return formatLocalDateTime(iso)
 }
 
 function clock(msEpoch: number, bucket: 'hour' | 'day' | undefined): string {

@@ -1,4 +1,5 @@
 import type { ApiClient } from '@paideia/core'
+import { JSON_HEADERS } from '@paideia/core'
 
 import { readEventStream } from './sse'
 import type {
@@ -115,7 +116,6 @@ export interface AssistantApi {
  */
 export function createAssistantApi(client: ApiClient): AssistantApi {
   const base = '/api/v1/ai'
-  const JSON_HEADERS = { 'Content-Type': 'application/json' }
 
   return {
     credential: () => client.requestEnvelope<CredentialView>(`${base}/credentials`),
