@@ -9460,3 +9460,14 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 已知项：`mvn -B -pl paideia-ops -am test` 无自带测试可跑（模块内 0 个测试类），其行为由 app 级 117 条覆盖；04/05 两张图只在检出层有 EOL 差异，已 `git checkout` 掉，避免无意义 diff
 - 本地提交：本片提交
 - 远端推送：未执行
+
+## 2026-11-02 20:15 +0800 · WORK-061 · TASK-004 记忆提取持久重试（关闭已登记缺口）
+
+- 类型：implementation
+- 变更：迁移 `V20261102200000__create_memory_extraction_jobs.sql`（62 张表）+ 校验和登记；新建 `MemoryExtractionJob`、`MemoryExtractionJobMapper`、`MemoryExtractionJobs`（入队/抢占/退避/回收）、`MemoryExtractionRelay`（@Scheduled 中继）；`ExtractionSlice` 增 `fromMessageId` + `ConversationService.materializeSlice`（重试按边界重读同一段）；`scheduleIfDue` 改为「同一事务抢游标+写任务行 → dispatch」；`MemoryProperties` 加 4 个参数；`AiUserDeletionListener` 与 `MemoryRetentionPurger` 各加一处；05 图与 README 随新表更新
+- 决策：①线程池满从**直接丢弃**改为**记一次失败、退避重排**（旧行为是游标已推进=永久丢失）；②四种"无意义"情形（记忆被关/没凭据/会话过期/欠费）收掉任务行而不重试——口径与旧行为一致但留痕；③每次尝试独立「预留→结算/退款」，重试不双扣；④不引 RabbitMQ（单实例下"表+进程内中继"语义等价，requirements 非目标已裁）；⑤新类 public 是给 app 级集成测试的（同仓既有做法，modulith 边界仍由 internal 包守住）
+- 依据：requirements REQ-004 / AC-004；原缺口见旧 `MemoryExtractionService` javadoc「抢到即推进游标 ⇒ 整理失败不重跑（设计 §10 已登记）」
+- 验证：`MemoryExtractionJobsIntegrationTest` 8 条（含唯一键故障注入的回滚原子性、抢占单飞、2 倍退避与上限、卡死回收、注销清零、保留回收、中继端到端重试成功）+ `MemoryAutoExtractionIntegrationTest` 13 条（失败用例口径已按新语义改写）+ `AccountDeletionCascadeIntegrationTest` 4 条 = **25 条 / 0 失败 / 0 跳过 / exit 0**；守卫切片 35 条 0 红（64 秒）；`--check` 在 README 表数 61≠62 时如实报红、改后 exit 0；9 个 mermaid 图块语法全过
+- 已知项：中继自身没接 `ScheduledTaskRecorder`（失败只进日志），运维可视性留作后续；线程池满的退避会消耗一次尝试（罕见路径，行为有界且可见）
+- 本地提交：本片提交
+- 远端推送：未执行

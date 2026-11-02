@@ -54,6 +54,23 @@ public class MemoryProperties {
     /** 淘汰任务开关。关掉只是停止删除，历史数据不受影响。 */
     private boolean purgeEnabled = true;
 
+    /**
+     * 一次整理最多尝试几次（WORK-061）：失败按退避重排，到上限置 failed 不再重试。
+     *
+     * <p>3 是"一次瞬时故障能自愈、账单又不至于被一个持续失败的切片放大"的折中；
+     * 每次尝试独立结算/退款，重试本身不产生额外扣费。
+     */
+    private int maxExtractionAttempts = 3;
+
+    /** 重试退避的基数（秒）：第 n 次失败后等 {@code base × 2^(n-1)}，封顶 10 分钟。 */
+    private int retryBackoffSeconds = 60;
+
+    /** {@code running} 超过这个秒数视为卡死（进程崩溃），由中继回收重试。 */
+    private int runningTimeoutSeconds = 600;
+
+    /** failed 任务行的保留天数：行留着是为了诊断，但不该无限积。 */
+    private int failedJobRetentionDays = 7;
+
     private static Map<String, Integer> defaultStructuredTtl() {
         Map<String, Integer> ttl = new LinkedHashMap<>();
         ttl.put("weak_topic", 90);
@@ -93,6 +110,38 @@ public class MemoryProperties {
 
     public void setPurgeEnabled(boolean purgeEnabled) {
         this.purgeEnabled = purgeEnabled;
+    }
+
+    public int getMaxExtractionAttempts() {
+        return maxExtractionAttempts;
+    }
+
+    public void setMaxExtractionAttempts(int maxExtractionAttempts) {
+        this.maxExtractionAttempts = maxExtractionAttempts;
+    }
+
+    public int getRetryBackoffSeconds() {
+        return retryBackoffSeconds;
+    }
+
+    public void setRetryBackoffSeconds(int retryBackoffSeconds) {
+        this.retryBackoffSeconds = retryBackoffSeconds;
+    }
+
+    public int getRunningTimeoutSeconds() {
+        return runningTimeoutSeconds;
+    }
+
+    public void setRunningTimeoutSeconds(int runningTimeoutSeconds) {
+        this.runningTimeoutSeconds = runningTimeoutSeconds;
+    }
+
+    public int getFailedJobRetentionDays() {
+        return failedJobRetentionDays;
+    }
+
+    public void setFailedJobRetentionDays(int failedJobRetentionDays) {
+        this.failedJobRetentionDays = failedJobRetentionDays;
     }
 
     public int getRoundsPerExtraction() {

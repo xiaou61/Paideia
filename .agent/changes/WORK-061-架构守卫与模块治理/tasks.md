@@ -66,13 +66,13 @@ approver_role: CTO
 - 验证：`mvn -B -pl paideia-ops -am test`；第二切片（ModularityTest 起）；`node scripts/gen-arch-diagram.mjs --check`；`node scripts/check-diagrams.mjs`；app 相关集成测试（Ops 三件）。
 - 完成记录：30 个类 `git mv` 且**包名零改动**（包名即 modulith 模块名，模块图不变、只换 Maven 归属）；依赖面 = platform / persistence / security / ai（与设计一致，无意外依赖）；根 pom 还需补 `dependencyManagement`（第一次编译报 version missing，属于套件结构而非代码问题）。分片验证：**P2 断言第一次真上岗**——加模块后 `--check` 如实报 01/06 两图漂移 + README 模块数 11≠12，改 README、重生成后 exit 0；mermaid 语法 9 图块全过（借主树依赖跑 `check-diagrams.mjs .worktrees/work-061/docs`）；第二切片 35 条 0 红；app 级 ops 面 **117 条 / 0 失败 / 0 跳过**（含 OpsSummary 等集成件）。ops 模块自身无测试，测试都在 app 级。
 
-### TASK-004 | pending | P4 记忆提取持久重试
+### TASK-004 | done | P4 记忆提取持久重试
 
 - 对应：REQ-004、AC-004
 - 修改：迁移 `V2026...__create_memory_extraction_jobs.sql` + 校验和登记；`MemoryExtractionJobMapper`、`MemoryExtractionJobs`、`MemoryExtractionRelay` 新建；`MemoryExtractionService` 入队与失败处理改造；`MemoryProperties` 加参数；`AiUserDeletionListener` 与 `MemoryRetentionPurger` 扩展。
 - 接口：见 design「任务表」。
 - 测试：`MemoryExtractionJobsTest`（抢占/退避/上限/卡死回收/删除）；`MemoryExtractionServiceTest`（扩展：失败留行、线程池满留行、与游标同事务）；`AccountDeletionCascadeIntegrationTest`（扩展：任务行清零）。
-- 验证：`scripts/test-db.sh mvn -B -pl paideia-ai -am test` + 第二切片。
+- 完成记录：迁移 `V20261102200000`（62 张表，README 与 05 图同步更新，P2 断言再次如实报红→改绿）；`ExtractionSlice` 增 `fromMessageId` + `ConversationService.materializeSlice` 重试按边界重读；`scheduleIfDue` 改为「同一事务抢游标+入队→dispatch」；线程池满从**丢弃**改为**记一次失败退避重排**；无凭据/会话过期/欠费/记忆被关四种"无意义"情形收掉任务行（口径与旧行为一致，但留痕）。旧测试 `extractorFailureIsSwallowed` 的口径按新语义改写（这是 requirements 明示的变更，不是偷偷改绿）。实测：新套件 `MemoryExtractionJobsIntegrationTest` 8 条、`MemoryAutoExtractionIntegrationTest` 13 条、`AccountDeletionCascadeIntegrationTest` 4 条，合计 **25 条 / 0 失败 / 0 跳过**；守卫切片 35 条 0 红；`--check` 与 mermaid 语法全绿。
 
 ### TASK-005 | pending | P5 收紧 ai 公开面
 

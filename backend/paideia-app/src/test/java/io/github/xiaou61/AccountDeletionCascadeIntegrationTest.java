@@ -57,6 +57,8 @@ class AccountDeletionCascadeIntegrationTest {
             {"ai_memories_text", "user_id"},
             // 待确认的候选（WORK-050）：提议也是这个人的数据，注销必须一并归零
             {"ai_memory_candidates", "user_id"},
+            // 整理任务行（WORK-061）：待重试的切片边界；留着等于注销后中继还在替他重试
+            {"ai_memory_extraction_jobs", "user_id"},
             {"ai_user_settings", "user_id"},
             // WORK-010：身份画像与面试评估也必须是"注销后逐表为 0"
             {"learner_profiles", "user_id"},
