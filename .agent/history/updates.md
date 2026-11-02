@@ -9553,3 +9553,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：判据——`lastIndexOf("```")` 只剩 CampItemParser/EssayQuestionParser/ModelJson；单元切片 0 失败；app 面（MemoryAuto、Resume）17 条 0 失败
 - 本地提交：本片提交
 - 远端推送：未执行
+
+## 2026-11-02 23:15 +0800 · WORK-062 · TASK-005 B5 Ops HTTP 收敛
+
+- 类型：implementation
+- 变更：新增 `ops.OpsHttp`（client / trimTrailingSlash / getJson）；Prometheus、Loki（queryRange+scalar）、Tempo 三家整方法替换，Grafana 反代 targetUri 的尾斜杠归一改调共享件；三家闲置的 JSON 字段与 4 类 import 一并清理
+- 决策：各家的失败返回类型（List.of/null/Optional）与 `"status":"success"` 校验**保留在各自客户端**——Loki 的 query_range 与 Tempo 没有该字段，统一会收紧失败语义；反代自己的 HttpClient 不在范围（转发语义不同）
+- 依据：WORK-062 requirements REQ-001 / design B5；扫描候选第 5 条
+- 验证：判据——`HttpClient.newBuilder()` 只剩 OpsHttp 与转发代理；ops/分析面 117 条 / 0 失败 / 0 跳过（与基线一致，BUILD SUCCESS）
+- 本地提交：本片提交
+- 远端推送：未执行

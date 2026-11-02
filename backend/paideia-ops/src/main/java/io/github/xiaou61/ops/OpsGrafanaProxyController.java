@@ -145,7 +145,7 @@ class OpsGrafanaProxyController {
      * <p>单独提出来是为了能逐条断言拼接结果。
      */
     static String targetUri(String baseUrl, String requestUri, String queryString) {
-        String base = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        String base = OpsHttp.trimTrailingSlash(baseUrl);
         String path = requestUri.isBlank() ? "/" : requestUri;
         if (!path.startsWith("/")) {
             path = "/" + path;

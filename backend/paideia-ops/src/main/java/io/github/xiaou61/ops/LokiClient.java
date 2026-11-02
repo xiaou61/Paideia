@@ -1,19 +1,16 @@
 package io.github.xiaou61.ops;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 极薄的 Loki 查询客户端（WORK-042）。
@@ -24,16 +21,15 @@ import java.util.List;
  */
 class LokiClient {
 
-    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final HttpClient http;
     private final String baseUrl;
     private final Duration timeout;
 
     LokiClient(String baseUrl, long timeoutMs) {
-        this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        this.baseUrl = OpsHttp.trimTrailingSlash(baseUrl);
         this.timeout = Duration.ofMillis(timeoutMs);
-        this.http = HttpClient.newBuilder().connectTimeout(timeout).build();
+        this.http = OpsHttp.client(timeout);
     }
 
     List<LogLine> queryRange(String query, Instant from, Instant to, int limit) {        String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
@@ -42,38 +38,23 @@ class LokiClient {
                 + "&end=" + to.getEpochSecond() + "000000000"
                 + "&limit=" + limit
                 + "&direction=backward";
-        HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                .timeout(timeout)
-                .GET()
-                .build();
-        try {
-            HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                return List.of();
-            }
-            JsonNode root = JSON.readTree(response.body());
-            if (!"success".equals(root.path("status").asText())) {
-                return List.of();
-            }
-            List<LogLine> lines = new ArrayList<>();
-            for (JsonNode stream : root.path("data").path("result")) {
-                for (JsonNode value : stream.path("values")) {
-                    if (value.size() < 2) {
-                        continue;
-                    }
-                    long nanos = Long.parseLong(value.get(0).asText());
-                    lines.add(new LogLine(Instant.ofEpochSecond(0, nanos), value.get(1).asText()));
-                }
-            }
-            // Loki 每个 stream 各自倒序；跨 stream 再排一次，调用方才能按"最近"截断。
-            lines.sort(Comparator.comparing(LogLine::at).reversed());
-            return lines.size() > limit ? lines.subList(0, limit) : lines;
-        } catch (IOException | InterruptedException | RuntimeException e) {
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
+        Optional<JsonNode> root = OpsHttp.getJson(http, url, timeout);
+        if (root.isEmpty() || !"success".equals(root.get().path("status").asText())) {
             return List.of();
         }
+        List<LogLine> lines = new ArrayList<>();
+        for (JsonNode stream : root.get().path("data").path("result")) {
+            for (JsonNode value : stream.path("values")) {
+                if (value.size() < 2) {
+                    continue;
+                }
+                long nanos = Long.parseLong(value.get(0).asText());
+                lines.add(new LogLine(Instant.ofEpochSecond(0, nanos), value.get(1).asText()));
+            }
+        }
+        // Loki 每个 stream 各自倒序；跨 stream 再排一次，调用方才能按"最近"截断。
+        lines.sort(Comparator.comparing(LogLine::at).reversed());
+        return lines.size() > limit ? lines.subList(0, limit) : lines;
     }
 
     record LogLine(Instant at, String line) {
@@ -87,30 +68,15 @@ class LokiClient {
         String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
         String url = baseUrl + "/loki/api/v1/query?query=" + encoded
                 + "&time=" + at.getEpochSecond() + "000000000";
-        HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                .timeout(timeout)
-                .GET()
-                .build();
-        try {
-            HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                return null;
-            }
-            JsonNode root = JSON.readTree(response.body());
-            if (!"success".equals(root.path("status").asText())) {
-                return null;
-            }
-            JsonNode result = root.path("data").path("result");
-            if (!result.isArray() || result.isEmpty()) {
-                return null;
-            }
-            String raw = result.get(0).path("value").path(1).asText();
-            return raw.isBlank() ? null : Double.valueOf(raw);
-        } catch (IOException | InterruptedException | RuntimeException e) {
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
+        Optional<JsonNode> root = OpsHttp.getJson(http, url, timeout);
+        if (root.isEmpty() || !"success".equals(root.get().path("status").asText())) {
             return null;
         }
+        JsonNode result = root.get().path("data").path("result");
+        if (!result.isArray() || result.isEmpty()) {
+            return null;
+        }
+        String raw = result.get(0).path("value").path(1).asText();
+        return raw.isBlank() ? null : Double.valueOf(raw);
     }
 }

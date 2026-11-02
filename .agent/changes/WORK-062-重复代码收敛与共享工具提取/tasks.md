@@ -57,9 +57,10 @@ approver_role: CTO
 - 验证：`mvn -pl paideia-ai -am test`；消失判据 B4。
 - 完成记录：实际 **11 处**——6 份逐字 stripFence（按归一化 hash 校验同一性后替换）+ textOrNull 组 3 份（其中 SummarySchemaValidator 风格不同、语义逐条相同）+ textOrEmpty 组 2 份；变体（CampItemParser/EssayQuestionParser 的截断保留版、ResumeJson 的带计数版）按设计保留。判据：`lastIndexOf("```")` 只剩两个变体 + ModelJson。实测：单元切片 0 失败；app 面 2 类 17 条 0 失败。
 
-### TASK-005 | pending | B5 Ops HTTP 样板收敛
+### TASK-005 | done | B5 Ops HTTP 样板收敛
 - 落点 `ops.OpsHttp`（包内）；改 Prometheus/Loki/Tempo 三家 + Grafana 反代尾斜杠 1 处；`"success"` 判定与失败类型保留。
 - 验证：`-Dtest='Ops*,Tempo*,Loki*'`；消失判据 B5。
+- 完成记录：整方法替换 8 处（三构造样板 + Prometheus.query + Loki.queryRange/scalar + Tempo.get + 反代 targetUri 尾斜杠）；三家的 `JSON` 字段与 ObjectMapper/IOException/HttpRequest/HttpResponse import 全部随替换清掉。判据：`HttpClient.newBuilder()` 只剩 OpsHttp 与 `OpsGrafanaProxyController`（后者是转发代理，本来就有自己的客户端，不在收敛范围）。实测：ops/分析面 117 条 / 0 失败 / 0 跳过（与基线一致）。
 
 ### TASK-006 | pending | T1 + T4 测试样板（body / SSE）
 - 新增 `MockMvcBodies`、`MockMvcSse`；替换 14 + 4 类。

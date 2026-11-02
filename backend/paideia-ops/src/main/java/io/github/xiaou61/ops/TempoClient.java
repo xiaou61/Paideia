@@ -1,13 +1,9 @@
 package io.github.xiaou61.ops;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -25,7 +21,6 @@ import java.util.Optional;
  */
 class TempoClient {
 
-    private static final ObjectMapper JSON = new ObjectMapper();
     private static final String ERROR_QUERY =
             "{ resource.service.name = \"paideia\" && status = error }";
     private static final String SLOW_QUERY =
@@ -36,9 +31,9 @@ class TempoClient {
     private final Duration timeout;
 
     TempoClient(String baseUrl, long timeoutMs) {
-        this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        this.baseUrl = OpsHttp.trimTrailingSlash(baseUrl);
         this.timeout = Duration.ofMillis(timeoutMs);
-        this.http = HttpClient.newBuilder().connectTimeout(timeout).build();
+        this.http = OpsHttp.client(timeout);
     }
 
     List<TraceSummary> search(Instant from, Instant to, int limit) {
@@ -140,22 +135,7 @@ class TempoClient {
     }
 
     private Optional<JsonNode> get(String url) {
-        HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                .timeout(timeout)
-                .GET()
-                .build();
-        try {
-            HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                return Optional.empty();
-            }
-            return Optional.of(JSON.readTree(response.body()));
-        } catch (IOException | InterruptedException | RuntimeException e) {
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
-            return Optional.empty();
-        }
+        return OpsHttp.getJson(http, url, timeout);
     }
 
     record TraceSummary(String traceId, String rootName, long durationMs, boolean error, Instant start) {
