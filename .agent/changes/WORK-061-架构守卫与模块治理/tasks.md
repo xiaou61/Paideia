@@ -44,11 +44,12 @@ approver_role: CTO
 
 ## 任务
 
-### TASK-001 | pending | P1 守卫进入第二切片
+### TASK-001 | done | P1 守卫进入第二切片
 
 - 对应：REQ-001、AC-001
 - 修改：`AGENTS.md` 测试节的第二切片命令，`-Dtest=` 列表加入 `ApiSurfaceTest,ApiContractTest,AuthorizationIsolationTest`；跑一次实测后把条数/耗时注记改成真实数字。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=... -Dsurefire.failIfNoSpecifiedTests=false test` → 0 failed 且三个类有 Tests run 数字。
+- 完成记录：首跑即红——`ApiSurfaceTest` 抓到 `POST /api/v1/ops/hooks/grafana` 从未声明访问级别。根因是 `ApiAccess.Access` 只有四种级别、缺「只许回环」这一类；补 `LOCAL_ONLY` + 给 `OpsHookController` 加类级声明 + `ApiContractTest` 新增「非回环 + 已认证 → 403、回环只有 JWT → 401」对照（先按 401 写错过一次，实测纠正）。最终实测 **35 条 / 66 秒 / exit 0**；顺带在 AGENTS.md 两条切片命令补了「必须在 backend 下跑」的说明。
 
 ### TASK-002 | pending | P2 README 计数断言
 

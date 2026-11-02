@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import io.github.xiaou61.platform.ApiAccess;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -28,6 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/v1/ops/hooks")
+@ApiAccess(ApiAccess.Access.LOCAL_ONLY)
 class OpsHookController {
 
     private static final Logger log = LoggerFactory.getLogger(OpsHookController.class);

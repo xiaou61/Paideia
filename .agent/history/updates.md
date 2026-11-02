@@ -9429,3 +9429,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：approve 输出 4 件已签署并由入口自身在 updates.md 留痕；四件 frontmatter 回读 approved_by=xiaou61
 - 本地提交：本笔提交（与四件工件同批）；分支 `feat/work-061-arch-guards` 在 worktree `.worktrees/work-061` 开工
 - 远端推送：未执行
+
+## 2026-11-02 19:05 +0800 · WORK-061 · TASK-001 守卫进入第二切片（首跑抓到既有缺陷）
+
+- 类型：implementation
+- 变更：`AGENTS.md` 第二切片命令加入 `ApiSurfaceTest,ApiContractTest,AuthorizationIsolationTest`（注记改为实测 66 秒 / 35 条；两条切片补「必须在 backend 目录下跑」说明——test-db.sh 带命令参数时不自己切目录）；`ApiAccess.Access` 新增 `LOCAL_ONLY` 级别；`OpsHookController` 补类级声明；`ApiContractTest` 新增 `declaredLocalOnlyReallyIsLocalOnly`（非回环 + 已认证 → 403；回环只有 JWT → 401），畸形体探测排除 LOCAL_ONLY
+- 决策：守卫首跑抓到的不是"忘了标"而是**分类缺位**——`/api/v1/ops/hooks/**` 走 `LocalOnlyAuthorizationManager`，而 `ApiAccess.Access` 四种级别里没有「只许回环」这一类，所以当初只能不声明。修分类（加 LOCAL_ONLY）而不是糊一个语义不对的现成级别；探测必须用「已认证 + 非回环」才能区分「规则在」与「规则没了」（匿名探测两种情况都返回 401）
+- 依据：requirements AC-001；本机实测：切片首跑 34 条红 1（`ApiSurfaceTest.everyEndpointDeclaresItsAccess` 报 `POST /api/v1/ops/hooks/grafana` 无 @ApiAccess），修复后 35 条 0 红 exit 0
+- 验证：切片命令 exit 0 / Tests run 35 / Failures 0 / Skipped 0 / 66 秒；三件守卫均有 Tests run 数字；工作区仅本片文件
+- 本地提交：本片提交
+- 远端推送：未执行

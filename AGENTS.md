@@ -25,9 +25,9 @@
   - 全量只在**改共享包**（`@paideia/ui` / `core` / `auth` / `knowledge`）或**发版前**跑
   - 对应关系：`HomePage`→`home`；知识库→`knowledge`；笔记→`notes`；图谱→`graph`；助手→`assistant`；markdown 渲染→`markdown-render`；简历→`resume`；身份与导航→`identity`；MCP→`mcp-tokens`；源码解读→`source-reading`；移动端布局→`layout.mobile`；课程关卡→`learn`；PWA→`pwa`
 - **测试库是唯一入口**：任何碰数据库的验证都走 `scripts/test-db.sh`（或它包的 e2e），**不要直接 `mvn -B test` / `pnpm test:e2e` 连共用的 `paideia_test`**。这台机器上可能有别的会话同时在跑，共用库会让两轮测试互相删数据——单类跑全绿、全量跑红那种红**不是产品缺陷**，也不能当证据。脚本每次分配独占的 `paideia_run_<时间>_<pid>` 库，成功后自动删；失败时保留库名并打印出来。
-- **后端内环不要跑全量**：全量（667 条 / 上次干净实测 3 分 30 秒 `-T 1C`）里 `paideia-app`（集成测试模块，257 条）独占 2 分 15 秒。**切片提交不跑全量**，跑下面两条就够（合计约 **2 分 15 秒**）：
+- **后端内环不要跑全量**：全量（667 条 / 上次干净实测 3 分 30 秒 `-T 1C`）里 `paideia-app`（集成测试模块，257 条）独占 2 分 15 秒。**切片提交不跑全量**，跑下面两条就够（合计约 **2 分 30 秒**；两条都必须在 `backend/` 目录下跑——`test-db.sh` 带命令参数时不会自己切目录）：
   - `scripts/test-db.sh mvn -B -T 1C -pl '!paideia-app' test` —— **88 秒 / 410 条**，除集成套件外的全部单测
-  - `scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=ModularityTest,MigrationVersionFormatTest,MigrationChecksumTest,MigrationSeedOverlapTest -Dsurefire.failIfNoSpecifiedTests=false test` —— **46 秒 / 9 条**，跨模块边界、迁移命名与校验和、迁移不污染种子表
+  - `scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=ModularityTest,MigrationVersionFormatTest,MigrationChecksumTest,MigrationSeedOverlapTest,ApiSurfaceTest,ApiContractTest,AuthorizationIsolationTest -Dsurefire.failIfNoSpecifiedTests=false test` —— **66 秒 / 35 条**（守卫三件占大头：ApiContractTest 单类约 31 秒），跨模块边界、迁移三件（命名/校验和/种子隔离）与守卫三件（每个端点必须声明访问级别、401/403 矩阵、非回环来源对照与令牌隔离）
   - 全量只留给**交接、改跨模块契约、改 schema 或迁移、发版带 `-WithTests`**，且一律加 `-T 1C`。数据与分层见 `.agent/notes/dev-workflow.md` 的「实测基线」。
 - **并发会话各占一个工作区**：多个会话同时改这个仓库时，除主树 `F:\Paideia` 外，每个会话用 `git worktree add .worktrees/<名字> -b <分支>` 开自己的树（目录已忽略），互不踩 `target/`、`node_modules` 与工作区状态。主树保持在 `master`，只用于 review、落库和部署。并行 e2e 还要各挑一组端口：`PAIDEIA_BACKEND_PORT` / `PAIDEIA_APP_PORT` / `PAIDEIA_ADMIN_PORT` 都可覆写，否则 `reuseExistingServer` 会静默复用别人的服务、打到别人的库上。
 - **工作树合并后必须删**，没有任何机制会自动回收：`git worktree remove .worktrees/<名字>` + `git branch -d <分支>`（合并后 `-d` 安全，未合并会拒删）。**实测占用**：只 checkout 约 5MB（`.git` 是共享的，不复制历史）；跑过后端测试 +100MB；跑过 `pnpm install` +814MB——一个真正用起来的工作树接近 1GB。不是"内存"是磁盘。

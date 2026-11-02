@@ -146,6 +146,35 @@ class ApiContractTest {
     }
 
     @Test
+    @DisplayName("声明为 LOCAL_ONLY 的端点：非回环来源 403；回环也要共享令牌，JWT 不算数")
+    void declaredLocalOnlyReallyIsLocalOnly() throws Exception {
+        List<String> problems = new ArrayList<>();
+        for (ApiSurfaceTest.Endpoint endpoint : endpoints()) {
+            if (!isLocalOnly(endpoint)) {
+                continue;
+            }
+            // 非回环 + 已认证：安全链必须拒为 403。**必须带令牌探测**——匿名被拒走的是入口点
+            // （401），而规则若整个缺失，请求会落到控制器里的令牌闸，同样是 401；
+            // 只有"已认证 + 非回环"的 403 才能区分"规则在"与"规则没了"。
+            int remoteStatus = perform(endpoint, learnerToken(), null, "198.51.100.7")
+                    .getResponse().getStatus();
+            if (remoteStatus != 403) {
+                problems.add(endpoint.method() + " " + endpoint.pattern()
+                        + " 非回环来源带学习者令牌得到 " + remoteStatus
+                        + "（期望 403；检查 LocalOnlyAuthorizationManager 是否覆盖它）");
+                continue;
+            }
+            // 回环来源：安全链放行，但 JWT 不算数——没有共享令牌必须被控制器的令牌闸拒为 401
+            int loopbackStatus = perform(endpoint, learnerToken(), null).getResponse().getStatus();
+            if (loopbackStatus != 401) {
+                problems.add(endpoint.method() + " " + endpoint.pattern()
+                        + " 回环但只有 JWT、没有共享令牌得到 " + loopbackStatus + "（期望 401）");
+            }
+        }
+        assertThat(problems).as("LOCAL_ONLY 声明与实际行为不一致").isEmpty();
+    }
+
+    @Test
     @DisplayName("畸形 JSON 体得到 400；只收 multipart 的路由得到 415")
     void malformedBodyIsAClientError() throws Exception {
         List<String> failures = new ArrayList<>();
@@ -153,7 +182,11 @@ class ApiContractTest {
             // 反代端点的请求体是**不透明字节**，本服务不解析它（WORK-028）：畸形 JSON 对它
             // 是合法输入，应当原样转给 Grafana 由下游决定。把它算进来等于逼转发路径加一层
             // 它不该有的解析。
-            if (isPublicWrite(endpoint) || isOpaqueForwarder(endpoint) || !hasRequestBody(endpoint)) {
+            // LOCAL_ONLY 也被排除：它要求共享令牌，探测矩阵不持有——请求在令牌闸就 401，
+            // 到不了畸形体解析，没法在这里断言 400。它的边界与令牌闸由
+            // declaredLocalOnlyReallyIsLocalOnly 对照。
+            if (isPublicWrite(endpoint) || isOpaqueForwarder(endpoint) || isLocalOnly(endpoint)
+                    || !hasRequestBody(endpoint)) {
                 continue;
             }
             String token = tokenFor(endpoint);
@@ -235,6 +268,11 @@ class ApiContractTest {
         return endpoint.access() == ApiAccess.Access.PUBLIC_WRITE;
     }
 
+    /** 只许回环来源的机器到机器端点：探测矩阵不持有它的共享令牌。 */
+    private static boolean isLocalOnly(ApiSurfaceTest.Endpoint endpoint) {
+        return endpoint.access() == ApiAccess.Access.LOCAL_ONLY;
+    }
+
     /** Grafana 反代（WORK-028）：请求体原样透传，本服务不解析。 */
     private static boolean isOpaqueForwarder(ApiSurfaceTest.Endpoint endpoint) {
         return endpoint.pattern().startsWith("/api/v1/ops/grafana/");
@@ -268,12 +306,24 @@ class ApiContractTest {
     private static final String PROBE_ID = "9223372036854775806";
 
     private MvcResult perform(ApiSurfaceTest.Endpoint endpoint, String bearer, String body) throws Exception {
+        return perform(endpoint, bearer, body, null);
+    }
+
+    /** 带 remoteAddr 覆盖的重载：用来探测 LOCAL_ONLY 的"来源即身份"。 */
+    private MvcResult perform(ApiSurfaceTest.Endpoint endpoint, String bearer, String body,
+                              String remoteAddr) throws Exception {
         var builder = request(HttpMethod.valueOf(endpoint.method()), concretePath(endpoint));
         if (bearer != null) {
             builder.header("Authorization", bearer);
         }
         if (body != null) {
             builder.contentType(APPLICATION_JSON).content(body);
+        }
+        if (remoteAddr != null) {
+            builder.with(probe -> {
+                probe.setRemoteAddr(remoteAddr);
+                return probe;
+            });
         }
         return mockMvc.perform(builder).andReturn();
     }
