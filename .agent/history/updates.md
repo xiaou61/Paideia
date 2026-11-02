@@ -9503,4 +9503,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：矩阵行见报告；`validate` 待跑（本记录提交后一并核）
 - 已知项：中继未接 ScheduledTaskRecorder（运维可视性）；前端与 e2e 未跑（无前端改动）
 - 本地提交：本片提交
+
+## 2026-11-02 20:09:56 +0800 · WORK-062 · 签署 .agent/changes/WORK-062-重复代码收敛与共享工具提取/requirements.md、.agent/changes/WORK-062-重复代码收敛与共享工具提取/proposal.md、.agent/changes/WORK-062-重复代码收敛与共享工具提取/design.md、.agent/changes/WORK-062-重复代码收敛与共享工具提取/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-062-重复代码收敛与共享工具提取/requirements.md、.agent/changes/WORK-062-重复代码收敛与共享工具提取/proposal.md、.agent/changes/WORK-062-重复代码收敛与共享工具提取/design.md、.agent/changes/WORK-062-重复代码收敛与共享工具提取/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-062-重复代码收敛与共享工具提取/requirements.md、.agent/changes/WORK-062-重复代码收敛与共享工具提取/proposal.md、.agent/changes/WORK-062-重复代码收敛与共享工具提取/design.md、.agent/changes/WORK-062-重复代码收敛与共享工具提取/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
+- 本地提交：待用户授权/未提交
 - 远端推送：未执行
