@@ -1,4 +1,5 @@
 import type { ApiClient } from '@paideia/core'
+import { JSON_HEADERS } from '@paideia/core'
 
 /**
  * 认证端点的调用。路径与后端 `AuthController` 一一对应。
@@ -34,7 +35,6 @@ export interface CaptchaChallenge {
   expiresAt: string
 }
 
-const JSON_HEADERS = { 'Content-Type': 'application/json' }
 
 function post(body: unknown): RequestInit {
   return { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(body) }

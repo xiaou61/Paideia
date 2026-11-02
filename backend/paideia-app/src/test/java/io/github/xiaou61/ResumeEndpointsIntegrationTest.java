@@ -1,10 +1,5 @@
 package io.github.xiaou61;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import io.github.xiaou61.ai.ModelAccess;
 import io.github.xiaou61.ai.ResumeAnalyzer;
@@ -30,6 +25,11 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 /**
  * 简历端点的归属与失败语义（WORK-018 AC-007 / AC-008 / AC-010）。
@@ -72,12 +72,9 @@ class ResumeEndpointsIntegrationTest {
             if (userId == null) {
                 continue;
             }
-            jdbcTemplate.update("DELETE FROM resume_proposals WHERE user_id = ?", userId);
-            jdbcTemplate.update("DELETE FROM resume_versions WHERE user_id = ?", userId);
-            jdbcTemplate.update("DELETE FROM resume_edit_history WHERE user_id = ?", userId);
-            jdbcTemplate.update("DELETE FROM resume_documents WHERE user_id = ?", userId);
-            jdbcTemplate.update("DELETE FROM ai_credit_ledger WHERE user_id = ?", userId);
-            jdbcTemplate.update("DELETE FROM ai_credit_accounts WHERE user_id = ?", userId);
+            // 逐表清理由 SqlCleanup 统一（顺序 = 参数顺序，子表在前）；users 走 id 列，单独删
+            SqlCleanup.deleteByUser(jdbcTemplate, userId, "resume_proposals", "resume_versions",
+                    "resume_edit_history", "resume_documents", "ai_credit_ledger", "ai_credit_accounts");
             jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
         }
         userA = null;
@@ -216,8 +213,7 @@ class ResumeEndpointsIntegrationTest {
     }
 
     private String token(long userId) {
-        return "Bearer " + authPort.issue(
-                new AuthPort.Subject(Long.toString(userId), AuthPort.ROLE_LEARNER)).value();
+        return TestTokens.bearer(authPort, Long.toString(userId));
     }
 
     /**

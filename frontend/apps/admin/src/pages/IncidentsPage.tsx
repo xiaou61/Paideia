@@ -24,6 +24,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { useState } from 'react'
 
 import { api } from '../api'
+import { JSON_HEADERS, errorMessage, formatLocalDateTime } from '@paideia/core'
 
 interface Incident {
   id: number
@@ -142,7 +143,7 @@ export function IncidentsPage() {
     mutationFn: (message: string) =>
       api.requestEnvelope<IncidentDetail>(`/api/v1/ops/admin/incidents/${selectedId}/notes`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify({ message }),
       }),
     onSuccess: () => {
@@ -205,7 +206,7 @@ export function IncidentsPage() {
         </p>
       ) : incidents.isError ? (
         <p className="text-muted-foreground text-sm">
-          事件读取失败：{errorMessage(incidents.error)}
+          事件读取失败：{errorMessage(incidents.error, '未知错误')}
         </p>
       ) : rows.length === 0 ? (
         <Empty data-testid="incidents-empty">
@@ -274,7 +275,7 @@ export function IncidentsPage() {
                 </p>
               ) : detail.isError ? (
                 <p className="text-muted-foreground text-sm">
-                  事件读取失败：{errorMessage(detail.error)}
+                  事件读取失败：{errorMessage(detail.error, '未知错误')}
                 </p>
               ) : detail.data ? (
                 <>
@@ -377,12 +378,12 @@ export function IncidentsPage() {
                   </div>
                   {addNote.isError ? (
                     <p className="text-destructive mt-2 text-sm">
-                      备注失败：{errorMessage(addNote.error)}
+                      备注失败：{errorMessage(addNote.error, '未知错误')}
                     </p>
                   ) : null}
                   {closeIncident.isError ? (
                     <p className="text-destructive mt-2 text-sm">
-                      关闭失败：{errorMessage(closeIncident.error)}
+                      关闭失败：{errorMessage(closeIncident.error, '未知错误')}
                     </p>
                   ) : null}
 
@@ -437,10 +438,6 @@ function grafanaLinks(incident: Incident): { panel: string; logs: string } {
 }
 
 function formatTime(value: string): string {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
+  return formatLocalDateTime(value)
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : '未知错误'
-}

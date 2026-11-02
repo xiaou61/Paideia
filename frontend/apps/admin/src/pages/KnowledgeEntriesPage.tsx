@@ -20,6 +20,8 @@ import {
   DialogTitle,
   Input,
   Label,
+  ListPagination,
+  LoadingRow,
   PageHeader,
   Select,
   SelectContent,
@@ -28,7 +30,6 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-  Spinner,
   Table,
   TableBody,
   TableCell,
@@ -42,6 +43,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 
 import { API_BASE_URL } from '../env'
 import { ConfirmDeleteDialog, Loading, admin, categoryGroups, flatten, type FlatCategory } from '../knowledge-shared'
+import { errorMessage, formatLocalDateTime } from '@paideia/core'
 
 /** 每页条数。列表用前端分页：接口一次给一页（size=200），条目量到千级再改成服务端分页。 */
 const PAGE_SIZE = 10
@@ -67,7 +69,8 @@ const RELATION_TYPES = [
 
 /** 后端时间戳是 UTC 的 ISO 串，列表里按浏览器本地时区显示——后台是给人看的钟点，不是给机器的。 */
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString('zh-CN', { hour12: false })
+  // 收敛时顺手补上了保护（原实现遇到非法输入会渲染 Invalid Date；共享件按"原样返回"处理）
+  return formatLocalDateTime(iso)
 }
 
 /**
@@ -111,7 +114,7 @@ export function KnowledgeEntriesPage() {
   const flat = useMemo(() => flatten(categories.data ?? []), [categories.data])
   const grouped = useMemo(() => categoryGroups(flat), [flat])
 
-  const report = (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause))
+  const report = (cause: unknown) => setError(errorMessage(cause))
 
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: ['admin-knowledge-categories'] })
@@ -250,7 +253,7 @@ export function KnowledgeEntriesPage() {
             <div className="px-(--card-spacing) pb-3">
               <Alert variant="destructive">
                 <AlertTitle>条目加载失败</AlertTitle>
-                <AlertDescription>{(entries.error as Error).message}</AlertDescription>
+                <AlertDescription>{errorMessage(entries.error)}</AlertDescription>
               </Alert>
             </div>
           ) : null}
@@ -410,33 +413,15 @@ function Pagination({
   totalPages: number
   onChange: (page: number) => void
 }) {
+  // 收敛到共享件（WORK-062）：testIdPrefix 生成 admin-entry-total/-prev/-next，e2e 锚点不变
   return (
-    <div className="border-border text-muted-foreground flex items-center justify-between gap-4 border-t px-(--card-spacing) py-3 text-xs">
-      <span data-testid="admin-entry-total">共 {total} 条</span>
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="xs"
-          disabled={current <= 1}
-          onClick={() => onChange(current - 1)}
-          data-testid="admin-entry-prev"
-        >
-          上一页
-        </Button>
-        <span className="tabular-nums">
-          {current} / {totalPages}
-        </span>
-        <Button
-          variant="outline"
-          size="xs"
-          disabled={current >= totalPages}
-          onClick={() => onChange(current + 1)}
-          data-testid="admin-entry-next"
-        >
-          下一页
-        </Button>
-      </div>
-    </div>
+    <ListPagination
+      total={total}
+      page={current}
+      totalPages={totalPages}
+      onPage={onChange}
+      testIdPrefix="admin-entry"
+    />
   )
 }
 
@@ -471,10 +456,7 @@ function EntryEditor({
       <Dialog open onOpenChange={() => onClose()}>
         <DialogContent>
           <DialogTitle>加载条目…</DialogTitle>
-          <p className="text-muted-foreground flex items-center gap-2 text-sm">
-            <Spinner />
-            正在读取
-          </p>
+          <LoadingRow label="正在读取" />
         </DialogContent>
       </Dialog>
     )

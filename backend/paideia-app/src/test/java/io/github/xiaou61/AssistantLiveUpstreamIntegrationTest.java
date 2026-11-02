@@ -1,14 +1,11 @@
 package io.github.xiaou61;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 
 import com.jayway.jsonpath.JsonPath;
 import io.github.xiaou61.security.AuthPort;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -209,14 +206,11 @@ class AssistantLiveUpstreamIntegrationTest {
                 .andReturn();
         long conversationId = ((Number) JsonPath.read(body(created), "$.data.id")).longValue();
 
-        MvcResult started = mockMvc.perform(post("/api/v1/ai/conversations/" + conversationId + "/messages")
+        return body(MockMvcSse.exchange(mockMvc, post("/api/v1/ai/conversations/" + conversationId + "/messages")
                         .header("Authorization", token())
                         .accept(MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"message\":\"" + message.replace("\"", "\\\"") + "\"}"))
-                .andExpect(request().asyncStarted())
-                .andReturn();
-        return body(mockMvc.perform(asyncDispatch(started)).andReturn());
+                        .content("{\"message\":\"" + message.replace("\"", "\\\"") + "\"}")));
     }
 
     private long createPublishedEntry(String title) throws Exception {
@@ -244,14 +238,14 @@ class AssistantLiveUpstreamIntegrationTest {
     }
 
     private String token() {
-        return "Bearer " + authPort.issue(new AuthPort.Subject(user, AuthPort.ROLE_LEARNER)).value();
+        return TestTokens.bearer(authPort, user);
     }
 
     private String adminToken() {
-        return "Bearer " + authPort.issue(new AuthPort.Subject("1", AuthPort.ROLE_ADMIN)).value();
+        return TestTokens.bearer(authPort, "1", AuthPort.ROLE_ADMIN);
     }
 
     private static String body(MvcResult result) throws Exception {
-        return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        return MockMvcBodies.body(result);
     }
 }

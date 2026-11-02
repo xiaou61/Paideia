@@ -1,15 +1,8 @@
 package io.github.xiaou61.ops;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.xiaou61.TestTokens;
 import io.github.xiaou61.ai.OpsDiagnoser;
 import io.github.xiaou61.ai.TokenUsage;
 import io.github.xiaou61.security.AuthPort;
@@ -28,6 +21,14 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * 诊断评分与 helpful 率（WORK-043 AC-010）。
@@ -211,6 +212,6 @@ class OpsFeedbackIntegrationTest {
     }
 
     private String tokenFor(String role) {
-        return "Bearer " + authPort.issue(new AuthPort.Subject("1", role)).value();
+        return TestTokens.bearer(authPort, "1", role);
     }
 }

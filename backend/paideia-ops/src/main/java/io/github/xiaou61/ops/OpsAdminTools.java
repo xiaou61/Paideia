@@ -1,6 +1,7 @@
 package io.github.xiaou61.ops;
 
 import io.github.xiaou61.platform.PaideiaTool;
+import io.github.xiaou61.platform.ToolArgs;
 import io.github.xiaou61.platform.ToolContext;
 import io.github.xiaou61.platform.ToolDescriptor;
 import io.github.xiaou61.platform.ToolResult;
@@ -66,8 +67,7 @@ public final class OpsAdminTools {
         }
 
         private static String messageOf(RuntimeException failure) {
-            String message = failure.getMessage();
-            return message == null || message.isBlank() ? failure.getClass().getSimpleName() : message;
+            return ToolArgs.messageOf(failure);
         }
     }
 

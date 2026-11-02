@@ -1,4 +1,4 @@
-import { ApiError } from '@paideia/core'
+import { ApiError, errorMessage } from '@paideia/core'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { createAuthApi, type AuthApi, type AuthTokens, type AuthUser } from './auth-api'
@@ -169,8 +169,7 @@ export function useAuth(): AuthContextValue {
 
 /** 把任意错误转成可展示的文案。后端给的是给用户看的中文，直接用。 */
 export function messageOf(error: unknown): string {
-  if (error instanceof ApiError) {
-    return error.message
-  }
-  return error instanceof Error ? error.message : '请求失败，请稍后重试'
+  // 归一到 @paideia/core 的 errorMessage（WORK-062）：ApiError 是 Error 子类，
+  // 原来的 ApiError 分支与"是 Error 就用 message"本就等价
+  return errorMessage(error, '请求失败，请稍后重试')
 }

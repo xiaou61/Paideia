@@ -1,9 +1,7 @@
 package io.github.xiaou61.ops;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.github.xiaou61.TestTokens;
 import io.github.xiaou61.security.AuthPort;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -20,6 +18,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * 数据大屏的性能（WORK-045 AC-007）。
@@ -56,7 +57,7 @@ class AnalyticsPerformanceTest {
     void p95WithinBudget() throws Exception {
         seed();
 
-        String token = "Bearer " + authPort.issue(new AuthPort.Subject("1", "admin")).value();
+        String token = TestTokens.bearer(authPort, "1", "admin");
 
         // 预热一轮：第一次请求要初始化连接池与 MyBatis 的映射缓存，
         // 把它算进 P95 会测到"冷启动"而不是"常态"

@@ -22,6 +22,7 @@ import { Activity, Database, HardDrive, RefreshCw, Server, ShieldAlert, Sparkles
 import { useState } from 'react'
 
 import { api } from '../api'
+import { JSON_HEADERS, errorMessage, formatLocalDateTime } from '@paideia/core'
 
 /**
  * 运维面板（WORK-028）。
@@ -276,7 +277,7 @@ function DiagnosisSection() {
     mutationFn: (text: string) =>
       api.requestEnvelope<{ id: number }>('/api/v1/ops/admin/diagnoses', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify({ question: text.trim() === '' ? undefined : text.trim() }),
       }),
     onSuccess: (data) => {
@@ -338,7 +339,7 @@ function DiagnosisSection() {
 
         {start.isError ? (
           <p className="text-destructive mb-3 text-sm" role="alert">
-            提交失败：{errorMessage(start.error)}
+            提交失败：{errorMessage(start.error, '未知错误')}
           </p>
         ) : null}
 
@@ -348,7 +349,7 @@ function DiagnosisSection() {
           </p>
         ) : diagnoses.isError ? (
           <p className="text-muted-foreground text-sm">
-            诊断记录读取失败：{errorMessage(diagnoses.error)}
+            诊断记录读取失败：{errorMessage(diagnoses.error, '未知错误')}
           </p>
         ) : diagnoses.data.length === 0 ? (
           <p className="text-muted-foreground text-sm" data-testid="ops-diagnosis-empty">
@@ -394,7 +395,7 @@ function DiagnosisItem({
     mutationFn: (rating: number) =>
       api.requestEnvelope<Diagnosis>(`/api/v1/ops/admin/diagnoses/${item.id}/feedback`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify({ rating, note: note.trim() === '' ? undefined : note.trim() }),
       }),
     onSuccess: () => {
@@ -448,7 +449,7 @@ function DiagnosisItem({
             </p>
           ) : detail.isError ? (
             <p className="text-muted-foreground mt-2 text-sm">
-              报告读取失败：{errorMessage(detail.error)}
+              报告读取失败：{errorMessage(detail.error, '未知错误')}
             </p>
           ) : detail.data?.reportMd ? (
             <div className="mt-3">
@@ -490,7 +491,7 @@ function DiagnosisItem({
               </div>
               {rate.isError ? (
                 <p className="text-destructive mt-2 text-xs" role="alert">
-                  评分失败：{errorMessage(rate.error)}
+                  评分失败：{errorMessage(rate.error, '未知错误')}
                 </p>
               ) : null}
             </div>
@@ -506,10 +507,6 @@ function DiagnosisItem({
 }
 
 function formatTime(value: string): string {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
+  return formatLocalDateTime(value)
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : '未知错误'
-}

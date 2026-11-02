@@ -1,15 +1,9 @@
 package io.github.xiaou61.ops;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.xiaou61.Await;
 import io.github.xiaou61.ai.OpsDiagnoser;
 import io.github.xiaou61.ai.TokenUsage;
 import java.util.List;
@@ -27,6 +21,13 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Grafana webhook 的两道门与冷却（WORK-042 AC-008/AC-011）。
@@ -314,15 +315,10 @@ class OpsHookIntegrationTest {
     }
 
     private OpsDiagnosisRow awaitFinished(long id) throws InterruptedException {
-        long deadline = System.currentTimeMillis() + 5_000;
-        while (System.currentTimeMillis() < deadline) {
-            OpsDiagnosisRow row = mapper.findById(id).orElseThrow();
-            if (!OpsDiagnosisRow.STATUS_PENDING.equals(row.getStatus())
-                    && !OpsDiagnosisRow.STATUS_RUNNING.equals(row.getStatus())) {
-                return row;
-            }
-            Thread.sleep(50);
-        }
-        throw new AssertionError("诊断未在 5 秒内完成");
+        return Await.value(() -> mapper.findById(id).orElseThrow(),
+                        row -> !OpsDiagnosisRow.STATUS_PENDING.equals(row.getStatus())
+                                && !OpsDiagnosisRow.STATUS_RUNNING.equals(row.getStatus()),
+                        5_000, 50)
+                .orElseThrow(() -> new AssertionError("诊断未在 5 秒内完成"));
     }
 }

@@ -32,6 +32,7 @@ import { Link2, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
 
 import { ConfirmDeleteDialog, Loading, admin, categoryGroups, flatten } from '../knowledge-shared'
+import { errorMessage } from '@paideia/core'
 
 /**
  * 概念维护（WORK-021）。
@@ -62,7 +63,7 @@ export function KnowledgeConceptsPage() {
   const flat = useMemo(() => flatten(categories.data ?? []), [categories.data])
   const grouped = useMemo(() => categoryGroups(flat), [flat])
 
-  const report = (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause))
+  const report = (cause: unknown) => setError(errorMessage(cause))
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: ['admin-concepts'] })
     // 图谱页读的是同一份数据，改完概念要让它重取

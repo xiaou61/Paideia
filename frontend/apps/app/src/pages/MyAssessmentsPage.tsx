@@ -1,10 +1,7 @@
-import { formatRelative } from '@paideia/core'
+import { errorMessage, formatRelative } from '@paideia/core'
 import { createKnowledgeApi } from '@paideia/knowledge'
 import type { SelfAssessmentLevel } from '@paideia/knowledge'
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
   AppShell,
   Badge,
   Button,
@@ -14,13 +11,14 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
+  ErrorAlert,
+  LoadingRow,
   PageHeader,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Spinner,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
 import { Target } from 'lucide-react'
@@ -101,16 +99,10 @@ export function MyAssessmentsPage() {
       </div>
 
       {mine.isPending ? (
-        <p className="text-muted-foreground flex items-center gap-2 text-sm" data-testid="my-assessment-state">
-          <Spinner />
-          加载中…
-        </p>
+        <LoadingRow label="加载中…" testId="my-assessment-state" />
       ) : null}
       {mine.isError ? (
-        <Alert variant="destructive" data-testid="my-assessment-state">
-          <AlertTitle>加载失败</AlertTitle>
-          <AlertDescription>{(mine.error as Error).message}</AlertDescription>
-        </Alert>
+        <ErrorAlert title="加载失败" error={mine.error} testId="my-assessment-state" />
       ) : null}
 
       {mine.isSuccess && mine.data.length === 0 ? (

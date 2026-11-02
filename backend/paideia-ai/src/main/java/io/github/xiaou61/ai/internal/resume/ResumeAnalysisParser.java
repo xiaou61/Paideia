@@ -3,6 +3,7 @@ package io.github.xiaou61.ai.internal.resume;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.xiaou61.ai.ResumeAnalysis;
+import io.github.xiaou61.ai.internal.support.ModelJson;
 import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
 import java.util.ArrayList;
@@ -84,22 +85,12 @@ public class ResumeAnalysisParser {
         }
     }
 
-    private static String stripFence(String raw) {
-        String trimmed = raw.trim();
-        if (!trimmed.startsWith("```")) {
-            return trimmed;
-        }
-        int firstNewline = trimmed.indexOf('\n');
-        int lastFence = trimmed.lastIndexOf("```");
-        if (firstNewline < 0 || lastFence <= firstNewline) {
-            return trimmed;
-        }
-        return trimmed.substring(firstNewline + 1, lastFence).trim();
+        private static String stripFence(String raw) {
+        return ModelJson.stripFence(raw);
     }
 
-    private static String text(JsonNode node, String field) {
-        JsonNode value = node == null ? null : node.get(field);
-        return value == null || value.isNull() || !value.isValueNode() ? "" : value.asText().trim();
+        private static String text(JsonNode node, String field) {
+        return ModelJson.textOrEmpty(node, field);
     }
 
     private static BizException failure(String reason) {

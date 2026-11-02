@@ -9511,4 +9511,165 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：矩阵行见报告；`validate` 待跑（本记录提交后一并核）
 - 已知项：中继未接 ScheduledTaskRecorder（运维可视性）；前端与 e2e 未跑（无前端改动）
 - 本地提交：本片提交
+
+
+## 2026-11-02 20:09:56 +0800 · WORK-062 · 签署 .agent/changes/WORK-062-重复代码收敛与共享工具提取/requirements.md、.agent/changes/WORK-062-重复代码收敛与共享工具提取/proposal.md、.agent/changes/WORK-062-重复代码收敛与共享工具提取/design.md、.agent/changes/WORK-062-重复代码收敛与共享工具提取/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-062-重复代码收敛与共享工具提取/requirements.md、.agent/changes/WORK-062-重复代码收敛与共享工具提取/proposal.md、.agent/changes/WORK-062-重复代码收敛与共享工具提取/design.md、.agent/changes/WORK-062-重复代码收敛与共享工具提取/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-062-重复代码收敛与共享工具提取/requirements.md、.agent/changes/WORK-062-重复代码收敛与共享工具提取/proposal.md、.agent/changes/WORK-062-重复代码收敛与共享工具提取/design.md、.agent/changes/WORK-062-重复代码收敛与共享工具提取/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-11-02 21:40 +0800 · WORK-062 · TASK-001 B1 令牌 subject→long 收敛
+
+- 类型：implementation
+- 变更：`security.CurrentUser` 新增 `userId()`（唯一文案落点）；account×2、ai.AiRequester、app.console.AdminUserController、mcp、note×3、sandbox×2 的逐字 try/catch 块收敛；ai×2 与 ops×4 的裸解析改用共享件；knowledge `CurrentUserId.require()` 改委托（`orNull()` 按设计保留——读路径要吞异常）
+- 决策：沙箱两处原只 catch `NumberFormatException`，统一后匿名请求文案变为"令牌主体不是有效的账号标识"（HTTP 401 不变）；裸解析处伪造令牌由 500 变 401，属修正（401 才符合"身份不被接受"）
+- 依据：WORK-062 requirements REQ-001 / design B1；三路扫描的第 1 条候选
+- 验证：消失判据——`令牌主体不是有效的账号标识` 全仓只剩 `CurrentUser.java:42`；`Long.parseLong(CurrentUser.subjectId())` 为 0；剩余 4 处 `subjectId()` 均为合法字符串用法。非 app 单元切片 805 条 / 0 失败 / exit 0（59 秒）；守卫切片 35 条 / 0 红（66 秒）
+- 本地提交：本片提交
+- 远端推送：未执行
+
+## 2026-11-02 22:05 +0800 · WORK-062 · TASK-002 B2 SHA-256 收敛
+
+- 类型：implementation
+- 变更：新增 `platform.Hashes.sha256Hex`；account.Digest、ai（CampFingerprint/DigestFingerprint/EssayCollectionService/SummaryFingerprint/ReviewQuestionGenerator）、ops.OpsIncidentService、knowledge.QuestionCatalog、sandbox.SandboxQuotaService 共 **10 处**收敛（第 10 处 `mcp.PatService.hash` 是消失判据抓到的扫描漏网）；顺带清理各文件因替换而闲置的 import（`MessageDigest` 在 PatService 因恒定时间比较保留）
+- 决策：EssayCollectionService 的"失败退回原值保证不丢内容"是**有意语义**，委托调用保留在原 try/catch 内；异常文案统一为"JVM 缺少 SHA-256 实现"
+- 依据：WORK-062 requirements REQ-001 / design B2；三路扫描的第 2 条候选（扫描报 9 处，实际 10 处）
+- 验证：消失判据——`MessageDigest.getInstance("SHA-256")` 仅剩 Hashes.java:30；单元切片 805 条 / 0 失败 / exit 0（57 秒）；app 面 7 类 54 条：53 绿 + 1 已知外部红（McpAdmin 工具数 19/21）
+- 本地提交：本片提交
+- 远端推送：未执行
+
+## 2026-11-02 22:35 +0800 · WORK-062 · TASK-003 B3 工具入参收敛
+
+- 类型：implementation
+- 变更：新增 `platform.ToolArgs`（stringOf/longOf/intOf/instantOf/messageOf/pageOf/sizeOf/clampedSize/pageQueryOf + `MAX_SIZE=100`）；14 个文件 39 处替换（12 个 tools 文件 + AdminUserController + OpsAdminTools 内层缩进版）；`intOf` 一并收
+- 决策：**PageQuery 上限 200、工具口径 100 是承重差异**——ToolArgs 用自有 MAX_SIZE 再走 PageQuery.of（其归一化对 ≤100 是恒等）；窄 longOf 两处与 OpsDiagnosisService.messageOf（带 1000 字截断）按设计保留；顺带清掉 4 个闲置常量与相应 import
+- 依据：WORK-062 requirements REQ-001 / design B3；扫描候选第 3 条
+- 验证：判据——正典 stringOf 体、`Math.min(Math.max(size,1),MAX_PAGE_SIZE)`、一行式 messageOf 均只剩 ToolArgs；单元切片 805 条 0 失败（55 秒）；app 工具面 5 类 36 条 0 失败（47 秒）
+- 本地提交：本片提交
+- 远端推送：未执行
+
+## 2026-11-02 22:55 +0800 · WORK-062 · TASK-004 B4 模型输出 JSON 收敛
+
+- 类型：implementation
+- 变更：新增 `ai.internal.support.ModelJson`（stripFence / textOrNull / textOrEmpty）；11 处替换——6 份逐字 stripFence（先用归一化 hash 校验同一性：b381aa682d 六份全同）、textOrNull 组 3 份（含 SummarySchemaValidator 的异风格同语义版）、textOrEmpty 组 2 份
+- 决策：两个 stripFence 变体（截断时保留全部正文）与 ResumeJson 的带计数 text 按设计保留；落 ai 模块内（消费者全在 ai），不提升 platform
+- 依据：WORK-062 requirements REQ-001 / design B4；扫描候选第 4 条
+- 验证：判据——`lastIndexOf("```")` 只剩 CampItemParser/EssayQuestionParser/ModelJson；单元切片 0 失败；app 面（MemoryAuto、Resume）17 条 0 失败
+- 本地提交：本片提交
+- 远端推送：未执行
+
+## 2026-11-02 23:15 +0800 · WORK-062 · TASK-005 B5 Ops HTTP 收敛
+
+- 类型：implementation
+- 变更：新增 `ops.OpsHttp`（client / trimTrailingSlash / getJson）；Prometheus、Loki（queryRange+scalar）、Tempo 三家整方法替换，Grafana 反代 targetUri 的尾斜杠归一改调共享件；三家闲置的 JSON 字段与 4 类 import 一并清理
+- 决策：各家的失败返回类型（List.of/null/Optional）与 `"status":"success"` 校验**保留在各自客户端**——Loki 的 query_range 与 Tempo 没有该字段，统一会收紧失败语义；反代自己的 HttpClient 不在范围（转发语义不同）
+- 依据：WORK-062 requirements REQ-001 / design B5；扫描候选第 5 条
+- 验证：判据——`HttpClient.newBuilder()` 只剩 OpsHttp 与转发代理；ops/分析面 117 条 / 0 失败 / 0 跳过（与基线一致，BUILD SUCCESS）
+- 本地提交：本片提交
+- 远端推送：未执行
+
+## 2026-11-02 23:50 +0800 · WORK-062 · TASK-006 T1+T4 测试样板收敛（含一次回退重做）
+
+- 类型：implementation
+- 变更：新增 `MockMvcBodies.body`（14 处替换）与 `MockMvcSse.exchange`（4 处替换：AiCredit/AssistantConversation/AssistantLiveUpstream/MemoryAuto）；相关静态导入与闲置 import 清理
+- 决策（教训）：SSE 首轮用**跨行非贪婪正则**做，结果把同一文件里别的 `mockMvc.perform(...).andReturn()` 也吞进了捕获组，4 个文件编译失败且语义被改；`git checkout` 整目录回退后改为**逐处手工替换**。结论已写进 updates：**含多个同类语句的文件不许用跨行非贪婪正则做机械替换——要么行级状态机，要么逐处手工**。另两处必须记得的差异：AssistantLiveUpstream 的 send 返回 String（要包 body）、MemoryAuto 的 sendMessage 返回 MvcResult（不包）
+- 依据：WORK-062 requirements REQ-002 / design T1/T4；扫描候选第 1/4 条
+- 验证：app 全量 **478 条 / 4 红 / 4 跳过**——4 红全部是 WORK-061 报告已登记的外部项（ApiWalkthrough 覆盖、McpAdmin 工具数、Sandbox 配额×2），**零新增失败**；T1 判据（14 份逐字 body 只剩 MockMvcBodies）与 T4 判据（asyncStarted 只剩 MockMvcSse）通过
+- 本地提交：本片提交
+- 远端推送：未执行
+
+## 2026-11-03 00:20 +0800 · WORK-062 · TASK-007 T2 Bearer token 收敛
+
+- 类型：implementation
+- 变更：新增 `TestTokens.bearer(authPort, subject[, role])`（public，供 ops/console 子包用）；全测试树 **52 处**替换
+- 决策：不提供任何默认 subject/role——各测试的 admin subject 本来就不同（1/2/900/test-role），隐式约定正是会写错的地方
+- 依据：WORK-062 requirements REQ-002 / design T2；扫描候选第 2 条
+- 验证：判据——`"Bearer " + authPort.issue` 只剩 TestTokens；app 全量 478 / 4 红（同 061 已登记外部项）/ 0 新增
+- 踩坑与修法（三个，全部当场修）：①正则首版不允许 subject 带括号、漏 21 处 → 允许嵌套括号与跨行拼接后补齐；②非递归 glob 漏 ops 子包、且包私有类不可跨包 → 改递归 + TestTokens 提 public；③import 清理条件过宽误删 11 个文件的 AuthPort import → 按词边界补回
+- 本地提交：本片提交
+- 远端推送：未执行
+
+## 2026-11-03 00:45 +0800 · WORK-062 · TASK-008 T3 轮询助手收敛
+
+- 类型：implementation
+- 变更：新增 `Await.until/value`（不做断言、不吞中断语义变化——沿用既有 sleep() 的"吞掉+还原标志"，调用点签名零改动）；替换 11 个循环 / 5 个类
+- 决策：超时值（2s/5s/10s）、间隔（25/50ms）、超时动作（静默 / 返回 null / AssertionError）**全部留在调用点**；AiTelemetry×2、AiObservability×1 按扫描建议暂不动（逻辑更缠）、ApiWalkthrough best-effort 与 DefaultRunRecorder 变体保留
+- 依据：WORK-062 requirements REQ-002 / design T3；扫描候选第 3 条
+- 验证：Ops 对、AssistantConversation、MemoryAuto、MemoryExtractionJobs 五类 **47 条 / 0 失败**；编译通过；新套件里闲置的 sleep() 已删
+- 本地提交：本片提交
+- 远端推送：未执行
+
+## 2026-11-03 01:05 +0800 · WORK-062 · TASK-009 T5 清理循环收敛（收敛版：只做 SqlCleanup）
+
+- 类型：implementation
+- 变更：新增 `SqlCleanup.deleteByUser(jdbc, userId, tables...)`；5 处表循环样板替换（Camp、CampMastery、McpAdmin、AdminUser、Resume）
+- 决策：表清单与顺序仍留各测试类（顺序承重、各测试表集不同，合并成共享常量只会制造耦合）；`users` 按 id 列删不进共享件；**UserFixture 与 TestIds 明确不做**（承重差异：UTC 方言 / 前缀数字区间；与扫描自身的建议一致），作为"不做项"记入报告
+- 依据：WORK-062 requirements REQ-002 / design T5；扫描候选第 5/6/7 条
+- 验证：5 类 38 条 / 1 红 = 已知外部项（McpAdmin 工具数），其余 37 绿；编译通过
+- 本地提交：本片提交
+- 远端推送：未执行
+
+## 2026-11-03 01:35 +0800 · WORK-062 · TASK-010 F1 errorMessage 收敛
+
+- 类型：implementation
+- 变更：`@paideia/core` 新增 `errorMessage(cause, fallback?)`（4 条单测）；全仓替换 A 形态（`x instanceof Error ? … : String(x)`）30 处 + B 形态（`(x as Error).message`）23 处，34 个文件；admin 两处私有 `errorMessage` 删除（8 处调用补 `'未知错误'` 兜底）；`auth.messageOf` 改一行委托
+- 决策：`packages/ui`（8 处）与 `apps/desktop/electron/main.cjs`（1 处）**保留**——前者是设计系统、刻意不依赖 core；后者是 CJS 主进程，不能引 ESM 包
+- 依据：WORK-062 requirements REQ-003 / design F1；扫描候选第 1 条
+- 验证：core/auth/assistant/app/admin 五包 typecheck 全过；`pnpm --filter @paideia/core test` **26 条）全绿（含新增 4 条 errorMessage 用例）**；B 形态的"非 Error 渲染 undefined"顺手修正并有了兜底语义
+- 本地提交：本片提交
+- 远端推送：未执行
+
+## 2026-11-03 02:05 +0800 · WORK-062 · TASK-011（上）：F6 JSON_HEADERS + F5 时间格式化
+
+- 类型：implementation
+- 变更：`core.JSON_HEADERS`（删 4 个局部同名常量 + 29 处内联 `headers: {...}` 替换，14 文件）；`core.formatLocalDateTime`/`formatDurationMs`（9 处 when/formatTime + 3 处 ms 改委托）；core 新增两个单测文件
+- 决策：**不做 `jsonRequest(body, method)` 包装**（设计里的另一半）——逐行替换 `headers: JSON_HEADERS` 风险最小，headers+body 成对改写只少一行、收益与风险不成比例；偏差记入报告。时间口径统一为"无值→fallback、解析失败→原样返回"，顺手修正 KnowledgeEntriesPage 原本会渲染 Invalid Date 的缺口；AnalyticsPage 时分秒版与 AiRunsScreen 的 clock 按设计保留
+- 依据：WORK-062 requirements REQ-003 / design F5/F6；扫描候选第 5/6 条
+- 验证：九包 typecheck 全过（修了 F6 首轮"多行 import 中间插行"的 4 个文件与 admin 两文件漏补 import）；core 单测 **31 条全绿**（含新增 5 条格式用例）；F6 残留仅 `auth.test.ts` 断言夹具
+- 本地提交：本片提交
+- 远端推送：未执行
+
+## 2026-11-03 02:35 +0800 · WORK-062 · TASK-011（下）：F2 ui 三件套
+
+- 类型：implementation
+- 变更：`ui` 新增 `query-state.tsx`（`LoadingRow` + `ErrorAlert`，均带 className/testId 插槽，ErrorAlert 内部两行归一错误文案、不 import core）；严格形状替换 **加载行 19 处 + 错误块 10 处 / 16 文件**（含 ui import 合并与 Spinner/Alert 系导入清理）；ui index 补导出
+- 决策：**EmptyHint 不做**（20 处空态的图标与排版差异多，建成空件违背"每个共享件至少两处真实调用"；留下一轮按页替换）；只收"形状"不收差异，文案/testId/className 全经 props
+- 依据：WORK-062 requirements REQ-003 / design F2；扫描候选第 2 条
+- 验证：ui/app/admin typecheck 全过（先修了 ui 导出遗漏）；ui 单测 **256 通过 / 1 红**——那 1 红是 **master 上本来就红**的 `tokens.test.ts` 令牌检查（AnalyticsPage 12 处调色板类；已去主树实测对照，与本项无关，列入报告外部项）
+- 本地提交：本片提交
+- 远端推送：未执行
+
+## 2026-11-03 02:55 +0800 · WORK-062 · TASK-012 F3 分页页脚收敛
+
+- 类型：implementation
+- 变更：`ui.ListPagination`（testIdPrefix → `{prefix}-total/-prev/-next`）；admin 5 处替换（含 KnowledgeEntries 本地 Pagination 改一行委托）
+- 决策：AiCreditsAuditPage 的原生 `<button>` 漂移（扫描点名的样式不一致）一并统一回 `<Button size="xs">`——有意为之的视觉修正；`pageCount` 助手不建（无第二消费者）
+- 依据：WORK-062 requirements REQ-003 / design F3；扫描候选第 3 条
+- 验证：admin typecheck 通过；闲置 Button 导入已清
+- 本地提交：本片提交
+- 远端推送：未执行
+
+## 2026-11-03 03:15 +0800 · WORK-062 · TASK-013 F4/F7：修 encode 漂移，合并缓一轮
+
+- 类型：implementation
+- 变更：`AiRunsListPage.windowParams` 补 `encodeURIComponent`（ISO 串的 `+` 会被当空格解析；扫描点名的真实漂移）
+- 决策：F7 的完整合并（4 份 WINDOWS/窗口函数并到 `admin/src/ai-window.ts`）与 F4（10 个 e2e spec 的 signIn 收敛）**缓一轮**——理由：①四页选项集与默认窗口本就不同，需逐页核对；②F4 改的是即将用于验收的 e2e 夹具，验收前夜改量具会把两类失败混在一起。记录为"排序选择"而非"做不到"
+- 依据：WORK-062 requirements REQ-003 / design F4/F7；扫描候选第 4/7 条
+- 验证：admin typecheck 通过；两端 Vite build 通过（app/admin，含既有懒加载守卫，60 秒）
+- 本地提交：本片提交
+- 远端推送：未执行
+
+## 2026-11-03 03:40 +0800 · WORK-062 · 收尾：联动验证、线上冒烟与报告（TASK-014/015/016）
+
+- 类型：verification
+- 变更：`testing/report.md`（status: passed，verified_commit=9aceb1fb，五列矩阵覆盖 AC-001…006 + 线上冒烟节 + 未覆盖清单）；TASK-014…016 收尾
+- 决策：①分支栈本地 e2e 以"九包 typecheck + 七包单测 + 两端 Vite build"替代（本地 e2e 需 jar+3307 隧道+写共享库；残留风险与合并后补课建议写入报告）；②线上冒烟的 6 条非 2xx 全部定性后才下结论：5 条 500 同根因 `e.line_kind`（线上受影响 **5 个接口**，比测试面更广；本分支 65a30c54 覆盖整族）、1 条 406 是脚本 Accept 头伪影（curl 复测 200）
+- 依据：requirements AC-001…006；本会话全部实测（后端单元/守卫/ops/记忆面切片、前端 typecheck/单测/构建、线上 31 端点 ×3 轮冒烟、journalctl 根因、主树对照）
+- 验证：见报告矩阵；**性能结论：无 ≥1s 接口（中位 53–351ms）**
+- 本地提交：本片提交
 - 远端推送：未执行

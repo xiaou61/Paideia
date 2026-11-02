@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 
 import type { AssistantApi } from './client'
 import type { CreditsView } from './types'
+import { errorMessage } from '@paideia/core'
 
 /** 流水的种类 → 人话。认不出的就照原样显示，不做兜底猜测。 */
 const KIND_LABEL: Record<string, string> = {
@@ -41,7 +42,7 @@ export function CreditsPanel({ api }: { api: AssistantApi }) {
       })
       .catch((cause: unknown) => {
         if (alive) {
-          setError(cause instanceof Error ? cause.message : String(cause))
+          setError(errorMessage(cause))
         }
       })
     return () => {

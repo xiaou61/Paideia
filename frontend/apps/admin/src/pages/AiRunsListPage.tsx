@@ -9,6 +9,7 @@ import {
   EmptyMedia,
   EmptyTitle,
   Input,
+  ListPagination,
   PageHeader,
   Select,
   SelectContent,
@@ -24,6 +25,7 @@ import {
   TableRow,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
+import { formatDurationMs, formatLocalDateTime } from '@paideia/core'
 import { ListOrdered } from 'lucide-react'
 import { useState } from 'react'
 
@@ -131,18 +133,11 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 function ms(value: number | null): string {
-  if (value === null || value === undefined) {
-    return '—'
-  }
-  return value < 1000 ? `${value} ms` : `${(value / 1000).toFixed(1)} s`
+  return formatDurationMs(value)
 }
 
 function when(value: string | null): string {
-  if (value === null) {
-    return '—'
-  }
-  const at = new Date(value)
-  return Number.isNaN(at.getTime()) ? value : at.toLocaleString('zh-CN', { hour12: false })
+  return formatLocalDateTime(value)
 }
 
 /** 时间窗选项（WORK-030）。原先写死 7 天，改不了。 */
@@ -158,7 +153,8 @@ function windowParams(hour?: string | null): string {
   const chosen = WINDOWS.find((option) => option.value === hour) ?? WINDOWS[2]
   const to = new Date()
   const from = new Date(to.getTime() - chosen.hours * 3600 * 1000)
-  return `from=${from.toISOString()}&to=${to.toISOString()}`
+  // 必须 encode：ISO 串里带 `+`（时区偏移），不编码会被后端当空格解析（WORK-062 顺带修）
+  return `from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`
 }
 
 const PAGE_SIZE = 50
@@ -342,32 +338,13 @@ export function AiRunsListPage() {
                 ))}
               </TableBody>
             </Table>
-            <div className="border-border text-muted-foreground flex items-center justify-between gap-4 border-t px-(--card-spacing) py-3 text-xs">
-              <span>共 {list.data?.total ?? 0} 条</span>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="xs"
-                  disabled={page <= 1}
-                  onClick={() => setPage(page - 1)}
-                  data-testid="runs-prev"
-                >
-                  上一页
-                </Button>
-                <span className="tabular-nums">
-                  {page} / {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="xs"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage(page + 1)}
-                  data-testid="runs-next"
-                >
-                  下一页
-                </Button>
-              </div>
-            </div>
+            <ListPagination
+              total={list.data?.total ?? 0}
+              page={page}
+              totalPages={totalPages}
+              onPage={setPage}
+              testIdPrefix="runs"
+            />
           </CardContent>
         </Card>
       ) : null}

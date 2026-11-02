@@ -1,8 +1,5 @@
 import { createKnowledgeApi, plainText } from '@paideia/knowledge'
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
   AppShell,
   Badge,
   Button,
@@ -11,9 +8,10 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
+  ErrorAlert,
   Input,
+  LoadingRow,
   PageHeader,
-  Spinner,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, BookOpenCheck, ChevronLeft, FileText, Search } from 'lucide-react'
@@ -22,6 +20,7 @@ import { Link, useParams, useSearchParams } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { errorMessage } from '@paideia/core'
 
 const knowledge = createKnowledgeApi(api)
 
@@ -152,16 +151,10 @@ export function CategoryEntriesPage() {
       </form>
 
       {entries.isPending ? (
-        <p className="text-muted-foreground flex items-center gap-2 text-sm" data-testid="entry-state">
-          <Spinner />
-          加载条目…
-        </p>
+        <LoadingRow label="加载条目…" testId="entry-state" />
       ) : null}
       {entries.isError ? (
-        <Alert variant="destructive" data-testid="entry-state">
-          <AlertTitle>条目加载失败</AlertTitle>
-          <AlertDescription>{(entries.error as Error).message}</AlertDescription>
-        </Alert>
+        <ErrorAlert title="条目加载失败" error={entries.error} testId="entry-state" />
       ) : null}
 
       {entries.isSuccess && entries.data.items.length === 0 ? (

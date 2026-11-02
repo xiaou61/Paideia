@@ -1,6 +1,7 @@
 import type { ApiClient } from '@paideia/core'
 
 import { api } from './api'
+import { JSON_HEADERS } from '@paideia/core'
 
 /** 列表项：**不含正文全文**，带一段服务端截好的摘要（前 200 字，未清洗）。 */
 export interface NoteSummary {
@@ -48,7 +49,6 @@ export interface NotesApi {
  */
 export function createNotesApi(client: ApiClient): NotesApi {
   const base = '/api/v1/notes'
-  const JSON_HEADERS = { 'Content-Type': 'application/json' }
 
   return {
     list: () => client.requestEnvelope<NoteSummary[]>(base),

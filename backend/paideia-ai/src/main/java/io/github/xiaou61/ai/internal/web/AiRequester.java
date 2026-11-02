@@ -18,12 +18,6 @@ final class AiRequester {
     }
 
     static long require() {
-        try {
-            return Long.parseLong(CurrentUser.subjectId());
-        } catch (NumberFormatException | BizException exception) {
-            // 合法令牌必然是数字（账号主键自增）；非数字只可能来自伪造或版本错配的令牌。
-            // BizException 是匿名请求时 CurrentUser 抛的；这条路径由安全链兜住，这里不制造 500。
-            throw new BizException(ErrorCode.UNAUTHENTICATED, "令牌主体不是有效的账号标识");
-        }
+        return CurrentUser.userId();
     }
 }

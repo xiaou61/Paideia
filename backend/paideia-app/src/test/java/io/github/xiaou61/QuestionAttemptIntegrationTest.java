@@ -89,7 +89,7 @@ class QuestionAttemptIntegrationTest {
     }
 
     private String token() {
-        return "Bearer " + authPort.issue(new AuthPort.Subject(String.valueOf(subject), AuthPort.ROLE_LEARNER)).value();
+        return TestTokens.bearer(authPort, String.valueOf(subject));
     }
 
     private String body(int choice) {
@@ -219,8 +219,7 @@ class QuestionAttemptIntegrationTest {
     @Test
     @DisplayName("管理端标注成功路径、练习选题与评估导出（REQ-008/012）")
     void adminTaggingPracticeAndExport() throws Exception {
-        String admin = "Bearer " + authPort.issue(
-                new AuthPort.Subject("900", AuthPort.ROLE_ADMIN)).value();
+        String admin = TestTokens.bearer(authPort, "900", AuthPort.ROLE_ADMIN);
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .get("/api/v1/learning/admin/questions").param("entryId", String.valueOf(entryId))

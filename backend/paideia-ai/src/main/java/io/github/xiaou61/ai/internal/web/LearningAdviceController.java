@@ -73,7 +73,7 @@ class LearningAdviceController {
         if (access.isEmpty()) {
             return ApiResponse.ok(new AdviceResponse(List.of()));
         }
-        long userId = Long.parseLong(CurrentUser.subjectId());
+        long userId = CurrentUser.userId();
         String roleLabel = body.roleLabel().trim();
 
         long reserved = credits.reserve(userId, credits.estimate());

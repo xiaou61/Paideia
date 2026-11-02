@@ -21,7 +21,6 @@ import io.github.xiaou61.ai.TokenUsage;
 import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
 import io.github.xiaou61.security.AuthPort;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -291,15 +290,15 @@ class AiSummaryIntegrationTest {
     }
 
     private String token(String subject) {
-        return "Bearer " + authPort.issue(new AuthPort.Subject(subject, AuthPort.ROLE_LEARNER)).value();
+        return TestTokens.bearer(authPort, subject);
     }
 
     private String adminToken() {
-        return "Bearer " + authPort.issue(new AuthPort.Subject("1", AuthPort.ROLE_ADMIN)).value();
+        return TestTokens.bearer(authPort, "1", AuthPort.ROLE_ADMIN);
     }
 
     private static String body(MvcResult result) throws Exception {
-        return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        return MockMvcBodies.body(result);
     }
 
     private static GeneratedSummary card(String headline) {

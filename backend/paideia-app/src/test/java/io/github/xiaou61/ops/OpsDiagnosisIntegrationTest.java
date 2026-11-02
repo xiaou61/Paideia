@@ -1,16 +1,10 @@
 package io.github.xiaou61.ops;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.xiaou61.Await;
+import io.github.xiaou61.TestTokens;
 import io.github.xiaou61.ai.OpsDiagnoser;
 import io.github.xiaou61.ai.TokenUsage;
 import io.github.xiaou61.platform.BizException;
@@ -28,6 +22,14 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * 手动诊断端点的权限、落库与失败语义（WORK-042 AC-007/AC-010/AC-013）。
@@ -132,20 +134,15 @@ class OpsDiagnosisIntegrationTest {
     }
 
     private OpsDiagnosisRow awaitFinished(long id) throws InterruptedException {
-        long deadline = System.currentTimeMillis() + 5_000;
-        while (System.currentTimeMillis() < deadline) {
-            OpsDiagnosisRow row = mapper.findById(id).orElseThrow();
-            if (!OpsDiagnosisRow.STATUS_PENDING.equals(row.getStatus())
-                    && !OpsDiagnosisRow.STATUS_RUNNING.equals(row.getStatus())) {
-                return row;
-            }
-            Thread.sleep(50);
-        }
-        throw new AssertionError("诊断未在 5 秒内完成");
+        return Await.value(() -> mapper.findById(id).orElseThrow(),
+                        row -> !OpsDiagnosisRow.STATUS_PENDING.equals(row.getStatus())
+                                && !OpsDiagnosisRow.STATUS_RUNNING.equals(row.getStatus()),
+                        5_000, 50)
+                .orElseThrow(() -> new AssertionError("诊断未在 5 秒内完成"));
     }
 
     private String tokenFor(String role) {
         // 生产令牌的 subject 是账号 id（数字）；这里也必须给数字，控制器会解析它记账。
-        return "Bearer " + authPort.issue(new AuthPort.Subject("1", role)).value();
+        return TestTokens.bearer(authPort, "1", role);
     }
 }

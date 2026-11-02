@@ -1,11 +1,12 @@
 package io.github.xiaou61.ai.internal.tools;
 
-import io.github.xiaou61.ai.internal.conversation.AssistantAnswerer;
 import io.github.xiaou61.ai.ModelAccess;
 import io.github.xiaou61.ai.TokenUsage;
 import io.github.xiaou61.ai.internal.billing.CreditService;
+import io.github.xiaou61.ai.internal.conversation.AssistantAnswerer;
 import io.github.xiaou61.ai.internal.conversation.HarnessPrompts;
 import io.github.xiaou61.platform.PaideiaTool;
+import io.github.xiaou61.platform.ToolArgs;
 import io.github.xiaou61.platform.ToolContext;
 import io.github.xiaou61.platform.ToolDescriptor;
 import io.github.xiaou61.platform.ToolResult;
@@ -127,12 +128,7 @@ public class AskTool implements PaideiaTool {
     }
 
     private static String stringOf(Map<String, Object> arguments, String key) {
-        Object raw = arguments == null ? null : arguments.get(key);
-        if (raw == null) {
-            return null;
-        }
-        String text = raw.toString().trim();
-        return text.isEmpty() ? null : text;
+        return ToolArgs.stringOf(arguments, key);
     }
 
     private static Long longOf(Map<String, Object> arguments, String key) {
@@ -144,7 +140,6 @@ public class AskTool implements PaideiaTool {
     }
 
     private static String messageOf(RuntimeException failure) {
-        String message = failure.getMessage();
-        return message == null || message.isBlank() ? failure.getClass().getSimpleName() : message;
+        return ToolArgs.messageOf(failure);
     }
 }

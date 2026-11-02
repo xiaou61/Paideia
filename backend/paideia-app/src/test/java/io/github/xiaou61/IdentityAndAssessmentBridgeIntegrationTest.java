@@ -1,16 +1,10 @@
 package io.github.xiaou61;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import io.github.xiaou61.account.AccountApi;
 import io.github.xiaou61.account.Identity;
 import io.github.xiaou61.ai.internal.memory.MemoryStore;
 import io.github.xiaou61.security.AuthPort;
-import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,6 +18,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 /**
  * 身份化与自评桥（WORK-010 T-02/T-03/T-07/T-08）。
@@ -242,10 +241,10 @@ class IdentityAndAssessmentBridgeIntegrationTest {
     }
 
     private String token(long userId) {
-        return "Bearer " + authPort.issue(new AuthPort.Subject(Long.toString(userId), AuthPort.ROLE_LEARNER)).value();
+        return TestTokens.bearer(authPort, Long.toString(userId));
     }
 
     private static String body(MvcResult result) throws Exception {
-        return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        return MockMvcBodies.body(result);
     }
 }

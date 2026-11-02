@@ -10,8 +10,8 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
+  LoadingRow,
   PageHeader,
-  Spinner,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
 import { FileCode2 } from 'lucide-react'
@@ -20,6 +20,7 @@ import { Link } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { errorMessage } from '@paideia/core'
 
 const knowledge = createKnowledgeApi(api)
 const learning = createLearningApi(api)
@@ -80,16 +81,13 @@ export function SourceProjectsPage() {
       {/* 没有 `source` 根分类时 `entries` 被禁用，而被禁用的 query 永远停在 isPending——
           不判 root 就会和下面的空态同时出现、且转圈永不消失（2026-11-02 审查抓到）。 */}
       {categories.isPending || (root !== undefined && entries.isPending) ? (
-        <p className="text-muted-foreground flex items-center gap-2 text-sm" data-testid="source-state">
-          <Spinner />
-          加载项目…
-        </p>
+        <LoadingRow label="加载项目…" testId="source-state" />
       ) : null}
       {(categories.isError || entries.isError) && (
         <Alert variant="destructive" data-testid="source-state">
           <AlertTitle>项目加载失败</AlertTitle>
           <AlertDescription>
-            {((categories.error ?? entries.error) as Error).message}
+            {errorMessage(categories.error ?? entries.error)}
           </AlertDescription>
         </Alert>
       )}

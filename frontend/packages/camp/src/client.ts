@@ -1,4 +1,5 @@
 import type { ApiClient } from '@paideia/core'
+import { JSON_HEADERS } from '@paideia/core'
 
 import type {
   CampAnswer,
@@ -50,7 +51,7 @@ export function createCampApi(api: ApiClient): CampApi {
     create: (resumeDocumentId, days) =>
       api.requestEnvelope<CampCreated>(base, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify({ resumeDocumentId, days }),
       }),
 
@@ -62,7 +63,7 @@ export function createCampApi(api: ApiClient): CampApi {
     submit: (id, form, answers) =>
       api.requestEnvelope<CampResult>(`${base}/${id}/submit`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify({ form, answers }),
       }),
 
@@ -78,7 +79,7 @@ export function createCampApi(api: ApiClient): CampApi {
     markTask: (id, taskId, done) =>
       api.requestEnvelope<boolean>(`${base}/${id}/tasks/${taskId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify({ done }),
       }),
   }

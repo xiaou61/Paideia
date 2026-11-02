@@ -5,17 +5,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 
 import com.jayway.jsonpath.JsonPath;
 import io.github.xiaou61.ai.AssistantConversation;
 import io.github.xiaou61.ai.TokenUsage;
 import io.github.xiaou61.ai.internal.billing.CreditService;
 import io.github.xiaou61.security.AuthPort;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -230,14 +227,11 @@ class AiCreditIntegrationTest {
     }
 
     private MvcResult sendMessage(String subject, long conversationId, String message) throws Exception {
-        MvcResult started = mockMvc.perform(post("/api/v1/ai/conversations/" + conversationId + "/messages")
+        return MockMvcSse.exchange(mockMvc, post("/api/v1/ai/conversations/" + conversationId + "/messages")
                         .header("Authorization", token(subject))
                         .accept(MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"message\":\"" + message + "\"}"))
-                .andExpect(request().asyncStarted())
-                .andReturn();
-        return mockMvc.perform(asyncDispatch(started)).andReturn();
+                        .content("{\"message\":\"" + message + "\"}"));
     }
 
     private long createConversation(String subject) throws Exception {
@@ -253,14 +247,14 @@ class AiCreditIntegrationTest {
     }
 
     private String token(String subject) {
-        return "Bearer " + authPort.issue(new AuthPort.Subject(subject, AuthPort.ROLE_LEARNER)).value();
+        return TestTokens.bearer(authPort, subject);
     }
 
     private String adminToken() {
-        return "Bearer " + authPort.issue(new AuthPort.Subject("1", AuthPort.ROLE_ADMIN)).value();
+        return TestTokens.bearer(authPort, "1", AuthPort.ROLE_ADMIN);
     }
 
     private static String body(MvcResult result) throws Exception {
-        return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        return MockMvcBodies.body(result);
     }
 }

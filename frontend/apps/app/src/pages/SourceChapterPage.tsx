@@ -9,12 +9,10 @@ import {
   stripDuplicateTitle,
 } from '@paideia/knowledge'
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
   AppShell,
+  ErrorAlert,
+  LoadingRow,
   PageHeader,
-  Spinner,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -25,6 +23,7 @@ import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
 import { API_BASE_URL } from '../env'
 import { readSourceMeta } from './source-meta'
+import { errorMessage } from '@paideia/core'
 
 const knowledge = createKnowledgeApi(api)
 const learning = createLearningApi(api)
@@ -110,16 +109,10 @@ export function SourceChapterPage() {
       </Link>
 
       {entry.isPending ? (
-        <p className="text-muted-foreground flex items-center gap-2 text-sm" data-testid="source-chapter-state">
-          <Spinner />
-          加载章节…
-        </p>
+        <LoadingRow label="加载章节…" testId="source-chapter-state" />
       ) : null}
       {entry.isError ? (
-        <Alert variant="destructive" data-testid="source-chapter-state">
-          <AlertTitle>章节加载失败</AlertTitle>
-          <AlertDescription>{(entry.error as Error).message}</AlertDescription>
-        </Alert>
+        <ErrorAlert title="章节加载失败" error={entry.error} testId="source-chapter-state" />
       ) : null}
 
       {entry.isSuccess ? (

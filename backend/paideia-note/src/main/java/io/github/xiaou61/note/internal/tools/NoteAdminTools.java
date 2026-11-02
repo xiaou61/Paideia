@@ -2,6 +2,7 @@ package io.github.xiaou61.note.internal.tools;
 
 import io.github.xiaou61.note.internal.share.ShareService;
 import io.github.xiaou61.platform.PaideiaTool;
+import io.github.xiaou61.platform.ToolArgs;
 import io.github.xiaou61.platform.ToolContext;
 import io.github.xiaou61.platform.ToolDescriptor;
 import io.github.xiaou61.platform.ToolResult;
@@ -112,27 +113,11 @@ public final class NoteAdminTools {
     }
 
     static String stringOf(Map<String, Object> arguments, String key) {
-        Object raw = arguments == null ? null : arguments.get(key);
-        if (raw == null) {
-            return null;
-        }
-        String text = raw.toString().trim();
-        return text.isEmpty() ? null : text;
+        return ToolArgs.stringOf(arguments, key);
     }
 
     static Long longOf(Map<String, Object> arguments, String key) {
-        Object raw = arguments == null ? null : arguments.get(key);
-        if (raw instanceof Number number) {
-            return number.longValue();
-        }
-        if (raw instanceof String text && !text.isBlank()) {
-            try {
-                return Long.parseLong(text.trim());
-            } catch (NumberFormatException ignored) {
-                return null;
-            }
-        }
-        return null;
+        return ToolArgs.longOf(arguments, key);
     }
 
     static String join(List<String> lines) {
@@ -140,7 +125,6 @@ public final class NoteAdminTools {
     }
 
     static String messageOf(RuntimeException failure) {
-        String message = failure.getMessage();
-        return message == null || message.isBlank() ? failure.getClass().getSimpleName() : message;
+        return ToolArgs.messageOf(failure);
     }
 }

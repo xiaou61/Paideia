@@ -20,6 +20,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
 import { notes } from '../notes-api'
+import { errorMessage } from '@paideia/core'
 
 const knowledge = createKnowledgeApi(api)
 
@@ -53,7 +54,7 @@ export function NoteNewPage() {
       // 带着 id 回列表页，那边会把它选中并加载出来
       void navigate('/notes', { state: { selected: created.id } })
     },
-    onError: (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)),
+    onError: (cause: unknown) => setError(errorMessage(cause)),
   })
 
   const dirty = title.trim() !== '' || body.trim() !== '' || entry !== null

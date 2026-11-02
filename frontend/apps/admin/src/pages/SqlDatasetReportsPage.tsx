@@ -30,6 +30,7 @@ import { Flag } from 'lucide-react'
 import { useState } from 'react'
 
 import { api } from '../api'
+import { errorMessage } from '@paideia/core'
 
 /** 一条数据集举报。 */
 interface DatasetReport {
@@ -87,7 +88,7 @@ export function SqlDatasetReportsPage() {
       void queryClient.invalidateQueries({ queryKey: ['sql-dataset-reports'] })
       void queryClient.invalidateQueries({ queryKey: ['sql-datasets'] })
     },
-    onError: (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)),
+    onError: (cause: unknown) => setError(errorMessage(cause)),
   })
 
   const rows = reports.data ?? []

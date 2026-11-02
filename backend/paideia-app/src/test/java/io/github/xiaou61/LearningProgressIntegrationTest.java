@@ -58,7 +58,7 @@ class LearningProgressIntegrationTest {
     }
 
     private String token(String subject) {
-        return "Bearer " + authPort.issue(new AuthPort.Subject(subject, AuthPort.ROLE_LEARNER)).value();
+        return TestTokens.bearer(authPort, subject);
     }
 
     private long courseEntry() {

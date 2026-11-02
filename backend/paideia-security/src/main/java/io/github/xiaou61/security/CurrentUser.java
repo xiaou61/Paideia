@@ -25,6 +25,25 @@ public final class CurrentUser {
     }
 
     /**
+     * 当前主体转成账号 id（WORK-062 收敛：全仓原来有 11 份逐字拷贝 + 6 处裸解析）。
+     *
+     * <p>令牌里的 {@code sub} 是账号 id 的**字符串形式**，而各表的外键是数字。合法令牌
+     * 必然是数字（账号主键自增）；非数字只可能来自伪造或版本错配的令牌。匿名请求由
+     * {@link #authentication()} 先抛 {@code UNAUTHENTICATED}；这里把"非数字"也归到同一条
+     * 401 上——它同样是"身份不被接受"，不该表现为 500。
+     *
+     * <p>要"读不到就放过"的读路径（例如知识库的标记读取）请在本模块内包 try/catch，
+     * 不要给这个方法加宽松变体：写路径上误用宽松版会把越权读变成静默。
+     */
+    public static long userId() {
+        try {
+            return Long.parseLong(subjectId());
+        } catch (NumberFormatException | BizException exception) {
+            throw new BizException(ErrorCode.UNAUTHENTICATED, "令牌主体不是有效的账号标识");
+        }
+    }
+
+    /**
      * 当前主体在当前请求中的角色（小写，与令牌 claim 和数据库一致）；没有角色时返回空串。
      *
      * <p>取值来自权限而不是重新解析令牌：权限是安全链已经算过的结果，

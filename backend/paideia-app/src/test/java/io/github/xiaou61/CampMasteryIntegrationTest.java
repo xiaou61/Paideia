@@ -1,6 +1,5 @@
 package io.github.xiaou61;
 
-import static org.assertj.core.api.Assertions.assertThat;
 
 import com.jayway.jsonpath.JsonPath;
 import io.github.xiaou61.security.AuthPort;
@@ -18,6 +17,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * 训练营成绩进入掌握度（WORK-029 AC-013）。
@@ -66,8 +66,7 @@ class CampMasteryIntegrationTest {
                 VALUES (?, ?, '$2a$10$abcdefghijklmnopqrstuv', 'learner', CURRENT_TIMESTAMP(3))
                 """, username, username + "@example.test");
         userId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE username = ?", Long.class, username);
-        token = "Bearer " + authPort.issue(
-                new AuthPort.Subject(Long.toString(userId), AuthPort.ROLE_LEARNER)).value();
+        token = TestTokens.bearer(authPort, Long.toString(userId));
 
         categoryId = jdbcTemplate.queryForObject(
                 "SELECT id FROM knowledge_categories ORDER BY id LIMIT 1", Long.class);
@@ -126,11 +125,10 @@ class CampMasteryIntegrationTest {
 
     @AfterEach
     void cleanUp() {
-        for (String table : List.of("camp_tasks", "camp_plans", "camp_attempts", "camp_items",
+        // 逐表清理由 SqlCleanup 统一（顺序 = 参数顺序，子表在前）
+        SqlCleanup.deleteByUser(jdbcTemplate, userId, "camp_tasks", "camp_plans", "camp_attempts", "camp_items",
                 "camp_programs", "resume_documents", "learning_progress", "knowledge_entry_views",
-                "knowledge_self_assessments", "ai_credit_ledger", "ai_credit_accounts")) {
-            jdbcTemplate.update("DELETE FROM " + table + " WHERE user_id = ?", userId);
-        }
+                "knowledge_self_assessments", "ai_credit_ledger", "ai_credit_accounts");
         jdbcTemplate.update("DELETE FROM knowledge_entry_concepts WHERE entry_id = ?", entryId);
         jdbcTemplate.update("DELETE FROM knowledge_entries WHERE id = ?", entryId);
         jdbcTemplate.update("DELETE FROM knowledge_concepts WHERE id = ?", conceptId);

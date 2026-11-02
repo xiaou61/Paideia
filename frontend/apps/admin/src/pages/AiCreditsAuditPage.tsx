@@ -8,6 +8,7 @@ import {
   EmptyMedia,
   EmptyTitle,
   Input,
+  ListPagination,
   PageHeader,
   Select,
   SelectContent,
@@ -23,6 +24,7 @@ import {
   TableRow,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
+import { formatLocalDateTime } from '@paideia/core'
 import { useState } from 'react'
 import { Receipt } from 'lucide-react'
 
@@ -79,11 +81,7 @@ const KIND_FILTERS = [
 
 /** 时间按本机时区显示；解析不出来就原样显示，不显示 "Invalid Date"。 */
 function when(value: string | null): string {
-  if (value === null) {
-    return '—'
-  }
-  const at = new Date(value)
-  return Number.isNaN(at.getTime()) ? value : at.toLocaleString('zh-CN', { hour12: false })
+  return formatLocalDateTime(value)
 }
 
 /**
@@ -262,30 +260,13 @@ export function AiCreditsAuditPage() {
               </TableBody>
             </Table>
             </div>
-            <div className="border-border text-muted-foreground flex items-center justify-between gap-4 border-t px-(--card-spacing) py-3 text-xs">
-              <span>共 {rows.data?.total ?? 0} 条</span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className="border-input rounded-md border px-2 py-1 disabled:opacity-50"
-                  disabled={page <= 1}
-                  onClick={() => setPage(page - 1)}
-                  data-testid="credits-audit-prev"
-                >
-                  上一页
-                </button>
-                <span className="tabular-nums">{page} / {totalPages}</span>
-                <button
-                  type="button"
-                  className="border-input rounded-md border px-2 py-1 disabled:opacity-50"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage(page + 1)}
-                  data-testid="credits-audit-next"
-                >
-                  下一页
-                </button>
-              </div>
-            </div>
+            <ListPagination
+              total={rows.data?.total ?? 0}
+              page={page}
+              totalPages={totalPages}
+              onPage={setPage}
+              testIdPrefix="credits-audit"
+            />
             </>
           )}
         </CardContent>

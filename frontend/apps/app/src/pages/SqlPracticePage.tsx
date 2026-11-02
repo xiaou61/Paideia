@@ -22,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  LoadingRow,
   PageHeader,
   Spinner,
 } from '@paideia/ui'
@@ -33,6 +34,7 @@ import { api } from '../api'
 import { DatasetCatalogDialog } from '../components/DatasetCatalogDialog'
 import { DatasetDesigner } from '../components/DatasetDesigner'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { errorMessage } from '@paideia/core'
 
 const knowledge = createKnowledgeApi(api)/**
  * 工作台组件必须**懒加载**（WORK-035 T-01 / AC-001）：CodeMirror 精简版 gzip 后约 137 kB，
@@ -178,7 +180,7 @@ export function SqlPracticePage() {
       }
       status.refetch()
     },
-    onError: (cause) => setError(cause instanceof Error ? cause.message : String(cause)),
+    onError: (cause) => setError(errorMessage(cause)),
   })
 
   /**
@@ -198,7 +200,7 @@ export function SqlPracticePage() {
       setAiQuestion(question)
       setError(null)
     },
-    onError: (cause) => setError(cause instanceof Error ? cause.message : String(cause)),
+    onError: (cause) => setError(errorMessage(cause)),
   })
 
   /**
@@ -253,7 +255,7 @@ export function SqlPracticePage() {
       void queryClient.invalidateQueries({ queryKey: ['sql-dataset-catalog'] })
       setDataset(created.key)
     },
-    onError: (cause) => setError(cause instanceof Error ? cause.message : String(cause)),
+    onError: (cause) => setError(errorMessage(cause)),
   })
 
   /**
@@ -354,10 +356,7 @@ export function SqlPracticePage() {
       />
 
       {status.isPending ? (
-        <p className="text-muted-foreground flex items-center gap-2 text-sm">
-          <Spinner />
-          检查运行环境…
-        </p>
+        <LoadingRow label="检查运行环境…" />
       ) : null}
 
       {status.isSuccess && !sqlReady ? (

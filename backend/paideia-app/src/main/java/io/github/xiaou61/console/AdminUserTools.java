@@ -4,6 +4,7 @@ import io.github.xiaou61.account.AccountAdminApi;
 import io.github.xiaou61.ai.AiAdminApi;
 import io.github.xiaou61.platform.PageResult;
 import io.github.xiaou61.platform.PaideiaTool;
+import io.github.xiaou61.platform.ToolArgs;
 import io.github.xiaou61.platform.ToolContext;
 import io.github.xiaou61.platform.ToolDescriptor;
 import io.github.xiaou61.platform.ToolResult;
@@ -28,7 +29,6 @@ import org.springframework.stereotype.Component;
 final class AdminUserTools {
 
     private static final String GROUP = "admin_users";
-    private static final int MAX_PAGE_SIZE = 100;
 
     private AdminUserTools() {
     }
@@ -321,52 +321,23 @@ final class AdminUserTools {
     }
 
     static String stringOf(Map<String, Object> arguments, String key) {
-        Object raw = arguments == null ? null : arguments.get(key);
-        if (raw == null) {
-            return null;
-        }
-        String text = raw.toString().trim();
-        return text.isEmpty() ? null : text;
+        return ToolArgs.stringOf(arguments, key);
     }
 
     static Long longOf(Map<String, Object> arguments, String key) {
-        Object raw = arguments == null ? null : arguments.get(key);
-        if (raw instanceof Number number) {
-            return number.longValue();
-        }
-        if (raw instanceof String text && !text.isBlank()) {
-            try {
-                return Long.parseLong(text.trim());
-            } catch (NumberFormatException ignored) {
-                return null;
-            }
-        }
-        return null;
+        return ToolArgs.longOf(arguments, key);
     }
 
     static Instant instantOf(Map<String, Object> arguments, String key) {
-        String text = stringOf(arguments, key);
-        if (text == null) {
-            return null;
-        }
-        try {
-            return Instant.parse(text);
-        } catch (java.time.format.DateTimeParseException failure) {
-            throw new IllegalArgumentException("时间格式应为 ISO-8601：" + text);
-        }
+        return ToolArgs.instantOf(arguments, key);
     }
 
     static int pageOf(Map<String, Object> arguments) {
-        Long page = longOf(arguments, "page");
-        return page == null || page < 1 ? 1 : (int) Math.min(page, Integer.MAX_VALUE);
+        return ToolArgs.pageOf(arguments);
     }
 
     static int sizeOf(Map<String, Object> arguments) {
-        Long size = longOf(arguments, "size");
-        if (size == null) {
-            return 20;
-        }
-        return (int) Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        return ToolArgs.sizeOf(arguments);
     }
 
     static String signed(long delta) {
@@ -378,7 +349,6 @@ final class AdminUserTools {
     }
 
     static String messageOf(RuntimeException failure) {
-        String message = failure.getMessage();
-        return message == null || message.isBlank() ? failure.getClass().getSimpleName() : message;
+        return ToolArgs.messageOf(failure);
     }
 }

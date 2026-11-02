@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.github.xiaou61.ai.ResumeData;
+import io.github.xiaou61.ai.internal.support.ModelJson;
 import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
 import java.util.ArrayList;
@@ -240,17 +241,8 @@ public class ResumeJson {
         }
     }
 
-    private static String stripFence(String raw) {
-        String trimmed = raw.trim();
-        if (!trimmed.startsWith("```")) {
-            return trimmed;
-        }
-        int firstNewline = trimmed.indexOf('\n');
-        int lastFence = trimmed.lastIndexOf("```");
-        if (firstNewline < 0 || lastFence <= firstNewline) {
-            return trimmed;
-        }
-        return trimmed.substring(firstNewline + 1, lastFence).trim();
+        private static String stripFence(String raw) {
+        return ModelJson.stripFence(raw);
     }
 
     private static ObjectNode object(ObjectNode parent, String field) {

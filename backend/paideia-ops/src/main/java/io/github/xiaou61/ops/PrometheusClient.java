@@ -1,19 +1,16 @@
 package io.github.xiaou61.ops;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 极薄的 Prometheus 即时查询客户端（WORK-028）。
@@ -26,16 +23,15 @@ import java.util.Map;
  */
 class PrometheusClient {
 
-    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final HttpClient http;
     private final String baseUrl;
     private final Duration timeout;
 
     PrometheusClient(String baseUrl, long timeoutMs) {
-        this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        this.baseUrl = OpsHttp.trimTrailingSlash(baseUrl);
         this.timeout = Duration.ofMillis(timeoutMs);
-        this.http = HttpClient.newBuilder().connectTimeout(timeout).build();
+        this.http = OpsHttp.client(timeout);
     }
 
     /** 单个数值：取第一条序列。没有结果返回 {@code null}（调用方据此判 UNKNOWN）。 */
@@ -47,37 +43,21 @@ class PrometheusClient {
     /** 多条序列，每条带自己的标签。 */
     List<Sample> query(String query) {
         String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
-        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl + "/api/v1/query?query=" + encoded))
-                .timeout(timeout)
-                .GET()
-                .build();
-        try {
-            HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                return List.of();
-            }
-            JsonNode root = JSON.readTree(response.body());
-            if (!"success".equals(root.path("status").asText())) {
-                return List.of();
-            }
-            List<Sample> samples = new ArrayList<>();
-            for (JsonNode item : root.path("data").path("result")) {
-                Map<String, String> labels = new LinkedHashMap<>();
-                item.path("metric").properties().forEach(entry ->
-                        labels.put(entry.getKey(), entry.getValue().asText()));
-                // value 是 [时间戳, "字符串数值"]，字符串形式是 Prometheus 的规范
-                String raw = item.path("value").path(1).asText();
-                Double value = raw.isBlank() ? null : Double.valueOf(raw);
-                samples.add(new Sample(labels, value));
-            }
-            return samples;
-        } catch (IOException | InterruptedException | RuntimeException e) {
-            // 中断也要还原标志位，否则线程池里的这条线程会带着中断状态继续跑
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
+        Optional<JsonNode> root = OpsHttp.getJson(http, baseUrl + "/api/v1/query?query=" + encoded, timeout);
+        if (root.isEmpty() || !"success".equals(root.get().path("status").asText())) {
             return List.of();
         }
+        List<Sample> samples = new ArrayList<>();
+        for (JsonNode item : root.get().path("data").path("result")) {
+            Map<String, String> labels = new LinkedHashMap<>();
+            item.path("metric").properties().forEach(entry ->
+                    labels.put(entry.getKey(), entry.getValue().asText()));
+            // value 是 [时间戳, "字符串数值"]，字符串形式是 Prometheus 的规范
+            String raw = item.path("value").path(1).asText();
+            Double value = raw.isBlank() ? null : Double.valueOf(raw);
+            samples.add(new Sample(labels, value));
+        }
+        return samples;
     }
 
     record Sample(Map<String, String> labels, Double value) {

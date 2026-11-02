@@ -4,11 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 
 import com.jayway.jsonpath.JsonPath;
 import io.github.xiaou61.ai.AssistantConversation;
@@ -19,7 +17,6 @@ import io.github.xiaou61.ai.internal.memory.MemoryStore;
 import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
 import io.github.xiaou61.security.AuthPort;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.RejectedExecutionException;
@@ -224,17 +221,14 @@ class AssistantConversationIntegrationTest {
 
     /** 等这一轮的 prompt_version 落库（写线程异步）。 */
     private String awaitPromptVersion(long conversationId) throws InterruptedException {
-        long deadline = System.currentTimeMillis() + 5000;
-        while (System.currentTimeMillis() < deadline) {
-            List<String> rows = jdbcTemplate.queryForList(
-                    "SELECT prompt_version FROM ai_runs WHERE conversation_id = ? AND kind = 'chat'",
-                    String.class, conversationId);
-            if (!rows.isEmpty() && rows.get(0) != null) {
-                return rows.get(0);
-            }
-            Thread.sleep(50);
-        }
-        return null;
+        return Await.value(
+                        () -> jdbcTemplate.queryForList(
+                                "SELECT prompt_version FROM ai_runs WHERE conversation_id = ? AND kind = 'chat'",
+                                String.class, conversationId),
+                        rows -> !rows.isEmpty() && rows.get(0) != null,
+                        5000, 50)
+                .map(rows -> rows.get(0))
+                .orElse(null);
     }
 
     @Test
@@ -519,21 +513,18 @@ class AssistantConversationIntegrationTest {
 
     /** 发一轮消息并把 SSE 流读完。异步派发会一直等到 emitter 结束（端口是桩，不会真的等网络）。 */
     private MvcResult sendMessage(String subject, long conversationId, String message) throws Exception {
-        MvcResult started = mockMvc.perform(post("/api/v1/ai/conversations/" + conversationId + "/messages")
+        return MockMvcSse.exchange(mockMvc, post("/api/v1/ai/conversations/" + conversationId + "/messages")
                         .header("Authorization", token(subject))
                         .accept(MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"message\":\"" + message + "\"}"))
-                .andExpect(request().asyncStarted())
-                .andReturn();
-        return mockMvc.perform(asyncDispatch(started)).andReturn();
+                        .content("{\"message\":\"" + message + "\"}"));
     }
 
     private String token(String subject) {
-        return "Bearer " + authPort.issue(new AuthPort.Subject(subject, AuthPort.ROLE_LEARNER)).value();
+        return TestTokens.bearer(authPort, subject);
     }
 
     private static String body(MvcResult result) throws Exception {
-        return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        return MockMvcBodies.body(result);
     }
 }

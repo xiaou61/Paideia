@@ -27,6 +27,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 
 import { api } from '../api'
+import { JSON_HEADERS, errorMessage } from '@paideia/core'
 
 /**
  * 学习者端页头：**主导航 + 搜索 + 账号区**放在一个组件里。
@@ -156,7 +157,7 @@ export function LearnerHeader() {
     try {
       await api.requestEnvelope<boolean>('/api/v1/me/deletion', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         // 有密码的账号：密码就是确认；没有密码的账号：显式确认是唯一凭据。
         // 两个字段都发，服务端按账号实际情况取用（confirmed 在有密码时被忽略）。
         body: JSON.stringify({ password, confirmed: hasPassword === false }),
@@ -165,7 +166,7 @@ export function LearnerHeader() {
       // 所以这里不 await 它的成败——本地令牌必须清掉，界面要回到登录门）
       void logout().catch(() => undefined)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
+      setError(errorMessage(cause))
     } finally {
       setBusy(false)
     }

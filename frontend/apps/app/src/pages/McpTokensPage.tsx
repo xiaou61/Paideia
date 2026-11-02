@@ -20,6 +20,7 @@ import { useState } from 'react'
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
 import { createMcpTokensApi } from '../mcp-tokens-api'
+import { errorMessage } from '@paideia/core'
 
 const tokens = createMcpTokensApi(api)
 
@@ -102,7 +103,7 @@ export function McpTokensPage() {
     },
     onError: (cause: unknown) => {
       // 不动 created：上一份明文可能还没被复制，而服务端不留它——清掉等于永久丢一把仍有效的钥匙
-      setCreateError(cause instanceof Error ? cause.message : String(cause))
+      setCreateError(errorMessage(cause))
     },
   })
 
@@ -296,7 +297,7 @@ export function McpTokensPage() {
             {error === null ? null : (
               <Alert variant="destructive">
                 <AlertTitle>读不到凭据列表</AlertTitle>
-                <AlertDescription>{error instanceof Error ? error.message : String(error)}</AlertDescription>
+                <AlertDescription>{errorMessage(error)}</AlertDescription>
               </Alert>
             )}
             {data !== undefined && data.length === 0 ? (

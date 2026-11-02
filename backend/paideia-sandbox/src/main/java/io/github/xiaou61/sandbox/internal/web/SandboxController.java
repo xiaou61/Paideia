@@ -450,11 +450,9 @@ class SandboxController {
      * 令牌主体 → 账号 id。合法令牌必然是数字（账号主键自增），非数字只可能来自伪造或版本错配。
      */
     private static long currentUserId() {
-        try {
-            return Long.parseLong(io.github.xiaou61.security.CurrentUser.subjectId());
-        } catch (NumberFormatException cause) {
-            throw new BizException(ErrorCode.UNAUTHENTICATED, "令牌主体不是有效的账号标识");
-        }
+        // 收敛到共享件（WORK-062）：原来这里只 catch NumberFormatException，匿名请求会漏出
+        // "未认证"文案；现在两种失败归到同一条 401 上（HTTP 状态不变，文案统一）
+        return io.github.xiaou61.security.CurrentUser.userId();
     }
 
     /** 一个结果集（WORK-032）。只有 SQL 会返回；其它语言是空数组。 */

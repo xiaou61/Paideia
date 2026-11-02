@@ -1,4 +1,5 @@
 import type { ApiClient } from '@paideia/core'
+import { JSON_HEADERS } from '@paideia/core'
 
 /**
  * MCP 凭据（WORK-019）。
@@ -60,7 +61,7 @@ export function createMcpTokensApi(client: ApiClient): McpTokensApi {
     create: (input) =>
       client.requestEnvelope<CreatedMcpToken>('/api/v1/ai/mcp-tokens', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
         body: JSON.stringify(input),
       }),
     revoke: async (id) => {

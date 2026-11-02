@@ -1,9 +1,5 @@
 package io.github.xiaou61;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.github.xiaou61.security.AuthPort;
 import java.util.List;
@@ -18,6 +14,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** 到期复习列表（WORK-034 S1）：只返回到期项、按到期日升序、带概念名。 */
 @SpringBootTest
@@ -88,8 +88,7 @@ class LearningReviewIntegrationTest {
     }
 
     private String token() {
-        return "Bearer " + authPort.issue(
-                new AuthPort.Subject(String.valueOf(subject), AuthPort.ROLE_LEARNER)).value();
+        return TestTokens.bearer(authPort, String.valueOf(subject));
     }
 
     @Test
@@ -162,8 +161,7 @@ class LearningReviewIntegrationTest {
                         .content("{\"answers\":[{\"itemId\":0,\"choice\":1}]}"))
                 .andExpect(status().isConflict());
 
-        String other = "Bearer " + authPort.issue(
-                new AuthPort.Subject("334456", AuthPort.ROLE_LEARNER)).value();
+        String other = TestTokens.bearer(authPort, "334456");
         long future = insertSession("+20 MINUTE");
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .post("/api/v1/learning/reviews/sessions/" + future + "/answers")

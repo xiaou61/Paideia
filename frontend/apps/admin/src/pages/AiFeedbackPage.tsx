@@ -1,6 +1,5 @@
 import {
   Badge,
-  Button,
   Card,
   CardContent,
   Empty,
@@ -8,6 +7,7 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
+  ListPagination,
   PageHeader,
   Select,
   SelectContent,
@@ -23,6 +23,7 @@ import {
   TableRow,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
+import { formatLocalDateTime } from '@paideia/core'
 import { MessageSquareWarning } from 'lucide-react'
 import { useState } from 'react'
 
@@ -88,8 +89,7 @@ function windowParams(choice: string): string {
 }
 
 function when(value: string): string {
-  const at = new Date(value)
-  return Number.isNaN(at.getTime()) ? value : at.toLocaleString('zh-CN', { hour12: false })
+  return formatLocalDateTime(value)
 }
 
 export function AiFeedbackPage() {
@@ -226,20 +226,13 @@ export function AiFeedbackPage() {
                 ))}
               </TableBody>
             </Table>
-            <div className="border-border text-muted-foreground flex items-center justify-between gap-4 border-t px-(--card-spacing) py-3 text-xs">
-              <span>共 {list.data?.total ?? 0} 条</span>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="xs" disabled={page <= 1}
-                  onClick={() => setPage(page - 1)} data-testid="feedback-prev">
-                  上一页
-                </Button>
-                <span className="tabular-nums">{page} / {totalPages}</span>
-                <Button variant="outline" size="xs" disabled={page >= totalPages}
-                  onClick={() => setPage(page + 1)} data-testid="feedback-next">
-                  下一页
-                </Button>
-              </div>
-            </div>
+            <ListPagination
+              total={list.data?.total ?? 0}
+              page={page}
+              totalPages={totalPages}
+              onPage={setPage}
+              testIdPrefix="feedback"
+            />
           </CardContent>
         </Card>
       ) : null}

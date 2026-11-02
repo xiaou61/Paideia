@@ -9,7 +9,6 @@ import io.github.xiaou61.ai.Harness;
 import io.github.xiaou61.ai.internal.tools.AgentToolBridge;
 import io.github.xiaou61.security.AuthPort;
 import org.springframework.jdbc.core.JdbcTemplate;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -231,14 +230,14 @@ class AgentToolBridgeIntegrationTest {
     }
 
     private String token(String subject) {
-        return "Bearer " + authPort.issue(new AuthPort.Subject(subject, AuthPort.ROLE_LEARNER)).value();
+        return TestTokens.bearer(authPort, subject);
     }
 
     private String adminToken() {
-        return "Bearer " + authPort.issue(new AuthPort.Subject("1", AuthPort.ROLE_ADMIN)).value();
+        return TestTokens.bearer(authPort, "1", AuthPort.ROLE_ADMIN);
     }
 
     private static String body(MvcResult result) throws Exception {
-        return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        return MockMvcBodies.body(result);
     }
 }

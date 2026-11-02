@@ -5,8 +5,9 @@ import {
   AlertTitle,
   AppShell,
   Button,
+  ErrorAlert,
+  LoadingRow,
   PageHeader,
-  Spinner,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
 import { Boxes, RotateCcw } from 'lucide-react'
@@ -18,6 +19,7 @@ import { LearnerHeader } from '../components/LearnerHeader'
 import { ConceptDetailPanel } from '../components/graph/ConceptDetailPanel'
 import { GraphCanvas2D } from '../components/graph/GraphCanvas2D'
 import { GraphCanvas3D } from '../components/graph/GraphCanvas3D'
+import { errorMessage } from '@paideia/core'
 
 const learning = createLearningApi(api)
 
@@ -61,17 +63,11 @@ export function GraphPage() {
       />
 
       {graph.isPending ? (
-        <p className="text-muted-foreground flex items-center gap-2 text-sm" data-testid="graph-state">
-          <Spinner />
-          正在计算你的掌握度…
-        </p>
+        <LoadingRow label="正在计算你的掌握度…" testId="graph-state" />
       ) : null}
 
       {graph.isError ? (
-        <Alert variant="destructive" data-testid="graph-state">
-          <AlertTitle>图谱加载失败</AlertTitle>
-          <AlertDescription>{(graph.error as Error).message}</AlertDescription>
-        </Alert>
+        <ErrorAlert title="图谱加载失败" error={graph.error} testId="graph-state" />
       ) : null}
 
       {data !== undefined && data.concepts.length === 0 ? (

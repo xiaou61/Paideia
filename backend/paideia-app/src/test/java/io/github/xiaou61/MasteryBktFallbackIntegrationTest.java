@@ -58,8 +58,7 @@ class MasteryBktFallbackIntegrationTest {
         entryId = new SeedIds(jdbcTemplate).entry("什么是依赖注入");
 
         String body = mockMvc.perform(post("/api/v1/knowledge/admin/concepts")
-                        .header("Authorization", "Bearer "
-                                + authPort.issue(new AuthPort.Subject("900", AuthPort.ROLE_ADMIN)).value())
+                        .header("Authorization", TestTokens.bearer(authPort, "900", AuthPort.ROLE_ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"回退开关测试-" + System.nanoTime()
                                 + "\",\"summary\":\"测开关\"}"))
@@ -68,8 +67,7 @@ class MasteryBktFallbackIntegrationTest {
 
         // 概念挂到这个条目上，这样图谱里能看到它
         mockMvc.perform(post("/api/v1/knowledge/admin/concepts/" + conceptId + "/entries")
-                        .header("Authorization", "Bearer "
-                                + authPort.issue(new AuthPort.Subject("900", AuthPort.ROLE_ADMIN)).value())
+                        .header("Authorization", TestTokens.bearer(authPort, "900", AuthPort.ROLE_ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"entryId\":" + entryId + "}"))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
@@ -111,8 +109,7 @@ class MasteryBktFallbackIntegrationTest {
                         """, userId, conceptId);
 
         String body = mockMvc.perform(get("/api/v1/learning/graph")
-                        .header("Authorization", "Bearer "
-                                + authPort.issue(new AuthPort.Subject(SUBJECT, AuthPort.ROLE_LEARNER)).value()))
+                        .header("Authorization", TestTokens.bearer(authPort, SUBJECT)))
                 .andReturn().getResponse().getContentAsString();
 
         // 只看**这个概念自己**的 tier。整段 body 里搜 "mastered" 会被别的概念

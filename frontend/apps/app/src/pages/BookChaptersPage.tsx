@@ -1,8 +1,5 @@
 import { createKnowledgeApi, findCategoryBySlug, orderChapters, plainText } from '@paideia/knowledge'
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
   AppShell,
   Badge,
   Empty,
@@ -10,8 +7,9 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
+  ErrorAlert,
+  LoadingRow,
   PageHeader,
-  Spinner,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
 import { BookOpen, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -20,6 +18,7 @@ import { Link, useParams } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { errorMessage } from '@paideia/core'
 
 const knowledge = createKnowledgeApi(api)
 
@@ -65,16 +64,10 @@ export function BookChaptersPage() {
       </Link>
 
       {categories.isPending ? (
-        <p className="text-muted-foreground flex items-center gap-2 text-sm" data-testid="book-state">
-          <Spinner />
-          加载…
-        </p>
+        <LoadingRow label="加载…" testId="book-state" />
       ) : null}
       {categories.isError ? (
-        <Alert variant="destructive" data-testid="book-state">
-          <AlertTitle>加载失败</AlertTitle>
-          <AlertDescription>{(categories.error as Error).message}</AlertDescription>
-        </Alert>
+        <ErrorAlert title="加载失败" error={categories.error} testId="book-state" />
       ) : null}
 
       {categories.isSuccess && book === undefined ? (
@@ -102,10 +95,7 @@ export function BookChaptersPage() {
           </div>
 
           {entries.isPending ? (
-            <p className="text-muted-foreground flex items-center gap-2 text-sm" data-testid="book-state">
-              <Spinner />
-              加载章节…
-            </p>
+            <LoadingRow label="加载章节…" testId="book-state" />
           ) : null}
 
           {chapters.length === 0 && entries.isSuccess ? (

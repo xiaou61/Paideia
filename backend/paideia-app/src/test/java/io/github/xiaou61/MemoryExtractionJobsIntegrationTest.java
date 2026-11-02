@@ -283,40 +283,26 @@ class MemoryExtractionJobsIntegrationTest {
 
     /** 等到"第一次尝试失败、已在退避中"这个状态落定，避免和即时派发抢时序。 */
     private void awaitFailedAttemptOne() {
-        long deadline = System.currentTimeMillis() + 10_000;
-        while (System.currentTimeMillis() < deadline) {
+        if (!Await.until(() -> {
             Integer failedOnce = jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM ai_memory_extraction_jobs "
                             + "WHERE user_id = ? AND status = 'pending' AND attempts = 1 AND last_error IS NOT NULL",
                     Integer.class, user);
-            if (failedOnce != null && failedOnce == 1) {
-                return;
-            }
-            sleep();
+            return failedOnce != null && failedOnce == 1;
+        }, 10_000, 50)) {
+            throw new AssertionError("等第一次失败落定超时");
         }
-        throw new AssertionError("等第一次失败落定超时");
     }
 
     /** 等记忆写入（异步那一步真正跑完）。 */
     private void awaitMemoryText(String expected) {
-        long deadline = System.currentTimeMillis() + 10_000;
-        while (System.currentTimeMillis() < deadline) {
+        if (!Await.until(() -> {
             Integer count = jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM ai_memories_text WHERE user_id = ? AND content = ?",
                     Integer.class, user, expected);
-            if (count != null && count >= 1) {
-                return;
-            }
-            sleep();
-        }
-        throw new AssertionError("等重试写入记忆超时");
-    }
-
-    private static void sleep() {
-        try {
-            Thread.sleep(50);
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
+            return count != null && count >= 1;
+        }, 10_000, 50)) {
+            throw new AssertionError("等重试写入记忆超时");
         }
     }
 }

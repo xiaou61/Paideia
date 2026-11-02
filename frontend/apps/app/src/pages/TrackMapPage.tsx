@@ -7,8 +7,8 @@ import {
   AppShell,
   Card,
   CardContent,
+  LoadingRow,
   PageHeader,
-  Spinner,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Check, Milestone, Play } from 'lucide-react'
@@ -17,6 +17,7 @@ import { Link, useParams } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { errorMessage } from '@paideia/core'
 
 const learning = createLearningApi(api)
 
@@ -89,16 +90,13 @@ export function TrackMapPage() {
       </div>
 
       {map.isPending ? (
-        <p className="text-muted-foreground flex items-center gap-2 text-sm">
-          <Spinner />
-          加载关卡…
-        </p>
+        <LoadingRow label="加载关卡…" />
       ) : null}
 
       {map.isError ? (
         <Alert variant="destructive">
           <AlertTitle>这条轨道打不开</AlertTitle>
-          <AlertDescription>{(map.error as Error).message}</AlertDescription>
+          <AlertDescription>{errorMessage(map.error)}</AlertDescription>
         </Alert>
       ) : null}
 

@@ -1,9 +1,7 @@
 package io.github.xiaou61.account.internal.support;
 
+import io.github.xiaou61.platform.Hashes;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 
 /**
  * 摘要工具。
@@ -21,12 +19,7 @@ public final class Digest {
     }
 
     public static String sha256Hex(String value) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException exception) {
-            // SHA-256 是 JDK 必须实现的算法，走到这里说明运行环境不完整
-            throw new IllegalStateException("运行环境缺少 SHA-256", exception);
-        }
+        // 收敛到共享件（WORK-062）；调用方不动
+        return Hashes.sha256Hex(value);
     }
 }

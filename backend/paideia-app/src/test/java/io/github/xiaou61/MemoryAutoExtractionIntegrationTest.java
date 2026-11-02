@@ -1,17 +1,5 @@
 package io.github.xiaou61;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 
 import io.github.xiaou61.ai.AssistantConversation;
 import io.github.xiaou61.ai.MemoryCandidate;
@@ -23,7 +11,6 @@ import io.github.xiaou61.ai.internal.memory.MemoryExtractionService;
 import io.github.xiaou61.ai.internal.memory.MemoryStore;
 import io.github.xiaou61.ai.internal.settings.AiSettingsStore;
 import io.github.xiaou61.security.AuthPort;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -43,6 +30,17 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 /**
  * 记忆的自动提取与控制面（WORK-013）。
@@ -417,14 +415,11 @@ class MemoryAutoExtractionIntegrationTest {
      * **另一个线程**里写的，直接读响应体只会读到空串——那会让断言看着像"功能坏了"。
      */
     private MvcResult sendMessage(long conversationId, String message) throws Exception {
-        MvcResult started = mockMvc.perform(post("/api/v1/ai/conversations/" + conversationId + "/messages")
+        return MockMvcSse.exchange(mockMvc, post("/api/v1/ai/conversations/" + conversationId + "/messages")
                         .header("Authorization", token(user))
                         .accept(MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"message\":\"" + message + "\"}"))
-                .andExpect(request().asyncStarted())
-                .andReturn();
-        return mockMvc.perform(asyncDispatch(started)).andReturn();
+                        .content("{\"message\":\"" + message + "\"}"));
     }
 
     private void stubStream(String content) {
@@ -450,79 +445,57 @@ class MemoryAutoExtractionIntegrationTest {
 
     /** 等异步那一步落地。超时即失败，不静默通过。 */
     private void awaitMemoryCount(int expected) {
-        long deadline = System.currentTimeMillis() + 10_000;
-        while (System.currentTimeMillis() < deadline) {
-            if (memories.list(user, 0, 0).size() == expected) {
-                return;
-            }
-            sleep();
+        if (!Await.until(() -> memories.list(user, 0, 0).size() == expected, 10_000, 50)) {
+            assertThat(memories.list(user, 0, 0)).as("等记忆写入超时").hasSize(expected);
         }
-        assertThat(memories.list(user, 0, 0)).as("等记忆写入超时").hasSize(expected);
     }
 
     private void awaitMemoryText(String expected) {
-        long deadline = System.currentTimeMillis() + 10_000;
-        while (System.currentTimeMillis() < deadline) {
-            if (memories.list(user, 0, 0).stream().anyMatch(it -> expected.equals(it.text()))) {
-                return;
-            }
-            sleep();
+        if (!Await.until(() -> memories.list(user, 0, 0).stream().anyMatch(it -> expected.equals(it.text())),
+                10_000, 50)) {
+            assertThat(memories.list(user, 0, 0).stream().map(MemoryStore.MemoryItem::text)).contains(expected);
         }
-        assertThat(memories.list(user, 0, 0).stream().map(MemoryStore.MemoryItem::text)).contains(expected);
     }
 
     private void awaitCandidateCount(int expected) {
-        long deadline = System.currentTimeMillis() + 10_000;
-        while (System.currentTimeMillis() < deadline) {
+        if (!Await.until(() -> {
             Integer count = jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM ai_memory_candidates WHERE user_id = ?", Integer.class, user);
-            if (count != null && count >= expected) {
-                return;
-            }
-            sleep();
+            return count != null && count >= expected;
+        }, 10_000, 50)) {
+            throw new AssertionError("等候选超时");
         }
-        throw new AssertionError("等候选超时");
     }
 
     private void awaitLedgerKind(String kind) {
-        long deadline = System.currentTimeMillis() + 10_000;
-        while (System.currentTimeMillis() < deadline) {
+        if (!Await.until(() -> {
             Long count = jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM ai_credit_ledger WHERE user_id = ? AND kind = ?", Long.class, user, kind);
-            if (count != null && count > 0) {
-                return;
-            }
-            sleep();
+            return count != null && count > 0;
+        }, 10_000, 50)) {
+            throw new AssertionError("等流水 " + kind + " 超时");
         }
-        throw new AssertionError("等流水 " + kind + " 超时");
     }
 
     private void awaitExtractorCalls(AtomicInteger calls, int expected) {
-        long deadline = System.currentTimeMillis() + 10_000;
-        while (System.currentTimeMillis() < deadline) {
-            if (calls.get() >= expected) {
-                return;
-            }
-            sleep();
+        if (!Await.until(() -> calls.get() >= expected, 10_000, 50)) {
+            assertThat(calls.get()).isGreaterThanOrEqualTo(expected);
         }
-        assertThat(calls.get()).isGreaterThanOrEqualTo(expected);
     }
 
     /** 失败用例没有计数器可用：等"游标已推进"这个可观测的事实。 */
     private void awaitExtractorCalls(long userId, int expected) {
-        long deadline = System.currentTimeMillis() + 10_000;
-        while (System.currentTimeMillis() < deadline) {
-            Integer claimed = jdbcTemplate.queryForObject(
+        boolean claimed = Await.until(() -> {
+            Integer count = jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM ai_conversations WHERE user_id = ? "
                             + "AND last_memory_extract_message_id IS NOT NULL", Integer.class, userId);
-            if (claimed != null && claimed >= expected) {
-                // 游标推进只说明"抢到了"，真正跑完还要一点时间：给它一小会儿再断言"没写记忆"
-                sleep();
-                return;
-            }
-            sleep();
+            return count != null && count >= expected;
+        }, 10_000, 50);
+        if (!claimed) {
+            throw new AssertionError("等整理被触发超时");
         }
-        throw new AssertionError("等整理被触发超时");
+        // 游标推进只说明"抢到了"，真正跑完还要一点时间：给它一小会儿再断言"没写记忆"
+        sleep();
     }
 
     private static void sleep() {
@@ -534,10 +507,10 @@ class MemoryAutoExtractionIntegrationTest {
     }
 
     private String token(long userId) {
-        return "Bearer " + authPort.issue(new AuthPort.Subject(Long.toString(userId), AuthPort.ROLE_LEARNER)).value();
+        return TestTokens.bearer(authPort, Long.toString(userId));
     }
 
     private static String body(MvcResult result) throws Exception {
-        return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        return MockMvcBodies.body(result);
     }
 }

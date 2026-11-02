@@ -12,6 +12,7 @@ import {
   EmptyMedia,
   EmptyTitle,
   Input,
+  ListPagination,
   PageHeader,
   Select,
   SelectContent,
@@ -32,6 +33,7 @@ import { useEffect, useState } from 'react'
 
 import { api } from '../api'
 import { ConfirmDeleteDialog } from '../knowledge-shared'
+import { errorMessage, formatLocalDateTime } from '@paideia/core'
 
 /**
  * 用户管理（WORK-030）。
@@ -88,11 +90,7 @@ function listUsers(query: string, role: string, page: number) {
 
 /** 时间按本机时区显示；解析不出来就原样显示。 */
 function when(value: string | null): string {
-  if (value === null) {
-    return '—'
-  }
-  const at = new Date(value)
-  return Number.isNaN(at.getTime()) ? value : at.toLocaleString('zh-CN', { hour12: false })
+  return formatLocalDateTime(value)
 }
 
 export function AdminUsersPage() {
@@ -227,7 +225,7 @@ export function AdminUsersPage() {
             <div className="px-(--card-spacing) pb-3">
               <Alert variant="destructive">
                 <AlertTitle>账号加载失败</AlertTitle>
-                <AlertDescription>{(users.error as Error).message}</AlertDescription>
+                <AlertDescription>{errorMessage(users.error)}</AlertDescription>
               </Alert>
             </div>
           ) : null}
@@ -307,30 +305,13 @@ export function AdminUsersPage() {
                 </TableBody>
               </Table>
 
-              <div className="border-border text-muted-foreground flex items-center justify-between gap-4 border-t px-(--card-spacing) py-3 text-xs">
-                <span>共 {users.data?.total ?? 0} 条</span>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    disabled={page <= 1}
-                    onClick={() => setPage(page - 1)}
-                  >
-                    上一页
-                  </Button>
-                  <span className="tabular-nums">
-                    {page} / {totalPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    disabled={page >= totalPages}
-                    onClick={() => setPage(page + 1)}
-                  >
-                    下一页
-                  </Button>
-                </div>
-              </div>
+              <ListPagination
+                total={users.data?.total ?? 0}
+                page={page}
+                totalPages={totalPages}
+                onPage={setPage}
+                testIdPrefix="users"
+              />
             </>
           ) : null}
         </CardContent>

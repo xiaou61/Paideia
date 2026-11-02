@@ -1,8 +1,7 @@
 package io.github.xiaou61.ai.internal.camp;
 
+import io.github.xiaou61.platform.Hashes;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
 
 /**
@@ -42,18 +41,7 @@ public final class CampFingerprint {
     }
 
     private static String sha256(String value) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(value.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hex = new StringBuilder(digest.length * 2);
-            for (byte item : digest) {
-                hex.append(Character.forDigit((item >> 4) & 0xF, 16));
-                hex.append(Character.forDigit(item & 0xF, 16));
-            }
-            return hex.toString();
-        } catch (NoSuchAlgorithmException exception) {
-            // SHA-256 是 JDK 必备算法，走到这里说明运行环境坏了
-            throw new IllegalStateException("SHA-256 不可用", exception);
-        }
+        // 收敛到共享件（WORK-062）：手写 forDigit 与 HexFormat 输出逐位一致
+        return Hashes.sha256Hex(value);
     }
 }

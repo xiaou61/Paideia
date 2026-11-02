@@ -19,11 +19,8 @@ final class CurrentUserId {
     }
 
     static Long require() {
-        Long value = orNull();
-        if (value == null) {
-            throw new BizException(ErrorCode.UNAUTHENTICATED, "令牌主体不是有效的账号标识");
-        }
-        return value;
+        // 收敛到共享件（WORK-062）：文案与判定只在 CurrentUser.userId() 一处
+        return CurrentUser.userId();
     }
 
     static Long orNull() {
