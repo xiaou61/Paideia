@@ -118,19 +118,19 @@ approver_role: CTO
 - 进度：已完成。表 `learning_plan_items` + `/api/v1/learning/plan-items`（GET/POST/PATCH/DELETE）；
   `/progress` 新增「今天要做的事」卡（手动添加/勾选/删除）；助手回复里的 plan 块渲染成卡片。
 
-### TASK-010 | pending | 迁移 #1 精简
+### TASK-010 | done | 迁移 #1 精简
 
 - 对应：`REQ-009`
 - 依赖：TASK-001
 - 修改：`AiSummary` 侧加只读工具或复用对话；助手面板「精简」改为对话引导
-- 验证：e2e + 线上
+- 验证：typecheck + assistant 76 tests（生成按钮已无引用）；线上未点
 
-### TASK-011 | pending | 迁移 #3 SQL 出题
+### TASK-011 | done | 迁移 #3 SQL 出题
 
 - 对应：`REQ-009`
 - 依赖：TASK-004
 - 修改：`SqlPracticePage` 出题入口
-- 验证：e2e
+- 验证：app typecheck；保留「直接生成」降级
 
 ### TASK-012 | pending | 迁移 #10 推荐理由 / #7 简历提案 / #4-5 训练营与复习
 
