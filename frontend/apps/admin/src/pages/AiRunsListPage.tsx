@@ -153,7 +153,8 @@ function windowParams(hour?: string | null): string {
   const chosen = WINDOWS.find((option) => option.value === hour) ?? WINDOWS[2]
   const to = new Date()
   const from = new Date(to.getTime() - chosen.hours * 3600 * 1000)
-  return `from=${from.toISOString()}&to=${to.toISOString()}`
+  // 必须 encode：ISO 串里带 `+`（时区偏移），不编码会被后端当空格解析（WORK-062 顺带修）
+  return `from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`
 }
 
 const PAGE_SIZE = 50

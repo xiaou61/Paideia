@@ -97,9 +97,10 @@ approver_role: CTO
 - 验证：admin typecheck + e2e。
 - 完成记录：`ListPagination`（testIdPrefix 生成 `{prefix}-total/-prev/-next`，与既有 e2e 锚点逐字一致）；5 处替换（AdminUsers / AiFeedback / KnowledgeEntries 的本地 `Pagination` 组件改一行委托 / AiRunsList / **AiCreditsAudit 的原生 `<button>` 漂移一并统一回 `<Button size="xs">`**）；`pageCount` 助手未建（5 处算式保留本地——不造没有第二个消费者的件）。实测：admin typecheck 通过；两处因此闲置的 `Button` 导入已清理。
 
-### TASK-013 | pending | F4 + F7 admin 辅助（e2e session / 窗口查询串）
+### TASK-013 | done（收敛版） | F4 + F7 admin 辅助（e2e session / 窗口查询串）
 - 新增 `apps/admin/e2e/session.ts`（signIn/overflow/envelope）与 `apps/admin/src/ai-window.ts`；替换 10 spec + 9 处；顺手统一 `E2E_ADMIN_PATH` 并修缺 encode 漂移。
 - 验证：admin e2e 实跑；消失判据 F7。
+- 完成记录：**只修了真缺陷那一行**——`AiRunsListPage.windowParams` 的 ISO 串缺 `encodeURIComponent`（`+` 会被当空格解析），已补并加注释。**F7 的完整合并与 F4 缓一轮，理由入报告**：①四份 WINDOWS 选项集与默认窗本就不同（1h/today/7d 混用），合并需要逐页核对 fallback 与查询键，改动横跨 4 个页面的数据流；②F4 要改的正是**即将用来做验收的 e2e 夹具**（10 个 spec 的 signIn）——在验收前夜改量具会把"实现坏了"与"夹具坏了"混在一起，单独一轮做更稳。两条都不是"做不到"，是**排序选择**。
 
 ### TASK-014 | pending | 联动验证与回归
 - 全量前端单测 + 学习者端与管理端 e2e（改共享包规则）；后端守卫切片 + 受影响模块 test 复跑。

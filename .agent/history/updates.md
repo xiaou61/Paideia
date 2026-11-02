@@ -9644,3 +9644,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：admin typecheck 通过；闲置 Button 导入已清
 - 本地提交：本片提交
 - 远端推送：未执行
+
+## 2026-11-03 03:15 +0800 · WORK-062 · TASK-013 F4/F7：修 encode 漂移，合并缓一轮
+
+- 类型：implementation
+- 变更：`AiRunsListPage.windowParams` 补 `encodeURIComponent`（ISO 串的 `+` 会被当空格解析；扫描点名的真实漂移）
+- 决策：F7 的完整合并（4 份 WINDOWS/窗口函数并到 `admin/src/ai-window.ts`）与 F4（10 个 e2e spec 的 signIn 收敛）**缓一轮**——理由：①四页选项集与默认窗口本就不同，需逐页核对；②F4 改的是即将用于验收的 e2e 夹具，验收前夜改量具会把两类失败混在一起。记录为"排序选择"而非"做不到"
+- 依据：WORK-062 requirements REQ-003 / design F4/F7；扫描候选第 4/7 条
+- 验证：admin typecheck 通过；两端 Vite build 通过（app/admin，含既有懒加载守卫，60 秒）
+- 本地提交：本片提交
+- 远端推送：未执行
