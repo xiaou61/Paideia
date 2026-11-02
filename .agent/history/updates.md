@@ -9217,3 +9217,35 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
+
+## 2026-11-02 09:26:06 +0800 · WORK-053 · 登记业务验收 .agent/changes/WORK-053-学习记录页与AI强联动/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-053-学习记录页与AI强联动/testing/report.md
+- 决策：审批人 xiaou61；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-053-学习记录页与AI强联动/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-11-02 09:27:45 +0800 · WORK-053 · 登记业务验收 .agent/changes/WORK-053-学习记录页与AI强联动/testing/report.md
+
+- 类型：decision
+- 变更：登记业务验收：.agent/changes/WORK-053-学习记录页与AI强联动/testing/report.md
+- 决策：审批人 xiaou61；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-053-学习记录页与AI强联动/testing/report.md
+- 验证：回读 frontmatter：accepted_by=xiaou61
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-11-02 · WORK-053 收尾（TASK-009~012）
+
+- 类型：implementation
+- TASK-009 计划落库：`learning_plan_items` + `/api/v1/learning/plan-items`（GET/POST/PATCH/DELETE）+
+  `/progress`「今天要做的事」+ 助手 `plan` 块渲染成卡片（点「加入计划」才写库）。
+- TASK-010/011/012：精简与 SQL 出题改走对话（预填不发送，SQL 保留「直接生成」降级）；
+  推荐理由删掉页面加载时的自动 AI 调用、改「问助手为什么」；简历页加只读「问助手差在哪」；
+  训练营无 AI 按钮、复习早已用 `ask`，无对象。
+- 验证：assistant 76 tests（plan 4 + 面板接线 1）、app typecheck、e2e `progress.spec.ts` 4 条。
+- 未达（校验器口径）：AC-002（两页同刻比数）、AC-004（请求体断言）、AC-007（只浏览无模型调用）、
+  AC-009（连续两次不重复问）没有命令级证据 → WORK-053 停在 `completed / needs_attention`。

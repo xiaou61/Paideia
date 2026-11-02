@@ -34,6 +34,7 @@ import {
   type ResumeProposal,
   type ResumeVersionDetail,
 } from '@paideia/resume'
+import { useAssistantContext } from '@paideia/assistant'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Printer, Sparkles } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -71,6 +72,7 @@ export function ResumeOptimizePage() {
   const [versionId, setVersionId] = useState<number | null>(null)
   const [analysis, setAnalysis] = useState<ResumeAnalysis | null>(null)
   const [proposals, setProposals] = useState<ResumeProposal[]>([])
+  const { ask } = useAssistantContext()
   const [error, setError] = useState<string | null>(null)
   const [finalized, setFinalized] = useState<ResumeVersionDetail | null>(null)
   const [filter, setFilter] = useState<'all' | 'accepted' | 'pending'>('all')
@@ -212,6 +214,16 @@ export function ResumeOptimizePage() {
               >
                 {propose.isPending ? <Spinner /> : null}
                 生成改写提案（消耗一次）
+              </Button>
+              {/* 统一到对话（WORK-053 TASK-012）：结构化提案流程保留，这里只补"问一句"的入口 */}
+              <Button
+                variant="ghost"
+                data-testid="resume-ask-gap"
+                onClick={() =>
+                  ask('这份 JD 和我的简历差在哪？按"必须有 / 加分"排序说缺口，先别改我的简历。')
+                }
+              >
+                问助手差在哪
               </Button>
               <Button
                 variant="outline"

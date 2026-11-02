@@ -24,6 +24,7 @@ import {
   PageHeader,
   Spinner,
 } from '@paideia/ui'
+import { useAssistantContext } from '@paideia/assistant'
 import { useQuery } from '@tanstack/react-query'
 import {
   ArrowRight,
@@ -160,7 +161,17 @@ export function LearnPage() {
     () => scoreTracks(tracks.data ?? [], role, new Date()),
     [tracks.data, role],
   )
+  const { ask } = useAssistantContext()
   const picks = useMemo(() => pickAdvice(scored, 3), [scored])
+  const askAdvice = () => {
+    if (picks.length === 0) {
+      return
+    }
+    ask(
+      `为什么给我推荐这三条线：${picks.map((item) => item.name).join('、')}？` +
+        '按我的学习记录说清楚顺序，别泛泛而谈；如果该换一条，直接说换哪条、为什么。',
+    )
+  }
 
   /**
    * 三段地图：**按岗位的 rank 排，不按分数排**。
@@ -188,57 +199,6 @@ export function LearnPage() {
     }
   }, [tracks.data, role])
 
-  // ---- AI 理由：按「岗位 + 自然日」缓存，失败就退回规则句 ----
-  const dayKey = new Date().toISOString().slice(0, 10)
-  const cacheKey = `paideia:advice:${role}:${dayKey}`
-  const [aiReasons, setAiReasons] = useState<Record<string, string>>({})
-  const [nonce, setNonce] = useState(0)
-  const pickedKey = picks.map((item) => item.slug).join(',')
-
-  useEffect(() => {
-    if (picks.length === 0) {
-      setAiReasons({})
-      return
-    }
-    const cached = readAdviceCache(cacheKey)
-    if (cached !== null) {
-      setAiReasons(cached)
-      return
-    }
-    let alive = true
-    void learning
-      .advice({
-        role,
-        roleLabel: meta.label,
-        picks: picks.map((item) => ({
-          slug: item.slug,
-          name: item.name,
-          tier: item.tier,
-          passed: item.passedCount,
-          total: item.stageCount,
-        })),
-      })
-      .then((result) => {
-        if (!alive || result.reasons.length === 0) {
-          return
-        }
-        const mapped = Object.fromEntries(result.reasons.map((item) => [item.slug, item.reason]))
-        setAiReasons(mapped)
-        writeAdviceCache(cacheKey, mapped)
-      })
-      // 理由缺失是产品允许状态：不设置错误、不打扰用户
-      .catch(() => undefined)
-    return () => {
-      alive = false
-    }
-    // pickedKey 是 picks 的内容键：数组每次渲染都是新引用，直接依赖会无限重跑
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cacheKey, pickedKey, nonce])
-
-  const shuffle = () => {
-    clearAdviceCache(cacheKey)
-    setNonce((value) => value + 1)
-  }
 
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
@@ -281,7 +241,7 @@ export function LearnPage() {
       ) : null}
 
       {meta.available && picks.length > 0 ? (
-        <AdviceCard picks={picks} reasons={aiReasons} onShuffle={shuffle} />
+        <AdviceCard picks={picks} onAsk={askAdvice} />
       ) : null}
 
       {/* 「继续上次」：地图里真正该先点的只有一条，别让人自己在卡片里找"下一关" */}
@@ -409,15 +369,7 @@ function RolePicker({ role, onChoose }: { role: RoleKey; onChoose: (next: RoleKe
  * 卡片本身永远在。所以这里没有任何 loading 与 error 态——那会让一次可选的润色
  * 看起来像页面依赖它。
  */
-function AdviceCard({
-  picks,
-  reasons,
-  onShuffle,
-}: {
-  picks: ScoredTrack[]
-  reasons: Record<string, string>
-  onShuffle: () => void
-}) {
+function AdviceCard({ picks, onAsk }: { picks: ScoredTrack[]; onAsk: () => void }) {
   const [showWhy, setShowWhy] = useState(false)
   return (
     <section
@@ -429,11 +381,11 @@ function AdviceCard({
         <span className="text-muted-foreground text-xs">按岗位和你现在的进度算的，每天更新一次</span>
         <button
           type="button"
-          onClick={onShuffle}
-          data-testid="learn-advice-shuffle"
+          onClick={onAsk}
+          data-testid="learn-advice-ask"
           className="text-muted-foreground hover:text-foreground ml-auto text-xs underline underline-offset-2"
         >
-          换一批
+          问助手为什么
         </button>
       </div>
 
@@ -456,7 +408,7 @@ function AdviceCard({
                   className="text-muted-foreground mt-0.5 block text-xs"
                   data-testid={`learn-advice-reason-${pick.slug}`}
                 >
-                  {reasons[pick.slug] ?? ruleReason(pick)}
+                  {ruleReason(pick)}
                 </span>
               </span>
               <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
@@ -494,43 +446,6 @@ function AdviceCard({
  *
  * <p>读写都吞异常：隐私模式或配额满时按"没有缓存"处理——一个可选的缓存不该让整页报错。
  */
-function readAdviceCache(key: string): Record<string, string> | null {
-  try {
-    const raw = window.localStorage.getItem(key)
-    if (raw === null) {
-      return null
-    }
-    const parsed = JSON.parse(raw) as unknown
-    if (parsed === null || typeof parsed !== 'object') {
-      return null
-    }
-    const result: Record<string, string> = {}
-    for (const [slug, reason] of Object.entries(parsed as Record<string, unknown>)) {
-      if (typeof reason === 'string') {
-        result[slug] = reason
-      }
-    }
-    return Object.keys(result).length === 0 ? null : result
-  } catch {
-    return null
-  }
-}
-
-function writeAdviceCache(key: string, reasons: Record<string, string>): void {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(reasons))
-  } catch {
-    // 存不下就算了：下次重新请求一次，功能不受影响
-  }
-}
-
-function clearAdviceCache(key: string): void {
-  try {
-    window.localStorage.removeItem(key)
-  } catch {
-    // 同上
-  }
-}
 
 /** 一栏轨道：理论或实战。空的时候给明确空状态，不留一片空白。 */
 function TrackSection({
