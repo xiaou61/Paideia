@@ -9471,3 +9471,14 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 已知项：中继自身没接 `ScheduledTaskRecorder`（失败只进日志），运维可视性留作后续；线程池满的退避会消耗一次尝试（罕见路径，行为有界且可见）
 - 本地提交：本片提交
 - 远端推送：未执行
+
+## 2026-11-02 20:40 +0800 · WORK-061 · TASK-005 收紧 ai 公开面（4 移 4 留）
+
+- 类型：implementation
+- 变更：`AssistantAnswerer` → `ai/internal/conversation/`、`ContentClassification` 与 `ContentClassifier` → `ai/internal/decision/`、`SummaryVisibility` → `ai/internal/summary/`（各带 package 行改写与 13 处 import 修正；移出文件补了对根类型 `ModelAccess`/`TokenUsage`/`ConversationTurn` 的 import）；ai 根类型 30 → **26 个**
+- 决策：**`ConversationTurn`、`NoteDraft`、`RunKind`、`RunOutcome` 留在根**——它们被根公开契约的签名引用（`AssistantConversation`、`MemoryExtractor`、`RunRecorder`），移走等于让公开面暴露 internal 类型；design I-06 对这条情形的规定就是"留根并在报告注明"。不是没做，是按批准的口径做
+- 依据：requirements REQ-005 / AC-005 + design I-06 的兜底条款；全仓词边界扫描确认这 8 个类型在 ai 之外只被 app 测试引用（RunOutcome 被两个遥测集成测试引用，同样在"公开契约"范围内）
+- 验证：ai 模块 `mvn test` **385 条 / 0 失败 / 15 跳过（全部为环境门控用例）/ BUILD SUCCESS**（含移动类型的 `AskToolTest`、`TechEssayFilterTest`）；守卫切片 35 条 0 红；`gen-arch-diagram.mjs --check` exit 0；根类型清点 `ls .../ai/*.java` = 27 个文件（26 类型 + package-info）
+- 已知项：机械改造用的是一次性脚本（临时目录、未入库）；若将来还有同类搬迁，值得把"同包删 import / 异包改写"收进 shell 工具，但现在不值得
+- 本地提交：本片提交
+- 远端推送：未执行

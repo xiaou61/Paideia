@@ -1,4 +1,4 @@
-package io.github.xiaou61.ai;
+package io.github.xiaou61.ai.internal.decision;
 
 /**
  * 一次内容判定的结果（WORK-026）。

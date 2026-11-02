@@ -2,8 +2,6 @@ package io.github.xiaou61.ai.internal.decision;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.xiaou61.ai.ContentClassification;
-import io.github.xiaou61.ai.ContentClassifier;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 

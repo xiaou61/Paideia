@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.xiaou61.ai.EntrySummarizer;
 import io.github.xiaou61.ai.GeneratedSummary;
 import io.github.xiaou61.ai.SummaryCard;
-import io.github.xiaou61.ai.SummaryVisibility;
 import io.github.xiaou61.ai.TokenUsage;
 import io.github.xiaou61.ai.internal.billing.CreditService;
 import io.github.xiaou61.ai.internal.credential.CredentialService;

@@ -74,11 +74,12 @@ approver_role: CTO
 - 测试：`MemoryExtractionJobsTest`（抢占/退避/上限/卡死回收/删除）；`MemoryExtractionServiceTest`（扩展：失败留行、线程池满留行、与游标同事务）；`AccountDeletionCascadeIntegrationTest`（扩展：任务行清零）。
 - 完成记录：迁移 `V20261102200000`（62 张表，README 与 05 图同步更新，P2 断言再次如实报红→改绿）；`ExtractionSlice` 增 `fromMessageId` + `ConversationService.materializeSlice` 重试按边界重读；`scheduleIfDue` 改为「同一事务抢游标+入队→dispatch」；线程池满从**丢弃**改为**记一次失败退避重排**；无凭据/会话过期/欠费/记忆被关四种"无意义"情形收掉任务行（口径与旧行为一致，但留痕）。旧测试 `extractorFailureIsSwallowed` 的口径按新语义改写（这是 requirements 明示的变更，不是偷偷改绿）。实测：新套件 `MemoryExtractionJobsIntegrationTest` 8 条、`MemoryAutoExtractionIntegrationTest` 13 条、`AccountDeletionCascadeIntegrationTest` 4 条，合计 **25 条 / 0 失败 / 0 跳过**；守卫切片 35 条 0 红；`--check` 与 mermaid 语法全绿。
 
-### TASK-005 | pending | P5 收紧 ai 公开面
+### TASK-005 | done | P5 收紧 ai 公开面
 
 - 对应：REQ-005、AC-005
 - 修改：8 个类型按 design 的去向表移入 internal；如遇公开签名引用则留在根并在报告注明。
 - 验证：`ls` 包根剩 22 个类型（若全部可移）；受影响模块 test + app 集成测试 + ModularityTest。
+- 完成记录：**按 design I-06 的口径只移了 4 个**——`AssistantAnswerer` → internal/conversation、`ContentClassification`/`ContentClassifier` → internal/decision、`SummaryVisibility` → internal/summary（根类型 30 → 26 个）；`ConversationTurn`/`NoteDraft`/`RunKind`/`RunOutcome` **留在根**：它们被根公开契约的签名引用（`AssistantConversation`、`MemoryExtractor`、`RunRecorder`），移走会让公开面暴露 internal 类型，I-06 明文规定这种情形留根并在报告注明。机械改造用一个只做包名/import 替换的脚本完成；移出的文件补了对根类型的 import（原来在根包不用写）。实测：ai 模块 **385 条 / 0 失败 / 15 跳过**（BUILD SUCCESS）、守卫切片 35 条 0 红、`--check` exit 0。
 
 ### TASK-006 | pending | 验证与报告
 
