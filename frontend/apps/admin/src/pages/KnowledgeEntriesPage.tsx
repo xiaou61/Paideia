@@ -20,6 +20,7 @@ import {
   DialogTitle,
   Input,
   Label,
+  LoadingRow,
   PageHeader,
   Select,
   SelectContent,
@@ -28,7 +29,6 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-  Spinner,
   Table,
   TableBody,
   TableCell,
@@ -473,10 +473,7 @@ function EntryEditor({
       <Dialog open onOpenChange={() => onClose()}>
         <DialogContent>
           <DialogTitle>加载条目…</DialogTitle>
-          <p className="text-muted-foreground flex items-center gap-2 text-sm">
-            <Spinner />
-            正在读取
-          </p>
+          <LoadingRow label="正在读取" />
         </DialogContent>
       </Dialog>
     )

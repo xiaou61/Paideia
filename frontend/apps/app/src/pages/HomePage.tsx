@@ -6,7 +6,7 @@ import {
   type CategoryNode,
 } from '@paideia/knowledge'
 import { configFor, createIdentityApi } from '@paideia/identity'
-import { AppShell, Button, Card, Input, Section, Spinner } from '@paideia/ui'
+import { AppShell, Button, Card, Input, LoadingRow, Section, Spinner } from '@paideia/ui'
 import { useAuth } from '@paideia/auth'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, BookOpen, Container, Database, Dumbbell, FileQuestion, GraduationCap, Layers, MessagesSquare, Network, Newspaper, NotebookPen, Search, Target, Terminal } from 'lucide-react'
@@ -492,10 +492,7 @@ export function HomePage() {
         }
       >
         {categories.isPending ? (
-          <p className="text-muted-foreground flex items-center gap-2 text-sm">
-            <Spinner />
-            加载分类…
-          </p>
+          <LoadingRow label="加载分类…" />
         ) : null}
         {categories.isSuccess && categories.data.length === 0 ? (
           <p className="text-muted-foreground text-sm">还没有建分类。</p>

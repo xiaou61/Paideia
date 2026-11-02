@@ -12,12 +12,12 @@ import {
 import type { EntryRef, SelfAssessmentLevel } from '@paideia/knowledge'
 import {
   Alert,
-  AlertDescription,
   AlertTitle,
   AppShell,
   Button,
+  ErrorAlert,
+  LoadingRow,
   PageHeader,
-  Spinner,
   extractQuizzes,
 } from '@paideia/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -257,24 +257,15 @@ export function KnowledgeEntryPage() {
       ) : null}
 
       {valid && entry.isPending ? (
-        <p className="text-muted-foreground flex items-center gap-2 text-sm" data-testid="entry-state">
-          <Spinner />
-          加载条目…
-        </p>
+        <LoadingRow label="加载条目…" testId="entry-state" />
       ) : null}
 
       {valid && entry.isError ? (
-        <Alert variant="destructive" data-testid="entry-state">
-          <AlertTitle>打不开这条内容</AlertTitle>
-          <AlertDescription>{errorMessage(entry.error)}</AlertDescription>
-        </Alert>
+        <ErrorAlert title="打不开这条内容" error={entry.error} testId="entry-state" />
       ) : null}
 
       {entry.isSuccess && serverProgress.isPending ? (
-        <p className="text-muted-foreground flex items-center gap-2 text-sm" data-testid="entry-progress-loading">
-          <Spinner />
-          读取学习记录…
-        </p>
+        <LoadingRow label="读取学习记录…" testId="entry-progress-loading" />
       ) : null}
 
       {entry.isSuccess && !serverProgress.isPending ? (

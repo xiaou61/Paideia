@@ -7,9 +7,6 @@ import {
   stripDuplicateTitle,
 } from '@paideia/knowledge'
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
   AppShell,
   Badge,
   Empty,
@@ -17,8 +14,9 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
+  ErrorAlert,
+  LoadingRow,
   PageHeader,
-  Spinner,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, FileCode2 } from 'lucide-react'
@@ -90,16 +88,10 @@ export function SourceProjectPage() {
       </Link>
 
       {categories.isPending ? (
-        <p className="text-muted-foreground flex items-center gap-2 text-sm" data-testid="source-project-state">
-          <Spinner />
-          加载…
-        </p>
+        <LoadingRow label="加载…" testId="source-project-state" />
       ) : null}
       {categories.isError ? (
-        <Alert variant="destructive" data-testid="source-project-state">
-          <AlertTitle>加载失败</AlertTitle>
-          <AlertDescription>{errorMessage(categories.error)}</AlertDescription>
-        </Alert>
+        <ErrorAlert title="加载失败" error={categories.error} testId="source-project-state" />
       ) : null}
 
       {categories.isSuccess && project === undefined ? (
@@ -141,10 +133,7 @@ export function SourceProjectPage() {
           </div>
 
           {entries.isPending ? (
-            <p className="text-muted-foreground flex items-center gap-2 text-sm" data-testid="source-project-state">
-              <Spinner />
-              加载章节…
-            </p>
+            <LoadingRow label="加载章节…" testId="source-project-state" />
           ) : null}
 
           <ol className="divide-border divide-y" data-testid="source-chapters">

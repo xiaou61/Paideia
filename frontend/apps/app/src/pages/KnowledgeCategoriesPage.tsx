@@ -1,19 +1,17 @@
 import { createKnowledgeApi, plainText } from '@paideia/knowledge'
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
   AppShell,
   Badge,
+  Button,
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-  Button,
+  ErrorAlert,
+  LoadingRow,
   PageHeader,
   Section,
-  Spinner,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, FolderOpen, Layers } from 'lucide-react'
@@ -72,16 +70,10 @@ export function KnowledgeCategoriesPage() {
       </Link>
 
       {categories.isPending ? (
-        <p className="text-muted-foreground flex items-center gap-2 text-sm" data-testid="category-state">
-          <Spinner />
-          加载分类…
-        </p>
+        <LoadingRow label="加载分类…" testId="category-state" />
       ) : null}
       {categories.isError ? (
-        <Alert variant="destructive" data-testid="category-state">
-          <AlertTitle>分类加载失败</AlertTitle>
-          <AlertDescription>{errorMessage(categories.error)}</AlertDescription>
-        </Alert>
+        <ErrorAlert title="分类加载失败" error={categories.error} testId="category-state" />
       ) : null}
 
       {categories.isSuccess && categories.data.length === 0 ? (

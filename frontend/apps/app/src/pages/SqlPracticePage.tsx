@@ -22,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  LoadingRow,
   PageHeader,
   Spinner,
 } from '@paideia/ui'
@@ -355,10 +356,7 @@ export function SqlPracticePage() {
       />
 
       {status.isPending ? (
-        <p className="text-muted-foreground flex items-center gap-2 text-sm">
-          <Spinner />
-          检查运行环境…
-        </p>
+        <LoadingRow label="检查运行环境…" />
       ) : null}
 
       {status.isSuccess && !sqlReady ? (

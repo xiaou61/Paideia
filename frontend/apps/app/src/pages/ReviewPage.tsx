@@ -13,8 +13,8 @@ import {
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
+  LoadingRow,
   PageHeader,
-  Spinner,
 } from '@paideia/ui'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { CalendarClock, RotateCcw } from 'lucide-react'
@@ -78,10 +78,7 @@ export function ReviewPage() {
       />
 
       {reviews.isPending ? (
-        <p className="text-muted-foreground flex items-center gap-2 text-sm" data-testid="review-state">
-          <Spinner />
-          加载中…
-        </p>
+        <LoadingRow label="加载中…" testId="review-state" />
       ) : null}
 
       {reviews.isError ? (

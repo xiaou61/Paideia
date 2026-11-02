@@ -1,8 +1,5 @@
 import { createKnowledgeApi, plainText } from '@paideia/knowledge'
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
   AppShell,
   Badge,
   Empty,
@@ -10,8 +7,9 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
+  ErrorAlert,
+  LoadingRow,
   PageHeader,
-  Spinner,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
 import { BookOpen } from 'lucide-react'
@@ -70,16 +68,10 @@ export function BooksPage() {
       />
 
       {categories.isPending ? (
-        <p className="text-muted-foreground flex items-center gap-2 text-sm" data-testid="books-state">
-          <Spinner />
-          加载书单…
-        </p>
+        <LoadingRow label="加载书单…" testId="books-state" />
       ) : null}
       {categories.isError ? (
-        <Alert variant="destructive" data-testid="books-state">
-          <AlertTitle>书单加载失败</AlertTitle>
-          <AlertDescription>{errorMessage(categories.error)}</AlertDescription>
-        </Alert>
+        <ErrorAlert title="书单加载失败" error={categories.error} testId="books-state" />
       ) : null}
 
       {categories.isSuccess && root === undefined ? (

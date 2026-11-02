@@ -21,8 +21,9 @@ import {
   AppShell,
   Card,
   CardContent,
+  ErrorAlert,
+  LoadingRow,
   PageHeader,
-  Spinner,
 } from '@paideia/ui'
 import { useAssistantContext } from '@paideia/assistant'
 import { useQuery } from '@tanstack/react-query'
@@ -225,17 +226,11 @@ export function LearnPage() {
       ) : null}
 
       {tracks.isPending ? (
-        <p className="text-muted-foreground flex items-center gap-2 text-sm" data-testid="learn-state">
-          <Spinner />
-          加载学习轨道…
-        </p>
+        <LoadingRow label="加载学习轨道…" testId="learn-state" />
       ) : null}
 
       {tracks.isError ? (
-        <Alert variant="destructive" data-testid="learn-state">
-          <AlertTitle>学习轨道加载失败</AlertTitle>
-          <AlertDescription>{errorMessage(tracks.error)}</AlertDescription>
-        </Alert>
+        <ErrorAlert title="学习轨道加载失败" error={tracks.error} testId="learn-state" />
       ) : null}
 
       {tracks.isSuccess && tracks.data.length === 0 ? (

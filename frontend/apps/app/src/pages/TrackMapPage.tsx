@@ -7,8 +7,8 @@ import {
   AppShell,
   Card,
   CardContent,
+  LoadingRow,
   PageHeader,
-  Spinner,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Check, Milestone, Play } from 'lucide-react'
@@ -90,10 +90,7 @@ export function TrackMapPage() {
       </div>
 
       {map.isPending ? (
-        <p className="text-muted-foreground flex items-center gap-2 text-sm">
-          <Spinner />
-          加载关卡…
-        </p>
+        <LoadingRow label="加载关卡…" />
       ) : null}
 
       {map.isError ? (

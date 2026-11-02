@@ -9624,3 +9624,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：九包 typecheck 全过（修了 F6 首轮"多行 import 中间插行"的 4 个文件与 admin 两文件漏补 import）；core 单测 **31 条全绿**（含新增 5 条格式用例）；F6 残留仅 `auth.test.ts` 断言夹具
 - 本地提交：本片提交
 - 远端推送：未执行
+
+## 2026-11-03 02:35 +0800 · WORK-062 · TASK-011（下）：F2 ui 三件套
+
+- 类型：implementation
+- 变更：`ui` 新增 `query-state.tsx`（`LoadingRow` + `ErrorAlert`，均带 className/testId 插槽，ErrorAlert 内部两行归一错误文案、不 import core）；严格形状替换 **加载行 19 处 + 错误块 10 处 / 16 文件**（含 ui import 合并与 Spinner/Alert 系导入清理）；ui index 补导出
+- 决策：**EmptyHint 不做**（20 处空态的图标与排版差异多，建成空件违背"每个共享件至少两处真实调用"；留下一轮按页替换）；只收"形状"不收差异，文案/testId/className 全经 props
+- 依据：WORK-062 requirements REQ-003 / design F2；扫描候选第 2 条
+- 验证：ui/app/admin typecheck 全过（先修了 ui 导出遗漏）；ui 单测 **256 通过 / 1 红**——那 1 红是 **master 上本来就红**的 `tokens.test.ts` 令牌检查（AnalyticsPage 12 处调色板类；已去主树实测对照，与本项无关，列入报告外部项）
+- 本地提交：本片提交
+- 远端推送：未执行
