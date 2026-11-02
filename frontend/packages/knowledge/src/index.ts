@@ -90,6 +90,7 @@ export type {
   LearningStatus,
   LineKind,
   MasteryTier,
+  PlanItem,
   ProgressReport,
   TrackChapter,
   TrackMap,

@@ -241,3 +241,13 @@ export interface AdviceRequest {
 export interface AdviceResult {
   reasons: { slug: string; reason: string }[]
 }
+
+/** 「今天要做的事」的一条（WORK-053 阶段二）。 */
+export interface PlanItem {
+  id: number
+  /** `yyyy-MM-dd`，客户端算出来的那一天 */
+  date: string
+  goal: string
+  reason: string
+  done: boolean
+}

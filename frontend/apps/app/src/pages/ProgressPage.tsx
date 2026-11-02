@@ -3,6 +3,7 @@ import {
   createLearningApi,
   type ConceptNode,
   type EntryProgressView,
+  type PlanItem,
   type TrackSummary,
 } from '@paideia/knowledge'
 import {
@@ -14,16 +15,18 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
+  Input,
   PageHeader,
   Spinner,
 } from '@paideia/ui'
-import { useQuery } from '@tanstack/react-query'
-import { Brain, CalendarClock, ListChecks, Sparkles, TriangleAlert } from 'lucide-react'
-import { useEffect, useMemo } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Brain, CalendarCheck, CalendarClock, ListChecks, Sparkles, Trash2, TriangleAlert } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 
 import { api } from '../api'
@@ -176,6 +179,8 @@ export function ProgressPage() {
           </CardContent>
         </Card>
 
+        <PlanSection />
+
         <Card data-testid="progress-weak">
           <CardContent className="pt-6">
             <SectionTitle icon={<Brain className="size-4" />} title="最薄弱的概念" hint="掌握度最低" />
@@ -217,6 +222,110 @@ export function ProgressPage() {
       </p>
     </AppShell>
   )
+}
+
+
+/**
+ * 「今天要做的事」（WORK-053 阶段二）。
+ *
+ * <p>计划项**只由用户写入**：助手在对话里给候选，真正落库发生在这里的「添加」或
+ * 助手卡片上的「加入计划」（REQ-007）。日期用浏览器本地的那一天——服务端不知道用户在哪个时区。
+ */
+function PlanSection() {
+  const queryClient = useQueryClient()
+  const today = todayIso()
+  const items = useQuery({ queryKey: ['learning-plan', today], queryFn: () => learning.planItems(today) })
+  const [goal, setGoal] = useState('')
+
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: ['learning-plan', today] })
+  const add = useMutation({
+    mutationFn: (text: string) => learning.addPlanItem({ date: today, goal: text, reason: '' }),
+    onSuccess: () => {
+      setGoal('')
+      refresh()
+    },
+  })
+  const toggle = useMutation({
+    mutationFn: (input: { id: number; done: boolean }) => learning.setPlanItemDone(input.id, input.done),
+    onSuccess: refresh,
+  })
+  const remove = useMutation({
+    mutationFn: (id: number) => learning.removePlanItem(id),
+    onSuccess: refresh,
+  })
+
+  const list = items.data ?? []
+  return (
+    <Card data-testid="progress-plan">
+      <CardContent className="pt-6">
+        <SectionTitle
+          icon={<CalendarCheck className="size-4" />}
+          title="今天要做的事"
+          hint={list.length === 0 ? '' : `${list.filter((item) => item.done).length}/${list.length} 已完成`}
+        />
+        {items.isPending ? <Loading /> : null}
+        {items.isError ? <Failed message="计划加载失败" /> : null}
+        {items.isSuccess && list.length === 0 ? (
+          <EmptyHint title="今天还没有计划" description="让助手按你的学习记录给建议，或者自己写一条。" />
+        ) : null}
+        <ul className="mt-3 space-y-2 text-sm">
+          {list.map((item: PlanItem) => (
+            <li key={item.id} className="flex items-start gap-2" data-testid={`plan-item-${item.id}`}>
+              <Checkbox
+                className="mt-0.5"
+                checked={item.done}
+                aria-label={`完成「${item.goal}」`}
+                onCheckedChange={(value) => toggle.mutate({ id: item.id, done: value === true })}
+              />
+              <div className="min-w-0 flex-1">
+                <p className={item.done ? 'text-muted-foreground line-through' : undefined}>{item.goal}</p>
+                {item.reason === '' ? null : (
+                  <p className="text-muted-foreground text-xs">{item.reason}</p>
+                )}
+              </div>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                aria-label={`删除「${item.goal}」`}
+                onClick={() => remove.mutate(item.id)}
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-3 flex gap-2">
+          <Input
+            value={goal}
+            placeholder="今天要做的一件事…"
+            data-testid="plan-goal"
+            onChange={(event) => setGoal(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && goal.trim() !== '') {
+                add.mutate(goal.trim())
+              }
+            }}
+          />
+          <Button
+            size="sm"
+            data-testid="plan-add"
+            disabled={goal.trim() === '' || add.isPending}
+            onClick={() => add.mutate(goal.trim())}
+          >
+            添加
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+/** 浏览器本地的那一天（`yyyy-MM-dd`）。不能用 `toISOString()`：那是 UTC 的日期。 */
+function todayIso(): string {
+  const now = new Date()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${now.getFullYear()}-${month}-${day}`
 }
 
 function summarizeLines(tracks: TrackSummary[]): { slug: string; name: string; passed: number; stage: number }[] {

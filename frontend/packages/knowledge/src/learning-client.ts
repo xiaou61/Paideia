@@ -1,6 +1,6 @@
 import type { ApiClient } from '@paideia/core'
 
-import type { AdviceRequest, AdviceResult, AnsweredChoice, ConceptGraph, EntryProgressView, LearningLine, ProgressReport, ReviewDueList, ReviewSession, ReviewSubmitResult, TrackMap, TrackSummary } from './learning-types'
+import type { AdviceRequest, AdviceResult, AnsweredChoice, ConceptGraph, EntryProgressView, LearningLine, PlanItem, ProgressReport, ReviewDueList, ReviewSession, ReviewSubmitResult, TrackMap, TrackSummary } from './learning-types'
 
 /**
  * 学习线 / 学习记录的客户端（WORK-020）。
@@ -77,6 +77,31 @@ export function createLearningApi(client: ApiClient) {
       client.requestEnvelope<AnsweredChoice[]>(`/api/v1/learning/entries/${entryId}/attempts`),
 
     /** 我的知识图谱（WORK-021）。掌握度是服务端现算的，前端不缓存也不推导。 */
+    /**
+     * 「今天要做的事」（WORK-053 阶段二）。
+     *
+     * <p>日期由**客户端**给：服务端不知道用户在哪个时区，"今天"是浏览器算出来的那一天。
+     */
+    planItems: (date: string) =>
+      client.requestEnvelope<PlanItem[]>(`/api/v1/learning/plan-items?date=${date}`),
+
+    addPlanItem: (item: { date: string; goal: string; reason: string }) =>
+      client.requestEnvelope<PlanItem>('/api/v1/learning/plan-items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(item),
+      }),
+
+    setPlanItemDone: (id: number, done: boolean) =>
+      client.requestEnvelope<null>(`/api/v1/learning/plan-items/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ done }),
+      }),
+
+    removePlanItem: (id: number) =>
+      client.requestEnvelope<null>(`/api/v1/learning/plan-items/${id}`, { method: 'DELETE' }),
+
     graph: () => client.requestEnvelope<ConceptGraph>('/api/v1/learning/graph'),
 
     /** 学习轨道（WORK-024）。与知识库无关的独立入口。 */
