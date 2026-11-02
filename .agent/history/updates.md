@@ -9654,3 +9654,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：admin typecheck 通过；两端 Vite build 通过（app/admin，含既有懒加载守卫，60 秒）
 - 本地提交：本片提交
 - 远端推送：未执行
+
+## 2026-11-03 03:40 +0800 · WORK-062 · 收尾：联动验证、线上冒烟与报告（TASK-014/015/016）
+
+- 类型：verification
+- 变更：`testing/report.md`（status: passed，verified_commit=9aceb1fb，五列矩阵覆盖 AC-001…006 + 线上冒烟节 + 未覆盖清单）；TASK-014…016 收尾
+- 决策：①分支栈本地 e2e 以"九包 typecheck + 七包单测 + 两端 Vite build"替代（本地 e2e 需 jar+3307 隧道+写共享库；残留风险与合并后补课建议写入报告）；②线上冒烟的 6 条非 2xx 全部定性后才下结论：5 条 500 同根因 `e.line_kind`（线上受影响 **5 个接口**，比测试面更广；本分支 65a30c54 覆盖整族）、1 条 406 是脚本 Accept 头伪影（curl 复测 200）
+- 依据：requirements AC-001…006；本会话全部实测（后端单元/守卫/ops/记忆面切片、前端 typecheck/单测/构建、线上 31 端点 ×3 轮冒烟、journalctl 根因、主树对照）
+- 验证：见报告矩阵；**性能结论：无 ≥1s 接口（中位 53–351ms）**
+- 本地提交：本片提交
+- 远端推送：未执行
