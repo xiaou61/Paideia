@@ -47,9 +47,10 @@ approver_role: CTO
 - 验证：受影响模块 test；消失判据 B2。
 - 完成记录：实际替换 **10 处**——消失判据多抓到一处扫描漏网的同类拷贝（`mcp.PatService.hash`，手写 forDigit 形态）；EssayCollectionService 保留"失败退回原值"语义（委托调用包在原 try/catch 内）。消失判据：`MessageDigest.getInstance("SHA-256")` 全仓仅剩 `Hashes.java` 一处。实测：非 app 单元切片 805 条 0 失败（57 秒）；app 面 7 类 54 条中 1 红＝**已知外部项**（McpAdmin 工具数 19/21，061 报告「外部阻塞」已登记），其余 53 条全绿。
 
-### TASK-003 | pending | B3 工具入参小工具收敛
+### TASK-003 | done | B3 工具入参小工具收敛
 - 落点 `platform.ToolArgs`；替换 stringOf 12、longOf 7、messageOf 12、instantOf 2、分页 3-4；窄变体与 fallback 族保留。
 - 验证：受影响模块 test（ai/note/knowledge/sandbox/app）；消失判据 B3。
+- 完成记录：实际替换 **39 处**（38 处脚本 + `OpsAdminTools` 内层类缩进版 1 处人工）；`intOf`（分类树）一并入 ToolArgs（第 13 个件）；后处理清掉 4 个因替换闲置的常量与相应 import。**PageQuery 上限 200 而工具口径 100 是承重差异**——ToolArgs 用自己的 `MAX_SIZE=100` + `PageQuery.of`，AdminUserController 的 HTTP 参数走 `clampedSize`。窄 longOf（AskTool/ResumeTools）与 `OpsDiagnosisService.messageOf`（还要截断 1000 字）按设计保留。判据：正典 stringOf 体只剩 ToolArgs 一处、`Math.min(Math.max(size,1),MAX_PAGE_SIZE)` 为 0、messageOf 一行式只剩 ToolArgs。实测：单元切片 805 条 0 失败（55 秒）；工具面 app 5 类 36 条 0 失败（47 秒）。
 
 ### TASK-004 | pending | B4 模型输出 JSON 收敛
 - 落点 `ai.internal.support.ModelJson`；替换 6 处逐字 + textOrNull/textOrEmpty 5 处；两个变体保留。

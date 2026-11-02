@@ -9533,3 +9533,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：消失判据——`MessageDigest.getInstance("SHA-256")` 仅剩 Hashes.java:30；单元切片 805 条 / 0 失败 / exit 0（57 秒）；app 面 7 类 54 条：53 绿 + 1 已知外部红（McpAdmin 工具数 19/21）
 - 本地提交：本片提交
 - 远端推送：未执行
+
+## 2026-11-02 22:35 +0800 · WORK-062 · TASK-003 B3 工具入参收敛
+
+- 类型：implementation
+- 变更：新增 `platform.ToolArgs`（stringOf/longOf/intOf/instantOf/messageOf/pageOf/sizeOf/clampedSize/pageQueryOf + `MAX_SIZE=100`）；14 个文件 39 处替换（12 个 tools 文件 + AdminUserController + OpsAdminTools 内层缩进版）；`intOf` 一并收
+- 决策：**PageQuery 上限 200、工具口径 100 是承重差异**——ToolArgs 用自有 MAX_SIZE 再走 PageQuery.of（其归一化对 ≤100 是恒等）；窄 longOf 两处与 OpsDiagnosisService.messageOf（带 1000 字截断）按设计保留；顺带清掉 4 个闲置常量与相应 import
+- 依据：WORK-062 requirements REQ-001 / design B3；扫描候选第 3 条
+- 验证：判据——正典 stringOf 体、`Math.min(Math.max(size,1),MAX_PAGE_SIZE)`、一行式 messageOf 均只剩 ToolArgs；单元切片 805 条 0 失败（55 秒）；app 工具面 5 类 36 条 0 失败（47 秒）
+- 本地提交：本片提交
+- 远端推送：未执行

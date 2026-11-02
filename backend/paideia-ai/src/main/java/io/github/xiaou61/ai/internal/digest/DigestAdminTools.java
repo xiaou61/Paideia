@@ -1,6 +1,7 @@
 package io.github.xiaou61.ai.internal.digest;
 
 import io.github.xiaou61.platform.PaideiaTool;
+import io.github.xiaou61.platform.ToolArgs;
 import io.github.xiaou61.platform.ToolContext;
 import io.github.xiaou61.platform.ToolDescriptor;
 import io.github.xiaou61.platform.ToolResult;
@@ -124,12 +125,7 @@ public final class DigestAdminTools {
     }
 
     static String stringOf(Map<String, Object> arguments, String key) {
-        Object raw = arguments == null ? null : arguments.get(key);
-        if (raw == null) {
-            return null;
-        }
-        String text = raw.toString().trim();
-        return text.isEmpty() ? null : text;
+        return ToolArgs.stringOf(arguments, key);
     }
 
     static Long longOf(Map<String, Object> arguments, String key) {
@@ -152,7 +148,6 @@ public final class DigestAdminTools {
     }
 
     static String messageOf(RuntimeException failure) {
-        String message = failure.getMessage();
-        return message == null || message.isBlank() ? failure.getClass().getSimpleName() : message;
+        return ToolArgs.messageOf(failure);
     }
 }

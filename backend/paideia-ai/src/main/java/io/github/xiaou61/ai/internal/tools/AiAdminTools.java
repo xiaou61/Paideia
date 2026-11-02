@@ -5,6 +5,7 @@ import io.github.xiaou61.ai.internal.telemetry.AiRunAdminService;
 import io.github.xiaou61.platform.PageQuery;
 import io.github.xiaou61.platform.PageResult;
 import io.github.xiaou61.platform.PaideiaTool;
+import io.github.xiaou61.platform.ToolArgs;
 import io.github.xiaou61.platform.ToolContext;
 import io.github.xiaou61.platform.ToolDescriptor;
 import io.github.xiaou61.platform.ToolResult;
@@ -26,7 +27,6 @@ import org.springframework.stereotype.Component;
 public final class AiAdminTools {
 
     private static final String GROUP = "admin_ai";
-    private static final int MAX_PAGE_SIZE = 100;
     private static final int MAX_SERIES_POINTS = 60;
     private static final int MAX_SPANS = 40;
     private static final int MAX_PAYLOAD_CHARS = 2000;
@@ -373,46 +373,19 @@ public final class AiAdminTools {
     }
 
     static String stringOf(Map<String, Object> arguments, String key) {
-        Object raw = arguments == null ? null : arguments.get(key);
-        if (raw == null) {
-            return null;
-        }
-        String text = raw.toString().trim();
-        return text.isEmpty() ? null : text;
+        return ToolArgs.stringOf(arguments, key);
     }
 
     static Long longOf(Map<String, Object> arguments, String key) {
-        Object raw = arguments == null ? null : arguments.get(key);
-        if (raw instanceof Number number) {
-            return number.longValue();
-        }
-        if (raw instanceof String text && !text.isBlank()) {
-            try {
-                return Long.parseLong(text.trim());
-            } catch (NumberFormatException ignored) {
-                return null;
-            }
-        }
-        return null;
+        return ToolArgs.longOf(arguments, key);
     }
 
     static Instant instantOf(Map<String, Object> arguments, String key) {
-        String text = stringOf(arguments, key);
-        if (text == null) {
-            return null;
-        }
-        try {
-            return Instant.parse(text);
-        } catch (java.time.format.DateTimeParseException failure) {
-            throw new IllegalArgumentException("时间格式应为 ISO-8601：" + text);
-        }
+        return ToolArgs.instantOf(arguments, key);
     }
 
     static PageQuery pageOf(Map<String, Object> arguments) {
-        Long page = longOf(arguments, "page");
-        Long size = longOf(arguments, "size");
-        int effectiveSize = size == null ? 20 : (int) Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
-        return PageQuery.of(page == null || page < 1 ? 1 : page.intValue(), effectiveSize, null);
+        return ToolArgs.pageQueryOf(arguments);
     }
 
     static String counts(List<?> rows) {
@@ -452,7 +425,6 @@ public final class AiAdminTools {
     }
 
     static String messageOf(RuntimeException failure) {
-        String message = failure.getMessage();
-        return message == null || message.isBlank() ? failure.getClass().getSimpleName() : message;
+        return ToolArgs.messageOf(failure);
     }
 }

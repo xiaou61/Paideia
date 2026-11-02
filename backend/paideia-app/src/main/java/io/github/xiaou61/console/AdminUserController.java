@@ -6,6 +6,7 @@ import io.github.xiaou61.platform.ApiAccess;
 import io.github.xiaou61.platform.ApiResponse;
 import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
+import io.github.xiaou61.platform.ToolArgs;
 import io.github.xiaou61.security.CurrentUser;
 import java.util.List;
 import java.util.Map;
@@ -39,8 +40,6 @@ import org.springframework.web.bind.annotation.RestController;
 class AdminUserController {
 
     /** 每页上限。`PageQuery` 自己有 200 的上限，这里再收一道业务上限。 */
-    private static final int MAX_PAGE_SIZE = 100;
-    private static final int DEFAULT_PAGE_SIZE = 20;
 
     private final AccountAdminApi accounts;
     private final AiAdminApi ai;
@@ -69,7 +68,7 @@ class AdminUserController {
                                @RequestParam(name = "role", required = false) String role,
                                @RequestParam(name = "page", required = false) Integer page,
                                @RequestParam(name = "size", required = false) Integer size) {
-        int pageSize = size == null ? DEFAULT_PAGE_SIZE : Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        int pageSize = ToolArgs.clampedSize(size);
         var result = accounts.list(query, role, page == null ? 1 : page, pageSize);
         return ApiResponse.ok(new UserPage(result.total(), result.page(), result.size(),
                 enrich(result.items())));

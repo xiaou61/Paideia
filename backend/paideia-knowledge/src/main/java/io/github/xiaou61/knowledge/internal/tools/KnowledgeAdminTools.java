@@ -10,6 +10,7 @@ import io.github.xiaou61.knowledge.internal.category.CategoryTree;
 import io.github.xiaou61.platform.PageQuery;
 import io.github.xiaou61.platform.PageResult;
 import io.github.xiaou61.platform.PaideiaTool;
+import io.github.xiaou61.platform.ToolArgs;
 import io.github.xiaou61.platform.ToolContext;
 import io.github.xiaou61.platform.ToolDescriptor;
 import io.github.xiaou61.platform.ToolResult;
@@ -34,7 +35,6 @@ import org.springframework.stereotype.Component;
 public final class KnowledgeAdminTools {
 
     private static final String GROUP = "admin_content";
-    private static final int MAX_PAGE_SIZE = 100;
 
     private KnowledgeAdminTools() {
     }
@@ -715,32 +715,15 @@ public final class KnowledgeAdminTools {
     }
 
     static String stringOf(Map<String, Object> arguments, String key) {
-        Object raw = arguments == null ? null : arguments.get(key);
-        if (raw == null) {
-            return null;
-        }
-        String text = raw.toString().trim();
-        return text.isEmpty() ? null : text;
+        return ToolArgs.stringOf(arguments, key);
     }
 
     static Long longOf(Map<String, Object> arguments, String key) {
-        Object raw = arguments == null ? null : arguments.get(key);
-        if (raw instanceof Number number) {
-            return number.longValue();
-        }
-        if (raw instanceof String text && !text.isBlank()) {
-            try {
-                return Long.parseLong(text.trim());
-            } catch (NumberFormatException ignored) {
-                return null;
-            }
-        }
-        return null;
+        return ToolArgs.longOf(arguments, key);
     }
 
     static Integer intOf(Map<String, Object> arguments, String key) {
-        Long value = longOf(arguments, key);
-        return value == null ? null : value.intValue();
+        return ToolArgs.intOf(arguments, key);
     }
 
     /** `0` 对分类树表示根：接口层用 null 表达，工具层接受 0 更符合直觉。 */
@@ -750,10 +733,7 @@ public final class KnowledgeAdminTools {
     }
 
     static PageQuery pageOf(Map<String, Object> arguments) {
-        Integer page = intOf(arguments, "page");
-        Integer size = intOf(arguments, "size");
-        int effectiveSize = size == null ? 20 : Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
-        return PageQuery.of(page == null ? 1 : page, effectiveSize, null);
+        return ToolArgs.pageQueryOf(arguments);
     }
 
     static String orEmpty(String value) {
@@ -765,7 +745,6 @@ public final class KnowledgeAdminTools {
     }
 
     static String messageOf(RuntimeException failure) {
-        String message = failure.getMessage();
-        return message == null || message.isBlank() ? failure.getClass().getSimpleName() : message;
+        return ToolArgs.messageOf(failure);
     }
 }
