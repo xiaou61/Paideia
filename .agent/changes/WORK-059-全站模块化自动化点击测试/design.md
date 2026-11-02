@@ -18,13 +18,20 @@ approver_role: CTO
 ego-browser CLI
   └─ nodejs 运行时执行 scripts/ego/run.mjs
        ├─ 读取 .secrets/ego.local.json（忽略文件，含线上地址与两个账号）
-       ├─ 打开真实 Chromium，TaskSpace 内两个 Page：学习者 / 管理员
+       ├─ 打开真实 Chromium，按角色分阶段：先学习者，再切换管理员
        ├─ 按 modules.mjs 顺序加载 scenarios/<模块>.mjs
        ├─ harness 执行点击与断言，失败截图
        └─ 写 .agent/testing/runs/<runid>-ego-<target>.md
 ```
 
 不经过 Playwright，不调后端接口；所有动作都发生在真实页面上。
+
+## 实施订正（2026-11-02，探针后）
+
+原设计写「p1 学习者、p2 管理员同时登录」不成立：登录态在 localStorage，按 origin 共享，同一 profile 下两个账号会互相覆盖。
+实际改为**按角色分阶段**——先跑学习者模块，再切换管理员跑管理端；同一时间只保持一个账号。
+切换账号会登出该 ego profile 里当前的账号，因此配置里增加可选 `profileId`，把自动化固定到一个专用 profile。
+详见 `.agent/notes/ego-click-probe.md`。
 
 ## 组件与职责
 

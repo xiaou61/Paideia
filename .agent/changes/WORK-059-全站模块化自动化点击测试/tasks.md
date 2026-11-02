@@ -43,7 +43,7 @@ approver_role: CTO
 
 ## 任务
 
-### TASK-001 | pending | ego 线上探针
+### TASK-001 | done | ego 线上探针
 
 - 对应：`REQ-003`、`REQ-006`
 - 依赖：无
@@ -54,7 +54,7 @@ approver_role: CTO
   3. 记录：可用的选择器写法、登录后等待条件、页面是否有白屏或控制台可见错误、耗时。
 - 验证：笔记里每条结论都有对应的命令输出或截图路径；不写口令。
 
-### TASK-002 | pending | 模块清单与覆盖闸门
+### TASK-002 | done | 模块清单与覆盖闸门
 
 - 对应：`REQ-001`、`REQ-004`、`AC-001`、`AC-003`
 - 依赖：TASK-001
@@ -68,7 +68,7 @@ approver_role: CTO
   3. 写 `check-map.test.mjs`：用临时目录造三组 router 与场景，断言通过/失败/重复三种结果。
 - 验证：`node --test scripts/ego/check-map.test.mjs` → 3 passed；`node scripts/ego/check-map.mjs` → 0。
 
-### TASK-003 | pending | harness、runner 与报告
+### TASK-003 | done | harness、runner 与报告
 
 - 对应：`REQ-003`、`REQ-007`、`REQ-009`、`REQ-010`、`REQ-012`、`AC-002`、`AC-004`、`AC-007`、`AC-010`
 - 依赖：TASK-002
@@ -81,7 +81,7 @@ approver_role: CTO
   4. 用 `--module home --read-only` 跑通第一条真实用例。
 - 验证：`ego-browser nodejs < scripts/ego/run.mjs --module home --read-only` → 退出码 0，`.agent/testing/runs/` 新增一份报告。
 
-### TASK-004 | pending | 学习者场景 L1–L4
+### TASK-004 | done | 学习者场景 L1–L4
 
 - 对应：`REQ-002`、`AC-003`
 - 依赖：TASK-003
@@ -93,7 +93,7 @@ approver_role: CTO
   4. `notes`：新建 → 改一次 → 刷新仍在 → 删除（`write: true`）。
 - 验证：`--module home,knowledge,notes,identity --read-only` 全绿（notes 的写入用例跳过）；`--module notes --write` 创建并删除。
 
-### TASK-005 | pending | 学习者场景 L5–L8
+### TASK-005 | done | 学习者场景 L5–L8
 
 - 对应：`REQ-002`、`AC-003`
 - 依赖：TASK-003
@@ -105,7 +105,7 @@ approver_role: CTO
   4. `camp`：开营或明确空态；作答页能进；未答完不能交卷。
 - 验证：四个模块只读全绿。
 
-### TASK-006 | pending | 学习者场景 L9–L12
+### TASK-006 | done | 学习者场景 L9–L12
 
 - 对应：`REQ-002`、`AC-003`
 - 依赖：TASK-003
@@ -117,7 +117,7 @@ approver_role: CTO
   4. `content`：速递有内容或空态、书籍列表 → 详情、源码列表 → 条目。
 - 验证：四个模块只读全绿；简历写入用例在 `--write` 下创建后删除。
 
-### TASK-007 | pending | 管理端场景 A1–A6
+### TASK-007 | done | 管理端场景 A1–A6
 
 - 对应：`REQ-002`、`AC-003`
 - 依赖：TASK-003
@@ -131,7 +131,7 @@ approver_role: CTO
   6. `admin-datasets`：数据集列表、报告页可开。
 - 验证：六个模块只读全绿；`admin-knowledge --write` 创建并删除。
 
-### TASK-008 | pending | 写入模式与清理守卫
+### TASK-008 | done | 写入模式与清理守卫
 
 - 对应：`REQ-005`、`REQ-008`、`AC-005`、`AC-008`
 - 依赖：TASK-004、TASK-006、TASK-007
@@ -143,7 +143,7 @@ approver_role: CTO
   4. 连续跑两次 `--module notes --write`，第二次不因第一次残留失败。
 - 验证：`--module notes --write` 两次均绿；只读轮次前后笔记数量不变。
 
-### TASK-009 | pending | 全量只读跑与稳定化
+### TASK-009 | done | 全量只读跑与稳定化
 
 - 对应：`AC-002`、`AC-004`、`AC-007`
 - 依赖：TASK-004、TASK-005、TASK-006、TASK-007
@@ -154,7 +154,7 @@ approver_role: CTO
   3. 人为改错一条断言，确认报告给出模块/用例/步骤/URL/截图；改回。
 - 验证：`--all --read-only` 全绿；报告在 `.agent/testing/runs/`。
 
-### TASK-010 | pending | 文档、配置样例与台账
+### TASK-010 | done | 文档、配置样例与台账
 
 - 对应：`REQ-006`、`AC-006`、`AC-010`
 - 依赖：TASK-009

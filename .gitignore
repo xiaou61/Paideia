@@ -54,6 +54,10 @@ logs/
 test-results/
 playwright-report/
 blob-report/
+# ego 点击测试的失败截图（WORK-059）；报告入台账，截图不入库。
+.agent/testing/.artifacts/
+# ego runner 的当次参数（cli.mjs 生成，含模块名与模式，不含凭据）。
+scripts/ego/.run.json
 # playwright-cli 的页面快照（skill 的临时产物，不是本项目的内容）。
 # 不加这行它会一直以未跟踪状态留在工作区，把 project-lifecycle 的
 # "工作区是否干净"判定弄脏 —— 于是验证报告会被判 stale（实测过一次）。

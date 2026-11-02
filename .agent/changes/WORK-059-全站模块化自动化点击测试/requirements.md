@@ -63,6 +63,14 @@ approver_role: CTO
 - **2026-11-02**：运行环境选**全部线上**（不是本地 test 库）。
 - **2026-11-02**：第一批就是**框架 + 全部 18 个模块**，不先做小范围试点。
 
+## 实现选择
+
+- 用**脚本化点击**而不是 LLM 自由探索：回归要可重复、可定位、可比较；ego 只当浏览器驱动。
+- 模块清单用 `scripts/ego/modules.mjs` 作唯一来源，`check-map.mjs` 与两个 `router.tsx` 对账。
+- 账号固定 `Profile 2`：学习者 `e2e-learner`、管理员 `admin`；同一 profile 下不能同时登录，按角色分阶段跑。
+- 默认只读，写入用例必须显式 `--write`；所有新建数据带 `e2e-click-<runid>-` 前缀并在结束时删除。
+- 报告写 `.agent/testing/runs/`，失败截图写 `.agent/testing/.artifacts/`（忽略，不入库）。
+
 ## 术语与边界
 
 | 词 | 含义 | 不是什么 |
