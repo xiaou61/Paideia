@@ -20,6 +20,7 @@ import {
   DialogTitle,
   Input,
   Label,
+  ListPagination,
   LoadingRow,
   PageHeader,
   Select,
@@ -412,33 +413,15 @@ function Pagination({
   totalPages: number
   onChange: (page: number) => void
 }) {
+  // 收敛到共享件（WORK-062）：testIdPrefix 生成 admin-entry-total/-prev/-next，e2e 锚点不变
   return (
-    <div className="border-border text-muted-foreground flex items-center justify-between gap-4 border-t px-(--card-spacing) py-3 text-xs">
-      <span data-testid="admin-entry-total">共 {total} 条</span>
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="xs"
-          disabled={current <= 1}
-          onClick={() => onChange(current - 1)}
-          data-testid="admin-entry-prev"
-        >
-          上一页
-        </Button>
-        <span className="tabular-nums">
-          {current} / {totalPages}
-        </span>
-        <Button
-          variant="outline"
-          size="xs"
-          disabled={current >= totalPages}
-          onClick={() => onChange(current + 1)}
-          data-testid="admin-entry-next"
-        >
-          下一页
-        </Button>
-      </div>
-    </div>
+    <ListPagination
+      total={total}
+      page={current}
+      totalPages={totalPages}
+      onPage={onChange}
+      testIdPrefix="admin-entry"
+    />
   )
 }
 

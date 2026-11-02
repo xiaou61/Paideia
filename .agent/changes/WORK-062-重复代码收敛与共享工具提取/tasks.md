@@ -92,9 +92,10 @@ approver_role: CTO
 - 验证：ui/core 单测 + 两端 typecheck；消失判据 F2/F5/F6。
 - 完成记录：F6（core.JSON_HEADERS：删 4 常量 + 29 内联）、F5（core.format \\*：9+3 处）、**F2（ui.LoadingRow/ErrorAlert：加载行 19 处 + 错误块 10 处 / 16 文件；严格形状替换，带 className/testId 插槽）**。**明确不做**：EmptyHint（空态 20 处图标与排版差异多，组件不建、留下一轮按页替换——避免"建了没人用"的空件）；`jsonRequest(body,method)` 包装（逐行换 JSON_HEADERS 风险最小，偏差记报告）。实测：九包 typecheck 全过（修了多行 import 插行、ui 导出遗漏两轮问题）；core **31 条单测**全绿；ui 单测 **256 通过 / 1 红＝master 上本来就红的令牌检查**（AnalyticsPage 12 处调色板类，主树对照实测同样红，非本项引入）。
 
-### TASK-012 | pending | F3 ListPagination
+### TASK-012 | done | F3 ListPagination
 - `ui` 新增 `pagination.tsx`；替换 admin 5 处分页页脚（pageCount 上移）；sql-workbench 变体保留。
 - 验证：admin typecheck + e2e。
+- 完成记录：`ListPagination`（testIdPrefix 生成 `{prefix}-total/-prev/-next`，与既有 e2e 锚点逐字一致）；5 处替换（AdminUsers / AiFeedback / KnowledgeEntries 的本地 `Pagination` 组件改一行委托 / AiRunsList / **AiCreditsAudit 的原生 `<button>` 漂移一并统一回 `<Button size="xs">`**）；`pageCount` 助手未建（5 处算式保留本地——不造没有第二个消费者的件）。实测：admin typecheck 通过；两处因此闲置的 `Button` 导入已清理。
 
 ### TASK-013 | pending | F4 + F7 admin 辅助（e2e session / 窗口查询串）
 - 新增 `apps/admin/e2e/session.ts`（signIn/overflow/envelope）与 `apps/admin/src/ai-window.ts`；替换 10 spec + 9 处；顺手统一 `E2E_ADMIN_PATH` 并修缺 encode 漂移。

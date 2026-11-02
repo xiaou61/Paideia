@@ -8,6 +8,7 @@ import {
   EmptyMedia,
   EmptyTitle,
   Input,
+  ListPagination,
   PageHeader,
   Select,
   SelectContent,
@@ -259,30 +260,13 @@ export function AiCreditsAuditPage() {
               </TableBody>
             </Table>
             </div>
-            <div className="border-border text-muted-foreground flex items-center justify-between gap-4 border-t px-(--card-spacing) py-3 text-xs">
-              <span>共 {rows.data?.total ?? 0} 条</span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className="border-input rounded-md border px-2 py-1 disabled:opacity-50"
-                  disabled={page <= 1}
-                  onClick={() => setPage(page - 1)}
-                  data-testid="credits-audit-prev"
-                >
-                  上一页
-                </button>
-                <span className="tabular-nums">{page} / {totalPages}</span>
-                <button
-                  type="button"
-                  className="border-input rounded-md border px-2 py-1 disabled:opacity-50"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage(page + 1)}
-                  data-testid="credits-audit-next"
-                >
-                  下一页
-                </button>
-              </div>
-            </div>
+            <ListPagination
+              total={rows.data?.total ?? 0}
+              page={page}
+              totalPages={totalPages}
+              onPage={setPage}
+              testIdPrefix="credits-audit"
+            />
             </>
           )}
         </CardContent>

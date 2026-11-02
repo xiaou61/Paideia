@@ -9634,3 +9634,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：ui/app/admin typecheck 全过（先修了 ui 导出遗漏）；ui 单测 **256 通过 / 1 红**——那 1 红是 **master 上本来就红**的 `tokens.test.ts` 令牌检查（AnalyticsPage 12 处调色板类；已去主树实测对照，与本项无关，列入报告外部项）
 - 本地提交：本片提交
 - 远端推送：未执行
+
+## 2026-11-03 02:55 +0800 · WORK-062 · TASK-012 F3 分页页脚收敛
+
+- 类型：implementation
+- 变更：`ui.ListPagination`（testIdPrefix → `{prefix}-total/-prev/-next`）；admin 5 处替换（含 KnowledgeEntries 本地 Pagination 改一行委托）
+- 决策：AiCreditsAuditPage 的原生 `<button>` 漂移（扫描点名的样式不一致）一并统一回 `<Button size="xs">`——有意为之的视觉修正；`pageCount` 助手不建（无第二消费者）
+- 依据：WORK-062 requirements REQ-003 / design F3；扫描候选第 3 条
+- 验证：admin typecheck 通过；闲置 Button 导入已清
+- 本地提交：本片提交
+- 远端推送：未执行

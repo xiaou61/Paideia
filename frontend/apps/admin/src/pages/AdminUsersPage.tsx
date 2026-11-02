@@ -12,6 +12,7 @@ import {
   EmptyMedia,
   EmptyTitle,
   Input,
+  ListPagination,
   PageHeader,
   Select,
   SelectContent,
@@ -304,30 +305,13 @@ export function AdminUsersPage() {
                 </TableBody>
               </Table>
 
-              <div className="border-border text-muted-foreground flex items-center justify-between gap-4 border-t px-(--card-spacing) py-3 text-xs">
-                <span>共 {users.data?.total ?? 0} 条</span>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    disabled={page <= 1}
-                    onClick={() => setPage(page - 1)}
-                  >
-                    上一页
-                  </Button>
-                  <span className="tabular-nums">
-                    {page} / {totalPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    disabled={page >= totalPages}
-                    onClick={() => setPage(page + 1)}
-                  >
-                    下一页
-                  </Button>
-                </div>
-              </div>
+              <ListPagination
+                total={users.data?.total ?? 0}
+                page={page}
+                totalPages={totalPages}
+                onPage={setPage}
+                testIdPrefix="users"
+              />
             </>
           ) : null}
         </CardContent>
