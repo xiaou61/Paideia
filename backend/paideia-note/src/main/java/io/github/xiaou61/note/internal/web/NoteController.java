@@ -70,11 +70,6 @@ class NoteController {
      * 往 security 里加一个公共入口——那会牵动另外两个已有调用点。
      */
     private static long requireUserId() {
-        try {
-            return Long.parseLong(CurrentUser.subjectId());
-        } catch (NumberFormatException | BizException exception) {
-            // 合法令牌的主体必然是数字（账号主键自增）；非数字只可能来自伪造或版本错配的令牌
-            throw new BizException(ErrorCode.UNAUTHENTICATED, "令牌主体不是有效的账号标识");
-        }
+        return CurrentUser.userId();
     }
 }

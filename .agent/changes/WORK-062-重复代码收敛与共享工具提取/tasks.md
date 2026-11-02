@@ -37,9 +37,10 @@ approver_role: CTO
 
 ## 任务
 
-### TASK-001 | pending | B1 令牌 subject→long 收敛
+### TASK-001 | done | B1 令牌 subject→long 收敛
 - 落点 `security.CurrentUser.userId()`；替换 11 处逐字 try/catch（account×2、ai.AiRequester、app.console.AdminUserController、knowledge.CurrentUserId、mcp.McpTokenController、note×3、sandbox×2）与 6 处裸解析（ai.LearningAdviceController、ai.digest.DigestController、ops.OpsDiagnosisController×2、ops.OpsIncidentController×2）。
 - 验证：受影响模块 test；守卫切片；消失判据 B1。
+- 完成记录：实际替换 10 块（8 块由机械脚本、sandbox 2 块形态不同单独改）+ 6 处裸解析 + knowledge 的 `require()` 改为委托；**knowledge 的 `orNull()` 按设计保留**（读路径要吞异常，不是逐字拷贝）。消失判据通过：文案只剩 `CurrentUser.java:42` 一处；`CurrentUser.subjectId()` 剩余 4 处均为"要字符串不要数字"的合法用法（MeController 回显、orNull、测试夹具、OAuth 身份绑定）。行为差异一处：sandbox 匿名请求文案由"未认证"统一为"令牌主体不是有效的账号标识"（HTTP 401 不变）。实测：非 app 单元切片 **805 条 / 0 失败 / exit 0（59 秒）**；守卫切片 35 条 0 红（66 秒）。
 
 ### TASK-002 | pending | B2 SHA-256 收敛
 - 落点 `platform.Hashes.sha256Hex`；替换 9 处（account.Digest 改委托；ai×5；ops.OpsIncidentService；knowledge.QuestionCatalog；sandbox.SandboxQuotaService）；EssayCollectionService 的 catch-返回原值保留。

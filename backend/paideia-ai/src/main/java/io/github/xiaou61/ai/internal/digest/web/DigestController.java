@@ -103,7 +103,7 @@ class DigestController {
     @PostMapping("/items/{id}/click")
     ApiResponse<Void> recordClick(@PathVariable("id") long id) {
         try {
-            long userId = Long.parseLong(CurrentUser.subjectId());
+            long userId = CurrentUser.userId();
             clicks.insert(userId, id, Instant.now());
         } catch (RuntimeException failure) {
             log.warn("digest.click.record-failed itemId={} cause={}", id, failure.toString());

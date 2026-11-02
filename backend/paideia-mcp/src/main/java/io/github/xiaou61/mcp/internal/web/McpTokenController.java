@@ -136,10 +136,6 @@ class McpTokenController {
     }
 
     private static long requester() {
-        try {
-            return Long.parseLong(CurrentUser.subjectId());
-        } catch (NumberFormatException | BizException failure) {
-            throw new BizException(ErrorCode.UNAUTHENTICATED, "令牌主体不是有效的账号标识");
-        }
+        return CurrentUser.userId();
     }
 }

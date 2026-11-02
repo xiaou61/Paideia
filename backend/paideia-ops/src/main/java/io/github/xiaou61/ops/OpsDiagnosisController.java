@@ -33,7 +33,7 @@ class OpsDiagnosisController {
     /** 提交即返回，报告在后台生成；前端按 id 轮询。 */
     @PostMapping
     ResponseEntity<ApiResponse<Created>> create(@RequestBody(required = false) CreateRequest request) {
-        long userId = Long.parseLong(CurrentUser.subjectId());
+        long userId = CurrentUser.userId();
         String question = request == null ? null : request.question();
         long id = service.start("manual", null, null, question, userId);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.ok(new Created(id)));
@@ -56,7 +56,7 @@ class OpsDiagnosisController {
     @PostMapping("/{id}/feedback")
     ApiResponse<OpsDiagnosisService.View> feedback(@PathVariable("id") long id,
                                                    @RequestBody(required = false) FeedbackRequest request) {
-        long userId = Long.parseLong(CurrentUser.subjectId());
+        long userId = CurrentUser.userId();
         Integer rating = request == null ? null : request.rating();
         String note = request == null ? null : request.note();
         return ApiResponse.ok(service.feedback(id, rating, note, userId));

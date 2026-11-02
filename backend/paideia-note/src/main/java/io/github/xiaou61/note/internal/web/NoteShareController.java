@@ -57,10 +57,6 @@ class NoteShareController {
     }
 
     private static long requireUserId() {
-        try {
-            return Long.parseLong(CurrentUser.subjectId());
-        } catch (NumberFormatException | BizException exception) {
-            throw new BizException(ErrorCode.UNAUTHENTICATED, "令牌主体不是有效的账号标识");
-        }
+        return CurrentUser.userId();
     }
 }

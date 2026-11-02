@@ -220,10 +220,6 @@ class SqlDatasetController {
 
     /** 令牌主体 → 账号 id。与 SandboxController 同一口径（同一个 `CurrentUser` 工具）。 */
     private static long currentUserId() {
-        try {
-            return Long.parseLong(io.github.xiaou61.security.CurrentUser.subjectId());
-        } catch (NumberFormatException cause) {
-            throw new BizException(ErrorCode.UNAUTHENTICATED, "令牌主体不是有效的账号标识");
-        }
+        return io.github.xiaou61.security.CurrentUser.userId();
     }
 }

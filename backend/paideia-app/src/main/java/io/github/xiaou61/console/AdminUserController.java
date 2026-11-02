@@ -130,11 +130,7 @@ class AdminUserController {
      * 按未认证处理而不是让它冒成 500。与 `AiRequester.require()` 同一口径。
      */
     private static long operatorId() {
-        try {
-            return Long.parseLong(CurrentUser.subjectId());
-        } catch (NumberFormatException | BizException exception) {
-            throw new BizException(ErrorCode.UNAUTHENTICATED, "令牌主体不是有效的账号标识");
-        }
+        return CurrentUser.userId();
     }
 
     /**

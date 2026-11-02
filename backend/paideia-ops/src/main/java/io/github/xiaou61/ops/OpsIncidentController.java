@@ -50,7 +50,7 @@ class OpsIncidentController {
     @PostMapping("/{id}/notes")
     ApiResponse<OpsIncidentService.Detail> note(@PathVariable("id") long id,
                                                 @RequestBody(required = false) NoteRequest request) {
-        long userId = Long.parseLong(CurrentUser.subjectId());
+        long userId = CurrentUser.userId();
         return ApiResponse.ok(incidents.addNote(
                 id, request == null ? null : request.message(), userId));
     }
@@ -58,7 +58,7 @@ class OpsIncidentController {
     /** 手动关闭（WORK-049）：resolved 漏投递或事件卡住时的兜底。 */
     @PostMapping("/{id}/close")
     ApiResponse<OpsIncidentService.Detail> close(@PathVariable("id") long id) {
-        long userId = Long.parseLong(CurrentUser.subjectId());
+        long userId = CurrentUser.userId();
         return ApiResponse.ok(incidents.close(id, userId));
     }
 

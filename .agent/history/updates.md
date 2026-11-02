@@ -9513,3 +9513,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
+
+## 2026-11-02 21:40 +0800 · WORK-062 · TASK-001 B1 令牌 subject→long 收敛
+
+- 类型：implementation
+- 变更：`security.CurrentUser` 新增 `userId()`（唯一文案落点）；account×2、ai.AiRequester、app.console.AdminUserController、mcp、note×3、sandbox×2 的逐字 try/catch 块收敛；ai×2 与 ops×4 的裸解析改用共享件；knowledge `CurrentUserId.require()` 改委托（`orNull()` 按设计保留——读路径要吞异常）
+- 决策：沙箱两处原只 catch `NumberFormatException`，统一后匿名请求文案变为"令牌主体不是有效的账号标识"（HTTP 401 不变）；裸解析处伪造令牌由 500 变 401，属修正（401 才符合"身份不被接受"）
+- 依据：WORK-062 requirements REQ-001 / design B1；三路扫描的第 1 条候选
+- 验证：消失判据——`令牌主体不是有效的账号标识` 全仓只剩 `CurrentUser.java:42`；`Long.parseLong(CurrentUser.subjectId())` 为 0；剩余 4 处 `subjectId()` 均为合法字符串用法。非 app 单元切片 805 条 / 0 失败 / exit 0（59 秒）；守卫切片 35 条 / 0 红（66 秒）
+- 本地提交：本片提交
+- 远端推送：未执行
