@@ -1,10 +1,5 @@
 package io.github.xiaou61;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import io.github.xiaou61.ai.ModelAccess;
 import io.github.xiaou61.ai.ResumeAnalyzer;
@@ -30,6 +25,11 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 /**
  * 简历端点的归属与失败语义（WORK-018 AC-007 / AC-008 / AC-010）。
@@ -216,8 +216,7 @@ class ResumeEndpointsIntegrationTest {
     }
 
     private String token(long userId) {
-        return "Bearer " + authPort.issue(
-                new AuthPort.Subject(Long.toString(userId), AuthPort.ROLE_LEARNER)).value();
+        return TestTokens.bearer(authPort, Long.toString(userId));
     }
 
     /**

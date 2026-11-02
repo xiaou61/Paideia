@@ -67,9 +67,10 @@ approver_role: CTO
 - 验证：受影响类实跑（含 Memory 与 AiCredit 家族）；消失判据 T1/T4。
 - 完成记录：`body()` 14 处由**行级状态机**替换（安全）；SSE 首轮用跨行正则做，**把普通 perform 也吞了**（非贪婪 `.*?` 跨方法匹配到后文真正的 SSE 站点），已 `git checkout` 整目录回退，改为逐处手工替换 4 个方法（AiCredit/AssistantConversation/AssistantLiveUpstream/MemoryAuto，注意 AssistantLiveUpstream 返回 String 要包 body、MemoryAuto 返回 MvcResult 不包）。教训入 updates：**含多个同类语句的文件不能用跨行非贪婪正则，要么行级状态机、要么逐处手工**。静态导入 `asyncDispatch`/`request` 与闲置 StandardCharsets 随之清理。实测：app 全量 **478 条 / 4 红（全部为 061 已登记外部项：ApiWalkthrough 覆盖、McpAdmin 19/21、Sandbox 配额×2）/ 0 新增失败**，与基线一致。
 
-### TASK-007 | pending | T2 Bearer token 收敛
+### TASK-007 | done | T2 Bearer token 收敛
 - 新增 `TestTokens`（subject/role 显式传参）；替换 28 类约 36 方法（含 ops 包 tokenFor 变体）。
 - 验证：app 模块受影响类实跑；消失判据 T2。
+- 完成记录：共 **52 处**（两版正则 25+20 + 递归版 6 个 ops 文件 + ApiWalkthrough 的全限定写法手工 1）。踩了三个坑并当场修：①第一版正则不允许 subject 带括号（`Long.toString(...)`）漏 21 处→第二版允许嵌套括号+跨行拼接；②`Path.glob("*.java")` 非递归漏掉 ops/ 子包→改 rglob 并把 `TestTokens` 提为 **public**（ops 子包跨包访问）；③import 清理条件写成 `"AuthPort." not in` 误删了把 `AuthPort` 当字段类型的文件的 import→补回 11 个文件。判据：`"Bearer " + authPort.issue` 全测试树只剩 TestTokens。实测：app 全量 478 条 / 4 红（同外部项）/ 0 新增失败。
 
 ### TASK-008 | pending | T3 Await 轮询收敛
 - 新增 `Await.until/value`；替换 OpsDiagnosis/OpsHook 对、MemoryAuto 六循环、MemoryExtractionJobs 二循环、AssistantConversation 一循环、AiTelemetry 二循环、AiObservability 一循环；ApiWalkthrough 与 DefaultRunRecorderTest 的变体保留。

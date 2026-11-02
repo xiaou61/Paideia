@@ -69,11 +69,11 @@ class ConceptGraphIntegrationTest {
     }
 
     private String token(String subject) {
-        return "Bearer " + authPort.issue(new AuthPort.Subject(subject, AuthPort.ROLE_LEARNER)).value();
+        return TestTokens.bearer(authPort, subject);
     }
 
     private String adminToken() {
-        return "Bearer " + authPort.issue(new AuthPort.Subject("900", AuthPort.ROLE_ADMIN)).value();
+        return TestTokens.bearer(authPort, "900", AuthPort.ROLE_ADMIN);
     }
 
     private long createConcept(String name) {

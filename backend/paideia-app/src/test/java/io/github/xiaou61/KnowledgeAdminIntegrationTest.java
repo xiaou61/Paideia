@@ -58,11 +58,11 @@ class KnowledgeAdminIntegrationTest {
     }
 
     private String learner() {
-        return "Bearer " + authPort.issue(new AuthPort.Subject("1", AuthPort.ROLE_LEARNER)).value();
+        return TestTokens.bearer(authPort, "1");
     }
 
     private String admin() {
-        return "Bearer " + authPort.issue(new AuthPort.Subject("2", AuthPort.ROLE_ADMIN)).value();
+        return TestTokens.bearer(authPort, "2", AuthPort.ROLE_ADMIN);
     }
 
     @Test

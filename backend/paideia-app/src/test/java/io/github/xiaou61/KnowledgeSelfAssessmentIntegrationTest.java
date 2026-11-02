@@ -54,7 +54,7 @@ class KnowledgeSelfAssessmentIntegrationTest {
     }
 
     private String token(String subject) {
-        return "Bearer " + authPort.issue(new AuthPort.Subject(subject, AuthPort.ROLE_LEARNER)).value();
+        return TestTokens.bearer(authPort, subject);
     }
 
     private void clear(String subject, long entryId) throws Exception {

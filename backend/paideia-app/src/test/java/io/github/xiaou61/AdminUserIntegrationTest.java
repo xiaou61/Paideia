@@ -83,7 +83,7 @@ class AdminUserIntegrationTest {
     }
 
     private String token(long id, String role) {
-        return "Bearer " + authPort.issue(new AuthPort.Subject(Long.toString(id), role)).value();
+        return TestTokens.bearer(authPort, Long.toString(id), role);
     }
 
     @Test

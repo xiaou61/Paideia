@@ -105,6 +105,6 @@ class OpsSummaryIntegrationTest {
     }
 
     private String tokenFor(String role) {
-        return "Bearer " + authPort.issue(new AuthPort.Subject("test-" + role, role)).value();
+        return TestTokens.bearer(authPort, "test-" + role, role);
     }
 }

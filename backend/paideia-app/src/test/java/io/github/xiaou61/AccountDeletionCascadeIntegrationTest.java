@@ -1,8 +1,5 @@
 package io.github.xiaou61;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import io.github.xiaou61.account.internal.user.PasswordHasher;
 import io.github.xiaou61.security.AuthPort;
@@ -21,6 +18,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 /**
  * 注销的级联硬删（AC-014）。
@@ -445,6 +445,6 @@ class AccountDeletionCascadeIntegrationTest {
     }
 
     private String token(long id) {
-        return "Bearer " + authPort.issue(new AuthPort.Subject(Long.toString(id), AuthPort.ROLE_LEARNER)).value();
+        return TestTokens.bearer(authPort, Long.toString(id));
     }
 }

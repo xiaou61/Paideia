@@ -1,12 +1,9 @@
 package io.github.xiaou61.ops;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.github.xiaou61.security.AuthPort;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.xiaou61.TestTokens;
+import io.github.xiaou61.security.AuthPort;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -19,6 +16,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * 两项新埋点的写入路径（WORK-045 AC-004b）。
@@ -142,6 +143,6 @@ class AnalyticsInstrumentationTest {
     }
 
     private String tokenFor(String role) {
-        return "Bearer " + authPort.issue(new AuthPort.Subject("1", role)).value();
+        return TestTokens.bearer(authPort, "1", role);
     }
 }

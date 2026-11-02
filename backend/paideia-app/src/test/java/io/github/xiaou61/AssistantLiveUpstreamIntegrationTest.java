@@ -238,11 +238,11 @@ class AssistantLiveUpstreamIntegrationTest {
     }
 
     private String token() {
-        return "Bearer " + authPort.issue(new AuthPort.Subject(user, AuthPort.ROLE_LEARNER)).value();
+        return TestTokens.bearer(authPort, user);
     }
 
     private String adminToken() {
-        return "Bearer " + authPort.issue(new AuthPort.Subject("1", AuthPort.ROLE_ADMIN)).value();
+        return TestTokens.bearer(authPort, "1", AuthPort.ROLE_ADMIN);
     }
 
     private static String body(MvcResult result) throws Exception {

@@ -264,7 +264,7 @@ class SandboxIntegrationTest {
     }
 
     private String token() {
-        return "Bearer " + authPort.issue(new AuthPort.Subject(user, AuthPort.ROLE_LEARNER)).value();
+        return TestTokens.bearer(authPort, user);
     }
 
     private java.util.List<String> statuses() {

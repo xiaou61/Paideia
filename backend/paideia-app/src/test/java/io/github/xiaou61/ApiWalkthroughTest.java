@@ -1,11 +1,5 @@
 package io.github.xiaou61;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.when;
 
 import com.jayway.jsonpath.JsonPath;
 import io.github.xiaou61.account.internal.credential.CaptchaImageRenderer;
@@ -25,6 +19,7 @@ import io.github.xiaou61.ai.TokenUsage;
 import io.github.xiaou61.ai.internal.billing.CreditService;
 import io.github.xiaou61.ai.internal.camp.CampItemGenerator;
 import io.github.xiaou61.ai.internal.camp.ItemValidator;
+import io.github.xiaou61.security.AuthPort;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -49,6 +44,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.when;
 
 /**
  * 全接口自查：**一个命令，把每一条对外接口都真的走一遍**。
@@ -976,8 +977,7 @@ class ApiWalkthroughTest {
 
     /** 管理端令牌：直接签发，不依赖种子账号（种子会与 devdata 漂移）。 */
     private String adminToken() {
-        return "Bearer " + authPort.issue(new io.github.xiaou61.security.AuthPort.Subject("1",
-                io.github.xiaou61.security.AuthPort.ROLE_ADMIN)).value();
+        return TestTokens.bearer(authPort, "1", io.github.xiaou61.security.AuthPort.ROLE_ADMIN);
     }
 
     @Autowired

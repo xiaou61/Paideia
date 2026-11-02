@@ -1,6 +1,6 @@
 package io.github.xiaou61;
 
-import static org.assertj.core.api.Assertions.assertThat;
+
 
 import com.jayway.jsonpath.JsonPath;
 import io.github.xiaou61.account.internal.user.PasswordHasher;
@@ -21,12 +21,12 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 /**
@@ -208,7 +208,7 @@ class McpAdminIntegrationTest {
     }
 
     private String jwt(long id, String role) {
-        return "Bearer " + authPort.issue(new AuthPort.Subject(Long.toString(id), role)).value();
+        return TestTokens.bearer(authPort, Long.toString(id), role);
     }
 
     private String initialize(String path, String token) throws IOException, InterruptedException {

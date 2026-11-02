@@ -9573,3 +9573,14 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：app 全量 **478 条 / 4 红 / 4 跳过**——4 红全部是 WORK-061 报告已登记的外部项（ApiWalkthrough 覆盖、McpAdmin 工具数、Sandbox 配额×2），**零新增失败**；T1 判据（14 份逐字 body 只剩 MockMvcBodies）与 T4 判据（asyncStarted 只剩 MockMvcSse）通过
 - 本地提交：本片提交
 - 远端推送：未执行
+
+## 2026-11-03 00:20 +0800 · WORK-062 · TASK-007 T2 Bearer token 收敛
+
+- 类型：implementation
+- 变更：新增 `TestTokens.bearer(authPort, subject[, role])`（public，供 ops/console 子包用）；全测试树 **52 处**替换
+- 决策：不提供任何默认 subject/role——各测试的 admin subject 本来就不同（1/2/900/test-role），隐式约定正是会写错的地方
+- 依据：WORK-062 requirements REQ-002 / design T2；扫描候选第 2 条
+- 验证：判据——`"Bearer " + authPort.issue` 只剩 TestTokens；app 全量 478 / 4 红（同 061 已登记外部项）/ 0 新增
+- 踩坑与修法（三个，全部当场修）：①正则首版不允许 subject 带括号、漏 21 处 → 允许嵌套括号与跨行拼接后补齐；②非递归 glob 漏 ops 子包、且包私有类不可跨包 → 改递归 + TestTokens 提 public；③import 清理条件过宽误删 11 个文件的 AuthPort import → 按词边界补回
+- 本地提交：本片提交
+- 远端推送：未执行

@@ -89,7 +89,7 @@ class SqlDatasetCatalogIntegrationTest {
     }
 
     private String token(long userId) {
-        return "Bearer " + authPort.issue(new AuthPort.Subject(String.valueOf(userId), AuthPort.ROLE_LEARNER)).value();
+        return TestTokens.bearer(authPort, String.valueOf(userId));
     }
 
     private int postVisibility(long userId, String key, String visibility) throws Exception {
@@ -193,8 +193,7 @@ class SqlDatasetCatalogIntegrationTest {
         String key = insertDataset("community", "published", authorId);
 
         String body = mockMvc.perform(get("/api/v1/sandbox/admin/sql-datasets")
-                        .header("Authorization", "Bearer " + authPort.issue(
-                                new AuthPort.Subject("1", AuthPort.ROLE_ADMIN)).value()))
+                        .header("Authorization", TestTokens.bearer(authPort, "1", AuthPort.ROLE_ADMIN)))
                 .andReturn().getResponse().getContentAsString();
 
         List<String> names = JsonPath.read(body, "$.data[?(@.datasetKey=='" + key + "')].ownerName");

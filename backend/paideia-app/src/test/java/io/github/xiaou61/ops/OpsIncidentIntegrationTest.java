@@ -1,11 +1,7 @@
 package io.github.xiaou61.ops;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.github.xiaou61.TestTokens;
 import io.github.xiaou61.security.AuthPort;
 import java.time.Instant;
 import java.util.Map;
@@ -19,6 +15,11 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** 管理端事件端点（WORK-043 AC-002/AC-015）。 */
 @SpringBootTest
@@ -174,6 +175,6 @@ class OpsIncidentIntegrationTest {
     }
 
     private String tokenFor(String role) {
-        return "Bearer " + authPort.issue(new AuthPort.Subject("1", role)).value();
+        return TestTokens.bearer(authPort, "1", role);
     }
 }
