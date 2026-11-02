@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 
 import type { AssistantApi } from './client'
 import { parseAttachmentUri, serializeAttachments, type Attachment } from './attachments'
+import { extractPlanSuggestions, stripPlanBlocks, type PlanSuggestion } from './plan'
 import { linkifyCitations } from './citation'
 import { CitationLink } from './citation-link'
 import { findMention, stripMention } from './mention'
@@ -36,9 +37,15 @@ export function ConversationPanel({
   onSaveNote,
   onOpenUri,
   searchObjects,
+  onAdoptPlanItem,
 }: {
   api: AssistantApi
   onSaveNote?: (note: NoteDraftInput, entryId: number | null) => Promise<unknown>
+  /**
+   * 采用一条计划候选（WORK-053 REQ-006）。**写入由应用做**：本包不认识
+   * `/api/v1/learning/plan-items`，只把一条候选交出去。
+   */
+  onAdoptPlanItem?: (item: PlanSuggestion) => Promise<void> | void
   /**
    * 打开一条被附着的对象（WORK-058）。**路由由应用决定**：本包不认识 `/knowledge/entries/123`
    * 这类地址，只把 uri 交出去。
@@ -529,11 +536,12 @@ export function ConversationPanel({
                  */
                 <>
                   <Markdown
-                    markdown={linkifyCitations(message.content, citationLabels)}
+                    markdown={linkifyCitations(stripPlanBlocks(message.content), citationLabels)}
                     streaming={busy && index === messages.length - 1}
                     className="text-sm leading-6"
                     components={markdownComponents}
                   />
+                  <PlanSuggestions content={message.content} onAdopt={onAdoptPlanItem} />
                   {/* 生成中的那条不给反馈按钮：回答还没长完，评价它没有意义 */}
                   {busy && index === messages.length - 1 ? null : (
                     <FeedbackRow
@@ -902,6 +910,61 @@ function FeedbackRow({ api, conversationId, message, onRated }: {
           没提交成功，稍后再试
         </span>
       ) : null}
+    </div>
+  )
+}
+
+/**
+ * 助手给的「今天做什么」候选（WORK-053 REQ-006）。
+ *
+ * <p>**只在这里展示、只由用户点按钮采用**：助手没有写权限，卡片上的「加入计划」是唯一的写入口。
+ */
+function PlanSuggestions({
+  content,
+  onAdopt,
+}: {
+  content: string
+  onAdopt?: (item: PlanSuggestion) => Promise<void> | void
+}) {
+  const [adopted, setAdopted] = useState<string[]>([])
+  const [failed, setFailed] = useState(false)
+  const { suggestions } = extractPlanSuggestions(content)
+  if (onAdopt === undefined || suggestions.length === 0) {
+    return null
+  }
+  return (
+    <div className="mt-2 space-y-1.5" data-testid="plan-suggestions">
+      {suggestions.map((item) => {
+        const key = `${item.date}|${item.goal}`
+        const done = adopted.includes(key)
+        return (
+          <div key={key} className="border-border flex items-start gap-2 rounded-lg border px-2.5 py-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium">{item.goal}</p>
+              {item.reason === '' ? null : <p className="text-muted-foreground text-[11px]">{item.reason}</p>}
+              <p className="text-muted-foreground text-[11px] tabular-nums">{item.date}</p>
+            </div>
+            <Button
+              size="sm"
+              variant={done ? 'ghost' : 'outline'}
+              disabled={done}
+              data-testid="plan-adopt"
+              onClick={async () => {
+                try {
+                  await onAdopt(item)
+                  setAdopted((previous) => [...previous, key])
+                  setFailed(false)
+                } catch {
+                  setFailed(true)
+                }
+              }}
+            >
+              {done ? '已加入' : '加入计划'}
+            </Button>
+          </div>
+        )
+      })}
+      {failed ? <p className="text-destructive text-[11px]">加入计划失败，稍后再试</p> : null}
     </div>
   )
 }

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPoi
 import type { AssistantApi } from './client'
 import type { Attachment } from './attachments'
 import { ConversationPanel } from './conversation-panel'
+import type { PlanSuggestion } from './plan'
 import { CreditsPanel } from './credits-panel'
 import { MemoryPanel } from './memory-panel'
 import { useAssistantContext } from './context'
@@ -144,12 +145,15 @@ function storePanelState(state: PanelState): void {
 export function AssistantShell({
   api,
   onSaveNote,
+  onAdoptPlanItem,
   onOpenUri,
   searchObjects,
 }: {
   api: AssistantApi
   /** 由应用注入：本包不认识笔记，只负责把"这一段话"交出去。 */
   onSaveNote?: (note: NoteDraftInput, entryId: number | null) => Promise<unknown>
+  /** 采用一条计划候选（WORK-053）：写入由应用做，本包只交出一条候选。 */
+  onAdoptPlanItem?: (item: PlanSuggestion) => Promise<void> | void
   /** 由应用注入：把被附着的对象打开（WORK-058）。本包不认识路由。 */
   onOpenUri?: (uri: string) => void
   /** 由应用注入：`@` 引用的搜索（WORK-058）。本包不认识业务检索端点。 */
@@ -494,6 +498,7 @@ export function AssistantShell({
           <ConversationPanel
             api={api}
             onSaveNote={onSaveNote}
+            onAdoptPlanItem={onAdoptPlanItem}
             onOpenUri={onOpenUri}
             searchObjects={searchObjects}
           />

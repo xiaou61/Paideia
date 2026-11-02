@@ -6,7 +6,7 @@ import {
   type Attachment,
 } from '@paideia/assistant'
 import { AuthProvider, useAuth } from '@paideia/auth'
-import { createKnowledgeApi } from '@paideia/knowledge'
+import { createKnowledgeApi, createLearningApi } from '@paideia/knowledge'
 import { ThemeProvider } from '@paideia/ui'
 import '@paideia/ui/styles.css'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -92,6 +92,19 @@ function DesktopOauthBridge() {
  *
  * <p>shortcut: 每次 `@` 都会拉一次全量笔记列表，笔记上千条时这里会变慢，届时给笔记加检索端点。
  */
+const learningApi = createLearningApi(auth.api)
+
+/**
+ * 采用一条计划候选（WORK-053 REQ-006）。
+ *
+ * <p>助手的卡片只把候选交出来，**写入在这里**：服务端按令牌取 user_id，写完让 /progress
+ * 的查询失效，用户回到页面就能看到它（不用刷新）。
+ */
+async function adoptPlanItem(item: { date: string; goal: string; reason: string }): Promise<void> {
+  await learningApi.addPlanItem({ date: item.date, goal: item.goal, reason: item.reason })
+  await queryClient.invalidateQueries({ queryKey: ['learning-plan'] })
+}
+
 async function searchAttachments(query: string): Promise<Attachment[]> {
   const keyword = query.trim()
   const [notesResult, entriesResult] = await Promise.allSettled([
@@ -170,6 +183,7 @@ function AssistantMount() {
       onSaveNote={saveNote}
       onOpenUri={openAttachment}
       searchObjects={searchAttachments}
+      onAdoptPlanItem={adoptPlanItem}
     />
   )
 }

@@ -208,3 +208,51 @@ describe('回答里的对象引用', () => {
     expect(opened).toEqual(['entry:123'])
   })
 })
+
+/**
+ * AC-006 的另一半（WORK-053 REQ-006）：计划候选渲染成卡片，**点按钮才写入**。
+ *
+ * <p>这里用桩流推一段带 ```plan 块的回答，验的是"面板把候选交给应用"这条接线；
+ * 真正落库由应用注入的 `onAdoptPlanItem` 完成（`main.tsx`）。
+ */
+describe('计划候选', () => {
+  it('渲染成卡片；点「加入计划」才回调，且块本身不留在正文里', async () => {
+    const adopted: string[] = []
+    const api = {
+      conversations: async () => [],
+      messages: async () => [],
+      createConversation: async () => ({ id: 1 }),
+      settings: async () => ({ memoryEnabled: true, referenceSavedMemories: true, referenceChatHistory: true }),
+      sendMessage: async (_id: number, _text: string, onEvent: (event: Record<string, unknown>) => void) => {
+        onEvent({
+          type: 'content',
+          delta: '先做这两件：\n```plan\n[{"date":"2026-11-02","goal":"过第 3 关","reason":"卡在这里最久"}]\n```',
+        })
+        onEvent({ type: 'done', usage: null })
+      },
+    } as unknown as AssistantApi
+
+    render(
+      <AssistantProvider>
+        <ConversationPanel
+          api={api}
+          onAdoptPlanItem={(item) => {
+            adopted.push(item.goal)
+          }}
+        />
+      </AssistantProvider>,
+    )
+
+    fireEvent.change(screen.getByTestId('conversation-input'), { target: { value: '今天做什么' } })
+    fireEvent.click(screen.getByTestId('conversation-send'))
+
+    const cards = await screen.findByTestId('plan-suggestions')
+    expect(cards.textContent).toContain('过第 3 关')
+    // 原始 JSON 不该出现在正文里
+    expect(screen.getByTestId('conversation-messages').textContent).not.toContain('"date"')
+    expect(adopted).toEqual([])
+
+    fireEvent.click(screen.getByTestId('plan-adopt'))
+    await waitFor(() => expect(adopted).toEqual(['过第 3 关']))
+  })
+})
