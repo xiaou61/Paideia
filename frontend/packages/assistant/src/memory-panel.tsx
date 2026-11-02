@@ -16,6 +16,7 @@ import { useEffect, useState } from 'react'
 
 import type { AssistantApi } from './client'
 import type { MemoryCandidate, MemorySettings, MemoryView } from './types'
+import { errorMessage } from '@paideia/core'
 
 /**
  * 记忆面板：看它记住了什么、控制它记不记、以及一次清干净（WORK-013 扩写；原为"查看 + 逐条删除"）。
@@ -502,7 +503,7 @@ const ORIGIN_LABEL: Record<MemoryView['origin'], string> = {
 }
 
 function message(cause: unknown): string {
-  return cause instanceof Error ? cause.message : String(cause)
+  return errorMessage(cause)
 }
 
 /** 带说明的一行开关。三处同构，抽出来只为少写两遍 `<label>` 的样板。 */

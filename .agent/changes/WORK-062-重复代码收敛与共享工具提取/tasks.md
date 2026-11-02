@@ -82,9 +82,10 @@ approver_role: CTO
 - 验证：上述类实跑。
 - 完成记录：**只做了 SqlCleanup**（5 处：Camp、CampMastery、McpAdmin、AdminUser、Resume——把"for(表名:List.of(...))"循环样板收进 `deleteByUser(jdbc, userId, tables...)`，表清单与顺序仍留各测试类；`users` 按 id 列单独删不进共享件）。**UserFixture 与 TestIds 明确不做**（与扫描建议一致）：UserFixture 的 11 处差异是承重的（`UTC_TIMESTAMP` 一处的时区语义、role/passwordless 变体），合并要么 4 参数要么留变体，收益/风险不划算；TestIds 的前缀数字承重（清理条件按区间）、扫描本身就建议"只在顺手改时替换、不专门扫"。两条作为"不做项"记入报告。实测：5 类 38 条 / 1 红 = 已知外部项（McpAdmin 工具数），其余 37 绿。
 
-### TASK-010 | pending | F1 errorMessage（core）
+### TASK-010 | done | F1 errorMessage（core）
 - `core` 新增 `error-message.ts`；替换 39 处；`auth.messageOf` 委托；admin 两处私有函数删除；顺手替换 24 处 `as Error` 断言。
 - 验证：core 单测（新增 2-3 条）+ 相关包 typecheck；消失判据 F1。
+- 完成记录：新增 `core.errorMessage`（4 条单测）；通用替换 **A 30 处 + B 23 处 / 34 文件**（apps/app、apps/admin、packages/assistant），admin 两处私有函数删除并把 8 处调用补 `'未知错误'` 兜底（原来非 Error 会渲染 `undefined`，现给兜底），`auth.messageOf` 改一行委托（ApiError 是 Error 子类，原两分支等价），`conversation-panel`×6 等全部收拢。**白名单保留**：`packages/ui` 内 8 处与 `apps/desktop/electron/main.cjs` 1 处——ui 是设计系统刻意不依赖 core、desktop 主进程是 CJS 不能引 ESM 包（各一行理由入报告）。实测：core/auth/assistant/app/admin 五包 typecheck 全过；core 单测 26 条（含新增 4）全绿。
 
 ### TASK-011 | pending | F2+F5+F6 core/ui 纯件（三件套 / 时间 / JSON 请求）
 - `ui` 新增 `query-state.tsx`；`core` 新增 `format.ts` 与 `api.ts` 增强；替换 ≈65 + 12 + 32 处；multipart 3 处与时间白名单保留。

@@ -25,6 +25,7 @@ import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
 import { API_BASE_URL } from '../env'
 import { readSourceMeta } from './source-meta'
+import { errorMessage } from '@paideia/core'
 
 const knowledge = createKnowledgeApi(api)
 const learning = createLearningApi(api)
@@ -118,7 +119,7 @@ export function SourceChapterPage() {
       {entry.isError ? (
         <Alert variant="destructive" data-testid="source-chapter-state">
           <AlertTitle>章节加载失败</AlertTitle>
-          <AlertDescription>{(entry.error as Error).message}</AlertDescription>
+          <AlertDescription>{errorMessage(entry.error)}</AlertDescription>
         </Alert>
       ) : null}
 

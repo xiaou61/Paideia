@@ -27,6 +27,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 
 import { api } from '../api'
+import { errorMessage } from '@paideia/core'
 
 /**
  * 学习者端页头：**主导航 + 搜索 + 账号区**放在一个组件里。
@@ -165,7 +166,7 @@ export function LearnerHeader() {
       // 所以这里不 await 它的成败——本地令牌必须清掉，界面要回到登录门）
       void logout().catch(() => undefined)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
+      setError(errorMessage(cause))
     } finally {
       setBusy(false)
     }

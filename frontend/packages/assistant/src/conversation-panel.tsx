@@ -12,6 +12,7 @@ import { useAssistantContext } from './context'
 import { extractSqlBlock, serializePageContext } from './page-context'
 import { readStoredConversation, storeConversation } from './session-store'
 import type { ChatMessage, ConversationView, NoteDraftInput } from './types'
+import { errorMessage } from '@paideia/core'
 
 /**
  * 对话面板：多轮 + 流式 + 思考折叠，**并记住上次那一段**（WORK-011）。
@@ -138,7 +139,7 @@ export function ConversationPanel({
         storeConversation(null)
         setConversationId(null)
         setMessages([])
-        setError(cause instanceof Error ? cause.message : String(cause))
+        setError(errorMessage(cause))
       }
     },
     [api],
@@ -177,7 +178,7 @@ export function ConversationPanel({
         }
       } catch (cause) {
         if (alive) {
-          setError(cause instanceof Error ? cause.message : String(cause))
+          setError(errorMessage(cause))
         }
       } finally {
         if (alive) {
@@ -416,7 +417,7 @@ export function ConversationPanel({
       )
       // 这一轮落库了，列表里的更新时间跟着变——顺手刷新，免得列表显示的时间是旧的
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
+      setError(errorMessage(cause))
       // 这一轮没成：把占位的空气泡去掉，否则看起来像"助手回了空内容"
       setMessages((previous) => {
         const last = previous[previous.length - 1]
@@ -630,7 +631,7 @@ export function ConversationPanel({
                             setSavedIndexes((previous) => [...previous, index])
                           })
                           .catch((cause: unknown) =>
-                            setError(cause instanceof Error ? cause.message : String(cause)),
+                            setError(errorMessage(cause)),
                           )
                       }}
                     >
@@ -651,7 +652,7 @@ export function ConversationPanel({
                           setRememberedIndexes((previous) => [...previous, index])
                         })
                         .catch((cause: unknown) =>
-                          setError(cause instanceof Error ? cause.message : String(cause)),
+                          setError(errorMessage(cause)),
                         )
                     }}
                   >
@@ -706,7 +707,7 @@ export function ConversationPanel({
                           setSavedDrafts((previous) => [...previous, index])
                         })
                         .catch((cause: unknown) =>
-                          setError(cause instanceof Error ? cause.message : String(cause)),
+                          setError(errorMessage(cause)),
                         )
                     }}
                   >

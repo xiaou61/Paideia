@@ -23,6 +23,7 @@ import { Link } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { errorMessage } from '@paideia/core'
 
 const learning = createLearningApi(api)
 
@@ -169,7 +170,7 @@ export function ReviewPage() {
               {submit.isError ? (
                 <Alert variant="destructive" className="mt-4" data-testid="review-submit-error">
                   <AlertTitle>没能交卷</AlertTitle>
-                  <AlertDescription>{(submit.error as Error).message}</AlertDescription>
+                  <AlertDescription>{errorMessage(submit.error)}</AlertDescription>
                 </Alert>
               ) : null}
             </CardContent>
@@ -231,7 +232,7 @@ export function ReviewPage() {
           {start.isError ? (
             <Alert variant="destructive" className="mb-4">
               <AlertTitle>没能开始</AlertTitle>
-              <AlertDescription>{(start.error as Error).message}</AlertDescription>
+              <AlertDescription>{errorMessage(start.error)}</AlertDescription>
             </Alert>
           ) : null}
           <ul className="grid gap-3" data-testid="review-list">

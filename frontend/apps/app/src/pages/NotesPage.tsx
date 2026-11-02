@@ -1,5 +1,5 @@
 import { Attach } from '@paideia/assistant'
-import { formatRelative } from '@paideia/core'
+import { errorMessage, formatRelative } from '@paideia/core'
 import { MarkdownField, plainText } from '@paideia/knowledge'
 import {
   Alert,
@@ -129,7 +129,7 @@ export function NotesPage() {
     void queryClient.invalidateQueries({ queryKey: ['note', selected] })
   }
 
-  const fail = (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause))
+  const fail = (cause: unknown) => setError(errorMessage(cause))
 
   const save = useMutation({
     mutationFn: () => notes.update(selected as number, { entryId: detail.data?.entryId ?? null, title, body }),
@@ -334,7 +334,7 @@ export function NotesPage() {
           ) : detail.isError ? (
             <Alert variant="destructive" className="m-5" data-testid="note-state">
               <AlertTitle>打不开这条笔记</AlertTitle>
-              <AlertDescription>{(detail.error as Error).message}</AlertDescription>
+              <AlertDescription>{errorMessage(detail.error)}</AlertDescription>
             </Alert>
           ) : (
             <>

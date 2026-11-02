@@ -1,4 +1,4 @@
-import { formatRelative } from '@paideia/core'
+import { errorMessage, formatRelative } from '@paideia/core'
 import { createKnowledgeApi } from '@paideia/knowledge'
 import type { SelfAssessmentLevel } from '@paideia/knowledge'
 import {
@@ -109,7 +109,7 @@ export function MyAssessmentsPage() {
       {mine.isError ? (
         <Alert variant="destructive" data-testid="my-assessment-state">
           <AlertTitle>加载失败</AlertTitle>
-          <AlertDescription>{(mine.error as Error).message}</AlertDescription>
+          <AlertDescription>{errorMessage(mine.error)}</AlertDescription>
         </Alert>
       ) : null}
 

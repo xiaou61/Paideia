@@ -31,6 +31,7 @@ import { useState } from 'react'
 
 import { api } from '../api'
 import { ConfirmDeleteDialog } from '../knowledge-shared'
+import { errorMessage } from '@paideia/core'
 
 /** 社区数据集的一行（管理端视角）。 */
 interface CommunityDataset {
@@ -93,7 +94,7 @@ export function SqlDatasetsPage() {
       setPending(null)
       void queryClient.invalidateQueries({ queryKey: ['sql-datasets'] })
     },
-    onError: (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)),
+    onError: (cause: unknown) => setError(errorMessage(cause)),
   })
 
   const restoreMutation = useMutation({
@@ -102,7 +103,7 @@ export function SqlDatasetsPage() {
       setError(null)
       void queryClient.invalidateQueries({ queryKey: ['sql-datasets'] })
     },
-    onError: (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)),
+    onError: (cause: unknown) => setError(errorMessage(cause)),
   })
 
   const rows = datasets.data ?? []

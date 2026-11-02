@@ -39,6 +39,7 @@ import { useEffect, useState, type ComponentType } from 'react'
 import { api } from '../api'
 import { AccountSecuritySection } from '../components/AccountSecuritySection'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { errorMessage } from '@paideia/core'
 
 const identity = createIdentityApi(api)
 
@@ -99,7 +100,7 @@ export function ProfilePage() {
       <AppShell title="Paideia" actions={<LearnerHeader />}>
         <Alert variant="destructive">
           <AlertTitle>读不到你的身份</AlertTitle>
-          <AlertDescription>{error instanceof Error ? error.message : String(error)}</AlertDescription>
+          <AlertDescription>{errorMessage(error)}</AlertDescription>
         </Alert>
       </AppShell>
     )
@@ -129,7 +130,7 @@ export function ProfilePage() {
       await identity.saveProfile(form)
       setSaved(true)
     } catch (cause) {
-      setSaveError(cause instanceof Error ? cause.message : String(cause))
+      setSaveError(errorMessage(cause))
     } finally {
       setSaving(false)
     }

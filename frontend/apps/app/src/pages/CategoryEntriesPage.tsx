@@ -22,6 +22,7 @@ import { Link, useParams, useSearchParams } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { errorMessage } from '@paideia/core'
 
 const knowledge = createKnowledgeApi(api)
 
@@ -160,7 +161,7 @@ export function CategoryEntriesPage() {
       {entries.isError ? (
         <Alert variant="destructive" data-testid="entry-state">
           <AlertTitle>条目加载失败</AlertTitle>
-          <AlertDescription>{(entries.error as Error).message}</AlertDescription>
+          <AlertDescription>{errorMessage(entries.error)}</AlertDescription>
         </Alert>
       ) : null}
 

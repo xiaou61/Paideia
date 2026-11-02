@@ -32,6 +32,7 @@ import { useEffect, useState } from 'react'
 
 import { api } from '../api'
 import { ConfirmDeleteDialog } from '../knowledge-shared'
+import { errorMessage } from '@paideia/core'
 
 /**
  * 用户管理（WORK-030）。
@@ -227,7 +228,7 @@ export function AdminUsersPage() {
             <div className="px-(--card-spacing) pb-3">
               <Alert variant="destructive">
                 <AlertTitle>账号加载失败</AlertTitle>
-                <AlertDescription>{(users.error as Error).message}</AlertDescription>
+                <AlertDescription>{errorMessage(users.error)}</AlertDescription>
               </Alert>
             </div>
           ) : null}

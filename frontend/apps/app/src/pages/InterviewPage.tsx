@@ -20,6 +20,7 @@ import { ChevronDown } from 'lucide-react'
 import { api } from '../api'
 import { createAssistantApi } from '@paideia/assistant'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { errorMessage } from '@paideia/core'
 
 const identity = createIdentityApi(api)
 const assistant: AssistantApi = createAssistantApi(api)
@@ -124,7 +125,7 @@ export function InterviewPage() {
       )
     } catch (cause) {
       if (!isAbort(cause)) {
-        setError(cause instanceof Error ? cause.message : String(cause))
+        setError(errorMessage(cause))
       }
     } finally {
       abortRef.current = null
@@ -147,7 +148,7 @@ export function InterviewPage() {
       // 新评分已经落库，列表要跟着变，否则要刷新整页才看得到
       void history.refetch()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
+      setError(errorMessage(cause))
     } finally {
       setReviewing(false)
     }

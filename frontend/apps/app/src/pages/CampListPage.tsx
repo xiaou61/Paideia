@@ -8,6 +8,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { errorMessage } from '@paideia/core'
 
 const camps = createCampApi(api)
 const resumes = createResumeApi(api)
@@ -129,7 +130,7 @@ export function CampListPage() {
           </div>
 
           {create.isError ? (
-            <p className="text-destructive text-sm">{(create.error as Error).message}</p>
+            <p className="text-destructive text-sm">{errorMessage(create.error)}</p>
           ) : null}
         </CardContent>
       </Card>

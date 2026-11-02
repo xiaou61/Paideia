@@ -1,5 +1,6 @@
 export { ApiError, createApiClient } from './api'
 export type { ApiClient, ApiClientOptions, ApiEnvelope } from './api'
+export { errorMessage } from './error-message'
 export type { KeyValueCache, Platform, PlatformKind } from './platform'
 export { canAccessAdmin, createSessionReader } from './session'
 export type { Role, Session, SessionReader } from './session'

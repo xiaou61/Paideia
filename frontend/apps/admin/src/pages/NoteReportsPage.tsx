@@ -31,6 +31,7 @@ import { useState } from 'react'
 
 import { api } from '../api'
 import { ConfirmDeleteDialog } from '../knowledge-shared'
+import { errorMessage } from '@paideia/core'
 
 /** 一条举报。`noteTitle` 可能为空——笔记可能已经被作者删了。 */
 interface Report {
@@ -89,7 +90,7 @@ export function NoteReportsPage() {
       setError(null)
       void queryClient.invalidateQueries({ queryKey: ['note-reports'] })
     },
-    onError: (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)),
+    onError: (cause: unknown) => setError(errorMessage(cause)),
   })
 
   return (

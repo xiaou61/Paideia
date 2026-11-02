@@ -17,6 +17,7 @@ import { Link, useParams } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { errorMessage } from '@paideia/core'
 
 const learning = createLearningApi(api)
 
@@ -98,7 +99,7 @@ export function TrackMapPage() {
       {map.isError ? (
         <Alert variant="destructive">
           <AlertTitle>这条轨道打不开</AlertTitle>
-          <AlertDescription>{(map.error as Error).message}</AlertDescription>
+          <AlertDescription>{errorMessage(map.error)}</AlertDescription>
         </Alert>
       ) : null}
 

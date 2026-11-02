@@ -32,6 +32,7 @@ import { Plus } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
 
 import { ConfirmDeleteDialog, Loading, admin, categoryGroups, flatten, type FlatCategory } from '../knowledge-shared'
+import { errorMessage } from '@paideia/core'
 
 /**
  * 分类管理。
@@ -87,7 +88,7 @@ export function KnowledgeCategoriesPage() {
         category.name.toLowerCase().includes(needle)
         || category.slug.toLowerCase().includes(needle)))
 
-  const report = (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause))
+  const report = (cause: unknown) => setError(errorMessage(cause))
 
   // 分类变了，条目列表上的「分类」列与编辑器里的下拉都跟着变，所以一起失效
   const invalidate = async () => {
@@ -152,7 +153,7 @@ export function KnowledgeCategoriesPage() {
             <div className="px-(--card-spacing) pb-3">
               <Alert variant="destructive">
                 <AlertTitle>分类加载失败</AlertTitle>
-                <AlertDescription>{(categories.error as Error).message}</AlertDescription>
+                <AlertDescription>{errorMessage(categories.error)}</AlertDescription>
               </Alert>
             </div>
           ) : null}

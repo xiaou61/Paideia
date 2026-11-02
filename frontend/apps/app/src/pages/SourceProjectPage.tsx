@@ -28,6 +28,7 @@ import { Link, useParams } from 'react-router'
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
 import { readSourceMeta } from './source-meta'
+import { errorMessage } from '@paideia/core'
 
 const knowledge = createKnowledgeApi(api)
 const learning = createLearningApi(api)
@@ -97,7 +98,7 @@ export function SourceProjectPage() {
       {categories.isError ? (
         <Alert variant="destructive" data-testid="source-project-state">
           <AlertTitle>加载失败</AlertTitle>
-          <AlertDescription>{(categories.error as Error).message}</AlertDescription>
+          <AlertDescription>{errorMessage(categories.error)}</AlertDescription>
         </Alert>
       ) : null}
 

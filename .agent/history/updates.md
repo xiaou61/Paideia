@@ -9604,3 +9604,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：5 类 38 条 / 1 红 = 已知外部项（McpAdmin 工具数），其余 37 绿；编译通过
 - 本地提交：本片提交
 - 远端推送：未执行
+
+## 2026-11-03 01:35 +0800 · WORK-062 · TASK-010 F1 errorMessage 收敛
+
+- 类型：implementation
+- 变更：`@paideia/core` 新增 `errorMessage(cause, fallback?)`（4 条单测）；全仓替换 A 形态（`x instanceof Error ? … : String(x)`）30 处 + B 形态（`(x as Error).message`）23 处，34 个文件；admin 两处私有 `errorMessage` 删除（8 处调用补 `'未知错误'` 兜底）；`auth.messageOf` 改一行委托
+- 决策：`packages/ui`（8 处）与 `apps/desktop/electron/main.cjs`（1 处）**保留**——前者是设计系统、刻意不依赖 core；后者是 CJS 主进程，不能引 ESM 包
+- 依据：WORK-062 requirements REQ-003 / design F1；扫描候选第 1 条
+- 验证：core/auth/assistant/app/admin 五包 typecheck 全过；`pnpm --filter @paideia/core test` **26 条）全绿（含新增 4 条 errorMessage 用例）**；B 形态的"非 Error 渲染 undefined"顺手修正并有了兜底语义
+- 本地提交：本片提交
+- 远端推送：未执行

@@ -18,6 +18,7 @@ import { LearnerHeader } from '../components/LearnerHeader'
 import { ConceptDetailPanel } from '../components/graph/ConceptDetailPanel'
 import { GraphCanvas2D } from '../components/graph/GraphCanvas2D'
 import { GraphCanvas3D } from '../components/graph/GraphCanvas3D'
+import { errorMessage } from '@paideia/core'
 
 const learning = createLearningApi(api)
 
@@ -70,7 +71,7 @@ export function GraphPage() {
       {graph.isError ? (
         <Alert variant="destructive" data-testid="graph-state">
           <AlertTitle>图谱加载失败</AlertTitle>
-          <AlertDescription>{(graph.error as Error).message}</AlertDescription>
+          <AlertDescription>{errorMessage(graph.error)}</AlertDescription>
         </Alert>
       ) : null}
 

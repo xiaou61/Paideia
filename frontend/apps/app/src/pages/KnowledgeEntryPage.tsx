@@ -29,6 +29,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
 import { API_BASE_URL } from '../env'
+import { errorMessage } from '@paideia/core'
 
 const knowledge = createKnowledgeApi(api)
 const learning = createLearningApi(api)
@@ -265,7 +266,7 @@ export function KnowledgeEntryPage() {
       {valid && entry.isError ? (
         <Alert variant="destructive" data-testid="entry-state">
           <AlertTitle>打不开这条内容</AlertTitle>
-          <AlertDescription>{(entry.error as Error).message}</AlertDescription>
+          <AlertDescription>{errorMessage(entry.error)}</AlertDescription>
         </Alert>
       ) : null}
 

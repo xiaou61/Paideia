@@ -20,6 +20,7 @@ import { Link } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { errorMessage } from '@paideia/core'
 
 const knowledge = createKnowledgeApi(api)
 
@@ -77,7 +78,7 @@ export function BooksPage() {
       {categories.isError ? (
         <Alert variant="destructive" data-testid="books-state">
           <AlertTitle>书单加载失败</AlertTitle>
-          <AlertDescription>{(categories.error as Error).message}</AlertDescription>
+          <AlertDescription>{errorMessage(categories.error)}</AlertDescription>
         </Alert>
       ) : null}
 

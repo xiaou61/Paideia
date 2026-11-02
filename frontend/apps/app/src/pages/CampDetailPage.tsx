@@ -30,6 +30,7 @@ import { useNavigate, useParams } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { errorMessage } from '@paideia/core'
 
 const camps = createCampApi(api)
 
@@ -155,7 +156,7 @@ export function CampDetailPage() {
     return (
       <AppShell title="Paideia" actions={<LearnerHeader />} wide>
         <PageHeader title="这个训练营看不到" />
-        <p className="text-muted-foreground text-sm">{(camp.error as Error).message}</p>
+        <p className="text-muted-foreground text-sm">{errorMessage(camp.error)}</p>
         <Button className="mt-4" onClick={() => navigate('/camp')}>
           回到列表
         </Button>
@@ -201,7 +202,7 @@ export function CampDetailPage() {
               items={diagnosticItems.data ?? []}
               loading={diagnosticItems.isPending}
               submitting={submit.isPending}
-              error={submit.isError ? (submit.error as Error).message : null}
+              error={submit.isError ? errorMessage(submit.error) : null}
               onSubmit={(answers) => submit.mutate({ form: 'diagnostic', answers })}
             />
           )}
@@ -287,7 +288,7 @@ export function CampDetailPage() {
                 items={retestItems.data ?? []}
                 loading={retestItems.isPending}
                 submitting={submit.isPending}
-                error={submit.isError ? (submit.error as Error).message : null}
+                error={submit.isError ? errorMessage(submit.error) : null}
                 onSubmit={(answers) => submit.mutate({ form: 'retest', answers })}
               />
             </div>
@@ -302,7 +303,7 @@ export function CampDetailPage() {
                   <span className="text-muted-foreground text-xs">出卷会调用一次模型，按积分计费。</span>
                 </div>
                 {retest.isError ? (
-                  <p className="text-destructive text-sm">{(retest.error as Error).message}</p>
+                  <p className="text-destructive text-sm">{errorMessage(retest.error)}</p>
                 ) : null}
               </CardContent>
             </Card>

@@ -60,6 +60,7 @@ import { Link } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { errorMessage } from '@paideia/core'
 
 const learning = createLearningApi(api)
 const identity = createIdentityApi(api)
@@ -233,7 +234,7 @@ export function LearnPage() {
       {tracks.isError ? (
         <Alert variant="destructive" data-testid="learn-state">
           <AlertTitle>学习轨道加载失败</AlertTitle>
-          <AlertDescription>{(tracks.error as Error).message}</AlertDescription>
+          <AlertDescription>{errorMessage(tracks.error)}</AlertDescription>
         </Alert>
       ) : null}
 

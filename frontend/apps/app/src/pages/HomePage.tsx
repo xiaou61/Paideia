@@ -16,6 +16,7 @@ import { Link, useNavigate } from 'react-router'
 import { api } from '../api'
 import { HomeFirstRun } from '../components/HomeFirstRun'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { errorMessage } from '@paideia/core'
 
 const knowledge = createKnowledgeApi(api)
 const learning = createLearningApi(api)
@@ -384,7 +385,7 @@ export function HomePage() {
           ) : null}
           {entries.isError ? (
             <p className="text-muted-foreground p-5 text-sm">
-              暂时读不到内容（{(entries.error as Error).message}）
+              暂时读不到内容（{errorMessage(entries.error)}）
             </p>
           ) : null}
           {entries.isSuccess ? (

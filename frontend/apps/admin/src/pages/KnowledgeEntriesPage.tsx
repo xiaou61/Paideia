@@ -42,6 +42,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 
 import { API_BASE_URL } from '../env'
 import { ConfirmDeleteDialog, Loading, admin, categoryGroups, flatten, type FlatCategory } from '../knowledge-shared'
+import { errorMessage } from '@paideia/core'
 
 /** 每页条数。列表用前端分页：接口一次给一页（size=200），条目量到千级再改成服务端分页。 */
 const PAGE_SIZE = 10
@@ -111,7 +112,7 @@ export function KnowledgeEntriesPage() {
   const flat = useMemo(() => flatten(categories.data ?? []), [categories.data])
   const grouped = useMemo(() => categoryGroups(flat), [flat])
 
-  const report = (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause))
+  const report = (cause: unknown) => setError(errorMessage(cause))
 
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: ['admin-knowledge-categories'] })
@@ -250,7 +251,7 @@ export function KnowledgeEntriesPage() {
             <div className="px-(--card-spacing) pb-3">
               <Alert variant="destructive">
                 <AlertTitle>条目加载失败</AlertTitle>
-                <AlertDescription>{(entries.error as Error).message}</AlertDescription>
+                <AlertDescription>{errorMessage(entries.error)}</AlertDescription>
               </Alert>
             </div>
           ) : null}

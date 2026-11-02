@@ -13,6 +13,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { api } from '../api'
+import { errorMessage } from '@paideia/core'
 
 const knowledge = createKnowledgeApi(api)
 
@@ -50,7 +51,7 @@ export function DatasetCatalogDialog({
       void queryClient.invalidateQueries({ queryKey: ['sql-dataset-catalog'] })
       void queryClient.invalidateQueries({ queryKey: ['sandbox-status'] })
     },
-    onError: (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)),
+    onError: (cause: unknown) => setError(errorMessage(cause)),
   })
 
   const items = catalog.data ?? []

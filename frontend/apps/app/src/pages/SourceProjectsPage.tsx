@@ -20,6 +20,7 @@ import { Link } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { errorMessage } from '@paideia/core'
 
 const knowledge = createKnowledgeApi(api)
 const learning = createLearningApi(api)
@@ -89,7 +90,7 @@ export function SourceProjectsPage() {
         <Alert variant="destructive" data-testid="source-state">
           <AlertTitle>项目加载失败</AlertTitle>
           <AlertDescription>
-            {((categories.error ?? entries.error) as Error).message}
+            {errorMessage(categories.error ?? entries.error)}
           </AlertDescription>
         </Alert>
       )}
