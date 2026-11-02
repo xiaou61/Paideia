@@ -77,7 +77,7 @@ approver_role: CTO
 - 验证：上述类实跑；消失判据 T3。
 - 完成记录：本轮实际替换 **11 循环 / 5 类**（Ops 对 ×2 手工、MemoryAuto ×6、AssistantConversation ×1 手工、本项新套件 ×2），并把新套件里因此闲置的 `sleep()` 删除。**刻意保留**：AiTelemetry×2 / AiObservability×1（超时动作与逻辑更缠，按扫描建议先不动）、ApiWalkthrough 的 best-effort for 循环、DefaultRunRecorderTest 的 2s 变体——**承重差异全部留在调用点**：超时值、间隔、超时动作（静默/返回 null/AssertionError）。`Await` 沿用既有 `sleep()` 口径（吞中断+还原标志），调用点签名零改动。实测：5 类 47 条 / 0 失败。
 
-### TASK-009 | done（收敛版） | T5 清理/播种/id 收敛
+### TASK-009 | done | T5 清理/播种/id 收敛（收敛版）
 - 新增 `SqlCleanup`、`UserFixture`、`TestIds`；替换 5 类表循环、4-5 处 CURRENT_TIMESTAMP 播种、顺手 id 后缀；UTC 与 passwordless 变体、各表顺序保留。
 - 验证：上述类实跑。
 - 完成记录：**只做了 SqlCleanup**（5 处：Camp、CampMastery、McpAdmin、AdminUser、Resume——把"for(表名:List.of(...))"循环样板收进 `deleteByUser(jdbc, userId, tables...)`，表清单与顺序仍留各测试类；`users` 按 id 列单独删不进共享件）。**UserFixture 与 TestIds 明确不做**（与扫描建议一致）：UserFixture 的 11 处差异是承重的（`UTC_TIMESTAMP` 一处的时区语义、role/passwordless 变体），合并要么 4 参数要么留变体，收益/风险不划算；TestIds 的前缀数字承重（清理条件按区间）、扫描本身就建议"只在顺手改时替换、不专门扫"。两条作为"不做项"记入报告。实测：5 类 38 条 / 1 红 = 已知外部项（McpAdmin 工具数），其余 37 绿。
@@ -97,12 +97,12 @@ approver_role: CTO
 - 验证：admin typecheck + e2e。
 - 完成记录：`ListPagination`（testIdPrefix 生成 `{prefix}-total/-prev/-next`，与既有 e2e 锚点逐字一致）；5 处替换（AdminUsers / AiFeedback / KnowledgeEntries 的本地 `Pagination` 组件改一行委托 / AiRunsList / **AiCreditsAudit 的原生 `<button>` 漂移一并统一回 `<Button size="xs">`**）；`pageCount` 助手未建（5 处算式保留本地——不造没有第二个消费者的件）。实测：admin typecheck 通过；两处因此闲置的 `Button` 导入已清理。
 
-### TASK-013 | done（收敛版） | F4 + F7 admin 辅助（e2e session / 窗口查询串）
+### TASK-013 | done | F4 + F7 admin 辅助（收敛版：e2e session / 窗口查询串）
 - 新增 `apps/admin/e2e/session.ts`（signIn/overflow/envelope）与 `apps/admin/src/ai-window.ts`；替换 10 spec + 9 处；顺手统一 `E2E_ADMIN_PATH` 并修缺 encode 漂移。
 - 验证：admin e2e 实跑；消失判据 F7。
 - 完成记录：**只修了真缺陷那一行**——`AiRunsListPage.windowParams` 的 ISO 串缺 `encodeURIComponent`（`+` 会被当空格解析），已补并加注释。**F7 的完整合并与 F4 缓一轮，理由入报告**：①四份 WINDOWS 选项集与默认窗本就不同（1h/today/7d 混用），合并需要逐页核对 fallback 与查询键，改动横跨 4 个页面的数据流；②F4 要改的正是**即将用来做验收的 e2e 夹具**（10 个 spec 的 signIn）——在验收前夜改量具会把"实现坏了"与"夹具坏了"混在一起，单独一轮做更稳。两条都不是"做不到"，是**排序选择**。
 
-### TASK-014 | done（口径替换） | 联动验证与回归
+### TASK-014 | done | 联动验证与回归（口径替换）
 - 全量前端单测 + 学习者端与管理端 e2e（改共享包规则）；后端守卫切片 + 受影响模块 test 复跑。
 - 验证：见报告。
 - 完成记录：九包 typecheck、七包单测、两端 Vite build 全绿；后端守卫切片与受影响类逐片复跑绿。**分支栈本地 e2e 未跑**（需 jar+3307 隧道+写共享库），残留风险与合并后补课建议写在报告「未覆盖」。
