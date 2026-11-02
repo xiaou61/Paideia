@@ -9207,3 +9207,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 部署：`release.ps1` 189.1 秒（含前端 73.5s，master 带到 db295fc）。
 - 状态：WORK-055 `phase=completed / state=complete`，7/7 任务。
 - 未达：1 核 27 秒基线未复测（线上 2 核）；并发争用未测。
+
+## 2026-11-02 09:18:30 +0800 · WORK-059 · 签署 .agent/changes/WORK-059-全站模块化自动化点击测试/requirements.md、.agent/changes/WORK-059-全站模块化自动化点击测试/proposal.md、.agent/changes/WORK-059-全站模块化自动化点击测试/design.md、.agent/changes/WORK-059-全站模块化自动化点击测试/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-059-全站模块化自动化点击测试/requirements.md、.agent/changes/WORK-059-全站模块化自动化点击测试/proposal.md、.agent/changes/WORK-059-全站模块化自动化点击测试/design.md、.agent/changes/WORK-059-全站模块化自动化点击测试/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-059-全站模块化自动化点击测试/requirements.md、.agent/changes/WORK-059-全站模块化自动化点击测试/proposal.md、.agent/changes/WORK-059-全站模块化自动化点击测试/design.md、.agent/changes/WORK-059-全站模块化自动化点击测试/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
