@@ -52,9 +52,10 @@ approver_role: CTO
 - 验证：受影响模块 test（ai/note/knowledge/sandbox/app）；消失判据 B3。
 - 完成记录：实际替换 **39 处**（38 处脚本 + `OpsAdminTools` 内层类缩进版 1 处人工）；`intOf`（分类树）一并入 ToolArgs（第 13 个件）；后处理清掉 4 个因替换闲置的常量与相应 import。**PageQuery 上限 200 而工具口径 100 是承重差异**——ToolArgs 用自己的 `MAX_SIZE=100` + `PageQuery.of`，AdminUserController 的 HTTP 参数走 `clampedSize`。窄 longOf（AskTool/ResumeTools）与 `OpsDiagnosisService.messageOf`（还要截断 1000 字）按设计保留。判据：正典 stringOf 体只剩 ToolArgs 一处、`Math.min(Math.max(size,1),MAX_PAGE_SIZE)` 为 0、messageOf 一行式只剩 ToolArgs。实测：单元切片 805 条 0 失败（55 秒）；工具面 app 5 类 36 条 0 失败（47 秒）。
 
-### TASK-004 | pending | B4 模型输出 JSON 收敛
+### TASK-004 | done | B4 模型输出 JSON 收敛
 - 落点 `ai.internal.support.ModelJson`；替换 6 处逐字 + textOrNull/textOrEmpty 5 处；两个变体保留。
 - 验证：`mvn -pl paideia-ai -am test`；消失判据 B4。
+- 完成记录：实际 **11 处**——6 份逐字 stripFence（按归一化 hash 校验同一性后替换）+ textOrNull 组 3 份（其中 SummarySchemaValidator 风格不同、语义逐条相同）+ textOrEmpty 组 2 份；变体（CampItemParser/EssayQuestionParser 的截断保留版、ResumeJson 的带计数版）按设计保留。判据：`lastIndexOf("```")` 只剩两个变体 + ModelJson。实测：单元切片 0 失败；app 面 2 类 17 条 0 失败。
 
 ### TASK-005 | pending | B5 Ops HTTP 样板收敛
 - 落点 `ops.OpsHttp`（包内）；改 Prometheus/Loki/Tempo 三家 + Grafana 反代尾斜杠 1 处；`"success"` 判定与失败类型保留。

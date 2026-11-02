@@ -3,6 +3,7 @@ package io.github.xiaou61.ai.internal.provider;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.xiaou61.ai.SummaryCard;
+import io.github.xiaou61.ai.internal.support.ModelJson;
 import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
 import java.util.ArrayList;
@@ -78,25 +79,12 @@ class SummarySchemaValidator {
     }
 
     /** 模型偶尔仍会套一层 ```json 代码块；只在整段被包住时剥掉，不做花哨的清洗。 */
-    private static String stripFence(String raw) {
-        String trimmed = raw.trim();
-        if (!trimmed.startsWith("```")) {
-            return trimmed;
-        }
-        int firstNewline = trimmed.indexOf('\n');
-        int lastFence = trimmed.lastIndexOf("```");
-        if (firstNewline < 0 || lastFence <= firstNewline) {
-            return trimmed;
-        }
-        return trimmed.substring(firstNewline + 1, lastFence).trim();
+        private static String stripFence(String raw) {
+        return ModelJson.stripFence(raw);
     }
 
-    private static String text(JsonNode node, String field) {
-        if (node == null) {
-            return null;
-        }
-        JsonNode value = node.get(field);
-        return value == null || value.isNull() ? null : value.asText();
+        private static String text(JsonNode node, String field) {
+        return ModelJson.textOrNull(node, field);
     }
 
     private static BizException failure(String reason) {

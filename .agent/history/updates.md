@@ -9543,3 +9543,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：判据——正典 stringOf 体、`Math.min(Math.max(size,1),MAX_PAGE_SIZE)`、一行式 messageOf 均只剩 ToolArgs；单元切片 805 条 0 失败（55 秒）；app 工具面 5 类 36 条 0 失败（47 秒）
 - 本地提交：本片提交
 - 远端推送：未执行
+
+## 2026-11-02 22:55 +0800 · WORK-062 · TASK-004 B4 模型输出 JSON 收敛
+
+- 类型：implementation
+- 变更：新增 `ai.internal.support.ModelJson`（stripFence / textOrNull / textOrEmpty）；11 处替换——6 份逐字 stripFence（先用归一化 hash 校验同一性：b381aa682d 六份全同）、textOrNull 组 3 份（含 SummarySchemaValidator 的异风格同语义版）、textOrEmpty 组 2 份
+- 决策：两个 stripFence 变体（截断时保留全部正文）与 ResumeJson 的带计数 text 按设计保留；落 ai 模块内（消费者全在 ai），不提升 platform
+- 依据：WORK-062 requirements REQ-001 / design B4；扫描候选第 4 条
+- 验证：判据——`lastIndexOf("```")` 只剩 CampItemParser/EssayQuestionParser/ModelJson；单元切片 0 失败；app 面（MemoryAuto、Resume）17 条 0 失败
+- 本地提交：本片提交
+- 远端推送：未执行
