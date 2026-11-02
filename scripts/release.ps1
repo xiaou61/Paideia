@@ -72,6 +72,9 @@ function RemoteOutput([string]$command) {
 # 同上，但**不因退出码抛异常**：把退出码与输出一起交回调用方。用在"可读的错误信息
 # 在远端脚本里"的场景——否则一次失败会把整段 base64 命令糊进报错，等于没有错误信息。
 function RemoteScript([string]$command) {
+    # 防线（2026-11-02 实测）：命令行单参数超过约 8192 字符会被**静默截断**——命令只跑前半段、
+    # 退出码还是 0。大内容一律走文件/部署包，不要拼进命令行；这里宁可炸在本地。
+    if ($command.Length -gt 7000) { throw "远端命令太长（$($command.Length) 字符，安全上限约 8192）——改走文件传输" }
     $out = & powershell -ExecutionPolicy Bypass -File $QuickServerScript -Server $Server -Command $command
     return [pscustomobject]@{ ExitCode = $LASTEXITCODE; Lines = @($out) }
 }
@@ -337,6 +340,14 @@ Step '取远端基线' {
     $script:remoteWeb = Parse-ManifestLines $webLines
     $script:webBaseline = $script:remoteWeb.Count -gt 0
 
+    # 前端产物的 diff 也在这里算：要用远端 web.manifest（与 jar 基线同一次 SSH 取回），
+    # 而且必须赶在"打部署包"之前——远端脚本 deploy.sh 要嵌删除清单，它本身还要进包。
+    if ($buildWeb) {
+        $script:webLocal = Get-WebManifest
+        $script:webChanged = @($script:webLocal.Keys | Where-Object { $script:remoteWeb[$_] -ne $script:webLocal[$_] })
+        $script:webRemoved = @($script:remoteWeb.Keys | Where-Object { -not $script:webLocal.ContainsKey($_) })
+    }
+
     if ($remote.Count -eq 0) {
         $script:firstTime = $true
         Write-Host '  （首次或清单格式升级：整包上传，并在服务器建立增量基线）'
@@ -347,83 +358,8 @@ Step '取远端基线' {
     Write-Host ("  变化 {0} 个文件 / 删除 {1} 个（共 {2}）" -f $script:changed.Count, $script:removed.Count, $script:local.Count)
 }
 
-Step '打部署包' {
-    if ($script:firstTime) {
-        # 首次没有基线，只能整包（91 MB）。这一趟慢是应该的，第二趟起走增量。
-        Copy-Item $jar (Join-Path $staging 'app-full.jar') -Force
-    } elseif ($script:changed.Count -gt 0) {
-        $listFile = Join-Path $staging 'changed-files.txt'
-        $script:changed | Set-Content -LiteralPath $listFile -Encoding utf8
-        Remove-Item $patch -Force -ErrorAction SilentlyContinue
-        & $bsdtar --options "gzip:compression-level=1" -czf $patch -C $explodedLocal -T $listFile
-        if ($LASTEXITCODE -ne 0) { throw '打包增量失败' }
-    }
-
-    # 一个包、一次上传。原来 web 单独压一份 tar.gz 再单独传一次 = 多压一遍 + 多一次 SSH。
-    $members = @()
-    # 前端只在真重建过时才进包；没重建时由远端自己检查"服务器上那份还在不在且完整"。
-    # 重建时也不再全量：拿服务器上的 web.manifest 做 diff，只传变化的文件（2026-11-02）。
-    if ($buildWeb) {
-        $script:webLocal = Get-WebManifest
-        $script:webChanged = @($script:webLocal.Keys | Where-Object { $script:remoteWeb[$_] -ne $script:webLocal[$_] })
-        $script:webRemoved = @($script:remoteWeb.Keys | Where-Object { -not $script:webLocal.ContainsKey($_) })
-
-        if (-not $script:webBaseline) {
-            # 服务器上还没有 web 清单（首次/刚换上新逻辑）：只能全量替换，并在这次建立基线
-            New-Item -ItemType Directory -Path (Join-Path $staging 'web\admin') -Force | Out-Null
-            Copy-Item (Join-Path $repo 'frontend\apps\app\dist\*') (Join-Path $staging 'web') -Recurse -Force
-            Copy-Item (Join-Path $repo 'frontend\apps\admin\dist\*') (Join-Path $staging 'web\admin') -Recurse -Force
-            $members += 'web'
-            $members += 'web.manifest'
-            Write-Host ("  web 首次：全量 {0} 个文件（服务器上还没有 web 基线清单）" -f $script:webLocal.Count)
-        } elseif ($script:webChanged.Count -gt 0 -or $script:webRemoved.Count -gt 0) {
-            Remove-Item $webPatchDir -Recurse -Force -ErrorAction SilentlyContinue
-            New-Item -ItemType Directory -Path $webPatchDir -Force | Out-Null
-            foreach ($rel in $script:webChanged) {
-                $dst = Join-Path $webPatchDir ($rel.Replace('/', '\'))
-                New-Item -ItemType Directory -Path (Split-Path $dst) -Force | Out-Null
-                Copy-Item (Resolve-WebSource $rel) $dst -Force
-            }
-            Remove-Item $webPatch -Force -ErrorAction SilentlyContinue
-            & $bsdtar --options "gzip:compression-level=1" -czf $webPatch -C $webPatchDir .
-            if ($LASTEXITCODE -ne 0) { throw '打包前端增量失败' }
-            $members += 'web-patch.tar.gz'
-            $members += 'web.manifest'
-            Write-Host ("  web 变化 {0} 个文件 / 删除 {1} 个（共 {2}）" -f $script:webChanged.Count, $script:webRemoved.Count, $script:webLocal.Count)
-        } else {
-            Write-Host ("  （前端没有变化：{0} 个文件与服务器一致，不传 web）" -f $script:webLocal.Count)
-        }
-        if ($members -contains 'web.manifest') {
-            Write-ManifestFile $script:webLocal $webManifestLocal
-        }
-    }
-    if ($script:firstTime) { $members += 'app-full.jar' }
-    elseif ($script:changed.Count -gt 0) { $members += 'release-patch.tar.gz' }
-    $members += 'exploded.manifest'
-    $members += 'MANIFEST.MF'
-
-    # 压缩交给 7-Zip（**-mmt 必须写数字**，`-mmt=on` 对 gzip 编码器不并行）。选它不是因为
-    # gzip 本身慢——同一份 32 MB 前端产物，单线程 bsdtar 干净时 2.4s、受 Defender/负载干扰时
-    # 实测拖到 31~114s（同类命令两轮差 4 倍）；多线程 7z 同一时刻 3~5s 且包小 8%（7.8 vs 8.5 MB）。
-    # 产物仍是标准 gzip，服务器端解包不动；本机没有 7z 时回退 bsdtar。
-    Remove-Item $bundle -Force -ErrorAction SilentlyContinue
-    $sevenZip = (Get-Command 7z -ErrorAction SilentlyContinue).Source
-    if ($sevenZip) {
-        $bundleTar = Join-Path $staging 'deploy-bundle.tar'
-        Remove-Item $bundleTar -Force -ErrorAction SilentlyContinue
-        & $bsdtar -cf $bundleTar -C $staging @members
-        if ($LASTEXITCODE -ne 0) { throw '打部署包（tar）失败' }
-        & $sevenZip a -tgzip -mx1 -mmt=16 -bsp0 -y $bundle $bundleTar | Out-Null
-        $zipExit = $LASTEXITCODE
-        Remove-Item $bundleTar -Force -ErrorAction SilentlyContinue
-        if ($zipExit -ne 0) { throw "打部署包（7z）失败：退出码 $zipExit" }
-    } else {
-        & $bsdtar --options "gzip:compression-level=1" -czf $bundle -C $staging @members
-        if ($LASTEXITCODE -ne 0) { throw '打部署包失败' }
-    }
-    if (-not (Test-Path $bundle)) { throw '部署包不存在' }
-    Write-Host ("  包内：{0}（{1:N1} MB）" -f ($members -join ' + '), ((Get-Item $bundle).Length / 1MB))
-}
+# 打部署包整块已下移到"远端脚本构造"之后：远端脚本 deploy.sh 要进包，而它嵌着两份
+# 删除清单（jar 的与 web 的），必须等两份都算出来才能生成。见文件后半部分的 Step '打部署包'。
 
 # ── 上传并应用：两次 SSH 搞定整轮远端动作（2026-11-02 改）────────────────────────
 # 原实现把"取基线 / 传补丁 / 传两个清单 / 传 web / 就位 / 重启 / 健康轮询 / 写标记"
@@ -468,16 +404,16 @@ $repackCmd = if ($script:changed.Count -eq 0 -and $script:removed.Count -eq 0) {
     '/opt/jdk25/bin/jar c0fm app.jar.new MANIFEST.MF -C exploded .'
 }
 
-# 远端脚本以 base64 传过去执行：省掉引号与换行在 SSH 命令行里的层层转义。
+# 远端脚本随部署包走（bundle 成员 'deploy.sh'），不从命令行传——命令行单参数超过约
+# 8192 字符会被静默截断（2026-11-02 实测：11572 字符的命令只跑了前半段 `echo <b64>`，
+# 远端零副作用、退出码还是 0，表现为"部署没成功但也不报错"）。
 # 清单只在健康检查通过后才推进（.new -> 正式），失败的部署不会让下一次误判"已经是最新的"。
 $remoteScript = @'
 set -eu
 cd __REMOTE_DIR__
-t0=$(date +%s)
-rm -rf deploy-in && mkdir deploy-in
-tar xzf deploy-bundle.tar.gz -C deploy-in
-rm -f deploy-bundle.tar.gz
-echo "PHASE unpack $(( $(date +%s) - t0 ))"
+# unpack（含本脚本自己的解包）已在命令行里做过——脚本是从 deploy-in/deploy.sh 跑起来的。
+# 只报 0 秒，保持 PHASE 序列完整。
+echo "PHASE unpack 0"
 
 # 跳过前端构建的前提是"服务器上那份还在且完整"：缺了就在这里拦下，
 # 别安静地发出一份没有前端的版本。
@@ -557,12 +493,90 @@ $remoteScript = $remoteScript.Replace('__REMOTE_DIR__', $RemoteDir).Replace('__P
 # 工作区是 CRLF（git autocrlf），bash 会把行尾的 \r 当成命令的一部分。2026-11-02 第一次
 # 跑就是这么炸的：`cd: $'/opt/paideia-app\r': No such file or directory` + `set: -: invalid option`。
 $remoteScript = $remoteScript.Replace("`r`n", "`n")
-$scriptB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($remoteScript))
+# 远端脚本写进 staging，由下面的"打部署包"作为 bundle 成员带上服务器（保持 LF 行尾）。
+[System.IO.File]::WriteAllText((Join-Path $staging 'deploy.sh'), $remoteScript, [System.Text.UTF8Encoding]::new($false))
+
+Step '打部署包' {
+    if ($script:firstTime) {
+        # 首次没有基线，只能整包（91 MB）。这一趟慢是应该的，第二趟起走增量。
+        Copy-Item $jar (Join-Path $staging 'app-full.jar') -Force
+    } elseif ($script:changed.Count -gt 0) {
+        $listFile = Join-Path $staging 'changed-files.txt'
+        $script:changed | Set-Content -LiteralPath $listFile -Encoding utf8
+        Remove-Item $patch -Force -ErrorAction SilentlyContinue
+        & $bsdtar --options "gzip:compression-level=1" -czf $patch -C $explodedLocal -T $listFile
+        if ($LASTEXITCODE -ne 0) { throw '打包增量失败' }
+    }
+
+    # 一个包、一次上传。原来 web 单独压一份 tar.gz 再单独传一次 = 多压一遍 + 多一次 SSH。
+    $members = @()
+    # 前端只在真重建过时才进包；没重建时由远端自己检查"服务器上那份还在不在且完整"。
+    # 重建时也不再全量：拿服务器上的 web.manifest 做 diff，只传变化的文件（2026-11-02）。
+    if ($buildWeb) {
+        if (-not $script:webBaseline) {
+            # 服务器上还没有 web 清单（首次/刚换上新逻辑）：只能全量替换，并在这次建立基线
+            New-Item -ItemType Directory -Path (Join-Path $staging 'web\admin') -Force | Out-Null
+            Copy-Item (Join-Path $repo 'frontend\apps\app\dist\*') (Join-Path $staging 'web') -Recurse -Force
+            Copy-Item (Join-Path $repo 'frontend\apps\admin\dist\*') (Join-Path $staging 'web\admin') -Recurse -Force
+            $members += 'web'
+            $members += 'web.manifest'
+            Write-Host ("  web 首次：全量 {0} 个文件（服务器上还没有 web 基线清单）" -f $script:webLocal.Count)
+        } elseif ($script:webChanged.Count -gt 0 -or $script:webRemoved.Count -gt 0) {
+            Remove-Item $webPatchDir -Recurse -Force -ErrorAction SilentlyContinue
+            New-Item -ItemType Directory -Path $webPatchDir -Force | Out-Null
+            foreach ($rel in $script:webChanged) {
+                $dst = Join-Path $webPatchDir ($rel.Replace('/', '\'))
+                New-Item -ItemType Directory -Path (Split-Path $dst) -Force | Out-Null
+                Copy-Item (Resolve-WebSource $rel) $dst -Force
+            }
+            Remove-Item $webPatch -Force -ErrorAction SilentlyContinue
+            & $bsdtar --options "gzip:compression-level=1" -czf $webPatch -C $webPatchDir .
+            if ($LASTEXITCODE -ne 0) { throw '打包前端增量失败' }
+            $members += 'web-patch.tar.gz'
+            $members += 'web.manifest'
+            Write-Host ("  web 变化 {0} 个文件 / 删除 {1} 个（共 {2}）" -f $script:webChanged.Count, $script:webRemoved.Count, $script:webLocal.Count)
+        } else {
+            Write-Host ("  （前端没有变化：{0} 个文件与服务器一致，不传 web）" -f $script:webLocal.Count)
+        }
+        if ($members -contains 'web.manifest') {
+            Write-ManifestFile $script:webLocal $webManifestLocal
+        }
+    }
+    if ($script:firstTime) { $members += 'app-full.jar' }
+    elseif ($script:changed.Count -gt 0) { $members += 'release-patch.tar.gz' }
+    $members += 'exploded.manifest'
+    $members += 'MANIFEST.MF'
+    # 远端脚本随包走（2026-11-02）：命令行单参数超过约 8192 字符会被静默截断，见构造处的注释
+    $members += 'deploy.sh'
+
+    # 压缩交给 7-Zip（**-mmt 必须写数字**，`-mmt=on` 对 gzip 编码器不并行）。选它不是因为
+    # gzip 本身慢——同一份 32 MB 前端产物，单线程 bsdtar 干净时 2.4s、受 Defender/负载干扰时
+    # 实测拖到 31~114s（同类命令两轮差 4 倍）；多线程 7z 同一时刻 3~5s 且包小 8%（7.8 vs 8.5 MB）。
+    # 产物仍是标准 gzip，服务器端解包不动；本机没有 7z 时回退 bsdtar。
+    Remove-Item $bundle -Force -ErrorAction SilentlyContinue
+    $sevenZip = (Get-Command 7z -ErrorAction SilentlyContinue).Source
+    if ($sevenZip) {
+        $bundleTar = Join-Path $staging 'deploy-bundle.tar'
+        Remove-Item $bundleTar -Force -ErrorAction SilentlyContinue
+        & $bsdtar -cf $bundleTar -C $staging @members
+        if ($LASTEXITCODE -ne 0) { throw '打部署包（tar）失败' }
+        & $sevenZip a -tgzip -mx1 -mmt=16 -bsp0 -y $bundle $bundleTar | Out-Null
+        $zipExit = $LASTEXITCODE
+        Remove-Item $bundleTar -Force -ErrorAction SilentlyContinue
+        if ($zipExit -ne 0) { throw "打部署包（7z）失败：退出码 $zipExit" }
+    } else {
+        & $bsdtar --options "gzip:compression-level=1" -czf $bundle -C $staging @members
+        if ($LASTEXITCODE -ne 0) { throw '打部署包失败' }
+    }
+    if (-not (Test-Path $bundle)) { throw '部署包不存在' }
+    Write-Host ("  包内：{0}（{1:N1} MB）" -f ($members -join ' + '), ((Get-Item $bundle).Length / 1MB))
+}
 
 $script:deployError = ''
 Step '上传并应用（远端一条脚本：换文件、重启、等健康、写标记）' {
     Upload $bundle "$RemoteDir/deploy-bundle.tar.gz"
-    $r = RemoteScript "echo $scriptB64 | base64 -d > /tmp/paideia-deploy.sh && bash /tmp/paideia-deploy.sh"
+    # 短命令（<200 字符）：解包 + 执行包内的 deploy.sh——脚本自己会 cd 到工作目录
+    $r = RemoteScript "cd $RemoteDir && rm -rf deploy-in && mkdir deploy-in && tar xzf deploy-bundle.tar.gz -C deploy-in && rm -f deploy-bundle.tar.gz && bash deploy-in/deploy.sh"
     foreach ($line in $r.Lines) {
         if ($line -match '^\s*PHASE\s+(\S+)\s+(\d+)\s*$') {
             Write-Host ("    {0,-8} {1,4}s" -f $Matches[1], $Matches[2])
