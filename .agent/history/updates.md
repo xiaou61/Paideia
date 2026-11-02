@@ -9584,3 +9584,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 踩坑与修法（三个，全部当场修）：①正则首版不允许 subject 带括号、漏 21 处 → 允许嵌套括号与跨行拼接后补齐；②非递归 glob 漏 ops 子包、且包私有类不可跨包 → 改递归 + TestTokens 提 public；③import 清理条件过宽误删 11 个文件的 AuthPort import → 按词边界补回
 - 本地提交：本片提交
 - 远端推送：未执行
+
+## 2026-11-03 00:45 +0800 · WORK-062 · TASK-008 T3 轮询助手收敛
+
+- 类型：implementation
+- 变更：新增 `Await.until/value`（不做断言、不吞中断语义变化——沿用既有 sleep() 的"吞掉+还原标志"，调用点签名零改动）；替换 11 个循环 / 5 个类
+- 决策：超时值（2s/5s/10s）、间隔（25/50ms）、超时动作（静默 / 返回 null / AssertionError）**全部留在调用点**；AiTelemetry×2、AiObservability×1 按扫描建议暂不动（逻辑更缠）、ApiWalkthrough best-effort 与 DefaultRunRecorder 变体保留
+- 依据：WORK-062 requirements REQ-002 / design T3；扫描候选第 3 条
+- 验证：Ops 对、AssistantConversation、MemoryAuto、MemoryExtractionJobs 五类 **47 条 / 0 失败**；编译通过；新套件里闲置的 sleep() 已删
+- 本地提交：本片提交
+- 远端推送：未执行

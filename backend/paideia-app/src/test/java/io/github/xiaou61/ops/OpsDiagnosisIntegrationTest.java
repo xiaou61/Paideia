@@ -3,6 +3,7 @@ package io.github.xiaou61.ops;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.xiaou61.Await;
 import io.github.xiaou61.TestTokens;
 import io.github.xiaou61.ai.OpsDiagnoser;
 import io.github.xiaou61.ai.TokenUsage;
@@ -133,16 +134,11 @@ class OpsDiagnosisIntegrationTest {
     }
 
     private OpsDiagnosisRow awaitFinished(long id) throws InterruptedException {
-        long deadline = System.currentTimeMillis() + 5_000;
-        while (System.currentTimeMillis() < deadline) {
-            OpsDiagnosisRow row = mapper.findById(id).orElseThrow();
-            if (!OpsDiagnosisRow.STATUS_PENDING.equals(row.getStatus())
-                    && !OpsDiagnosisRow.STATUS_RUNNING.equals(row.getStatus())) {
-                return row;
-            }
-            Thread.sleep(50);
-        }
-        throw new AssertionError("诊断未在 5 秒内完成");
+        return Await.value(() -> mapper.findById(id).orElseThrow(),
+                        row -> !OpsDiagnosisRow.STATUS_PENDING.equals(row.getStatus())
+                                && !OpsDiagnosisRow.STATUS_RUNNING.equals(row.getStatus()),
+                        5_000, 50)
+                .orElseThrow(() -> new AssertionError("诊断未在 5 秒内完成"));
     }
 
     private String tokenFor(String role) {

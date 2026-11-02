@@ -72,9 +72,10 @@ approver_role: CTO
 - 验证：app 模块受影响类实跑；消失判据 T2。
 - 完成记录：共 **52 处**（两版正则 25+20 + 递归版 6 个 ops 文件 + ApiWalkthrough 的全限定写法手工 1）。踩了三个坑并当场修：①第一版正则不允许 subject 带括号（`Long.toString(...)`）漏 21 处→第二版允许嵌套括号+跨行拼接；②`Path.glob("*.java")` 非递归漏掉 ops/ 子包→改 rglob 并把 `TestTokens` 提为 **public**（ops 子包跨包访问）；③import 清理条件写成 `"AuthPort." not in` 误删了把 `AuthPort` 当字段类型的文件的 import→补回 11 个文件。判据：`"Bearer " + authPort.issue` 全测试树只剩 TestTokens。实测：app 全量 478 条 / 4 红（同外部项）/ 0 新增失败。
 
-### TASK-008 | pending | T3 Await 轮询收敛
+### TASK-008 | done | T3 Await 轮询收敛
 - 新增 `Await.until/value`；替换 OpsDiagnosis/OpsHook 对、MemoryAuto 六循环、MemoryExtractionJobs 二循环、AssistantConversation 一循环、AiTelemetry 二循环、AiObservability 一循环；ApiWalkthrough 与 DefaultRunRecorderTest 的变体保留。
 - 验证：上述类实跑；消失判据 T3。
+- 完成记录：本轮实际替换 **11 循环 / 5 类**（Ops 对 ×2 手工、MemoryAuto ×6、AssistantConversation ×1 手工、本项新套件 ×2），并把新套件里因此闲置的 `sleep()` 删除。**刻意保留**：AiTelemetry×2 / AiObservability×1（超时动作与逻辑更缠，按扫描建议先不动）、ApiWalkthrough 的 best-effort for 循环、DefaultRunRecorderTest 的 2s 变体——**承重差异全部留在调用点**：超时值、间隔、超时动作（静默/返回 null/AssertionError）。`Await` 沿用既有 `sleep()` 口径（吞中断+还原标志），调用点签名零改动。实测：5 类 47 条 / 0 失败。
 
 ### TASK-009 | pending | T5 清理/播种/id 收敛
 - 新增 `SqlCleanup`、`UserFixture`、`TestIds`；替换 5 类表循环、4-5 处 CURRENT_TIMESTAMP 播种、顺手 id 后缀；UTC 与 passwordless 变体、各表顺序保留。

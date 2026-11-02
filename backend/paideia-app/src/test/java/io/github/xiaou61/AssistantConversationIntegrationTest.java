@@ -221,17 +221,14 @@ class AssistantConversationIntegrationTest {
 
     /** 等这一轮的 prompt_version 落库（写线程异步）。 */
     private String awaitPromptVersion(long conversationId) throws InterruptedException {
-        long deadline = System.currentTimeMillis() + 5000;
-        while (System.currentTimeMillis() < deadline) {
-            List<String> rows = jdbcTemplate.queryForList(
-                    "SELECT prompt_version FROM ai_runs WHERE conversation_id = ? AND kind = 'chat'",
-                    String.class, conversationId);
-            if (!rows.isEmpty() && rows.get(0) != null) {
-                return rows.get(0);
-            }
-            Thread.sleep(50);
-        }
-        return null;
+        return Await.value(
+                        () -> jdbcTemplate.queryForList(
+                                "SELECT prompt_version FROM ai_runs WHERE conversation_id = ? AND kind = 'chat'",
+                                String.class, conversationId),
+                        rows -> !rows.isEmpty() && rows.get(0) != null,
+                        5000, 50)
+                .map(rows -> rows.get(0))
+                .orElse(null);
     }
 
     @Test

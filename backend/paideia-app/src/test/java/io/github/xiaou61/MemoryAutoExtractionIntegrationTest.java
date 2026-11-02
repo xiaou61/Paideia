@@ -445,79 +445,57 @@ class MemoryAutoExtractionIntegrationTest {
 
     /** 等异步那一步落地。超时即失败，不静默通过。 */
     private void awaitMemoryCount(int expected) {
-        long deadline = System.currentTimeMillis() + 10_000;
-        while (System.currentTimeMillis() < deadline) {
-            if (memories.list(user, 0, 0).size() == expected) {
-                return;
-            }
-            sleep();
+        if (!Await.until(() -> memories.list(user, 0, 0).size() == expected, 10_000, 50)) {
+            assertThat(memories.list(user, 0, 0)).as("等记忆写入超时").hasSize(expected);
         }
-        assertThat(memories.list(user, 0, 0)).as("等记忆写入超时").hasSize(expected);
     }
 
     private void awaitMemoryText(String expected) {
-        long deadline = System.currentTimeMillis() + 10_000;
-        while (System.currentTimeMillis() < deadline) {
-            if (memories.list(user, 0, 0).stream().anyMatch(it -> expected.equals(it.text()))) {
-                return;
-            }
-            sleep();
+        if (!Await.until(() -> memories.list(user, 0, 0).stream().anyMatch(it -> expected.equals(it.text())),
+                10_000, 50)) {
+            assertThat(memories.list(user, 0, 0).stream().map(MemoryStore.MemoryItem::text)).contains(expected);
         }
-        assertThat(memories.list(user, 0, 0).stream().map(MemoryStore.MemoryItem::text)).contains(expected);
     }
 
     private void awaitCandidateCount(int expected) {
-        long deadline = System.currentTimeMillis() + 10_000;
-        while (System.currentTimeMillis() < deadline) {
+        if (!Await.until(() -> {
             Integer count = jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM ai_memory_candidates WHERE user_id = ?", Integer.class, user);
-            if (count != null && count >= expected) {
-                return;
-            }
-            sleep();
+            return count != null && count >= expected;
+        }, 10_000, 50)) {
+            throw new AssertionError("等候选超时");
         }
-        throw new AssertionError("等候选超时");
     }
 
     private void awaitLedgerKind(String kind) {
-        long deadline = System.currentTimeMillis() + 10_000;
-        while (System.currentTimeMillis() < deadline) {
+        if (!Await.until(() -> {
             Long count = jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM ai_credit_ledger WHERE user_id = ? AND kind = ?", Long.class, user, kind);
-            if (count != null && count > 0) {
-                return;
-            }
-            sleep();
+            return count != null && count > 0;
+        }, 10_000, 50)) {
+            throw new AssertionError("等流水 " + kind + " 超时");
         }
-        throw new AssertionError("等流水 " + kind + " 超时");
     }
 
     private void awaitExtractorCalls(AtomicInteger calls, int expected) {
-        long deadline = System.currentTimeMillis() + 10_000;
-        while (System.currentTimeMillis() < deadline) {
-            if (calls.get() >= expected) {
-                return;
-            }
-            sleep();
+        if (!Await.until(() -> calls.get() >= expected, 10_000, 50)) {
+            assertThat(calls.get()).isGreaterThanOrEqualTo(expected);
         }
-        assertThat(calls.get()).isGreaterThanOrEqualTo(expected);
     }
 
     /** 失败用例没有计数器可用：等"游标已推进"这个可观测的事实。 */
     private void awaitExtractorCalls(long userId, int expected) {
-        long deadline = System.currentTimeMillis() + 10_000;
-        while (System.currentTimeMillis() < deadline) {
-            Integer claimed = jdbcTemplate.queryForObject(
+        boolean claimed = Await.until(() -> {
+            Integer count = jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM ai_conversations WHERE user_id = ? "
                             + "AND last_memory_extract_message_id IS NOT NULL", Integer.class, userId);
-            if (claimed != null && claimed >= expected) {
-                // 游标推进只说明"抢到了"，真正跑完还要一点时间：给它一小会儿再断言"没写记忆"
-                sleep();
-                return;
-            }
-            sleep();
+            return count != null && count >= expected;
+        }, 10_000, 50);
+        if (!claimed) {
+            throw new AssertionError("等整理被触发超时");
         }
-        throw new AssertionError("等整理被触发超时");
+        // 游标推进只说明"抢到了"，真正跑完还要一点时间：给它一小会儿再断言"没写记忆"
+        sleep();
     }
 
     private static void sleep() {
