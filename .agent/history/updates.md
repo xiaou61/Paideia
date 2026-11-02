@@ -9409,3 +9409,23 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 已知项：可视化建表生成的 SQL 仍是"只预览"——保存走原有白名单 + 沙箱干跑（与手写路径同一道闸，没开新口子）
 - 本地提交：dc9db0c；本记录未提交
 - 远端推送：未执行
+
+## 2026-11-02 18:34:50 +0800 · WORK-061 · 签署 .agent/changes/WORK-061-架构守卫与模块治理/requirements.md、.agent/changes/WORK-061-架构守卫与模块治理/proposal.md、.agent/changes/WORK-061-架构守卫与模块治理/design.md、.agent/changes/WORK-061-架构守卫与模块治理/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-061-架构守卫与模块治理/requirements.md、.agent/changes/WORK-061-架构守卫与模块治理/proposal.md、.agent/changes/WORK-061-架构守卫与模块治理/design.md、.agent/changes/WORK-061-架构守卫与模块治理/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（CTO）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-061-架构守卫与模块治理/requirements.md、.agent/changes/WORK-061-架构守卫与模块治理/proposal.md、.agent/changes/WORK-061-架构守卫与模块治理/design.md、.agent/changes/WORK-061-架构守卫与模块治理/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-11-02 18:40 +0800 · WORK-061 · 建项与批准依据（用户会话内授权）
+
+- 类型：decision
+- 变更：新建 `.agent/changes/WORK-061-架构守卫与模块治理/`（requirements/proposal/design/tasks 四件）并同批签署
+- 决策：P1–P5 全部实施。用户原话「p1～p5全部优化吧开始吧 新开一个work我直接批准 你开一个worktree直接开始干就行了 开始吧」；沿用 xiaou61/CTO 署名；实现口径以 requirements 的 D-01…D-03 与 I-01…I-06 为准
+- 依据：requirements.md「用户诉求（原话）」节；本会话 Agent 的架构评估与 P1–P5 清单（P4 的链路在 MemoryExtractionService javadoc 里明文登记为「已知缺口（设计 §10）」）
+- 验证：approve 输出 4 件已签署并由入口自身在 updates.md 留痕；四件 frontmatter 回读 approved_by=xiaou61
+- 本地提交：本笔提交（与四件工件同批）；分支 `feat/work-061-arch-guards` 在 worktree `.worktrees/work-061` 开工
+- 远端推送：未执行

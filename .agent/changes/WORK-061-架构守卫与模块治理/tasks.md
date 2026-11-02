@@ -1,0 +1,84 @@
+---
+artifact: tasks
+work_id: WORK-061
+work: 架构守卫与模块治理
+status: approved
+created: 2026-11-02
+updated: 2026-11-02
+approved_by: xiaou61
+approved_at: 2026-11-02 18:34:50 +0800
+approver_role: CTO
+---
+
+# 架构守卫与模块治理实施任务
+
+## 依据
+
+- `requirements.md`（REQ-001…006 / AC-001…006 / D-01…D-03 / I-01…I-06）
+- `proposal.md`（P1–P5 的形态与备选取舍）
+- `design.md`（任务表 DDL、中继状态机、README 断言、类型去向）
+
+## 全局约束
+
+- 全部改动在 worktree `.worktrees/work-061`（分支 `feat/work-061-arch-guards`），分片提交；主树不携带本项源码改动。
+- 测试一律 `scripts/test-db.sh`；每片提交前跑受影响模块单测；涉及 app 的片跑第二条切片命令。
+- 新迁移 14 位时间戳、登记校验和、只建结构不插业务数据。
+- P4 不得改变：6 轮触发、三开关、判重覆盖、预留-结算-退款口径、注销硬删语义。
+- P3 包名/类名/端点/配置前缀零改动；只允许换 Maven 归属与 pom。
+- 不部署、不推送。
+
+## 评审焦点
+
+| 失败模式 | 归属任务 | 测试 |
+| --- | --- | --- |
+| 守卫加了名字但实际被跳过（无 DB 口令） | TASK-001 | 目视切片二输出的 Tests run 与 Skipped 列 |
+| README 断言漏项或误报正文数字 | TASK-002 | 反向验证：故意改错一个数字 → 退出 1 |
+| P3 顺手引入未预期模块依赖 | TASK-003 | ModularityTest + pom 依赖面人查 |
+| P3 搬家后 Prometheus 抓取/反代行为变化 | TASK-003 | OpsSummaryIntegrationTest、OpsDiagnosisServiceTest、端点清单条数不变 |
+| 游标推进而任务行没写（或反之） | TASK-004 | 回滚测试：任务行插入失败时游标不动 |
+| 中继与即时 dispatch 双跑同一件 | TASK-004 | 抢占单测：两次 claim 只有一次成功 |
+| 崩溃后 running 行永远卡住 | TASK-004 | 卡死回收单测（locked_at 早于超时） |
+| 重试造成双扣 | TASK-004 | 退款流水断言：失败尝试各退各的 |
+| 新表漏进注销级联 | TASK-004 | AccountDeletionCascadeIntegrationTest 扩展 |
+| 移类型后公开契约被破坏 | TASK-005 | 全仓编译 + app 集成测试 + ModularityTest |
+
+## 任务
+
+### TASK-001 | pending | P1 守卫进入第二切片
+
+- 对应：REQ-001、AC-001
+- 修改：`AGENTS.md` 测试节的第二切片命令，`-Dtest=` 列表加入 `ApiSurfaceTest,ApiContractTest,AuthorizationIsolationTest`；跑一次实测后把条数/耗时注记改成真实数字。
+- 验证：`scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=... -Dsurefire.failIfNoSpecifiedTests=false test` → 0 failed 且三个类有 Tests run 数字。
+
+### TASK-002 | pending | P2 README 计数断言
+
+- 对应：REQ-002、AC-002
+- 修改：`scripts/gen-arch-diagram.mjs` 的 `--check` 分支增加 README 六项计数断言（见 design）；生成模式不碰 README。
+- 验证：`--check` 通过；故意改错一个数字 → 退出 1 且指明项；改回 → 退出 0；`git diff docs/architecture/README.md` 为空。
+
+### TASK-003 | pending | P3 拆出 paideia-ops 模块
+
+- 对应：REQ-003、AC-003
+- 修改：新建 `backend/paideia-ops/pom.xml`；`io/github/xiaou61/ops` 30 个类从 app 迁入；`backend/pom.xml` modules 加一项；`paideia-app/pom.xml` 加依赖；重生成结构图；README 模块数 11 → 12。
+- 依赖：TASK-002（README 断言先就位，模块数变化必须红→改绿，作为守卫的首个真实用例）。
+- 验证：`mvn -B -pl paideia-ops -am test`；第二切片（ModularityTest 起）；`node scripts/gen-arch-diagram.mjs --check`；`node scripts/check-diagrams.mjs`；app 相关集成测试（Ops 三件）。
+
+### TASK-004 | pending | P4 记忆提取持久重试
+
+- 对应：REQ-004、AC-004
+- 修改：迁移 `V2026...__create_memory_extraction_jobs.sql` + 校验和登记；`MemoryExtractionJobMapper`、`MemoryExtractionJobs`、`MemoryExtractionRelay` 新建；`MemoryExtractionService` 入队与失败处理改造；`MemoryProperties` 加参数；`AiUserDeletionListener` 与 `MemoryRetentionPurger` 扩展。
+- 接口：见 design「任务表」。
+- 测试：`MemoryExtractionJobsTest`（抢占/退避/上限/卡死回收/删除）；`MemoryExtractionServiceTest`（扩展：失败留行、线程池满留行、与游标同事务）；`AccountDeletionCascadeIntegrationTest`（扩展：任务行清零）。
+- 验证：`scripts/test-db.sh mvn -B -pl paideia-ai -am test` + 第二切片。
+
+### TASK-005 | pending | P5 收紧 ai 公开面
+
+- 对应：REQ-005、AC-005
+- 修改：8 个类型按 design 的去向表移入 internal；如遇公开签名引用则留在根并在报告注明。
+- 验证：`ls` 包根剩 22 个类型（若全部可移）；受影响模块 test + app 集成测试 + ModularityTest。
+
+### TASK-006 | pending | 验证与报告
+
+- 对应：AC-001…006
+- 内容：跑齐全部自动化检查；写 `testing/report.md`（五列证据矩阵、覆盖全部 AC）；更新 `.agent/history/updates.md`；确认主树干净、未推送。
+- 依赖：TASK-001…005。
