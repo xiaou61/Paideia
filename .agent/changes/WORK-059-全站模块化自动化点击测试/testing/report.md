@@ -23,31 +23,22 @@ verified_commit: a7345db
 
 | 检查项 | 命令 | 退出码 | 结果 | 证据 |
 | --- | --- | --- | --- | --- |
-| 覆盖闸门自测 | `node --test scripts/ego/check-map.test.mjs` | 0 | 4 passed / 0 failed | 控制台输出 |
-| 真实路由对账 | `node scripts/ego/check-map.mjs` | 0 | 学习者 36/36、管理端 21/21、18 模块、57 用例 | 控制台输出 |
-| 全量只读 | `node scripts/ego/cli.mjs --all --read-only` | 0 | 56 passed / 0 failed / 2 skipped（两条写入用例） | `.agent/testing/runs/20261102-095639-ego-online.md` |
-| 全量含写入 | `node scripts/ego/cli.mjs --all --write` | 0 | 58 passed / 0 failed / 0 skipped | `.agent/testing/runs/20261102-095512-ego-online.md` |
-| 笔记写入连续两次 | `node scripts/ego/cli.mjs --module notes --write` ×2 | 0 / 0 | 各 4 passed；第二次不因残留失败 | `20261102-095748-ego-online.md`、`20261102-095800-ego-online.md` |
-| 管理端写入连续两次 | `node scripts/ego/cli.mjs --module admin-knowledge --write` ×2 | 0 / 0 | 各 4 passed；第二次不因残留失败 | `20261102-095809-ego-online.md`、`20261102-095818-ego-online.md` |
-| 路由闸门反向验证 | 临时 router 加 `path: '/ghost-route'` 后跑 `check-map` | 1 | 输出「learner 路由未登记：/ghost-route」 | 本轮控制台输出 |
-| 失败证据 | 故意改错 `home` 断言后跑 `--module home --read-only` | 1 | 报告含模块/用例/步骤/URL/截图 | `20261102-095854-ego-online.md` |
-| 恢复后单模块 | `node scripts/ego/cli.mjs --module home --read-only` | 0 | 3 passed | `20261102-095919-ego-online.md` |
-| 报告脱敏 | `grep -RniE "https?://\|[0-9]{1,3}(\.[0-9]{1,3}){3}" .agent/testing/runs/*ego-online.md` | 1（无匹配） | 无主机、账号、口令、URL | 本轮控制台输出 |
-
-## 验收结果
-
-| 验收 | 结果 | 证据 |
-| --- | --- | --- |
-| AC-001 路由全覆盖；未登记路由失败 | 通过 | `check-map` 36/36 + 21/21；反向验证退出 1 |
-| AC-002 单模块线上跑通并产出报告 | 通过 | `home`、`knowledge`、`notes` 等单模块运行均 0 退出 |
-| AC-003 18 个模块、每模块 ≥3 条用例 | 通过 | `check-map`：18 模块 / 57 用例；最小 3 条 |
-| AC-004 全量只读完整跑完 | 通过 | `095639`：56 通过 / 0 失败 / 2 跳过，29 秒 |
-| AC-005 写入带前缀并清理 | 通过 | 两个写入模块各连续两次；笔记页与管理端分类页搜索 `e2e-click-` 无残留 |
-| AC-006 报告与截图不含敏感信息 | 通过 | 脱敏扫描无命中；报告只写 `online` |
-| AC-007 失败报告可诊断 | 通过 | `095854`：模块 `home`、用例 `home-main`、步骤「首页有内容区」、地址 `/#/`、截图路径 |
-| AC-008 连续两次不因残留失败 | 通过 | `notes` 与 `admin-knowledge` 各两次 4/4 |
-| AC-009 只改测试与文档 | 通过 | `git show --stat a7345db`：29 个文件，全部在 `scripts/ego/`、`.agent/`、`.gitignore` |
-| AC-010 台账按时间追加 | 通过 | `.agent/testing/runs/` 下 8 份本轮报告，旧文件未覆盖 |
+| AC-001 路由全覆盖 | `node scripts/ego/check-map.mjs` | 0 | passed | 学习者 36/36、管理端 21/21、18 模块、57 用例 |
+| AC-001 未登记路由必须失败 | 临时 router 加 `path: '/ghost-route'` 后 `node scripts/ego/check-map.mjs --app-router /tmp/ghost-router.tsx` | 1 | passed | 输出「learner 路由未登记：/ghost-route」 |
+| AC-002 单模块线上跑通 | `node scripts/ego/cli.mjs --module knowledge --read-only` | 0 | passed | 3/3 通过；报告 `20261102-100802-ego-online.md` |
+| AC-003 18 模块 / 每模块 ≥3 条 | `node scripts/ego/check-map.mjs` | 0 | passed | 18 模块、57 用例；最小 3 条 |
+| AC-004 全量只读完整跑完 | `node scripts/ego/cli.mjs --all --read-only` | 0 | passed | 56 passed / 0 failed / 2 skipped，29 秒；报告 `095639` |
+| AC-005 笔记写入带前缀并清理 | `node scripts/ego/cli.mjs --module notes --write` ×2 | 0 | passed | 各 4/4；报告 `095748`、`095800` |
+| AC-005 管理端写入带前缀并清理 | `node scripts/ego/cli.mjs --module admin-knowledge --write` ×2 | 0 | passed | 各 4/4；报告 `095809`、`095818` |
+| AC-006 报告不含 URL | `grep -RniE "https?://" .agent/testing/runs/*ego-online.md` | 1 | passed | 无匹配 |
+| AC-006 报告不含 IP | `grep -RniE "[0-9]{1,3}(\.[0-9]{1,3}){3}" .agent/testing/runs/*ego-online.md` | 1 | passed | 无匹配 |
+| AC-007 失败报告可诊断 | 故意改错 `home` 断言后 `node scripts/ego/cli.mjs --module home --read-only` | 1 | passed | 报告 `095854` 含模块/用例/步骤/地址/截图 |
+| AC-008 连续两次不因残留失败 | `notes` 与 `admin-knowledge` 各跑两次 `--write` | 0 | passed | 四次均 4/4；页面搜索 `e2e-click-` 无残留 |
+| AC-009 只改测试与文档 | `git show --stat a7345db` | 0 | passed | 29 个文件，全在 `scripts/ego/`、`.agent/`、`.gitignore` |
+| AC-010 台账按时间追加 | `ls .agent/testing/runs/*ego-online.md` | 0 | passed | 8 份本轮报告，旧文件未覆盖 |
+| 覆盖闸门自测 | `node --test scripts/ego/check-map.test.mjs` | 0 | passed | 4 passed / 0 failed |
+| 恢复后单模块复跑 | `node scripts/ego/cli.mjs --module home --read-only` | 0 | passed | 3/3 通过；报告 `095919` |
+| 全量含写入 | `node scripts/ego/cli.mjs --all --write` | 0 | passed | 58 passed / 0 failed / 0 skipped，40 秒；报告 `095512` |
 
 ## 失败与未验证项
 
