@@ -76,9 +76,8 @@ class McpAdminIntegrationTest {
             if (id == null) {
                 continue;
             }
-            jdbcTemplate.update("DELETE FROM mcp_access_tokens WHERE user_id = ?", id);
-            jdbcTemplate.update("DELETE FROM refresh_tokens WHERE user_id = ?", id);
-            jdbcTemplate.update("DELETE FROM learner_profiles WHERE user_id = ?", id);
+            // 逐表清理由 SqlCleanup 统一；users 走 id 列，单独删
+            SqlCleanup.deleteByUser(jdbcTemplate, id, "mcp_access_tokens", "refresh_tokens", "learner_profiles");
             jdbcTemplate.update("DELETE FROM users WHERE id = ?", id);
         }
         learnerId = null;

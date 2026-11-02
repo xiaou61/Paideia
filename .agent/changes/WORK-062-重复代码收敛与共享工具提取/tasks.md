@@ -77,9 +77,10 @@ approver_role: CTO
 - 验证：上述类实跑；消失判据 T3。
 - 完成记录：本轮实际替换 **11 循环 / 5 类**（Ops 对 ×2 手工、MemoryAuto ×6、AssistantConversation ×1 手工、本项新套件 ×2），并把新套件里因此闲置的 `sleep()` 删除。**刻意保留**：AiTelemetry×2 / AiObservability×1（超时动作与逻辑更缠，按扫描建议先不动）、ApiWalkthrough 的 best-effort for 循环、DefaultRunRecorderTest 的 2s 变体——**承重差异全部留在调用点**：超时值、间隔、超时动作（静默/返回 null/AssertionError）。`Await` 沿用既有 `sleep()` 口径（吞中断+还原标志），调用点签名零改动。实测：5 类 47 条 / 0 失败。
 
-### TASK-009 | pending | T5 清理/播种/id 收敛
+### TASK-009 | done（收敛版） | T5 清理/播种/id 收敛
 - 新增 `SqlCleanup`、`UserFixture`、`TestIds`；替换 5 类表循环、4-5 处 CURRENT_TIMESTAMP 播种、顺手 id 后缀；UTC 与 passwordless 变体、各表顺序保留。
 - 验证：上述类实跑。
+- 完成记录：**只做了 SqlCleanup**（5 处：Camp、CampMastery、McpAdmin、AdminUser、Resume——把"for(表名:List.of(...))"循环样板收进 `deleteByUser(jdbc, userId, tables...)`，表清单与顺序仍留各测试类；`users` 按 id 列单独删不进共享件）。**UserFixture 与 TestIds 明确不做**（与扫描建议一致）：UserFixture 的 11 处差异是承重的（`UTC_TIMESTAMP` 一处的时区语义、role/passwordless 变体），合并要么 4 参数要么留变体，收益/风险不划算；TestIds 的前缀数字承重（清理条件按区间）、扫描本身就建议"只在顺手改时替换、不专门扫"。两条作为"不做项"记入报告。实测：5 类 38 条 / 1 红 = 已知外部项（McpAdmin 工具数），其余 37 绿。
 
 ### TASK-010 | pending | F1 errorMessage（core）
 - `core` 新增 `error-message.ts`；替换 39 处；`auth.messageOf` 委托；admin 两处私有函数删除；顺手替换 24 处 `as Error` 断言。

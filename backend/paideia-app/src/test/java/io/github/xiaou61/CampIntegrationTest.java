@@ -90,10 +90,9 @@ class CampIntegrationTest {
     @AfterEach
     void cleanUp() {
         for (long userId : List.of(userA, userB)) {
-            for (String table : List.of("camp_tasks", "camp_plans", "camp_attempts", "camp_items",
-                    "camp_programs", "resume_documents", "ai_credit_ledger", "ai_credit_accounts")) {
-                jdbcTemplate.update("DELETE FROM " + table + " WHERE user_id = ?", userId);
-            }
+            // 逐表清理由 SqlCleanup 统一（顺序 = 参数顺序，子表在前）；users 走 id 列，单独删
+            SqlCleanup.deleteByUser(jdbcTemplate, userId, "camp_tasks", "camp_plans", "camp_attempts",
+                    "camp_items", "camp_programs", "resume_documents", "ai_credit_ledger", "ai_credit_accounts");
             jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
         }
     }

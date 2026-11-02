@@ -9594,3 +9594,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：Ops 对、AssistantConversation、MemoryAuto、MemoryExtractionJobs 五类 **47 条 / 0 失败**；编译通过；新套件里闲置的 sleep() 已删
 - 本地提交：本片提交
 - 远端推送：未执行
+
+## 2026-11-03 01:05 +0800 · WORK-062 · TASK-009 T5 清理循环收敛（收敛版：只做 SqlCleanup）
+
+- 类型：implementation
+- 变更：新增 `SqlCleanup.deleteByUser(jdbc, userId, tables...)`；5 处表循环样板替换（Camp、CampMastery、McpAdmin、AdminUser、Resume）
+- 决策：表清单与顺序仍留各测试类（顺序承重、各测试表集不同，合并成共享常量只会制造耦合）；`users` 按 id 列删不进共享件；**UserFixture 与 TestIds 明确不做**（承重差异：UTC 方言 / 前缀数字区间；与扫描自身的建议一致），作为"不做项"记入报告
+- 依据：WORK-062 requirements REQ-002 / design T5；扫描候选第 5/6/7 条
+- 验证：5 类 38 条 / 1 红 = 已知外部项（McpAdmin 工具数），其余 37 绿；编译通过
+- 本地提交：本片提交
+- 远端推送：未执行

@@ -72,12 +72,9 @@ class ResumeEndpointsIntegrationTest {
             if (userId == null) {
                 continue;
             }
-            jdbcTemplate.update("DELETE FROM resume_proposals WHERE user_id = ?", userId);
-            jdbcTemplate.update("DELETE FROM resume_versions WHERE user_id = ?", userId);
-            jdbcTemplate.update("DELETE FROM resume_edit_history WHERE user_id = ?", userId);
-            jdbcTemplate.update("DELETE FROM resume_documents WHERE user_id = ?", userId);
-            jdbcTemplate.update("DELETE FROM ai_credit_ledger WHERE user_id = ?", userId);
-            jdbcTemplate.update("DELETE FROM ai_credit_accounts WHERE user_id = ?", userId);
+            // 逐表清理由 SqlCleanup 统一（顺序 = 参数顺序，子表在前）；users 走 id 列，单独删
+            SqlCleanup.deleteByUser(jdbcTemplate, userId, "resume_proposals", "resume_versions",
+                    "resume_edit_history", "resume_documents", "ai_credit_ledger", "ai_credit_accounts");
             jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
         }
         userA = null;

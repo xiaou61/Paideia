@@ -125,11 +125,10 @@ class CampMasteryIntegrationTest {
 
     @AfterEach
     void cleanUp() {
-        for (String table : List.of("camp_tasks", "camp_plans", "camp_attempts", "camp_items",
+        // 逐表清理由 SqlCleanup 统一（顺序 = 参数顺序，子表在前）
+        SqlCleanup.deleteByUser(jdbcTemplate, userId, "camp_tasks", "camp_plans", "camp_attempts", "camp_items",
                 "camp_programs", "resume_documents", "learning_progress", "knowledge_entry_views",
-                "knowledge_self_assessments", "ai_credit_ledger", "ai_credit_accounts")) {
-            jdbcTemplate.update("DELETE FROM " + table + " WHERE user_id = ?", userId);
-        }
+                "knowledge_self_assessments", "ai_credit_ledger", "ai_credit_accounts");
         jdbcTemplate.update("DELETE FROM knowledge_entry_concepts WHERE entry_id = ?", entryId);
         jdbcTemplate.update("DELETE FROM knowledge_entries WHERE id = ?", entryId);
         jdbcTemplate.update("DELETE FROM knowledge_concepts WHERE id = ?", conceptId);
