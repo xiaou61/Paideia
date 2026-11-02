@@ -9,7 +9,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import com.jayway.jsonpath.JsonPath;
 import io.github.xiaou61.account.internal.oauth.OAuthHttp;
 import io.github.xiaou61.account.internal.oauth.OAuthProvider;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -82,7 +81,7 @@ class OAuthEndpointsIntegrationTest {
     }
 
     private String body(MvcResult result) throws Exception {
-        return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        return MockMvcBodies.body(result);
     }
 
     // ---------------------------------------------------------------- 放行与形状

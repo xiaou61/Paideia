@@ -1031,7 +1031,7 @@ class ApiWalkthroughTest {
     }
 
     private String body(MvcResult result) throws Exception {
-        return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        return MockMvcBodies.body(result);
     }
 
     private String stringAt(MvcResult result, String path) throws Exception {

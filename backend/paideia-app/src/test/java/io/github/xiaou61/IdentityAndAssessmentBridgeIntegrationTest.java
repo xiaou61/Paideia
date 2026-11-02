@@ -10,7 +10,6 @@ import io.github.xiaou61.account.AccountApi;
 import io.github.xiaou61.account.Identity;
 import io.github.xiaou61.ai.internal.memory.MemoryStore;
 import io.github.xiaou61.security.AuthPort;
-import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -246,6 +245,6 @@ class IdentityAndAssessmentBridgeIntegrationTest {
     }
 
     private static String body(MvcResult result) throws Exception {
-        return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        return MockMvcBodies.body(result);
     }
 }

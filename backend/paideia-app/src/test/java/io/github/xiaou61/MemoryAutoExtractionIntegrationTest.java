@@ -11,7 +11,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 
 import io.github.xiaou61.ai.AssistantConversation;
 import io.github.xiaou61.ai.MemoryCandidate;
@@ -23,7 +22,6 @@ import io.github.xiaou61.ai.internal.memory.MemoryExtractionService;
 import io.github.xiaou61.ai.internal.memory.MemoryStore;
 import io.github.xiaou61.ai.internal.settings.AiSettingsStore;
 import io.github.xiaou61.security.AuthPort;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -417,14 +415,11 @@ class MemoryAutoExtractionIntegrationTest {
      * **另一个线程**里写的，直接读响应体只会读到空串——那会让断言看着像"功能坏了"。
      */
     private MvcResult sendMessage(long conversationId, String message) throws Exception {
-        MvcResult started = mockMvc.perform(post("/api/v1/ai/conversations/" + conversationId + "/messages")
+        return MockMvcSse.exchange(mockMvc, post("/api/v1/ai/conversations/" + conversationId + "/messages")
                         .header("Authorization", token(user))
                         .accept(MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"message\":\"" + message + "\"}"))
-                .andExpect(request().asyncStarted())
-                .andReturn();
-        return mockMvc.perform(asyncDispatch(started)).andReturn();
+                        .content("{\"message\":\"" + message + "\"}"));
     }
 
     private void stubStream(String content) {
@@ -538,6 +533,6 @@ class MemoryAutoExtractionIntegrationTest {
     }
 
     private static String body(MvcResult result) throws Exception {
-        return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        return MockMvcBodies.body(result);
     }
 }

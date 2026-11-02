@@ -11,7 +11,6 @@ import com.jayway.jsonpath.JsonPath;
 import io.github.xiaou61.sandbox.internal.run.CodeRun;
 import io.github.xiaou61.sandbox.internal.run.CodeRunner;
 import io.github.xiaou61.security.AuthPort;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -274,6 +273,6 @@ class SandboxIntegrationTest {
     }
 
     private static String body(MvcResult result) throws Exception {
-        return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        return MockMvcBodies.body(result);
     }
 }

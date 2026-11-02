@@ -9,7 +9,6 @@ import io.github.xiaou61.ai.Harness;
 import io.github.xiaou61.ai.internal.tools.AgentToolBridge;
 import io.github.xiaou61.security.AuthPort;
 import org.springframework.jdbc.core.JdbcTemplate;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -239,6 +238,6 @@ class AgentToolBridgeIntegrationTest {
     }
 
     private static String body(MvcResult result) throws Exception {
-        return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        return MockMvcBodies.body(result);
     }
 }

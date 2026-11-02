@@ -9563,3 +9563,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：判据——`HttpClient.newBuilder()` 只剩 OpsHttp 与转发代理；ops/分析面 117 条 / 0 失败 / 0 跳过（与基线一致，BUILD SUCCESS）
 - 本地提交：本片提交
 - 远端推送：未执行
+
+## 2026-11-02 23:50 +0800 · WORK-062 · TASK-006 T1+T4 测试样板收敛（含一次回退重做）
+
+- 类型：implementation
+- 变更：新增 `MockMvcBodies.body`（14 处替换）与 `MockMvcSse.exchange`（4 处替换：AiCredit/AssistantConversation/AssistantLiveUpstream/MemoryAuto）；相关静态导入与闲置 import 清理
+- 决策（教训）：SSE 首轮用**跨行非贪婪正则**做，结果把同一文件里别的 `mockMvc.perform(...).andReturn()` 也吞进了捕获组，4 个文件编译失败且语义被改；`git checkout` 整目录回退后改为**逐处手工替换**。结论已写进 updates：**含多个同类语句的文件不许用跨行非贪婪正则做机械替换——要么行级状态机，要么逐处手工**。另两处必须记得的差异：AssistantLiveUpstream 的 send 返回 String（要包 body）、MemoryAuto 的 sendMessage 返回 MvcResult（不包）
+- 依据：WORK-062 requirements REQ-002 / design T1/T4；扫描候选第 1/4 条
+- 验证：app 全量 **478 条 / 4 红 / 4 跳过**——4 红全部是 WORK-061 报告已登记的外部项（ApiWalkthrough 覆盖、McpAdmin 工具数、Sandbox 配额×2），**零新增失败**；T1 判据（14 份逐字 body 只剩 MockMvcBodies）与 T4 判据（asyncStarted 只剩 MockMvcSse）通过
+- 本地提交：本片提交
+- 远端推送：未执行

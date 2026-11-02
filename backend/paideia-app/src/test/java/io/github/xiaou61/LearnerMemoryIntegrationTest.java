@@ -9,7 +9,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import io.github.xiaou61.ai.internal.memory.MemoryStore;
 import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.security.AuthPort;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -233,6 +232,6 @@ class LearnerMemoryIntegrationTest {
     }
 
     private static String body(MvcResult result) throws Exception {
-        return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        return MockMvcBodies.body(result);
     }
 }

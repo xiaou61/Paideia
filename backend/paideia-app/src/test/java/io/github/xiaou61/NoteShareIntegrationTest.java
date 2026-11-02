@@ -7,7 +7,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import com.jayway.jsonpath.JsonPath;
 import io.github.xiaou61.security.AuthPort;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -188,6 +187,6 @@ class NoteShareIntegrationTest {
     }
 
     private static String body(MvcResult result) throws Exception {
-        return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        return MockMvcBodies.body(result);
     }
 }
