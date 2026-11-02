@@ -58,12 +58,13 @@ approver_role: CTO
 - 验证：`--check` 通过；故意改错一个数字 → 退出 1 且指明项；改回 → 退出 0；`git diff docs/architecture/README.md` 为空。
 - 完成记录：顺带修掉一个既有坑——比较前归一 CRLF（Windows 检出是 CRLF、生成物是 LF，**任何新 worktree 里 `--check` 原来恒假红**，主树恰好 LF 所以从没暴露）。实测：正向 exit 0（8 个 ✓）；反向改错端点数/模块数各 exit 1 并指名；恢复后 exit 0、README 无 diff。
 
-### TASK-003 | pending | P3 拆出 paideia-ops 模块
+### TASK-003 | done | P3 拆出 paideia-ops 模块
 
 - 对应：REQ-003、AC-003
 - 修改：新建 `backend/paideia-ops/pom.xml`；`io/github/xiaou61/ops` 30 个类从 app 迁入；`backend/pom.xml` modules 加一项；`paideia-app/pom.xml` 加依赖；重生成结构图；README 模块数 11 → 12。
 - 依赖：TASK-002（README 断言先就位，模块数变化必须红→改绿，作为守卫的首个真实用例）。
 - 验证：`mvn -B -pl paideia-ops -am test`；第二切片（ModularityTest 起）；`node scripts/gen-arch-diagram.mjs --check`；`node scripts/check-diagrams.mjs`；app 相关集成测试（Ops 三件）。
+- 完成记录：30 个类 `git mv` 且**包名零改动**（包名即 modulith 模块名，模块图不变、只换 Maven 归属）；依赖面 = platform / persistence / security / ai（与设计一致，无意外依赖）；根 pom 还需补 `dependencyManagement`（第一次编译报 version missing，属于套件结构而非代码问题）。分片验证：**P2 断言第一次真上岗**——加模块后 `--check` 如实报 01/06 两图漂移 + README 模块数 11≠12，改 README、重生成后 exit 0；mermaid 语法 9 图块全过（借主树依赖跑 `check-diagrams.mjs .worktrees/work-061/docs`）；第二切片 35 条 0 红；app 级 ops 面 **117 条 / 0 失败 / 0 跳过**（含 OpsSummary 等集成件）。ops 模块自身无测试，测试都在 app 级。
 
 ### TASK-004 | pending | P4 记忆提取持久重试
 

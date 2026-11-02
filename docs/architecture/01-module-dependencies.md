@@ -6,7 +6,7 @@
 
 # 后端模块依赖
 
-由 `backend/pom.xml` 的 11 个模块生成。箭头方向是**依赖方 → 被依赖方**，
+由 `backend/pom.xml` 的 12 个模块生成。箭头方向是**依赖方 → 被依赖方**，
 所以箭头指向的模块可以不知道调用者的存在（依赖只许单向下行，`spring-modulith` 在构建期挡循环）。
 
 ```mermaid
@@ -21,6 +21,7 @@ flowchart TB
   ai["paideia-ai"]
   sandbox["paideia-sandbox"]
   mcp["paideia-mcp"]
+  ops["paideia-ops"]
   app["paideia-app"]
   web --> platform
   persistence --> platform
@@ -45,6 +46,10 @@ flowchart TB
   mcp --> platform
   mcp --> persistence
   mcp --> security
+  ops --> platform
+  ops --> persistence
+  ops --> security
+  ops --> ai
   app --> platform
   app --> web
   app --> persistence
@@ -55,6 +60,7 @@ flowchart TB
   app --> ai
   app --> sandbox
   app --> mcp
+  app --> ops
 ```
 
 ## 各模块的直接依赖
@@ -71,4 +77,5 @@ flowchart TB
 | `paideia-ai` | `paideia-platform`、`paideia-persistence`、`paideia-security`、`paideia-knowledge`、`paideia-sandbox` |
 | `paideia-sandbox` | `paideia-platform`、`paideia-persistence`、`paideia-security` |
 | `paideia-mcp` | `paideia-platform`、`paideia-persistence`、`paideia-security` |
-| `paideia-app` | `paideia-platform`、`paideia-web`、`paideia-persistence`、`paideia-security`、`paideia-account`、`paideia-knowledge`、`paideia-note`、`paideia-ai`、`paideia-sandbox`、`paideia-mcp` |
+| `paideia-ops` | `paideia-platform`、`paideia-persistence`、`paideia-security`、`paideia-ai` |
+| `paideia-app` | `paideia-platform`、`paideia-web`、`paideia-persistence`、`paideia-security`、`paideia-account`、`paideia-knowledge`、`paideia-note`、`paideia-ai`、`paideia-sandbox`、`paideia-mcp`、`paideia-ops` |

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.github.xiaou61</groupId>
+    <artifactId>paideia</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>paideia-ops</artifactId>
+  <name>paideia-ops</name>
+  <description>运维面：Prometheus / Grafana / Loki / Tempo 集成、事件流水、AI 诊断、学习分析（WORK-061 从 paideia-app 拆出）</description>
+
+  <!--
+    依赖方向：ops -> {platform, persistence, security, ai}。
+
+    **为什么是独立模块**（WORK-061）：这块东西原来住在 paideia-app 里。app 依赖一切，
+    所以住在其中的代码**不受模块边界检查约束**——它是全仓唯一一块没有边界的业务区。
+    拆出来之后，ops 对别的东西的依赖必须写进 pom、受 spring-modulith 校验，
+    app 不再承载一整块运维面。
+
+    包名保持 io.github.xiaou61.ops 不变：包名即 modulith 模块名，改名会让
+    模块图与全仓 import 动一遍，收益为零。
+
+    依赖 ai 是因为 AI 诊断（OpsDiagnosisService 走 ai 的 OpsDiagnoser 与 TokenUsage）；
+    依赖 security 是因为 Grafana 反代与端点声明要 CurrentUser / ApiAccess；
+    依赖 persistence 是因为两张诊断/事件表的 MyBatis Mapper。
+  -->
+  <dependencies>
+    <dependency>
+      <groupId>io.github.xiaou61</groupId>
+      <artifactId>paideia-platform</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.github.xiaou61</groupId>
+      <artifactId>paideia-persistence</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.github.xiaou61</groupId>
+      <artifactId>paideia-security</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.github.xiaou61</groupId>
+      <artifactId>paideia-ai</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc</artifactId>
+    </dependency>
+    <!-- 指标：ScheduledTaskMetrics 用 MeterRegistry（micrometer-core）；
+         prometheus registry 的选择权仍在 paideia-app（装配模块决定导出方式）。 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-webmvc-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

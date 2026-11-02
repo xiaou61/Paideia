@@ -55,6 +55,12 @@
       <groupId>io.github.xiaou61</groupId>
       <artifactId>paideia-mcp</artifactId>
     </dependency>
+    <!-- 运维面（WORK-061 拆出后由 app 引入）：这里没有代码直接引用它，
+         依赖的意义是让 ops 的 Bean 进入组件扫描与运行时类路径。 -->
+    <dependency>
+      <groupId>io.github.xiaou61</groupId>
+      <artifactId>paideia-ops</artifactId>
+    </dependency>
 
     <!--
       schema 迁移。数据源只在 local/test profile 提供，默认 profile 下不存在数据源，Flyway 自然不执行。

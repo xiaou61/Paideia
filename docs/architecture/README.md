@@ -23,7 +23,7 @@ mermaid 在 GitHub 上原生渲染，且在 `frontend/` 里已有渲染链路（
 
 | 文件 | 类型 | 内容 |
 | --- | --- | --- |
-| [`01-module-dependencies.md`](01-module-dependencies.md) | 脚本生成 | 后端 11 个 Maven 模块的依赖方向 |
+| [`01-module-dependencies.md`](01-module-dependencies.md) | 脚本生成 | 后端 12 个 Maven 模块的依赖方向 |
 | [`02-request-path.md`](02-request-path.md) | AI 撰写 | 一个请求从浏览器到数据库、以及 AI 流式回答的时序 |
 | [`03-deployment.md`](03-deployment.md) | AI 撰写 | 部署形态、信任边界与端口拓扑 |
 | [`04-frontend-packages.md`](04-frontend-packages.md) | 脚本生成 | 前端 16 个 workspace 包的依赖方向 |

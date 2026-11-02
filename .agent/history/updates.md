@@ -9449,3 +9449,14 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：正向 `--check` exit 0（8 个 ✓）；反向改错端点数 → exit 1「README=189/48，事实=190/48」；反向改错模块数 → exit 1「README=12，事实=11」；恢复后 exit 0、`git diff docs/architecture/README.md` 为空
 - 本地提交：本片提交
 - 远端推送：未执行
+
+## 2026-11-02 19:40 +0800 · WORK-061 · TASK-003 拆出 paideia-ops 模块（P2 断言首次真上岗）
+
+- 类型：implementation
+- 变更：新建 `backend/paideia-ops`（pom + 30 个类 `git mv`，**包名 `io.github.xiaou61.ops` 零改动**）；`backend/pom.xml` 的 modules 与 dependencyManagement 各补一项；`paideia-app/pom.xml` 引入 ops（只为类路径与组件扫描——app 里没有任何代码直接引用 ops，工具目录按 `PaideiaTool` 接口扫 Bean）；重生成 01/06 两张结构图；README 模块数 11 → 12
+- 决策：包名即 modulith 模块名，包名不变则模块图不变、只换 Maven 归属；ops 模块依赖面固定为 platform / persistence / security / ai（编译实测无意外依赖）；测试全部留在 app 级（它们本来就是应用级集成测试）
+- 依据：requirements REQ-003 / AC-003；design「P3 的 pom 依赖面」
+- 验证：`--check` 在加模块后**如实报红**（01/06 漂移 + README 11≠12），改 README 并重生成后 exit 0（12 个模块 / 38 条依赖，README 四项计数一致）；mermaid 语法 9 个图块全过；第二切片 35 条 0 红（ModularityTest 9.16s 通过）；app 级 ops 面 `-Dtest='Ops*,Analytics*,Tempo*,Loki*,ScheduledTaskMetrics*'` **117 条 / 0 失败 / 0 跳过 / exit 0**（含 OpsSummaryIntegrationTest 等 25 个类）
+- 已知项：`mvn -B -pl paideia-ops -am test` 无自带测试可跑（模块内 0 个测试类），其行为由 app 级 117 条覆盖；04/05 两张图只在检出层有 EOL 差异，已 `git checkout` 掉，避免无意义 diff
+- 本地提交：本片提交
+- 远端推送：未执行

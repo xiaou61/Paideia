@@ -6,7 +6,7 @@
 
 # API 端点清单
 
-由后端 48 个 Controller 生成：**190 个端点**，分布在 8 个模块。
+由后端 48 个 Controller 生成：**190 个端点**，分布在 9 个模块。
 
 这是**结构性的清单**，不是手写文档——端点加一个这里就多一行，
 所以它不会像手写的接口文档那样过期。真正的授权规则在 `SecurityConfiguration`，
@@ -36,13 +36,7 @@
 | `paideia-ai` | `/api/v1/digest` | `DigestController` | 登录即可 | 4 |
 | `paideia-ai` | `/api/v1/digest/admin` | `DigestAdminController` | 仅管理员 | 2 |
 | `paideia-ai` | `/api/v1/learning` | `LearningAdviceController` | 登录即可 | 1 |
-| `paideia-app` | `(根)` | `OpsGrafanaProxyController` | 登录即可 | 2 |
 | `paideia-app` | `/api/v1/account/admin/users` | `AdminUserController` | 仅管理员 | 5 |
-| `paideia-app` | `/api/v1/ops/admin` | `OpsSummaryController` | 仅管理员 | 1 |
-| `paideia-app` | `/api/v1/ops/admin/analytics` | `AnalyticsController` | 仅管理员 | 1 |
-| `paideia-app` | `/api/v1/ops/admin/diagnoses` | `OpsDiagnosisController` | 仅管理员 | 5 |
-| `paideia-app` | `/api/v1/ops/admin/incidents` | `OpsIncidentController` | 仅管理员 | 4 |
-| `paideia-app` | `/api/v1/ops/hooks` | `OpsHookController` | 登录即可 | 1 |
 | `paideia-knowledge` | `/api/v1/knowledge` | `EntryViewController` | 登录即可 | 1 |
 | `paideia-knowledge` | `/api/v1/knowledge` | `KnowledgeFileController` | 登录即可 | 2 |
 | `paideia-knowledge` | `/api/v1/knowledge` | `KnowledgeReadController` | 登录即可 | 3 |
@@ -58,6 +52,12 @@
 | `paideia-note` | `/api/v1/notes/admin/reports` | `NoteReportAdminController` | 仅管理员 | 2 |
 | `paideia-note` | `/api/v1/public/shares` | `PublicShareController` | 免鉴权 | 1 |
 | `paideia-note` | `/api/v1/reports` | `ReportController` | 登录即可 | 1 |
+| `paideia-ops` | `(根)` | `OpsGrafanaProxyController` | 登录即可 | 2 |
+| `paideia-ops` | `/api/v1/ops/admin` | `OpsSummaryController` | 仅管理员 | 1 |
+| `paideia-ops` | `/api/v1/ops/admin/analytics` | `AnalyticsController` | 仅管理员 | 1 |
+| `paideia-ops` | `/api/v1/ops/admin/diagnoses` | `OpsDiagnosisController` | 仅管理员 | 5 |
+| `paideia-ops` | `/api/v1/ops/admin/incidents` | `OpsIncidentController` | 仅管理员 | 4 |
+| `paideia-ops` | `/api/v1/ops/hooks` | `OpsHookController` | 登录即可 | 1 |
 | `paideia-sandbox` | `/api/v1/sandbox` | `SandboxController` | 登录即可 | 5 |
 | `paideia-sandbox` | `/api/v1/sandbox/admin/sql-datasets` | `SqlDatasetAdminController` | 仅管理员 | 4 |
 | `paideia-sandbox` | `/api/v1/sql-datasets` | `SqlDatasetController` | 登录即可 | 9 |
