@@ -87,3 +87,12 @@ desktop.ini
 # ---- 并发会话的独立工作区（git worktree） ----
 # 多个会话同时改这个仓库时各开一个树，互不踩 target/ 与工作区状态。
 .worktrees/
+
+# ---- 仓库根上的误产物 ----
+# 根目录没有前端 workspace（前端在 frontend/），下面三个是在根目录误跑
+# `npm init` / `pnpm install` 以及手工丢进来的压缩包留下的，不是本项目内容。
+# 2026-11-02 发现它们以未跟踪状态挂在根上：一次 `git add -A` 就会提交进公开仓库。
+# 一律锚定根路径——不锚定的话 `/pnpm-lock.yaml` 会去匹配 frontend/pnpm-lock.yaml 这类真正该入库的文件。
+/package.json
+/pnpm-lock.yaml
+/.agent/html.rar
