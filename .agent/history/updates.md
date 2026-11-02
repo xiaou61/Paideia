@@ -9482,3 +9482,14 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 已知项：机械改造用的是一次性脚本（临时目录、未入库）；若将来还有同类搬迁，值得把"同包删 import / 异包改写"收进 shell 工具，但现在不值得
 - 本地提交：本片提交
 - 远端推送：未执行
+
+## 2026-11-02 21:05 +0800 · WORK-061 附带 · 修已上线的 line_kind 引用错误（全量跑抓出）
+
+- 类型：fix
+- 变更：`LearningProgressMapper.findVisibleByUser` 的 `e.line_kind` → `JOIN knowledge_categories c` + `c.line_kind`
+- 决策：这是**独立于 WORK-061 五片的窄修**（单文件、边界清楚，按项目入口规则不另建 WORK）。归因清楚：`61b005d1`（第七轮审查「TrackService 的 N+1 改成 JOIN 取 line_kind」）把列引用写到了 `knowledge_entries` 上，而 `line_kind` 自 `V17` 起就在**分类**上（`knowledge_categories`）——任何只跑迁移的环境执行该查询都报 `Unknown column`，`/learning/graph` 一系接口整片 500
+- 依据：WORK-061 全量跑 478 条中 12 条红，其中 8 条同一根因（ConceptGraph×3、CampMastery×3、LearningProgress×1、MasteryBkt×1），异常栈直指该 SQL；`61b005d1` 已是 `dc9db0c`（今天部署版）的祖先，**属线上缺陷**
+- 验证：修复前那 8 条红；修复后 `-Dtest='LearningProgressIntegrationTest,ConceptGraphIntegrationTest,CampMasteryIntegrationTest,MasteryBktFallbackIntegrationTest'` → **22 条 / 0 失败 / exit 0**
+- 已知项：全量仍有 4 条红，全部是别的项落地后未跟上的 stale 断言（沙箱配额 50→1000、学习者工具数 19→21、walkthrough 漏打 12 个新端点），已在报告「外部阻塞」列明归属，本片不动它们
+- 本地提交：本片提交
+- 远端推送：未执行

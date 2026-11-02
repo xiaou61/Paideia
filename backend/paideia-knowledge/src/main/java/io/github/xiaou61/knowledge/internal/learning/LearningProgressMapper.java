@@ -39,13 +39,18 @@ public interface LearningProgressMapper {
     /**
      * 只列**仍已发布**的条目——下架/删除的条目不应出现在"我在学什么"里，
      * 而记录行本身保留（条目重新发布后进度还在）。
+     *
+     * <p>line_kind 在**分类**上（V17），不在条目上：这里 JOIN 到分类取。修的是 61b005d1
+     * 把 N+1 改 JOIN 时写成 `e.line_kind` 的错误引用——列不存在，整条查询报
+     * 「Unknown column」，`/learning/graph` 一系接口直接 500（2026-11-02 全量跑抓出）。
      */
     @Select("""
             SELECT p.id, p.user_id, p.entry_id, p.tour_step, p.challenges_json, p.quizzes_json, p.status,
                    p.passed_at, p.review_stage, p.review_due_at, p.created_at, p.updated_at,
-                   e.title, e.line_kind
+                   e.title, c.line_kind
             FROM learning_progress p
             JOIN knowledge_entries e ON e.id = p.entry_id
+            JOIN knowledge_categories c ON c.id = e.category_id
             WHERE p.user_id = #{userId} AND e.status = 'published'
             ORDER BY p.updated_at DESC, p.entry_id DESC
             """)
