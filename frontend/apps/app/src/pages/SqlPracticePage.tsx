@@ -457,10 +457,23 @@ export function SqlPracticePage() {
                 type="button"
                 variant="outline"
                 data-testid="sql-ai-question"
+                disabled={selected === null}
+                onClick={() =>
+                  // 统一到对话（WORK-053 REQ-009）：预填意图，不自动发送
+                  ask('按当前数据集和我的 SQL 水平出一道练习题：先别给答案，我写完再让你判。')
+                }
+              >
+                让 AI 出题
+              </Button>
+              {/* 降级：助手不可用（余额/上游）时仍然能一次性生成，与「AI 造数据集」同一取舍 */}
+              <Button
+                type="button"
+                variant="ghost"
+                data-testid="sql-ai-question-direct"
                 disabled={askAi.isPending || selected === null}
                 onClick={() => askAi.mutate()}
               >
-                {askAi.isPending ? '出题中…' : '让 AI 出题'}
+                {askAi.isPending ? '出题中…' : '直接生成'}
               </Button>
               <Button
                 type="button"

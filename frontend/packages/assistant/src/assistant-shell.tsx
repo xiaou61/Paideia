@@ -11,7 +11,7 @@ import { MemoryPanel } from './memory-panel'
 import { useAssistantContext } from './context'
 import { hasSeenHint, markHintSeen } from './session-store'
 import { SummaryCardView } from './summary-card'
-import type { CredentialView, NoteDraftInput, SummaryView, SummaryVisibility } from './types'
+import type { CredentialView, NoteDraftInput, SummaryView } from './types'
 
 /** 四个标签页。后三个与条目无关，所以换条目时不该把它们挤走。 */
 type Tab = 'chat' | 'summary' | 'memory' | 'credits'
@@ -159,7 +159,7 @@ export function AssistantShell({
   /** 由应用注入：`@` 引用的搜索（WORK-058）。本包不认识业务检索端点。 */
   searchObjects?: (query: string) => Promise<Attachment[]>
 }) {
-  const { entryId, entryTitle, onlyMine, setOnlyMine, pendingPrompt, revealSeq } = useAssistantContext()
+  const { entryId, entryTitle, onlyMine, setOnlyMine, pendingPrompt, revealSeq, ask } = useAssistantContext()
   const [panel, setPanel] = useState<PanelState>(readPanelState)
   const [credential, setCredential] = useState<CredentialView | null>(null)
   const [view, setView] = useState<SummaryView | null>(null)
@@ -303,21 +303,6 @@ export function AssistantShell({
       alive = false
     }
   }, [api, entryId])
-
-  const generate = async (visibility: SummaryVisibility) => {
-    if (entryId === null) {
-      return
-    }
-    setBusy(true)
-    setError(null)
-    try {
-      setView(await api.generate(entryId, visibility))
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
-    } finally {
-      setBusy(false)
-    }
-  }
 
   const visible =
     view !== null && !(onlyMine && view.source === 'others' && view.visibility === 'public') ? view : null
@@ -531,21 +516,14 @@ export function AssistantShell({
                 <div className="flex flex-wrap gap-2">
                   <Button
                     size="sm"
-                    disabled={busy || credential?.configured !== true}
-                    onClick={() => void generate('public')}
-                    data-testid="assistant-generate-public"
+                    data-testid="assistant-summary-to-chat"
+                    onClick={() => {
+                      // 统一到对话（WORK-053 REQ-009）：生成类入口都走"预填意图、不自动发送"
+                      setTab('chat')
+                      ask('把这条内容精简成几个小标题 + 要点：保留原文里的数字、结论与术语，不要加原文没有的事实。')
+                    }}
                   >
-                    {busy ? <Spinner /> : null}
-                    生成并公开
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy || credential?.configured !== true}
-                    onClick={() => void generate('private')}
-                    data-testid="assistant-generate-private"
-                  >
-                    只给自己
+                    去对话里精简
                   </Button>
                 </div>
                 {credential?.configured !== true ? (
