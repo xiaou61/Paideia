@@ -9332,5 +9332,15 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 依据：用户 2026-11-02 反馈 + 截图（「不要说只有一个让 AI 设计……有一个弹窗然后自己设计……AI 去问问题，用户来回答就可以了」）
 - 验证：app typecheck 通过；e2e/sql-practice.spec.ts 8 passed / 1 skipped（含新增「让 AI 设计：关掉弹窗并打开助手预填问题」）；人工截图确认页面 / 弹窗 / 助手三态（本机临时文件，未入库）
 - 已知项：「存为数据集」→ 弹窗回填链路的端到端（含真实 AI 调用）无自动化覆盖，仍是人工验证；scripts/release.ps1 的重写与 .agent/reviews/ 新增文件是别的会话的在飞改动，本提交未包含
-- 本地提交：待填
+- 本地提交：`dde38eb`
+- 远端推送：未执行
+
+## 2026-11-02 17:03 +0800 · 发版 dde38eb（数据集工坊弹窗）
+
+- 类型：release
+- 变更：`release.ps1` 全量发版（前端重建）；线上 176aaea → dde38eb
+- 决策：先提交（dde38eb）再发版，保证制品与标记一致；`scripts/release.ps1` 的重写与 `.agent/reviews/` 新增文件是别的会话的在飞改动，本次发版未包含（它们是脚本/记录，不参与制品）
+- 依据：本次实现记录（2026-11-02 16:58 条）
+- 验证：`release.ps1` 155.0 秒 exit 0（前端构建 47.3s / 打部署包 39.4s / 上传并应用 42.6s）；服务器 `paideia_build_info{version="dde38eb"}`、app.jar 17:01:27、服务 17:01:29 启动、`/actuator/health` 200；线上 bundle 实测命中 `sql-dataset-dialog` 与「不想自己写」，旧串「直接生成并保存」与 `sql-generate-dataset` 均已不在
+- 本地提交：本记录未提交
 - 远端推送：未执行
