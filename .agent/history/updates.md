@@ -9761,5 +9761,5 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 决策：不把"外键推断"写进工具（`manager_id` 猜不准，留坑是编辑意图）；数据连贯性靠提示词要求，工具只保证 SQL 合法。
 - 验证：`SqlDatasetBuildToolsTest` 6/6、`SqlDatasetToolsTest` 9/9、`PlannerPromptTest` 4/4（BUILD SUCCESS）；前端 typecheck 0 错、assistant 79/79、`让 AI 设计` e2e 1/1。
 - 已知：外键一致性是**提示词级**约束，不是机制级；未用真模型跑端到端。
-- 本地提交：见下
-- 远端推送：未执行
+- 本地提交：`8816f8be`、`4e373124`
+- 远端推送：`eef1311c..4e373124` 成功；部署 `4e373124`（143.6 秒），health 200 / 0.23 秒、ego 只读 56/0
