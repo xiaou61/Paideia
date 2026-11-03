@@ -5,8 +5,12 @@ import io.github.xiaou61.platform.ToolContext;
 import io.github.xiaou61.platform.ToolDescriptor;
 import io.github.xiaou61.platform.ToolResult;
 import io.github.xiaou61.platform.ToolScope;
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -14,12 +18,14 @@ import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
 /**
- * 生成一份练习数据集的 SQL（WORK-053）。
+ * 生成一份练习数据集的 SQL（WORK-053；2026-11-03 改成"模型出数据，工具只拼装"）。
  *
- * <p><b>为什么是"拼装"而不是再调一次模型</b>：造数据的模型调用已有专用路径
- * （`SqlDatasetGeneratorPort`）。在对话里再调一次等于同一次生成收两笔钱，还绕开那次
- * 模型调用的记账。这里让模型负责**问清楚要什么**（哪些表、哪些列、多少行），
- * 工具负责**确定性地拼出合法 SQL**——同一份参数永远得到同一份输出，可测试。
+ * <p><b>为什么不自己造数据</b>：早先按「列名 + 行号 + 类型」算哈希填值——外键指向谁、status 该是
+ * 什么、日期该不该在今天之前，它一概不知道，产出的数据 JOIN 不上（2026-11-03 用户实测）。
+ * 现在模型逐行给出数据，工具只做三件事：校验取值、转义、拼成 CREATE + INSERT。
+ *
+ * <p><b>为什么不干脆让模型写 SQL</b>：拼装与转义留在一处，产出必须能过
+ * {@link SqlStatementGuard} 与保存时的沙箱干跑；模型只负责它擅长的语义（谁引用谁、坑留在哪）。
  *
  * <p><b>为什么只返回文本</b>：`ToolQuery.internal` 把内部工具硬约束为只读。落库仍走页面上的
  * 保存按钮（白名单 + 沙箱干跑），库里不会因为一句"帮我造个数据集"就多出东西。
@@ -35,11 +41,13 @@ public final class SqlDatasetBuildTools {
     private static final Pattern TYPE = Pattern.compile(
             "(INT|BIGINT|TINYINT|DECIMAL\\(\\d{1,2},\\d{1,2}\\)|VARCHAR\\(\\d{1,3}\\)|DATE|DATETIME)");
 
-    private static final List<String> WORDS = List.of("alpha", "beta", "gamma", "delta", "epsilon");
+    private static final Pattern DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
+    private static final Pattern DATETIME = Pattern.compile("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}");
 
     private static final int MAX_TABLES = 3;
     private static final int MAX_COLUMNS = 12;
-    private static final int MAX_ROWS = 200;
+    /** 模型要逐行给出数据：200 行会把一次工具调用撑到几万 token，50 行够教学用。 */
+    private static final int MAX_ROWS = 50;
 
     private SqlDatasetBuildTools() {
     }
@@ -47,7 +55,7 @@ public final class SqlDatasetBuildTools {
     private record Column(String name, String type) {
     }
 
-    private record Table(String name, List<Column> columns) {
+    private record Table(String name, List<Column> columns, List<Map<String, Object>> rows) {
     }
 
     @Component
@@ -59,48 +67,51 @@ public final class SqlDatasetBuildTools {
                     "type", "array",
                     "description", "列定义，如 [\"id:INT\", \"amount:DECIMAL(10,2)\"]",
                     "items", Map.of("type", "string"));
+            Map<String, Object> rows = Map.of(
+                    "type", "array",
+                    "description", "每行一个对象：键是列名，值按列类型给（字符串给字符串、日期给 "
+                            + "yyyy-MM-dd / yyyy-MM-dd HH:mm:ss、数字给数字；null 表示 NULL）。"
+                            + "外键要指向真实存在的 id；日期不要超过今天；可以故意留几行对不上的数据做练习。",
+                    "items", Map.of("type", "object"));
             Map<String, Object> table = Map.of(
                     "type", "object",
                     "properties", Map.of(
                             "name", Map.of("type", "string", "description", "表名，如 orders"),
-                            "columns", columnList));
+                            "columns", columnList,
+                            "rows", rows));
             Map<String, Object> schema = Map.of(
                     "type", "object",
                     "properties", Map.of(
                             "tables", Map.of(
                                     "type", "array",
-                                    "description", "表定义，1–3 张",
-                                    "items", table),
-                            "rows", Map.of("type", "integer", "description", "每张表插入多少行，1–200")),
-                    "required", List.of("tables", "rows"));
+                                    "description", "表定义与数据，1–3 张",
+                                    "items", table)),
+                    "required", List.of("tables"));
             return new ToolDescriptor(
                     "planner_build_dataset",
                     "planner",
-                    "拼一份练习数据集的 SQL",
-                    "用户要「造一个数据集」时用它：先把表、列、行数问清楚，再用这个工具拼出"
-                            + "CREATE TABLE + INSERT。**它只返回 SQL 文本、不会保存**——"
-                            + "用户要在自己的 SQL 工作台点保存才会落库（保存时还要过白名单与沙箱干跑）。"
+                    "把表结构和每行数据拼成数据集 SQL",
+                    "用户要「造一个数据集」时用它：**你先逐行想好数据**（谁引用谁、status 取什么值、"
+                            + "日期、要不要故意留几条对不上的行做练习），再把表结构与 rows 一起交给它。"
+                            + "它只做校验与拼装，不替你编数据。**只返回 SQL 文本、不会保存**——"
+                            + "用户要在 SQL 工作台点保存才会落库（保存时还要过白名单与沙箱干跑）。"
                             + "列写成 \"列名:类型\"；类型只支持 INT / BIGINT / TINYINT / "
                             + "DECIMAL(p,s) / VARCHAR(n) / DATE / DATETIME；"
-                            + "最多 3 张表、每表 12 列、行数 1–200；标识符必须小写字母开头。",
+                            + "最多 3 张表、每表 12 列、每表 1–50 行；标识符必须小写字母开头。",
                     schema, null, true, false, false, ToolScope.READ, false);
         }
 
         @Override
         public ToolResult call(ToolContext context, Map<String, Object> arguments) {
-            Integer rows = intOf(arguments.get("rows"));
-            if (rows == null || rows < 1 || rows > MAX_ROWS) {
-                return ToolResult.fail("rows 必须在 1–" + MAX_ROWS + " 之间");
-            }
             Object rawTables = arguments.get("tables");
             if (!(rawTables instanceof List<?> tables) || tables.isEmpty()) {
-                return ToolResult.fail("需要提供 tables（1–" + MAX_TABLES + " 张表的定义）");
+                return ToolResult.fail("需要提供 tables（1–" + MAX_TABLES + " 张表的定义与数据）");
             }
             if (tables.size() > MAX_TABLES) {
                 return ToolResult.fail("最多 " + MAX_TABLES + " 张表，这次给了 " + tables.size() + " 张");
             }
             try {
-                return ToolResult.ok(build(parse(tables), rows));
+                return ToolResult.ok(build(parse(tables)));
             } catch (IllegalArgumentException bad) {
                 return ToolResult.fail(bad.getMessage());
             }
@@ -111,7 +122,7 @@ public final class SqlDatasetBuildTools {
         List<Table> parsed = new ArrayList<>();
         for (Object item : rawTables) {
             if (!(item instanceof Map<?, ?> raw)) {
-                throw new IllegalArgumentException("每张表要是对象：{name, columns}");
+                throw new IllegalArgumentException("每张表要是对象：{name, columns, rows}");
             }
             String name = String.valueOf(raw.get("name")).trim().toLowerCase(Locale.ROOT);
             if (!IDENTIFIER.matcher(name).matches()) {
@@ -140,12 +151,39 @@ public final class SqlDatasetBuildTools {
                 }
                 columns.add(new Column(columnName, type));
             }
-            parsed.add(new Table(name, columns));
+            if (!(raw.get("rows") instanceof List<?> rawRows) || rawRows.isEmpty()) {
+                throw new IllegalArgumentException("表 " + name + " 没有数据：rows 要逐行给出对象");
+            }
+            if (rawRows.size() > MAX_ROWS) {
+                throw new IllegalArgumentException("表 " + name + " 有 " + rawRows.size() + " 行，超过上限 " + MAX_ROWS);
+            }
+            List<Map<String, Object>> rows = new ArrayList<>();
+            for (int i = 0; i < rawRows.size(); i++) {
+                if (!(rawRows.get(i) instanceof Map<?, ?> rawRow)) {
+                    throw new IllegalArgumentException("表 " + name + " 第 " + (i + 1) + " 行不是对象");
+                }
+                Map<String, Object> row = new LinkedHashMap<>();
+                for (Column column : columns) {
+                    if (!rawRow.containsKey(column.name())) {
+                        throw new IllegalArgumentException("表 " + name + " 第 " + (i + 1)
+                                + " 行缺列 " + column.name() + "（NULL 也要写成 null，键不能省）");
+                    }
+                    row.put(column.name(), rawRow.get(column.name()));
+                }
+                for (Object key : rawRow.keySet()) {
+                    String keyName = String.valueOf(key).trim().toLowerCase(Locale.ROOT);
+                    if (columns.stream().noneMatch(column -> column.name().equals(keyName))) {
+                        throw new IllegalArgumentException("表 " + name + " 第 " + (i + 1) + " 行有多余的列 " + key);
+                    }
+                }
+                rows.add(row);
+            }
+            parsed.add(new Table(name, columns, rows));
         }
         return parsed;
     }
 
-    private static String build(List<Table> tables, int rows) {
+    private static String build(List<Table> tables) {
         StringBuilder sql = new StringBuilder();
         for (Table table : tables) {
             sql.append("CREATE TABLE ").append(table.name()).append(" (\n");
@@ -161,62 +199,102 @@ public final class SqlDatasetBuildTools {
             sql.append(");\n");
         }
         for (Table table : tables) {
-            sql.append(insert(table, rows));
+            sql.append(insert(table));
         }
         return sql.toString().trim() + "\n";
     }
 
-    private static String insert(Table table, int rows) {
+    private static String insert(Table table) {
         StringBuilder sql = new StringBuilder("INSERT INTO ").append(table.name()).append(" (");
         List<Column> columns = table.columns();
         for (int i = 0; i < columns.size(); i++) {
             sql.append(i == 0 ? "" : ", ").append(columns.get(i).name());
         }
         sql.append(") VALUES\n");
-        for (int row = 1; row <= rows; row++) {
+        List<Map<String, Object>> rows = table.rows();
+        for (int i = 0; i < rows.size(); i++) {
             sql.append("  (");
-            for (int i = 0; i < columns.size(); i++) {
-                sql.append(i == 0 ? "" : ", ").append(valueOf(columns.get(i), row));
+            for (int c = 0; c < columns.size(); c++) {
+                Column column = columns.get(c);
+                sql.append(c == 0 ? "" : ", ")
+                        .append(literal(column, rows.get(i).get(column.name()),
+                                "表 " + table.name() + " 第 " + (i + 1) + " 行"));
             }
-            sql.append(row == rows ? ");\n" : "),\n");
+            sql.append(i == rows.size() - 1 ? ");\n" : "),\n");
         }
         return sql.toString();
     }
 
-    /**
-     * 值由「列名 + 行号 + 类型」决定，**不用随机数**：同一份参数永远得到同一份 SQL，
-     * 测试与"再生成一次"都不会漂移。
-     */
-    private static String valueOf(Column column, int row) {
-        int hash = Math.abs(31 * (column.name().hashCode() * 31 + row) + column.type().hashCode());
+    private static String literal(Column column, Object value, String where) {
+        if (value == null) {
+            return "NULL";
+        }
         String type = column.type();
-        if ("TINYINT".equals(type)) {
-            return String.valueOf(hash % 2);
-        }
-        if ("INT".equals(type) || "BIGINT".equals(type)) {
-            return String.valueOf(hash % 1000 + 1);
-        }
-        if (type.startsWith("DECIMAL")) {
-            return String.format(Locale.ROOT, "%.2f", (hash % 100_000) / 100.0);
-        }
         if (type.startsWith("VARCHAR")) {
-            return "'" + WORDS.get(hash % WORDS.size()) + "-" + (hash % 100) + "'";
+            if (!(value instanceof String text)) {
+                throw new IllegalArgumentException(where + " 的 " + column.name() + " 要是字符串");
+            }
+            return quoted(text, where, column.name());
         }
-        LocalDate date = LocalDate.of(2026, 1, 1).plusDays(hash % 365);
-        if ("DATE".equals(type)) {
-            return "'" + date + "'";
+        if (type.equals("DATE") || type.equals("DATETIME")) {
+            if (!(value instanceof String text)) {
+                throw new IllegalArgumentException(where + " 的 " + column.name() + " 要是日期字符串");
+            }
+            return quoted(temporal(text, type, where, column.name()), where, column.name());
         }
-        return String.format(Locale.ROOT, "'%s 09:%02d:00'", date, hash % 60);
+        return number(column, value, where);
     }
 
-    private static Integer intOf(Object value) {
-        if (value instanceof Number number) {
-            return number.intValue();
+    private static String number(Column column, Object value, String where) {
+        if (!(value instanceof Number) && !(value instanceof String)) {
+            throw new IllegalArgumentException(where + " 的 " + column.name() + " 要是数字");
+        }
+        BigDecimal number;
+        try {
+            number = new BigDecimal(String.valueOf(value).trim());
+        } catch (NumberFormatException notANumber) {
+            throw new IllegalArgumentException(where + " 的 " + column.name() + " 不是数字：" + value);
+        }
+        if (column.type().startsWith("DECIMAL")) {
+            return number.toPlainString();
+        }
+        if (number.stripTrailingZeros().scale() > 0) {
+            throw new IllegalArgumentException(where + " 的 " + column.name() + " 要是整数：" + value);
+        }
+        return number.toBigInteger().toString();
+    }
+
+    private static String temporal(String text, String type, String where, String column) {
+        if (type.equals("DATE")) {
+            if (!DATE.matcher(text).matches()) {
+                throw new IllegalArgumentException(where + " 的 " + column + " 要是 yyyy-MM-dd：" + text);
+            }
+            try {
+                LocalDate.parse(text);
+            } catch (DateTimeParseException bad) {
+                throw new IllegalArgumentException(where + " 的 " + column + " 日期不合法：" + text);
+            }
+            return text;
+        }
+        if (!DATETIME.matcher(text).matches()) {
+            throw new IllegalArgumentException(where + " 的 " + column + " 要是 yyyy-MM-dd HH:mm:ss：" + text);
         }
         try {
-            return value == null ? null : Integer.valueOf(String.valueOf(value).trim());
-        } catch (NumberFormatException notANumber) {
-            return null;
+            LocalDateTime.parse(text.replace(' ', 'T'));
+        } catch (DateTimeParseException bad) {
+            throw new IllegalArgumentException(where + " 的 " + column + " 时间不合法：" + text);
         }
+        return text;
+    }
+
+    /**
+     * shortcut: 含换行或反斜杠的字符串直接拒绝，而不是按方言转义——MySQL 默认把 `\` 当转义符、
+     * `NO_BACKSLASH_ESCAPES` 下又不是；练习数据用不到它。真需要时再按保存库的方言处理。
+     */
+    private static String quoted(String text, String where, String column) {
+        if (text.indexOf('\n') >= 0 || text.indexOf('\r') >= 0 || text.indexOf('\\') >= 0) {
+            throw new IllegalArgumentException(where + " 的 " + column + " 含换行或反斜杠：" + text);
+        }
+        return "'" + text.replace("'", "''") + "'";
     }
 }

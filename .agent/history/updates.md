@@ -9752,3 +9752,14 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：前端 typecheck 0 错；assistant 包 79 例（1 例环境超时，单跑复验通过）；`sql-practice` e2e 9 通过 / 1 跳过 / 0 失败（含新用例，SSE 用桩）。
 - 本地提交：`bfa8344f`、`7dbb758c`
 - 远端推送：`3559ca04..7dbb758c` 成功；部署 `7dbb758c`（147.3 秒），health 200 / 0.2 秒、ego 只读 56/0（2 条写入用例按只读模式跳过）
+
+## 2026-11-03 15:15 +0800 · WORK-064 数据集生成改为模型出数据
+
+- 类型：fix
+- 问题（用户实测）：`planner_build_dataset` 按「列名 + 行号 + 类型」算哈希自己编数据——外键两列对不上（`customer_id` vs `customers.id`）、`status` 被填成 `alpha-25`、`signed_up` 到了未来；保存时的沙箱干跑兜不住（DDL 里没有 `FOREIGN KEY`）。
+- 变更：工具改为接收 `tables[].rows`（模型逐行给数据），只做校验 + 单引号转义 + 拼装；每表上限 200→50；`PlannerPrompt`、`page-context.ts`、向导提示与行数选项（10/30/50）同步。
+- 决策：不把"外键推断"写进工具（`manager_id` 猜不准，留坑是编辑意图）；数据连贯性靠提示词要求，工具只保证 SQL 合法。
+- 验证：`SqlDatasetBuildToolsTest` 6/6、`SqlDatasetToolsTest` 9/9、`PlannerPromptTest` 4/4（BUILD SUCCESS）；前端 typecheck 0 错、assistant 79/79、`让 AI 设计` e2e 1/1。
+- 已知：外键一致性是**提示词级**约束，不是机制级；未用真模型跑端到端。
+- 本地提交：见下
+- 远端推送：未执行

@@ -27,7 +27,8 @@ export function serializePageContext(context: PageContext | null): string | unde
       truncateContext(context.draftSql, PAGE_CONTEXT_LIMITS.draftSql),
       '```',
       '',
-      '如果用户要造新数据集：用 `planner_build_dataset` 拼 SQL，不要凭记忆写建表语句。',
+      '如果用户要造新数据集：先逐行想好数据（外键指向真实 id、日期不超过今天、状态用真实取值），'
+        + '再把表结构与 rows 交给 `planner_build_dataset` 拼装；不要凭记忆写建表语句。',
       '如果用户要改现有数据集：先用 `sql_read_dataset` 读它的完整 SQL，再在原 SQL 上改；保存由用户在页面上确认。',
     ]
     if (context.lastResult.trim() !== '') {
