@@ -108,7 +108,7 @@ interface Overview {
 /** 节点三态的视觉。`not-collected` 用虚线边框而不是颜色——它不是"坏"，是"没看"。 */
 const NODE_STYLE: Record<NodeState, string> = {
   ok: 'tile-surface border-border',
-  zero: 'border-amber-500/60 bg-amber-500/10',
+  zero: 'border-warning/60 bg-warning/10',
   'not-collected': 'border-dashed border-muted-foreground/40 bg-transparent',
 }
 
@@ -134,10 +134,10 @@ const SERIES_LABEL: Record<string, string> = {
 
 const SERIES_COLOR: Record<string, string> = {
   ai_runs: 'bg-primary',
-  digest_items: 'bg-sky-500',
-  entry_views: 'bg-emerald-500',
-  digest_clicks: 'bg-amber-500',
-  resumes: 'bg-violet-500',
+  digest_items: 'bg-info',
+  entry_views: 'bg-success',
+  digest_clicks: 'bg-warning',
+  resumes: 'bg-primary',
 }
 
 export function AnalyticsPage() {
@@ -232,7 +232,7 @@ function FlowsSection({ flows }: { flows: Flow[] }) {
           数据流转
         </CardTitle>
         <CardDescription>
-          六条链，每条四个阶段。节点上是真实计数；<span className="text-amber-600">琥珀色</span>
+          六条链，每条四个阶段。节点上是真实计数；<span className="text-warning">琥珀色</span>
           表示上一步有数据、这一步为 0（断点）；虚线边框表示这项没有采集，不是 0。
         </CardDescription>
       </CardHeader>
@@ -275,7 +275,7 @@ function FlowsSection({ flows }: { flows: Flow[] }) {
                         </span>
                       </div>
                       {node.state !== 'ok' && STATE_LABEL[node.state] ? (
-                        <div className="text-[0.7rem] text-amber-600">{STATE_LABEL[node.state]}</div>
+                        <div className="text-[0.7rem] text-warning">{STATE_LABEL[node.state]}</div>
                       ) : null}
                     </div>
                     {index < flow.nodes.length - 1 ? (
@@ -314,7 +314,7 @@ function VolumeSection({ volume }: { volume: Overview['volume'] }) {
         <CardDescription>
           按北京自然日切桶（与速递的 edition_date 同源）。
           {volume.dailyNote ? (
-            <span className="ml-1 text-amber-600" data-testid="analytics-daily-note">
+            <span className="ml-1 text-warning" data-testid="analytics-daily-note">
               {volume.dailyNote}
             </span>
           ) : null}
@@ -402,7 +402,7 @@ function UsageSection({ usage }: { usage: Overview['usage'] }) {
           功能使用度
         </CardTitle>
         <CardDescription>
-          当前 {usage.accounts} 个账号。<span className="text-amber-600">琥珀色</span>
+          当前 {usage.accounts} 个账号。<span className="text-warning">琥珀色</span>
           表示已采集但为 0（功能存在、没人用）；虚线表示没有采集。
         </CardDescription>
       </CardHeader>
@@ -540,7 +540,7 @@ function SearchSection({ search }: { search: Overview['search'] }) {
               )}
             </div>
             <div>
-              <div className="mb-1.5 text-[0.7rem] text-amber-600">搜不到（内容缺口）</div>
+              <div className="mb-1.5 text-[0.7rem] text-warning">搜不到（内容缺口）</div>
               {search.zeroResult.length === 0 ? (
                 <p className="text-muted-foreground text-[0.7rem]">无</p>
               ) : (
@@ -577,7 +577,7 @@ function MonitoringSection({ monitoring }: { monitoring: Overview['monitoring'] 
       </CardHeader>
       <CardContent>
         {!monitoring.reachable ? (
-          <p className="text-sm text-amber-600" data-testid="analytics-monitoring-down">
+          <p className="text-sm text-warning" data-testid="analytics-monitoring-down">
             Prometheus 不可达。上面四个区块来自数据库，不受影响。
           </p>
         ) : (
