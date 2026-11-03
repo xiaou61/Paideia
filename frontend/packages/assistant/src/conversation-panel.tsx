@@ -6,6 +6,7 @@ import type { AssistantApi } from './client'
 import { parseAttachmentUri, serializeAttachments, type Attachment } from './attachments'
 import { extractPlanSuggestions, stripPlanBlocks, type PlanSuggestion } from './plan'
 import { linkifyCitations } from './citation'
+import { GuideCard } from './guide-card'
 import { CitationLink } from './citation-link'
 import { findMention, stripMention } from './mention'
 import { useAssistantContext } from './context'
@@ -58,8 +59,10 @@ export function ConversationPanel({
    */
   searchObjects?: (query: string) => Promise<Attachment[]>
 }) {
-  const { entryId, entryTitle, harness, pageContext, attachments, attach, detach, applySql, applyDatasetSql, pendingPrompt, clearPendingPrompt } =
-    useAssistantContext()
+  const {
+    entryId, entryTitle, harness, pageContext, attachments, attach, detach,
+    applySql, appendSql, applyDatasetSql, pendingPrompt, clearPendingPrompt, guide, clearGuide,
+  } = useAssistantContext()
   const [conversationId, setConversationId] = useState<number | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [sessions, setSessions] = useState<ConversationView[]>([])
@@ -362,8 +365,8 @@ export function ConversationPanel({
     attach(candidate)
   }
 
-  const send = async () => {
-    const text = input.trim()
+  const send = async (override?: string) => {
+    const text = (override ?? input).trim()
     if (text === '' || busy) {
       return
     }
@@ -581,6 +584,22 @@ export function ConversationPanel({
                       <Button
                         variant="ghost"
                         size="sm"
+                        data-testid="conversation-append-sql"
+                        onClick={() => {
+                          const sql = extractSqlBlock(message.content)
+                          if (sql === null) {
+                            setError('这条回答里没有 SQL 代码块，没法插入编辑器')
+                            return
+                          }
+                          setError(null)
+                          appendSql(sql)
+                        }}
+                      >
+                        插入编辑器
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         data-testid="conversation-apply-sql"
                         onClick={() => {
                           const sql = extractSqlBlock(message.content)
@@ -592,7 +611,7 @@ export function ConversationPanel({
                           applySql(sql)
                         }}
                       >
-                        填入编辑器
+                        继续编辑
                       </Button>
                       {/*
                         存为数据集（WORK-060）：只把 SQL 送进数据集面板，不保存。
@@ -680,6 +699,20 @@ export function ConversationPanel({
           ))
         )}
       </div>
+
+      {/* 发送前的向导卡（WORK-063）：选完点「生成」才发一条消息，卡片本身不进会话历史 */}
+      {guide === null ? null : (
+        <GuideCard
+          key={guide.id}
+          guide={guide}
+          disabled={busy}
+          onCancel={() => clearGuide(guide.id)}
+          onSubmit={(text) => {
+            clearGuide(guide.id)
+            void send(text)
+          }}
+        />
+      )}
 
       {/* 助手提出的笔记草稿：**点了才存**。它不是回答的一部分，所以单独放在消息区下面 */}
       {drafts.length === 0 ? null : (

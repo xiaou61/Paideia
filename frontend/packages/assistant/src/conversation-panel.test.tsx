@@ -324,3 +324,55 @@ describe('存为数据集', () => {
     )
   })
 })
+
+/**
+ * 向导卡（WORK-063）。
+ *
+ * <p>钉住"点生成才发"：卡片出现时一条请求都没有；点「生成」发出去的那条要带各组选择。
+ * 选项由页面给，不进会话历史——所以这里只验发送那一下。
+ */
+describe('向导卡', () => {
+  it('点「生成」才发消息，内容含各组选择', async () => {
+    const sent: string[] = []
+    const api = {
+      ...stubApi(() => {}),
+      sendMessage: (_id: number, text: string) => {
+        sent.push(text)
+        return new Promise<void>(() => {})
+      },
+    } as unknown as AssistantApi
+
+    function Opener() {
+      const { openGuide } = useAssistantContext()
+      useEffect(() => {
+        openGuide({
+          id: 1,
+          title: '先定三件事',
+          prompt: '我已经选好了',
+          groups: [
+            { key: 'topic', label: '练什么', options: ['单表', 'JOIN'] },
+            { key: 'tables', label: '几张表', options: ['1', '2'] },
+          ],
+        })
+      }, [openGuide])
+      return null
+    }
+
+    render(
+      <AssistantProvider>
+        <Opener />
+        <ConversationPanel api={api} />
+      </AssistantProvider>,
+    )
+
+    await screen.findByTestId('assistant-guide')
+    expect(sent).toHaveLength(0)
+
+    fireEvent.click(screen.getByTestId('guide-topic-1'))
+    fireEvent.click(screen.getByTestId('guide-submit'))
+
+    await waitFor(() => expect(sent).toHaveLength(1))
+    expect(sent[0]).toContain('练什么：JOIN')
+    expect(sent[0]).toContain('几张表：1')
+  })
+})

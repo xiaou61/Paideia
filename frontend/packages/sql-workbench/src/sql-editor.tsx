@@ -46,6 +46,8 @@ export interface SqlEditorProps {
   placeholder?: string
   /** 供测试与外部聚焦用。 */
   ariaLabel?: string
+  /** 递增即聚焦（WORK-063：替换全文后让光标落进编辑器）。 */
+  focusSignal?: number
 }
 
 /**
@@ -60,6 +62,7 @@ export function SqlEditor({
   readOnly = false,
   placeholder,
   ariaLabel = 'SQL 编辑器',
+  focusSignal,
 }: SqlEditorProps) {
   const host = useRef<HTMLDivElement | null>(null)
   const view = useRef<EditorView | null>(null)
@@ -139,6 +142,14 @@ export function SqlEditor({
       instance.dispatch({ changes: { from: 0, to: current.length, insert: value } })
     }
   }, [value])
+
+  // 递增即聚焦（WORK-063）：「继续编辑」替换全文后，光标直接落进编辑器，省一次手点。
+  useEffect(() => {
+    if (focusSignal === undefined || focusSignal === 0) {
+      return
+    }
+    view.current?.focus()
+  }, [focusSignal])
 
   return (
     <div

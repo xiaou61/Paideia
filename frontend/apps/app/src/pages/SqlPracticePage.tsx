@@ -85,6 +85,8 @@ const ResultChart = lazy(async () => {
  */
 export function SqlPracticePage() {
   const [code, setCode] = useState('SELECT * FROM customers;')
+  /** 递增即让编辑器聚焦（WORK-063 的「继续编辑」）。 */
+  const [editorFocusSeq, setEditorFocusSeq] = useState(0)
   const [tables, setTables] = useState<{ statementIndex: number; columns: string[]; rows: string[][] }[] | null>(null)
   const [explainOutput, setExplainOutput] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -95,9 +97,12 @@ export function SqlPracticePage() {
     setPageContext,
     pendingSql,
     clearPendingSql,
+    pendingAppendSql,
+    clearPendingAppendSql,
     pendingDatasetSql,
     clearPendingDatasetSql,
     ask,
+    openGuide,
   } = useAssistantContext()
   const queryClient = useQueryClient()
   const [searchParams] = useSearchParams()
@@ -270,17 +275,25 @@ export function SqlPracticePage() {
   })
 
   /**
-   * 「让 AI 设计」（WORK-053；2026-11-02 改成直开助手）。
+   * 「让 AI 设计」（WORK-053；2026-11-02 改成直开助手；2026-11-03 改引导式）。
    *
-   * <p>**不在页面上收集主题**：AI 自己会先问（要练什么、哪些表、多少行），用户回答即可。
-   * 生成的 SQL 经回答里的「存为数据集」回到弹窗（见上面的 `pendingDatasetSql` effect），
-   * 确认名字与可见性后才保存。
+   * <p>**先给选项再生成**（WORK-063）：面板里出现三组选项（练什么 / 几张表 / 每表行数），
+   * 选完点「生成」才发一条消息。选项是页面固定的，不让模型先回一轮文字反问——省一次等待。
+   * 生成的 SQL 可从回答里「插入编辑器」「继续编辑」，或经「存为数据集」回到弹窗保存。
    */
   const askAiToDesign = () => {
     setDatasetDialogOpen(false)
-    ask(
-      '帮我造一个 SQL 练习数据集。先问我三个问题：用来练什么、要哪些表、大概多少行，然后用 planner_build_dataset 把 SQL 拼出来。',
-    )
+    openGuide({
+      id: Date.now(),
+      title: '先定三件事，再生成 SQL',
+      prompt:
+        '帮我造一个 SQL 练习数据集。我已经选好了下面的内容，请直接用 planner_build_dataset 生成建表与插数 SQL，不要再问我问题。',
+      groups: [
+        { key: 'topic', label: '练什么', options: ['单表过滤与排序', 'JOIN 与聚合', '窗口函数', 'NULL 与日期'] },
+        { key: 'tables', label: '几张表', options: ['1', '2', '3'] },
+        { key: 'rows', label: '每表行数', options: ['10', '50', '200'] },
+      ],
+    })
   }
 
   /**
@@ -339,8 +352,21 @@ export function SqlPracticePage() {
       return
     }
     setCode(pendingSql.text)
+    // 「继续编辑」替换全文后把光标落进编辑器（WORK-063）
+    setEditorFocusSeq((current) => current + 1)
     clearPendingSql(pendingSql.id)
   }, [pendingSql, clearPendingSql])
+
+  /** 「插入编辑器」：追加到现有内容之后，不毁掉用户已写的草稿（WORK-063）。 */
+  useEffect(() => {
+    if (pendingAppendSql === null) {
+      return
+    }
+    setCode((current) =>
+      current.trim() === '' ? pendingAppendSql.text : `${current.trimEnd()}\n\n${pendingAppendSql.text}`,
+    )
+    clearPendingAppendSql(pendingAppendSql.id)
+  }, [pendingAppendSql, clearPendingAppendSql])
 
   /**
    * 消费助手送来的「存为数据集」（WORK-060）。
@@ -443,8 +469,8 @@ export function SqlPracticePage() {
 
             {/*
               数据集工坊（WORK-035 T-13 / WORK-060；2026-11-02 由展开面板改弹窗）：
-              「自己设计」= 在弹窗里直接写 SQL；「让 AI 设计」= 关弹窗、开助手，AI 先问问题，
-              再把 SQL 经回答里的「存为数据集」带回来。
+              「自己设计」= 在弹窗里直接写 SQL；「让 AI 设计」= 关弹窗、开助手，
+              先用三组选项问清要练什么，再把 SQL 带回来（WORK-063）。
             */}
             <Dialog open={datasetDialogOpen} onOpenChange={setDatasetDialogOpen}>
               <DialogContent
@@ -587,8 +613,8 @@ export function SqlPracticePage() {
                       只允许建表与插数；保存前会在沙箱里真跑一遍，跑不通不会存。
                     </p>
                     <p className="text-muted-foreground text-xs">
-                      点「让 AI 设计」会打开助手：AI 先问你要练什么、哪些表、多少行，再把 SQL
-                      带回来填进「写 SQL」里。
+                      点「让 AI 设计」会打开助手并给出三组选项（练什么、几张表、每表行数）：
+                      选完点「生成」，回答里的 SQL 可以「插入编辑器」或「继续编辑」。
                     </p>
                   </>
                 ) : (
@@ -666,6 +692,7 @@ export function SqlPracticePage() {
                 schema={completionSchema}
                 placeholder="写一段 SQL，按运行看结果"
                 ariaLabel="SQL 编辑器"
+                focusSignal={editorFocusSeq}
               />
             </Suspense>
 

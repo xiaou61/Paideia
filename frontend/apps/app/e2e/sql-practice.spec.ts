@@ -376,20 +376,70 @@ test.describe('SQL 自由练习', () => {
   })
 
   /**
-   * 「让 AI 设计」直开助手（2026-11-02 用户反馈）。
+   * 「让 AI 设计」引导式生成（WORK-063）。
    *
-   * <p>断两件事：弹窗让位（关掉，不然会挡在助手面板前）、助手面板打开且输入框**预填**了提问。
-   * 不发送是刻意的（发送等于替用户花钱）——用户按回车才算数。
+   * <p>断三件事：点入口只出选项卡、**不发消息**；点「生成」才发一条（内容含选择）；
+   * SQL 回答里的「插入编辑器」是追加、「继续编辑」是替换并把光标落进编辑器。
+   *
+   * <p>模型侧打桩（SSE 返回一个 sql 代码块）：这条验的是交互与接线，不是模型质量。
    */
-  test('让 AI 设计：关掉弹窗并打开助手预填问题', async ({ page }) => {
+  test('让 AI 设计：选完选项才发，SQL 可插入或替换编辑器', async ({ page }) => {
     await mockStatus(page)
+    await page.route('**/api/v1/ai/conversations', async (route) => {
+      if (route.request().method() !== 'POST') {
+        await route.fallback()
+        return
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 0, message: 'ok', traceId: null, data: { id: 1 } }),
+      })
+    })
+    await page.route('**/api/v1/ai/conversations/1/messages', async (route) => {
+      if (route.request().method() !== 'POST') {
+        await route.fallback()
+        return
+      }
+      await route.fulfill({
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+        // 解析器要求每块带 `event:` 行（见 packages/assistant/src/sse.ts），只写 data: 会被丢掉
+        body:
+          'event: content\n' +
+          'data: {"type":"content","delta":"```sql\\nCREATE TABLE t (id INT);\\n```"}\n\n' +
+          'event: done\n' +
+          'data: {"type":"done"}\n\n',
+      })
+    })
 
     await page.goto('/#/practice/sql')
     await page.getByTestId('sql-create-dataset').click()
     await page.getByTestId('sql-ask-dataset').click()
 
+    // 弹窗让位，向导卡出现；输入框是空的——没有预填、更没有自动发
     await expect(page.getByTestId('sql-dataset-dialog')).toHaveCount(0)
-    await expect(page.getByTestId('conversation-input')).toHaveValue(/先问我三个问题/)
+    await expect(page.getByTestId('assistant-guide')).toBeVisible()
+    await expect(page.getByTestId('conversation-input')).toHaveValue('')
+
+    await page.getByTestId('guide-topic-1').click()
+    await page.getByTestId('guide-submit').click()
+
+    // 发出的是拼好的那条：选择出现在用户消息里
+    await expect(page.getByTestId('conversation-messages')).toContainText('JOIN 与聚合')
+    await expect(page.getByTestId('conversation-messages')).toContainText('练什么')
+
+    const editor = page.getByTestId('sql-practice-editor')
+    // 插入 = 追加：原草稿还在，SQL 在后面
+    await page.getByTestId('conversation-append-sql').click()
+    await expect(editor).toContainText('SELECT * FROM customers;')
+    await expect(editor).toContainText('CREATE TABLE t (id INT);')
+
+    // 继续编辑 = 替换全文并聚焦
+    await page.getByTestId('conversation-apply-sql').click()
+    await expect(editor).not.toContainText('SELECT * FROM customers;')
+    await expect(editor).toContainText('CREATE TABLE t (id INT);')
+    await expect(page.locator('.cm-content')).toBeFocused()
   })
 })
 

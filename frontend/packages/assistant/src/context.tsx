@@ -136,6 +136,30 @@ interface AssistantContextApi extends AssistantContextValue {
   pendingDatasetSql: PendingPrompt | null
   applyDatasetSql: (text: string) => void
   clearPendingDatasetSql: (id: number) => void
+  /**
+   * 发送前的向导卡（WORK-063）。页面决定选项，用户在卡上选完点「生成」才发一条消息；
+   * **不进会话历史**——关掉面板即丢弃。
+   */
+  guide: AssistantGuide | null
+  openGuide: (guide: AssistantGuide) => void
+  clearGuide: (id: number) => void
+  /** 追加到编辑器（与 `applySql` 的"替换"相对）。 */
+  pendingAppendSql: PendingPrompt | null
+  appendSql: (text: string) => void
+  clearPendingAppendSql: (id: number) => void
+}
+
+/**
+ * 一张"发送前的表单"：标题 + 若干组单选 + 拼消息用的前置说明。
+ *
+ * <p>选项由页面给（当前固定三组），不让模型生成：省一轮等待，也不会因模型输出格式漂移退化成文字。
+ */
+export interface AssistantGuide {
+  id: number
+  title: string
+  /** 拼进消息的前置说明（例如"我已经选好了，直接用 planner_build_dataset，不要再问"）。 */
+  prompt: string
+  groups: { key: string; label: string; options: string[] }[]
 }
 
 const AssistantContext = createContext<AssistantContextApi | null>(null)
@@ -161,6 +185,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const [pendingPrompt, setPendingPrompt] = useState<PendingPrompt | null>(null)
   const [pendingSql, setPendingSql] = useState<PendingPrompt | null>(null)
   const [pendingDatasetSql, setPendingDatasetSql] = useState<PendingPrompt | null>(null)
+  const [pendingAppendSql, setPendingAppendSql] = useState<PendingPrompt | null>(null)
+  const [guide, setGuide] = useState<AssistantGuide | null>(null)
 
   // setEntry 必须**稳定**：调用方（条目页）把它放进 useEffect 的依赖里，
   // 每次渲染都换一个新函数会让那个 effect 反复跑。
@@ -193,6 +219,28 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
   const clearPendingSql = useCallback((id: number) => {
     setPendingSql((current) => (current?.id === id ? null : current))
+  }, [])
+
+  const appendSql = useCallback((text: string) => {
+    const trimmed = text.trim()
+    if (trimmed === '') {
+      return
+    }
+    setPendingAppendSql({ id: Date.now(), text: trimmed })
+  }, [])
+
+  const clearPendingAppendSql = useCallback((id: number) => {
+    setPendingAppendSql((current) => (current?.id === id ? null : current))
+  }, [])
+
+  const openGuide = useCallback((next: AssistantGuide) => {
+    setGuide(next)
+    // 与 ask 同一套打开逻辑，但**不发消息**：发送要等用户点「生成」
+    setRevealSeq((current) => current + 1)
+  }, [])
+
+  const clearGuide = useCallback((id: number) => {
+    setGuide((current) => (current?.id === id ? null : current))
   }, [])
 
   const applyDatasetSql = useCallback((text: string) => {
@@ -243,6 +291,12 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       pendingDatasetSql,
       applyDatasetSql,
       clearPendingDatasetSql,
+      guide,
+      openGuide,
+      clearGuide,
+      pendingAppendSql,
+      appendSql,
+      clearPendingAppendSql,
     }),
     [
       entryId,
@@ -265,6 +319,12 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       pendingDatasetSql,
       applyDatasetSql,
       clearPendingDatasetSql,
+      guide,
+      openGuide,
+      clearGuide,
+      pendingAppendSql,
+      appendSql,
+      clearPendingAppendSql,
     ],
   )
 
