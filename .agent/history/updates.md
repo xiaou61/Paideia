@@ -9719,3 +9719,17 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
   - 本轮修复**未部署、未推送**
 - 本地提交：见上四条
 - 远端推送：未执行
+
+## 2026-11-03 11:30 +0800 · 区间审查 4a37586..HEAD（59 提交 / 5 段，91 条）
+
+- 类型：review + fix
+- 变更：`.agent/reviews/2026-11-03-4a37586..HEAD.md`（high 2 / medium 24 / low 65）；`BASELINE` 前移到 `c2ca182c`
+- 处置：
+  - **high#1 误报，未改代码**：报告称 `MemoryExtractionService` 只捕 `RejectedExecutionException` 漏了 `TaskRejectedException`；`javap` 核实 `TaskRejectedException extends RejectedExecutionException`，原 catch 已覆盖，多 catch 反而编译不过。`AssistantConversationController` 同理。
+  - **high#2 已修**：`PrometheusClient` 的 `Double.valueOf("+Inf")` 会抛 `NumberFormatException`，违背"绝不抛"契约；数值解析收敛到 `OpsHttp.parseDouble`，Loki 的 `+Inf` 与非数值时间戳一并兜住；新增 `PrometheusClientTest` 2 例。
+  - **medium 影响主流程的 5 条已修**：progress 内连接丢未分类条目（LEFT JOIN + 集成测试）、SQL 数据集弹窗保存失败不可见、保存后可见性不复位、目录里自己的公开集重复、`OpsHttp` 的 `URI.create` 在 try 外。
+  - 其余 19 medium / 65 low 只登记（含 5 处未使用 import、2 处重复 testid，可下次顺手清）。
+- 验证：`PrometheusClientTest` 2/2、`LearningProgressIntegrationTest` 10/10（含新增）、`Ops*` 全绿（BUILD SUCCESS）；前端 typecheck 通过；`sql-practice` e2e **9 通过 / 1 跳过 / 0 失败**。
+- **过程中踩到的坑（写给下一次）**：Playwright 在 Windows 上会漏掉 java 子进程——上一轮 e2e 结束后 8080 仍被占，下一轮 `reuseExistingServer` 复用它（连的是已删库），表现是"登录后停在登录页"。跑 e2e 前先 `netstat -ano | grep :8080`。另外失败的 test-db 运行会累积残留库（本次见到约 300 个 `paideia_run_*`）。
+- 本地提交：见下四条
+- 远端推送：未执行
