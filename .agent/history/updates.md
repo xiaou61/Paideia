@@ -9793,5 +9793,7 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 变更：探测改为 `TABLE_SCHEMA = DATABASE()`（两条路径都对），并在注释里写明原因。
 - 验证：`SqlDatasetUploadServiceTest` 4/4、`SqlDatasetSchemaReaderTest` 7/7，BUILD SUCCESS。
 - 已知：已存在的 3 个上传数据集不会自愈，需要重新保存一次；其它语言的沙箱不受影响。
-- 本地提交：见下
-- 远端推送：未执行
+- 本地提交：`49474cb7`
+- 远端推送：已推送；部署 `49474cb7`，108.4 秒
+- 线上验证：新建数据集「结构修复…」→ 右侧显示「共 1 张表 · 3 列 / 主键：id」；库里 `table_count=1, schema_json IS NULL=0`
+- 未自愈：修复前保存的「我的数据集」`schema_json` 仍是 NULL，需重新保存一次（或另行补数据）
