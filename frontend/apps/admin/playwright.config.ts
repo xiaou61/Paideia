@@ -83,7 +83,8 @@ export default defineConfig({
             MANAGEMENT_ENDPOINTS_WEB_CORS_ALLOWED_ORIGINS: ADMIN_ORIGINS,
           },
           url: `http://127.0.0.1:${BACKEND_PORT}/actuator/health`,
-          reuseExistingServer: true,
+          // 同学习者端：复用已有后端会静默打到别人的库，端口被占就让它报错。
+          reuseExistingServer: false,
           timeout: 120_000,
         },
         {

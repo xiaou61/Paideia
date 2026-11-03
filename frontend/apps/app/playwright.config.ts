@@ -122,9 +122,10 @@ export default defineConfig({
         MANAGEMENT_ENDPOINTS_WEB_CORS_ALLOWED_ORIGINS: APP_ORIGINS,
       },
       url: `http://127.0.0.1:${BACKEND_PORT}/actuator/health`,
-      // 注意：若本机已有一个后端在跑，这里会复用它，上面的 env 就不生效，
-      // 于是 e2e 会打到那个后端连接的库（通常是 paideia）而找不到种子账号。跑之前先确认没有在跑的后端。
-      reuseExistingServer: true,
+      // **不复用已有后端**：固定端口上复用会静默打到别人的库（2026-11-03 实测：上一轮的
+      // java 子进程漏在 8080，本轮复用它、连的是已删库，表现为"登录后停在登录页"）。
+      // 端口被占就让 Playwright 直接报错——跑之前先 `netstat -ano | grep :8080`。
+      reuseExistingServer: false,
       timeout: 120_000,
     },
     {
