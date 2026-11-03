@@ -9731,5 +9731,5 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
   - 其余 19 medium / 65 low 只登记（含 5 处未使用 import、2 处重复 testid，可下次顺手清）。
 - 验证：`PrometheusClientTest` 2/2、`LearningProgressIntegrationTest` 10/10（含新增）、`Ops*` 全绿（BUILD SUCCESS）；前端 typecheck 通过；`sql-practice` e2e **9 通过 / 1 跳过 / 0 失败**。
 - **过程中踩到的坑（写给下一次）**：Playwright 在 Windows 上会漏掉 java 子进程——上一轮 e2e 结束后 8080 仍被占，下一轮 `reuseExistingServer` 复用它（连的是已删库），表现是"登录后停在登录页"。跑 e2e 前先 `netstat -ano | grep :8080`。另外失败的 test-db 运行会累积残留库（本次见到约 300 个 `paideia_run_*`）。
-- 本地提交：见下四条
-- 远端推送：未执行
+- 本地提交：`5f546f11`、`e313acae`、`e51101bc`、`62553171`
+- 远端推送：`c2ca182c..62553171` 成功；随后部署 `62553171`（150.2 秒），部署后 health 200 / 0.11 秒、ego 全站点击 58/58、全量后端 1288/0/20
