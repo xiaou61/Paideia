@@ -78,7 +78,7 @@ record McpViews(String name, Set<String> toolsets, boolean write, boolean defaul
      * 的工具在调用阶段同样不可见——两道判断用的是同一份过滤链。
      */
     ToolQuery queryFor(Set<ToolScope> scopes, String role) {
-        return ToolQuery.view(toolsets, write, role, scopes);
+        return ToolQuery.view(toolsets, write, role, scopes, defaultsOnly);
     }
 
     /**
@@ -95,7 +95,7 @@ record McpViews(String name, Set<String> toolsets, boolean write, boolean defaul
                 ? allowedToolsets
                 : toolsets.stream().filter(allowedToolsets::contains)
                         .collect(java.util.stream.Collectors.toSet());
-        return ToolQuery.view(intersected, write, role, scopes);
+        return ToolQuery.view(intersected, write, role, scopes, defaultsOnly);
     }
 
 }

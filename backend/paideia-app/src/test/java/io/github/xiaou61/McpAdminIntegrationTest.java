@@ -127,12 +127,14 @@ class McpAdminIntegrationTest {
         HttpResponse<String> learnerView = postJson("/mcp/x/admin_users", learnerPat, initializeBody(), null);
         assertThat(learnerView.statusCode()).isEqualTo(404);
 
-        // 学习者默认视图：19 个只读工具，且没有任何管理工具。
-        // 12 → 19 是 WORK-044 之前就发生的（assistant_ask 等进了默认组），不是本项改的。
+        // 学习者默认视图 = 目录里的默认组（只读），与 McpToolSnapshotTest.DEFAULT_VIEW 同一份。
+        // 2026-11-03 前这里是 19：`defaultsOnly` 没接进查询，默认视图实际返回全部只读工具，
+        // WORK-044 的 8 个域工具一直漏在里面；修复后恢复 11。
         List<String> learnerTools = tools("/mcp", learnerPat, initialize("/mcp", learnerPat));
-        // 19 是 WORK-044 之前就有的实际值（本项新增的 8 个工具都是 defaultGroup=false，不计入）
-        assertThat(learnerTools).hasSize(19);
+        assertThat(learnerTools).hasSize(11);
         assertThat(learnerTools).noneMatch(name -> name.startsWith("admin_"));
+        // 非默认组的工具必须走显式视图：memory 组仍能取到，且不会出现在 /mcp 里
+        assertThat(learnerTools).doesNotContain("memory_list", "resume_list", "sql_read_dataset");
     }
 
     @Test

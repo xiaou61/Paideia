@@ -25,13 +25,14 @@ import org.junit.jupiter.api.Test;
  */
 class McpViewRegistryTest {
 
-    private static PaideiaTool tool(String name, String toolset, ToolScope scope, boolean readOnly) {
+    private static PaideiaTool tool(String name, String toolset, ToolScope scope, boolean readOnly,
+                                    boolean defaultGroup) {
         return new PaideiaTool() {
             @Override
             public ToolDescriptor descriptor() {
                 return new ToolDescriptor(name, toolset, name, "描述 " + name,
                         Map.of("type", "object", "properties", Map.of()), null,
-                        readOnly, false, true, scope, false);
+                        readOnly, false, true, scope, defaultGroup);
             }
 
             @Override
@@ -43,9 +44,9 @@ class McpViewRegistryTest {
 
     private static ToolCatalog catalog() {
         return new ToolCatalog(List.of(
-                tool("knowledge_search", "knowledge", ToolScope.READ, true),
-                tool("admin_users_list", "admin_users", ToolScope.ADMIN, true),
-                tool("admin_users_set_role", "admin_users", ToolScope.ADMIN, false)));
+                tool("knowledge_search", "knowledge", ToolScope.READ, true, true),
+                tool("admin_users_list", "admin_users", ToolScope.ADMIN, true, false),
+                tool("admin_users_set_role", "admin_users", ToolScope.ADMIN, false, false)));
     }
 
     private static List<String> names(ToolCatalog catalog, McpViews view, String role) {
@@ -84,11 +85,12 @@ class McpViewRegistryTest {
     }
 
     @Test
-    void defaultViewForAdminAddsAdminReadToolsButStillNoWrites() {
-        // 默认视图 = 全部只读工具：管理员凭 admin scope 能看到管理读工具，但管理写工具仍不可见
+    void defaultViewOnlyContainsDefaultGroupToolsForEitherRole() {
+        // 默认视图 = 默认组（只读），不是"全部只读"（WORK-044 AC-005：新工具一律不进默认视图）。
+        // 管理工具在各自组里、defaultGroup=false，管理员同样要走 /x/admin_* 才看得到。
         assertThat(names(catalog(), McpViews.DEFAULT, "admin"))
-                .containsExactlyInAnyOrder("knowledge_search", "admin_users_list");
-        // 学习者仍然只有学习者工具
+                .containsExactly("knowledge_search");
+        // 学习者仍然只有学习者工具，且没有写工具
         assertThat(names(catalog(), McpViews.DEFAULT, "learner"))
                 .containsExactly("knowledge_search");
     }

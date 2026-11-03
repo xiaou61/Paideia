@@ -55,9 +55,20 @@ public record ToolQuery(
      * @param scopes   凭据的作用域
      */
     public static ToolQuery view(Set<String> toolsets, boolean write, String role, Set<ToolScope> scopes) {
+        return view(toolsets, write, role, scopes, false);
+    }
+
+    /**
+     * 同上，但可以只要默认组（`/mcp` 的语义）。
+     *
+     * <p>`/mcp` 是"默认组、只读"，不是"全部只读"——漏掉这个参数会让标了 `defaultGroup=false` 的工具
+     * 全部暴露在默认视图里（2026-11-03 修：WORK-019 起一直如此，WORK-044 的 8 个域工具都在其中）。
+     */
+    public static ToolQuery view(Set<String> toolsets, boolean write, String role, Set<ToolScope> scopes,
+                                 boolean defaultsOnly) {
         Set<ToolScope> effective = write
                 ? scopes
                 : scopes.stream().filter(it -> it != ToolScope.WRITE).collect(java.util.stream.Collectors.toSet());
-        return new ToolQuery(toolsets, Set.of(), !write, role, effective, false);
+        return new ToolQuery(toolsets, Set.of(), !write, role, effective, defaultsOnly);
     }
 }
