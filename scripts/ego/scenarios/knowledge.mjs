@@ -43,4 +43,21 @@ export const cases = [
       })
     },
   },
+  {
+    id: 'knowledge-entry-summary',
+    title: '条目正文：AI 摘要区在（按钮或卡片），不再需要开助手',
+    write: false,
+    async run(s) {
+      await s.goto('/#/knowledge/entries')
+      await s.step('进第一条条目', async () => {
+        await s.waitFor('[data-testid="entry-list"]', 'visible', 20_000)
+        await s.clickFirstVisible('[data-testid="entry-list"] [data-testid^="entry-link-"]')
+        await s.waitFor('[data-testid="markdown-body"]')
+      })
+      await s.step('摘要区与生成按钮可见', async () => {
+        await s.waitFor('[data-testid="entry-summary"]')
+        await s.waitFor('[data-testid="entry-summary-generate"]')
+      })
+    },
+  },
 ]

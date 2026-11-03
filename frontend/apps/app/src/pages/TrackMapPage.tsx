@@ -1,4 +1,3 @@
-import { Attach } from '@paideia/assistant'
 import { createLearningApi, type TrackStage } from '@paideia/knowledge'
 import {
   Alert,
@@ -278,14 +277,6 @@ function StageCell({
       </Link>
 
       {/* 这一关可以被单独递给助手：不用先点进去——"卡在第 13 关"这类问题在选关时就有 */}
-      <Attach
-        type="level"
-        id={`${trackSlug}/${stage.seq}`}
-        label={`${trackName} · 第 ${stage.seq} 关 ${stage.title}`}
-        excerpt={`难度：${level.label}；状态：${done ? '已通关' : '未通关'}`}
-        compact
-        className="shrink-0"
-      />
     </div>
   )
 }

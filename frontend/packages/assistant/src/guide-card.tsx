@@ -1,7 +1,20 @@
 import { Button } from '@paideia/ui'
 import { useState } from 'react'
 
-import type { AssistantGuide } from './context'
+/**
+ * 一张"发送前的表单"：标题 + 若干组单选 + 拼消息用的前置说明。
+ *
+ * <p>选项由页面给（数据集向导里固定四组），不让模型生成：省一轮等待，也不会因模型输出格式
+ * 漂移退化成文字。`hints` 是**选中项的说明**，没有就不显示。
+ */
+export interface AssistantGuide {
+  id: number
+  title: string
+  /** 拼进消息的前置说明（例如"我已经选好了，直接用 planner_build_dataset，不要再问"）。 */
+  prompt: string
+  groups: { key: string; label: string; options: string[]; hints?: Record<string, string> }[]
+}
+
 
 /**
  * 发送前的向导卡（WORK-063）。

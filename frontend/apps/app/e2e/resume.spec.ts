@@ -81,11 +81,6 @@ test.describe('简历编辑', () => {
     await expect(page.getByTestId('resume-print').locator('aside')).toHaveCount(0)
     await expect(page.getByTestId('resume-print')).toContainText(name)
 
-    // 打印态下悬浮助手必须消失：它挂在路由之外，不写 `data-print-hide` 会一起印到纸上
-    await page.emulateMedia({ media: 'print' })
-    await expect(page.getByTestId('assistant-launcher')).toBeHidden()
-    await page.emulateMedia({ media: 'screen' })
-
     // 版式记在 localStorage：刷新后仍是紧凑
     await page.reload()
     await expect(page.getByTestId('resume-template-compact')).toHaveAttribute('aria-pressed', 'true')

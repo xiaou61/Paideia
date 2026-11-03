@@ -22,7 +22,7 @@ import {
   DropdownMenuTrigger,
   Input,
 } from '@paideia/ui'
-import { ChevronDown, LogOut, Menu, Plug, Search, UserRound, UserX } from 'lucide-react'
+import { ChevronDown, LogOut, Menu, Plug, Search, Sparkles, UserRound, UserX } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 
@@ -341,6 +341,11 @@ export function LearnerHeader() {
           <DropdownMenuItem data-testid="account-profile" onClick={() => { void navigate('/profile'); setNavOpen(false) }}>
             <UserRound className="size-4" />
             身份与目标
+          </DropdownMenuItem>
+          {/* 记忆与积分（WORK-066）：原先在助手面板里，面板下线后搬到这里。 */}
+          <DropdownMenuItem data-testid="account-settings" onClick={() => { void navigate('/settings'); setNavOpen(false) }}>
+            <Sparkles className="size-4" />
+            记忆与积分
           </DropdownMenuItem>
           {/* MCP 接入入口（WORK-019）：它是"给外部助手用的钥匙"，低频且带凭据含义，
               放账号菜单比放主导航稳妥——主航道上不该出现一个可能泄露 token 的入口。 */}

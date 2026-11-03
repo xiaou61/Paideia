@@ -11,7 +11,7 @@ export const modules = [
     side: 'learner',
     scenario: 'identity',
     minCases: 3,
-    routes: ['/login', '/register', '/oauth/callback', '/profile', '/settings/mcp'],
+    routes: ['/login', '/register', '/oauth/callback', '/profile', '/settings/mcp', '/settings'],
   },
   {
     id: 'home',
@@ -36,14 +36,6 @@ export const modules = [
     scenario: 'notes',
     minCases: 3,
     routes: ['/notes', '/notes/new', '/share/:shareId'],
-  },
-  {
-    id: 'assistant',
-    name: '助手与记忆',
-    side: 'learner',
-    scenario: 'assistant',
-    minCases: 3,
-    routes: [],
   },
   {
     id: 'learn',

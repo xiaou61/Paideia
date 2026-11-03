@@ -253,14 +253,3 @@ test('新建页没写东西就能直接返回；写了东西才拦一下', async
   await expect(page.locator('body')).not.toContainText(before)
 })
 
-test('跟着助手的回答走：回答上带"存进笔记"入口（本环境没凭据，只验入口的挂载规则）', async ({ page }) => {
-  await signIn(page)
-  await page.goto('/#/knowledge')
-  await page.getByTestId('assistant-launcher').click()
-  await page.getByTestId('assistant-tab-chat').click()
-
-  // 还没有任何回答：不该出现存笔记入口（空正文与提示都不该被存成笔记）
-  await expect(page.getByTestId('conversation-save-to-note')).toHaveCount(0)
-  // 聊天输入照常在：面板本身是通的
-  await expect(page.getByTestId('conversation-input')).toBeVisible()
-})

@@ -165,7 +165,6 @@ async function runSide(side, page) {
         if (item.start) await session.goto(item.start)
         // 菜单、弹窗、助手面板都会跨页面保留；先收掉，避免遮挡点击目标。
         await session.hotkey('Escape').catch(() => {})
-        await session.closeAssistant().catch(() => {})
         await item.run(session)
         results.push({ module: mod.id, case: item.id, title: item.title, status: 'passed', durationMs: Date.now() - caseStart })
         console.log(`✓ ${mod.id}/${item.id}（${((Date.now() - caseStart) / 1000).toFixed(1)}s）`)

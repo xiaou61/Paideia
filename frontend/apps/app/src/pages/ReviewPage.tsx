@@ -1,4 +1,3 @@
-import { Attach } from '@paideia/assistant'
 import { createLearningApi, type ReviewSession, type ReviewSubmitResult } from '@paideia/knowledge'
 import {
   Alert,
@@ -255,13 +254,6 @@ export function ReviewPage() {
                     </span>
                     {/* 到期列表里只有条目 id，没有复习项自己的 id：对象就是那条条目，
                         第几档与到期日放进摘录（WORK-058 的一期做法） */}
-                    <Attach
-                      type="entry"
-                      id={item.entryId}
-                      label={`复习：${item.title}`}
-                      excerpt={`第 ${item.stage} 档，${new Date(item.reviewDueAt).toLocaleDateString('zh-CN')} 到期`}
-                      compact
-                    />
                   </CardContent>
                 </Card>
               </li>

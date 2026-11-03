@@ -1,4 +1,3 @@
-import { useAssistantContext } from '@paideia/assistant'
 import {
   MarkdownBody,
   createKnowledgeApi,
@@ -39,7 +38,6 @@ export function SourceChapterPage() {
   const { project = '', entryId: rawId } = useParams<{ project: string; entryId: string }>()
   const entryId = Number(rawId)
   const valid = Number.isFinite(entryId) && entryId > 0
-  const { ask } = useAssistantContext()
 
   const entry = useQuery({
     queryKey: ['knowledge-entry', entryId],
@@ -130,7 +128,6 @@ export function SourceChapterPage() {
             mediaBaseUrl={API_BASE_URL}
             entryId={entry.data.id}
             entryTitle={entry.data.title}
-            onAskAssistant={ask}
             progress={progressPort}
           />
 

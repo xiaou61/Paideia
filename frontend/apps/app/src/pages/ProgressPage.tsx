@@ -1,4 +1,3 @@
-import { useAssistantContext } from '@paideia/assistant'
 import {
   createLearningApi,
   type ConceptNode,
@@ -38,24 +37,19 @@ const learning = createLearningApi(api)
 const LIMIT = 5
 
 /**
- * 学习记录（WORK-053）。
+ * 学习记录（WORK-053；WORK-066 去掉 AI 后只留记录本身）。
  *
- * <p><b>这一页的定位</b>：把"我学到哪、卡在哪、该复习什么"摆出来，并且每个关键位置都能把 AI
- * 叫进来——它不是第二个 `/learn`（地图还在那边），也不重算任何数字：四块全部来自既有接口，
- * 前端只做拼接与截断。
- *
- * <p><b>为什么入口只有三个</b>：按钮越多越像演示。这三个是"用户当场就知道要问什么"的：
- * 卡关处、复习出题、解释推荐理由。
+ * <p><b>这一页的定位</b>：把"我学到哪、卡在哪、该复习什么"摆出来。它不是第二个 `/learn`
+ * （地图还在那边），也不重算任何数字：四块全部来自既有接口，前端只做拼接与截断。
  */
 export function ProgressPage() {
-  const { setPageContext, ask } = useAssistantContext()
 
   const tracks = useQuery({ queryKey: ['learning-tracks'], queryFn: () => learning.tracks() })
   const progress = useQuery({ queryKey: ['learning-progress'], queryFn: () => learning.progress() })
   const reviews = useQuery({ queryKey: ['learning-reviews'], queryFn: () => learning.reviews() })
   const graph = useQuery({ queryKey: ['learning-graph'], queryFn: () => learning.graph() })
 
-  // 四块摘要：既渲染在页面上，也作为助手上下文。**同一份来源**，不各算一次。
+  // 四块摘要：同一份来源，不各算一次。
   const lines = useMemo(() => summarizeLines(tracks.data ?? []), [tracks.data])
   const failing = useMemo(() => summarizeFailing(progress.data ?? []), [progress.data])
   const dueReviews = useMemo(
@@ -64,29 +58,11 @@ export function ProgressPage() {
   )
   const weakConcepts = useMemo(() => weakestConcepts(graph.data?.concepts ?? []), [graph.data])
 
-  // 页面上下文：离开时清掉，与 entryId 那套分开清理。
-  // `lines` 必须自己拼：它是对象数组，`join` 只会给助手一串 `[object Object]`
-  // （2026-11-02 审查抓到）；`failing` 只给条数不给条目名的话，助手不知道人在哪卡住。
-  useEffect(() => {
-    setPageContext({
-      kind: 'study-log',
-      lines: lines.map((line) => `${line.name} ${line.passed}/${line.stage}`).join('；'),
-      failing: failing.map((item) => `${item.title}（${item.label}）`).join('；'),
-      dueReviews: dueReviews.join('、'),
-      weakConcepts: weakConcepts.map((concept) => `${concept.name} ${concept.score.toFixed(2)}`).join('；'),
-    })
-    return () => setPageContext(null)
-  }, [setPageContext, lines, failing, dueReviews, weakConcepts])
-
-  const askFailing = (label: string) => {
-    ask(`我在「${label}」上卡住了。我已经把学习记录给你了：先看我卡住的地方，再告诉我下一步该做什么——不要泛泛而谈。`)
-  }
-
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
       <PageHeader
         title="学习记录"
-        description="你学到哪、卡在哪、该复习什么。每一块都可以叫助手一起看——它会先问清楚，再给具体建议。"
+        description="你学到哪、卡在哪、该复习什么。"
       />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -127,17 +103,7 @@ export function ProgressPage() {
               {failing.map((item) => (
                 <li key={item.entryId} className="flex items-center justify-between gap-3 text-sm">
                   <span className="min-w-0 truncate">{item.title}</span>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <Badge variant="secondary">{item.label}</Badge>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      data-testid={`progress-ask-failing-${item.entryId}`}
-                      onClick={() => askFailing(item.title)}
-                    >
-                      问问
-                    </Button>
-                  </div>
+                  <Badge variant="secondary">{item.label}</Badge>
                 </li>
               ))}
             </ul>
@@ -165,17 +131,7 @@ export function ProgressPage() {
                     </li>
                   ))}
                 </ul>
-                <Button
-                  className="mt-3"
-                  size="sm"
-                  data-testid="progress-ask-review"
-                  onClick={() =>
-                    ask('按我的学习记录，从到期复习里挑 3 个最该先过的，各出一题考我；先别给答案。')
-                  }
-                >
-                  <Sparkles className="size-4" />
-                  让 AI 出复习题
-                </Button>
+                
               </>
             ) : null}
           </CardContent>
@@ -201,27 +157,11 @@ export function ProgressPage() {
                 </li>
               ))}
             </ul>
-            <Button
-              className="mt-3"
-              size="sm"
-              variant="outline"
-              data-testid="progress-ask-recommend"
-              onClick={() =>
-                ask('看我的学习记录：为什么现在推这几条线？如果我想换目标，该先动哪一条？')
-              }
-            >
-              问为什么这样推荐
-            </Button>
+            
           </CardContent>
         </Card>
       </div>
 
-      <p className="text-muted-foreground mt-6 text-xs">
-        助手会读这一页上的四块记录。对话会消耗积分，问得越细花得越多。
-        <Link className="ml-1 underline" to="/learn">
-          去从零开始
-        </Link>
-      </p>
     </AppShell>
   )
 }

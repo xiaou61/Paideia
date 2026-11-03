@@ -110,26 +110,6 @@ test('进度：刷新后回到上次那一步，练习成绩保留', async ({ pa
   await expect(page.getByTestId('code-tour')).toContainText('第 3 步')
 })
 
-test('问 AI：只填进输入框、不发送', async ({ page }) => {
-  await openEntry(page)
-
-  let sent = 0
-  page.on('request', (request) => {
-    if (request.method() === 'POST' && /\/api\/v1\/ai\/conversations\/\d+\/messages/.test(request.url())) {
-      sent += 1
-    }
-  })
-
-  await page.getByTestId('block-ask').first().click()
-  const input = page.getByTestId('conversation-input')
-  await expect(input).toBeVisible()
-  await expect(input).toHaveValue(/第 1 步/)
-  await expect(input).toHaveValue(/ReactFiberWorkLoop\.js:2794/)
-  // 给潜在的在飞请求一点时间；没有点击发送就不该有
-  await page.waitForTimeout(800)
-  expect(sent).toBe(0)
-})
-
 test('阅读不请求 GitHub', async ({ page }) => {
   const github: string[] = []
   page.on('request', (request) => {

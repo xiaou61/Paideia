@@ -27,6 +27,25 @@ export const cases = [
     },
   },
   {
+    id: 'identity-settings',
+    title: '记忆与积分：账号菜单进得去，两块都在',
+    write: false,
+    async run(s) {
+      await s.step('从账号菜单进入', async () => {
+        await s.goto('/#/')
+        await s.clickCss('[data-testid="account-menu-trigger"]', '打开账号菜单')
+        await s.waitFor('[data-testid="account-settings"]')
+        await s.clickCss('[data-testid="account-settings"]', '进入记忆与积分')
+        await s.waitFor('[data-testid="settings-memory"]')
+      })
+      await s.step('记忆与积分两块都渲染', async () => {
+        await s.waitFor('[data-testid="settings-credits"]')
+        await s.expectText('记忆')
+        await s.expectText('积分')
+      })
+    },
+  },
+  {
     id: 'identity-account-menu',
     title: '账号菜单：能看到身份入口与登出',
     write: false,

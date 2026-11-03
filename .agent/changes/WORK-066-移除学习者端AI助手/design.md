@@ -2,7 +2,7 @@
 artifact: design
 work_id: WORK-066
 work: 移除学习者端 AI 助手，入口改成专用流程
-status: draft
+status: approved
 created: 2026-11-03
 updated: 2026-11-03
 ---

@@ -31,22 +31,6 @@ test('学习记录：导航里有入口', async ({ page }) => {
   await expect(page.getByRole('heading', { name: '学习记录', level: 1 })).toBeVisible()
 })
 
-test('学习记录：点「问问」打开助手并预填，但不自动发送', async ({ page }) => {
-  await signIn(page)
-  await page.goto('/#/progress')
-
-  const ask = page.locator('[data-testid^="progress-ask-failing-"]').first()
-  // 没有卡住的关卡时这条用例没有观察点——跳过而不是伪造一条数据
-  test.skip((await ask.count()) === 0, '这个账号没有未满分的关卡，卡关入口不可观察')
-
-  await ask.click()
-  const input = page.getByTestId('conversation-input')
-  await expect(input).toBeVisible({ timeout: 15_000 })
-  await expect(input).not.toHaveValue('')
-  // 预填 ≠ 发送：消息列表里不该多出这条
-  await expect(page.getByText('我在「').first()).toHaveCount(1)
-})
-
 /**
  * 「今天要做的事」（WORK-053 TASK-009 / REQ-006/007）。
  *

@@ -9817,3 +9817,14 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 状态：**draft**。三项范围待用户裁决（面板四块怎么处置 / 八处按钮删还是改 / 管理端保留哪个），未写任何实现代码。
 - 本地提交：本笔
 - 远端推送：未执行
+
+## 2026-11-03 17:20 +0800 · WORK-066 移除学习者端 AI 助手
+
+- 类型：refactor
+- 用户裁决（按推荐执行）：对话删除；精简搬到条目页；记忆/积分搬到 `/#/settings`；八处「问 AI」全删；管理端不新建助手（只留 AI 统计）。
+- 变更：删除 `AssistantShell`/`AssistantProvider` 与助手包的面板、附着、上下文、citation/plan/mention/session-store 等 12 个文件及各自测试；对应 e2e 同步删（assistant/attachments/移动端抽屉/各处 ask 用例）。
+- 新增：`/#/settings`（记忆 + 积分，复用 `MemoryPanel`/`CreditsPanel`）+ 账号菜单入口「记忆与积分」；条目页正文末尾「AI 摘要」区（按钮 + 卡片）。
+- 保留：后端接口与会话/记忆/积分数据不动；`client.ts` 的聊天方法暂留（无 UI 调用方），接口下线时一并删。
+- 验证：前端 typecheck 0 错；单测全绿；学习者 e2e **120 通过 / 14 跳过**（1 条残留用例已删）；ego 闸门 17 模块 / 56 用例通过。
+- 本地提交：见下
+- 远端推送：未执行

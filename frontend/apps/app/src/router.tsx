@@ -6,6 +6,7 @@ import { BooksPage } from './pages/BooksPage'
 import { BookChaptersPage } from './pages/BookChaptersPage'
 import { GraphPage } from './pages/GraphPage'
 import { ProgressPage } from './pages/ProgressPage'
+import { SettingsPage } from './pages/SettingsPage'
 import { ReviewPage } from './pages/ReviewPage'
 import { KnowledgeEntryPage } from './pages/KnowledgeEntryPage'
 import { CampDetailPage } from './pages/CampDetailPage'
@@ -87,6 +88,15 @@ export const router = createHashRouter([
     element: (
       <RequireAuth>
         <ProgressPage />
+      </RequireAuth>
+    ),
+  },
+  // 记忆与积分（WORK-066）：助手面板下线后，这两块的自有入口。
+  {
+    path: '/settings',
+    element: (
+      <RequireAuth>
+        <SettingsPage />
       </RequireAuth>
     ),
   },

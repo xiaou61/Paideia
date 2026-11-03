@@ -188,18 +188,6 @@ export function createSession({ page, baseUrl, role, runId, artifactsDir }) {
       await session.waitFor('[data-testid="login-form"]')
     },
 
-    async openAssistant() {
-      if (await session.count('[data-testid="assistant-shell"]')) return
-      await session.clickCss('[data-testid="assistant-launcher"]', '打开 AI 助手')
-      await session.waitFor('[data-testid="assistant-shell"]')
-    },
-
-    async closeAssistant() {
-      if (await session.count('[data-testid="assistant-shell"]')) {
-        await session.clickCss('[data-testid="assistant-collapse"]', '收起助手')
-      }
-    },
-
     async hotkey(keys) {
       await page.keyboard.press(keys)
     },

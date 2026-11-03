@@ -25,7 +25,6 @@ import {
   LoadingRow,
   PageHeader,
 } from '@paideia/ui'
-import { useAssistantContext } from '@paideia/assistant'
 import { useQuery } from '@tanstack/react-query'
 import {
   ArrowRight,
@@ -167,17 +166,7 @@ export function LearnPage() {
     () => scoreTracks(tracks.data ?? [], role, new Date()),
     [tracks.data, role],
   )
-  const { ask } = useAssistantContext()
   const picks = useMemo(() => pickAdvice(scored, 3), [scored])
-  const askAdvice = () => {
-    if (picks.length === 0) {
-      return
-    }
-    ask(
-      `为什么给我推荐这三条线：${picks.map((item) => item.name).join('、')}？` +
-        '按我的学习记录说清楚顺序，别泛泛而谈；如果该换一条，直接说换哪条、为什么。',
-    )
-  }
 
   /**
    * 三段地图：**按岗位的 rank 排，不按分数排**。
@@ -241,7 +230,7 @@ export function LearnPage() {
       ) : null}
 
       {meta.available && picks.length > 0 ? (
-        <AdviceCard picks={picks} onAsk={askAdvice} />
+        <AdviceCard picks={picks} />
       ) : null}
 
       {/* 「继续上次」：地图里真正该先点的只有一条，别让人自己在卡片里找"下一关" */}
@@ -369,7 +358,7 @@ function RolePicker({ role, onChoose }: { role: RoleKey; onChoose: (next: RoleKe
  * 卡片本身永远在。所以这里没有任何 loading 与 error 态——那会让一次可选的润色
  * 看起来像页面依赖它。
  */
-function AdviceCard({ picks, onAsk }: { picks: ScoredTrack[]; onAsk: () => void }) {
+function AdviceCard({ picks }: { picks: ScoredTrack[] }) {
   const [showWhy, setShowWhy] = useState(false)
   return (
     <section
@@ -379,14 +368,6 @@ function AdviceCard({ picks, onAsk }: { picks: ScoredTrack[]; onAsk: () => void 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h2 className="text-base font-semibold">接下来先学这三条</h2>
         <span className="text-muted-foreground text-xs">按岗位和你现在的进度算的，每天更新一次</span>
-        <button
-          type="button"
-          onClick={onAsk}
-          data-testid="learn-advice-ask"
-          className="text-muted-foreground hover:text-foreground ml-auto text-xs underline underline-offset-2"
-        >
-          问助手为什么
-        </button>
       </div>
 
       <ol className="divide-border divide-y">

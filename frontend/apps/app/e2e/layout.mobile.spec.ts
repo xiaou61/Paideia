@@ -140,41 +140,6 @@ test.describe('移动导航抽屉', () => {
   })
 })
 
-test.describe('助手底部抽屉', () => {
-  test('窄屏是贴底抽屉，覆盖而不占位，可点遮罩关闭', async ({ page }) => {
-    await signIn(page)
-    await page.goto('/#/knowledge')
-    const before = await page.locator('main').boundingBox()
-
-    await page.getByTestId('assistant-launcher').click()
-    const shell = page.getByTestId('assistant-shell')
-    await expect(shell).toBeVisible()
-    await expect(shell).toHaveAttribute('data-narrow', 'true')
-
-    // 覆盖不占位：正文列宽不因助手改变（WORK-011 的 AC-008 在窄屏同样成立）
-    expect((await page.locator('main').boundingBox())?.width).toBe(before?.width)
-
-    // 贴底、留出高度上限
-    const box = await shell.boundingBox()
-    const vh = page.viewportSize()!.height
-    expect(box!.y + box!.height).toBeLessThanOrEqual(vh + 1)
-    expect(box!.height).toBeLessThanOrEqual(vh * 0.86)
-
-    // 遮罩点击关闭，且关闭后入口重新出现
-    await page.getByTestId('assistant-backdrop').click({ position: { x: 5, y: 5 } })
-    await expect(shell).toHaveCount(0)
-    await expect(page.getByTestId('assistant-launcher')).toBeVisible()
-  })
-
-  test('Esc 也能关闭', async ({ page }) => {
-    await signIn(page)
-    await page.getByTestId('assistant-launcher').click()
-    await expect(page.getByTestId('assistant-shell')).toBeVisible()
-    await page.keyboard.press('Escape')
-    await expect(page.getByTestId('assistant-shell')).toHaveCount(0)
-  })
-})
-
 test.describe('触控目标', () => {
   test('默认按钮的主档命中区不小于 44px', async ({ page }) => {
     await signIn(page)

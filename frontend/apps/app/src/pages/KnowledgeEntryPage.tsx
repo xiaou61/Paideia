@@ -21,7 +21,7 @@ import {
   extractQuizzes,
 } from '@paideia/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { attachmentUri, useAssistantContext } from '@paideia/assistant'
+import { createAssistantApi, SummaryCardView } from '@paideia/assistant'
 import { ArrowLeft, ArrowRight, ChevronLeft, ListTree } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
@@ -53,16 +53,27 @@ export function KnowledgeEntryPage() {
   const fromTrack = location.state as
     | { fromTrackSlug?: string; fromTrackName?: string }
     | null
-  const { setEntry, ask, attach, revealAssistant } = useAssistantContext()
-  /** 选区太短时的提示（WORK-058）：不静默吞掉，否则用户会以为按钮坏了。 */
-  const [selectionHint, setSelectionHint] = useState<string | null>(null)
 
   /**
-   * 源码解读的双向入口（WORK-014）：内容里的「问 AI」把一句话交给助手输入框，
-   * 学习路径点击某站直接跳过去。两个都保持**稳定引用**——它们会进 `MarkdownBody`
-   * 的 memo 依赖，每次渲染换新函数会让整篇正文重解析。
+   * 源码解读的双向入口（WORK-014）：学习路径点击某站直接跳过去。
+   * 保持**稳定引用**——它会进 `MarkdownBody` 的 memo 依赖，每次渲染换新函数会让整篇正文重解析。
    */
   const openEntry = useCallback((id: number) => navigate(`/knowledge/entries/${id}`), [navigate])
+
+  /**
+   * AI 摘要（WORK-066）：原来在助手面板的「精简」页签；面板下线后放在正文末尾。
+   * 只读已有的那份，没有就点按钮生成——不再需要开对话。
+   */
+  const assistantApi = useMemo(() => createAssistantApi(api), [])
+  const summaryQuery = useQuery({
+    queryKey: ['entry-summary', entryId],
+    queryFn: () => assistantApi.summary(entryId),
+    enabled: valid,
+  })
+  const generateSummary = useMutation({
+    mutationFn: () => assistantApi.generate(entryId, 'private'),
+    onSuccess: (view) => queryClient.setQueryData(['entry-summary', entryId], view),
+  })
 
   /**
    * 代码执行（WORK-015）：把能力探测与运行封成端口交给正文块。
@@ -172,20 +183,6 @@ export function KnowledgeEntryPage() {
 
   // 把"当前在读哪一条"交给悬浮壳：它是唯一知道这件事的地方。
   // 离开页面时清空，壳随即回到"打开一条内容后可用"的状态。
-  useEffect(() => {
-    if (entry.data === undefined) {
-      return
-    }
-    // 课程条目用导师行为（WORK-020）：判断依据是服务端给的学习线类别，不是标题或地址。
-    // 学情还没取到时先按通用助手——它没有学情段落，也不会假装看过记录。
-    setEntry({
-      id: entry.data.id,
-      title: entry.data.title,
-      harness: serverProgress.data?.lineKind === 'course' ? 'tutor' : 'assistant',
-    })
-    return () => setEntry(null)
-  }, [entry.data, serverProgress.data?.lineKind, setEntry])
-
   /**
    * 记一次浏览（WORK-021）。
    *
@@ -212,30 +209,6 @@ export function KnowledgeEntryPage() {
       await queryClient.invalidateQueries({ queryKey: ['my-assessments'] })
     },
   })
-
-  /**
-   * 把正文里选中的一段递给助手（WORK-058）。
-   *
-   * <p>选区在按钮**按下**时就会被浏览器清掉，所以按钮的 `onMouseDown` 要 `preventDefault`
-   * （见下面的 Button）；键盘触发没有选区问题，照常可用。
-   */
-  const attachSelection = () => {
-    if (entry.data === undefined) {
-      return
-    }
-    const text = window.getSelection()?.toString().trim() ?? ''
-    if (text.length < 4) {
-      setSelectionHint('先用鼠标选中正文里的一段，再点这里')
-      return
-    }
-    setSelectionHint(null)
-    attach({
-      uri: attachmentUri('entry', `${entry.data.id}/selection`),
-      label: `${entry.data.title} · 选中片段`,
-      excerpt: text,
-    })
-    revealAssistant()
-  }
 
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
@@ -285,24 +258,6 @@ export function KnowledgeEntryPage() {
             )}
             <PageHeader title={entry.data.title} />
 
-            {/* 选中一段递给助手（WORK-058）：整条条目已经在上下文里，这里补的是"我正在读的这一段" */}
-            <div className="mb-6 flex flex-wrap items-center gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                data-testid="entry-attach-selection"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={attachSelection}
-              >
-                把选中这段问助手
-              </Button>
-              {selectionHint === null ? null : (
-                <span className="text-muted-foreground text-xs" role="status">
-                  {selectionHint}
-                </span>
-              )}
-            </div>
-
             {/*
               来源链接（WORK-025）：抓来的面经帖标出原帖，让读者能回原处核对。
               平台自产内容与存量条目的 sourceUrl 是 null，这里整个不渲染。
@@ -347,7 +302,6 @@ export function KnowledgeEntryPage() {
               mediaBaseUrl={API_BASE_URL}
               entryId={entry.data.id}
               entryTitle={entry.data.title}
-              onAskAssistant={ask}
               onOpenEntry={openEntry}
               sandbox={sandbox}
               progress={progressPort}
@@ -366,6 +320,37 @@ export function KnowledgeEntryPage() {
                 }
               />
             )}
+
+            {/* AI 摘要（WORK-066）：面板下线后这块回到条目页 */}
+            <section className="border-border bg-card mt-8 rounded-xl border p-4" data-testid="entry-summary">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-sm font-medium">AI 摘要</h2>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={generateSummary.isPending}
+                  data-testid="entry-summary-generate"
+                  onClick={() => generateSummary.mutate()}
+                >
+                  {generateSummary.isPending ? '生成中…' : summaryQuery.data == null ? '生成摘要' : '重新生成'}
+                </Button>
+              </div>
+              {summaryQuery.isPending ? (
+                <p className="text-muted-foreground text-xs">读取中…</p>
+              ) : summaryQuery.data == null ? (
+                <p className="text-muted-foreground text-xs">
+                  还没有摘要。点「生成摘要」用 AI 把这条内容压缩成要点。
+                </p>
+              ) : (
+                <SummaryCardView view={summaryQuery.data} />
+              )}
+              {generateSummary.isError ? (
+                <p className="text-destructive mt-2 text-xs" data-testid="entry-summary-error">
+                  {errorMessage(generateSummary.error)}
+                </p>
+              ) : null}
+            </section>
 
             <div className="mt-10">
               <SelfAssessmentButtons

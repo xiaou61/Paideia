@@ -1,5 +1,5 @@
 import { createKnowledgeApi } from '@paideia/knowledge'
-import { GuideCard, useAssistantContext, type AssistantGuide } from '@paideia/assistant'
+import { GuideCard, type AssistantGuide } from '@paideia/assistant'
 // 只引 schema 子入口：它是纯函数、不含 CodeMirror，静态引入不会把编辑器带进主 chunk。
 // 编辑器/结果表/执行计划/侧栏都走下面的 lazy()。
 import {
@@ -145,23 +145,12 @@ const ResultChart = lazy(async () => {
 export function SqlPracticePage() {
   const [code, setCode] = useState('SELECT * FROM customers;')
   /** 递增即让编辑器聚焦（WORK-063 的「继续编辑」）。 */
-  const [editorFocusSeq, setEditorFocusSeq] = useState(0)
   const [tables, setTables] = useState<{ statementIndex: number; columns: string[]; rows: string[][] }[] | null>(null)
   const [explainOutput, setExplainOutput] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [dataset, setDataset] = useState<string | null>(null)
   const [catalogOpen, setCatalogOpen] = useState(false)
 
-  const {
-    setPageContext,
-    pendingSql,
-    clearPendingSql,
-    pendingAppendSql,
-    clearPendingAppendSql,
-    pendingDatasetSql,
-    clearPendingDatasetSql,
-    ask,
-  } = useAssistantContext()
   const queryClient = useQueryClient()
   const [searchParams] = useSearchParams()
   // 从关卡跳过来（WORK-035 T-14）：带 entryId + blockKey 就在工作台里打开那道题
@@ -276,11 +265,9 @@ export function SqlPracticePage() {
   const [datasetSql, setDatasetSql] = useState('')
   const [datasetVisibility, setDatasetVisibility] = useState<'private' | 'public'>('private')
   const [datasetNameInput, setDatasetNameInput] = useState('')
-  const [datasetMode, setDatasetMode] = useState<'new' | 'existing'>('new')
   const [datasetDialogOpen, setDatasetDialogOpen] = useState(false)
   /** 弹窗里的「AI 生成」步骤（选项 → 生成中 → 回填 SQL）。 */
   const [designing, setDesigning] = useState(false)
-  const [addRows, setAddRows] = useState(5)
 
   /**
    * 新建数据集的两种编辑方式（2026-11-02 用户要求可视化建表）：点着建表（默认）或直接写 SQL。
@@ -373,75 +360,6 @@ export function SqlPracticePage() {
     }
   }, [challenge])
 
-  /**
-   * 上报页面场景给助手（WORK-035 T-15）。
-   *
-   * <p>**只放错误或行数摘要，不放数据行**：结果集可能上千行，塞进提示词既贵又可能
-   * 把用户没想分享的数据送进模型。模型想看结构有 `sql_describe_dataset`。
-   *
-   * <p>离开页面时必须清掉——否则从 SQL 页跳到别处，助手还在说"你这段 SQL……"。
-   */
-  useEffect(() => {
-    if (selected === null) {
-      setPageContext(null)
-      return
-    }
-    const summary =
-      error !== null
-        ? `报错：${error}`
-        : tables !== null
-          ? `返回 ${tables.length} 个结果集，共 ${tables.reduce((sum, table) => sum + table.rows.length, 0)} 行`
-          : explainOutput !== null
-            ? '刚才看了执行计划'
-            : ''
-    setPageContext({ kind: 'sql-workbench', datasetKey: selected, draftSql: code, lastResult: summary })
-    return () => setPageContext(null)
-  }, [selected, code, error, tables, explainOutput, setPageContext])
-
-  /**
-   * 消费助手填回的 SQL（WORK-035 T-15）。
-   *
-   * <p>**只填回编辑器，不执行**：助手没有执行 SQL 的能力（跑一次要 3 秒与一次配额，
-   * 写操作还会真的落数据）。用户点"运行"才算数——这与 WORK-006 的"自主只建议不动作"一致。
-   */
-  useEffect(() => {
-    if (pendingSql === null) {
-      return
-    }
-    setCode(pendingSql.text)
-    // 「继续编辑」替换全文后把光标落进编辑器（WORK-063）
-    setEditorFocusSeq((current) => current + 1)
-    clearPendingSql(pendingSql.id)
-  }, [pendingSql, clearPendingSql])
-
-  /** 「插入编辑器」：追加到现有内容之后，不毁掉用户已写的草稿（WORK-063）。 */
-  useEffect(() => {
-    if (pendingAppendSql === null) {
-      return
-    }
-    setCode((current) =>
-      current.trim() === '' ? pendingAppendSql.text : `${current.trimEnd()}\n\n${pendingAppendSql.text}`,
-    )
-    clearPendingAppendSql(pendingAppendSql.id)
-  }, [pendingAppendSql, clearPendingAppendSql])
-
-  /**
-   * 消费助手送来的「存为数据集」（WORK-060）。
-   *
-   * <p>**只回填面板，不保存**：唯一写库的动作仍是用户点「确认保存」。
-   */
-  useEffect(() => {
-    if (pendingDatasetSql === null) {
-      return
-    }
-    setDatasetSql(pendingDatasetSql.text)
-    // 助手给的是 SQL 文本：切到「写 SQL」页签，别让它落在点着建表的视图后面看不见
-    setDesignerTab('sql')
-    setDatasetMode('new')
-    setDatasetDialogOpen(true)
-    clearPendingDatasetSql(pendingDatasetSql.id)
-  }, [pendingDatasetSql, clearPendingDatasetSql])
-
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
       <PageHeader
@@ -507,7 +425,6 @@ export function SqlPracticePage() {
                 size="sm"
                 data-testid="sql-create-dataset"
                 onClick={() => {
-                  setDatasetMode('new')
                   setDatasetDialogOpen(true)
                 }}
               >
@@ -537,30 +454,11 @@ export function SqlPracticePage() {
                 <DialogHeader>
                   <DialogTitle>造一个自己的数据集</DialogTitle>
                   <DialogDescription>
-                    点着建表就能造数据集，生成 SQL 后保存；也可以自己写 SQL，或让 AI 先问你几个问题再拼。
+                    点着建表就能造数据集，生成 SQL 后保存；也可以自己写 SQL，或让 AI 按四组选项先拼一版。
                   </DialogDescription>
                 </DialogHeader>
-                <div className="flex flex-wrap gap-2" role="group" aria-label="数据集模式">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={datasetMode === 'new' ? 'default' : 'outline'}
-                    onClick={() => setDatasetMode('new')}
-                  >
-                    新建数据集
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={datasetMode === 'existing' ? 'default' : 'outline'}
-                    onClick={() => setDatasetMode('existing')}
-                  >
-                    基于当前数据集改
-                  </Button>
-                </div>
 
-                {datasetMode === 'new' ? (
-                  designing ? (
+                {designing ? (
                     <div className="space-y-3" data-testid="sql-dataset-design">
                       <GuideCard
                         guide={DATASET_DESIGN_GUIDE}
@@ -694,62 +592,6 @@ export function SqlPracticePage() {
                       SQL 直接填进上面的「写 SQL」里，你改完再点「确认保存」。
                     </p>
                   </>
-                  )
-                ) : (
-                  <>
-                    <p className="text-muted-foreground text-xs">
-                      当前数据集：<strong>{selected ?? '未选择'}</strong>
-                      {schema === null ? '' : `（${schema.tables.length} 张表）`}。
-                      选一张表让 AI 在它基础上追加；<strong>原数据集不会被修改，保存的是新的一份</strong>。
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <label className="text-xs" htmlFor="sql-dataset-add-rows">
-                        每张表加
-                      </label>
-                      <Input
-                        id="sql-dataset-add-rows"
-                        type="number"
-                        min={1}
-                        max={50}
-                        value={addRows}
-                        onChange={(event) =>
-                          setAddRows(Math.max(1, Math.min(50, Number(event.target.value) || 1)))
-                        }
-                        className="w-20"
-                        aria-label="每张表追加行数"
-                      />
-                      <span className="text-xs">行</span>
-                    </div>
-                    {schema === null || schema.tables.length === 0 ? (
-                      <p className="text-muted-foreground text-xs">
-                        这个数据集还没有结构信息，先选中它再试。
-                      </p>
-                    ) : (
-                      <div className="flex flex-wrap gap-1.5">
-                        {schema.tables.map((table) => (
-                          <Button
-                            key={table.name}
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={selected === null}
-                            data-testid={`sql-dataset-add-${table.name}`}
-                            onClick={() => {
-                              setDatasetDialogOpen(false)
-                              ask(
-                                `当前数据集是 ${selected}。请先用 sql_read_dataset 读取它的完整 SQL，然后给表 ${table.name} 追加 ${addRows} 行数据，其他表保持不变。最后给出可以直接保存的完整 SQL。`,
-                              )
-                            }}
-                          >
-                            {table.name} +{addRows} 行
-                          </Button>
-                        ))}
-                      </div>
-                    )}
-                    <p className="text-muted-foreground text-xs">
-                      AI 会先读取完整 SQL 再追加；回答里点「存为数据集」就回到「新建数据集」里确认保存。
-                    </p>
-                  </>
                 )}
               </DialogContent>
             </Dialog>
@@ -770,7 +612,6 @@ export function SqlPracticePage() {
                 schema={completionSchema}
                 placeholder="写一段 SQL，按运行看结果"
                 ariaLabel="SQL 编辑器"
-                focusSignal={editorFocusSeq}
               />
             </Suspense>
 
@@ -803,32 +644,11 @@ export function SqlPracticePage() {
               <Button
                 type="button"
                 variant="outline"
-                data-testid="sql-ai-question"
-                disabled={selected === null}
-                onClick={() =>
-                  // 统一到对话（WORK-053 REQ-009）：预填意图，不自动发送
-                  ask('按当前数据集和我的 SQL 水平出一道练习题：先别给答案，我写完再让你判。')
-                }
-              >
-                让 AI 出题
-              </Button>
-              {/* 降级：助手不可用（余额/上游）时仍然能一次性生成，与「AI 造数据集」同一取舍 */}
-              <Button
-                type="button"
-                variant="ghost"
                 data-testid="sql-ai-question-direct"
                 disabled={askAi.isPending || selected === null}
                 onClick={() => askAi.mutate()}
               >
-                {askAi.isPending ? '出题中…' : '直接生成'}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                data-testid="sql-ask-assistant"
-                onClick={() => ask('帮我看看这段 SQL 哪里有问题')}
-              >
-                问助手
+                {askAi.isPending ? '出题中…' : '让 AI 出题'}
               </Button>
               <span className="text-muted-foreground text-xs">
                 每次运行约 4–5 秒（要起一个干净的数据库）

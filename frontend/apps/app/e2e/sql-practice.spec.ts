@@ -322,18 +322,6 @@ test.describe('SQL 自由练习', () => {
     expect(bodies[0]).toContain('"name":"我的新库"')
   })
 
-  /** 基于当前数据集改：列出表，每张表一个「让 AI 加 N 行」按钮（WORK-060）。 */
-  test('基于当前数据集改：列出表并提供加行入口', async ({ page }) => {
-    await mockStatus(page)
-    await mockSchema(page)
-
-    await page.goto('/#/practice/sql')
-    await page.getByTestId('sql-create-dataset').click()
-    await page.getByRole('button', { name: '基于当前数据集改' }).click()
-    await expect(page.getByTestId('sql-dataset-add-customers')).toContainText('+5 行')
-    await expect(page.getByTestId('sql-dataset-add-orders')).toBeVisible()
-  })
-
   /**
    * 可视化建表（2026-11-02 用户要求）：点着建表实时生成 SQL，保存的就是生成的那份。
    *
