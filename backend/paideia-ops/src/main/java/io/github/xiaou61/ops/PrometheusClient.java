@@ -54,7 +54,7 @@ class PrometheusClient {
                     labels.put(entry.getKey(), entry.getValue().asText()));
             // value 是 [时间戳, "字符串数值"]，字符串形式是 Prometheus 的规范
             String raw = item.path("value").path(1).asText();
-            Double value = raw.isBlank() ? null : Double.valueOf(raw);
+            Double value = OpsHttp.parseDouble(raw);
             samples.add(new Sample(labels, value));
         }
         return samples;

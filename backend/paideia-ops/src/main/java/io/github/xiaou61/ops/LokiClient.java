@@ -48,7 +48,13 @@ class LokiClient {
                 if (value.size() < 2) {
                     continue;
                 }
-                long nanos = Long.parseLong(value.get(0).asText());
+                long nanos;
+                try {
+                    nanos = Long.parseLong(value.get(0).asText());
+                } catch (NumberFormatException broken) {
+                    // 非数值的时间戳只丢这一行：整段日志不该因为一条脏数据变空（2026-11-03 审查）
+                    continue;
+                }
                 lines.add(new LogLine(Instant.ofEpochSecond(0, nanos), value.get(1).asText()));
             }
         }
@@ -77,6 +83,6 @@ class LokiClient {
             return null;
         }
         String raw = result.get(0).path("value").path(1).asText();
-        return raw.isBlank() ? null : Double.valueOf(raw);
+        return OpsHttp.parseDouble(raw);
     }
 }

@@ -43,11 +43,13 @@ final class OpsHttp {
      * <p>中断也要还原标志位，否则线程池里的这条线程会带着中断状态继续跑。
      */
     static Optional<JsonNode> getJson(HttpClient http, String url, Duration timeout) {
-        HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                .timeout(timeout)
-                .GET()
-                .build();
         try {
+            // URI/请求的构造也放进 try：基地址里混进空格等非法字符时 URI.create 会抛
+            // IllegalArgumentException，放在外面就违反"绝不抛"的约定（2026-11-03 审查）。
+            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+                    .timeout(timeout)
+                    .GET()
+                    .build();
             HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
                 return Optional.empty();
@@ -58,6 +60,24 @@ final class OpsHttp {
                 Thread.currentThread().interrupt();
             }
             return Optional.empty();
+        }
+    }
+
+    /**
+     * Prometheus / Loki 的字符串数值。
+     *
+     * <p>两者都用字符串表示特殊浮点值：`"+Inf"` / `"-Inf"` / `"NaN"`，而 `Double.valueOf`
+     * 只认 `"Infinity"`——`"+Inf"` 会抛 NumberFormatException。解析不了的一律按无数据
+     * （{@code null}）返回，与两个客户端"失败不抛"的契约一致。
+     */
+    static Double parseDouble(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return Double.valueOf(raw.trim());
+        } catch (NumberFormatException specialOrBroken) {
+            return null;
         }
     }
 }
