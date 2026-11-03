@@ -48,12 +48,16 @@ public class SqlDatasetUploadService {
      *
      * <p>它与用户的数据集在**同一个容器、同一个库**里跑，所以拿到的是真实的表结构。
      * 注意它必须排在数据集之后——容器脚本先灌数据集、再执行这里的 SQL。
+     *
+     * <p><b>库名用 {@code DATABASE()} 而不是写死 `practice`</b>：一次性容器导入 `practice`，
+     * 但容器池（WORK-052）每次执行用的是随机库名 `p<纳秒>`；写死会让池内探测永远 0 行，
+     * 结构快照存成 NULL（2026-11-03 线上实测：三个上传数据集全部没有结构）。
      */
     private static final String PROBE = """
             SELECT c.TABLE_NAME AS tbl, c.COLUMN_NAME AS col, c.COLUMN_TYPE AS typ,
                    c.IS_NULLABLE AS nullable, c.COLUMN_KEY AS colkey
             FROM information_schema.COLUMNS c
-            WHERE c.TABLE_SCHEMA = 'practice'
+            WHERE c.TABLE_SCHEMA = DATABASE()
             ORDER BY c.TABLE_NAME, c.ORDINAL_POSITION;
             """;
 

@@ -9784,3 +9784,14 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 远端推送：已推送；部署 93.8 秒（Web 重建），线上 bundle `index-B3vCX7S8.js` 已含「先定四件事 / 酒店预订 / guide-hint」（curl 核实）
 - 线上 ego 复验：4 组、主题 8 个、练习 5 个、每组选中项下方有说明；卡片在视口内。截图 `F:/caches/tmp/ego-sql-guide-6.png`
 - 补充事实：线上是纯 HTTP，`navigator.serviceWorker` 不存在（没有 SW），HTML/JS 都是 `Cache-Control: no-store`；用户看到旧卡片只可能是"部署前就打开的标签页没刷新"，不是缓存策略问题
+
+## 2026-11-03 16:10 +0800 · 修复：保存的数据集没有结构（容器池下探测查错库）
+
+- 类型：fix
+- 问题（用户实测）：保存数据集后右侧「表结构」为空、编辑器也空。线上库查证：`sql_datasets` 三个上传行 `schema_json` **全是 NULL**。
+- 根因：结构探测 SQL 写死 `WHERE TABLE_SCHEMA = 'practice'`；一次性容器导入 `practice` 没问题，但线上开了 SQL 容器池（WORK-052），池内每次执行用随机库名 `p<纳秒>`，探测永远 0 行；探测 0 行不算失败（"结构缺失不该让上传失败"），于是存了 NULL。
+- 变更：探测改为 `TABLE_SCHEMA = DATABASE()`（两条路径都对），并在注释里写明原因。
+- 验证：`SqlDatasetUploadServiceTest` 4/4、`SqlDatasetSchemaReaderTest` 7/7，BUILD SUCCESS。
+- 已知：已存在的 3 个上传数据集不会自愈，需要重新保存一次；其它语言的沙箱不受影响。
+- 本地提交：见下
+- 远端推送：未执行
