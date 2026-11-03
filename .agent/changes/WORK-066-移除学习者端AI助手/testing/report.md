@@ -18,6 +18,7 @@ verified_commit: 0e65332e
 | 学习者端 e2e | `scripts/test-db.sh pnpm --filter @paideia/app test:e2e` | passed | 见下（含删掉助手相关用例后的结果） |
 | ego 覆盖闸门 | `node scripts/ego/check-map.mjs` | passed | 17 模块 / 56 用例；`/settings` 已登记，条目的摘要区新增一条用例 |
 | 后端 | 未改 | n/a | 接口与数据原样保留 |
+| 线上端到端（ego） | 真实浏览器：首页 → 账号菜单 → `/#/settings` → 条目页 | passed | 首页 `assistant-launcher`/`assistant-shell` **计数 0**；设置页记忆与积分两块都渲染（余额 99803、流水在）；条目页出现「AI 摘要 / 生成摘要」；截图 `F:/caches/tmp/ego-no-assistant-1.png`、`-2.png` |
 
 ## 改动清单（代码核实）
 
