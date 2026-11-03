@@ -6,7 +6,7 @@ status: passed
 evidence: required
 created: 2026-11-03
 updated: 2026-11-03
-verified_commit: faf88b98
+verified_commit: bfa8344f
 ---
 
 # 验证报告
