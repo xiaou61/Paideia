@@ -254,4 +254,21 @@ class SqlAiServiceTest {
                 .hasMessageContaining("没有生成数据集");
         verify(uploads, org.mockito.Mockito.never()).upload(anyLong(), anyString(), anyString(), anyString());
     }
+
+    /** WORK-065：向导只要 SQL，不落库；保存仍由用户在页面上点。 */
+    @Test
+    void 只生成不保存() {
+        SqlDatasetUploadService uploads = uploads();
+        SqlAiService service = service(
+                runner(result(List.of("id"), List.of(List.of("1")), 0)),
+                questionPort("SELECT id FROM t"),
+                generatorPort("CREATE TABLE hotels (id INT);", null),
+                uploads);
+
+        SqlAiService.GeneratedDraft draft = service.draftDataset("造一个酒店库");
+
+        assertThat(draft.name()).isEqualTo("AI 生成的数据集");
+        assertThat(draft.sql()).contains("CREATE TABLE hotels");
+        org.mockito.Mockito.verifyNoInteractions(uploads);
+    }
 }

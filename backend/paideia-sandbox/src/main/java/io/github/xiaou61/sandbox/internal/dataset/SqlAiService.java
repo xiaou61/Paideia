@@ -107,17 +107,32 @@ public class SqlAiService {
      * @param visibility `private`（缺省）或 `public`；由用户在保存前选择
      */
     public String generateDataset(long userId, String topic, String visibility) {
+        GeneratedDraft draft = draftDataset(topic);
+        // 走上传流程：白名单、大小、干跑、抓结构，一条都不少
+        return uploads.upload(userId, draft.name(), draft.sql(), visibility);
+    }
+
+    /**
+     * 只生成、不保存（WORK-065）：向导拿到 SQL 先填进「写 SQL」让人看/改，保存由他点。
+     *
+     * <p>生成器是结构化输出（`{name, sql}`），不像聊天那样会附一篇解释——"数据集设计"这条线
+     * 不该走对话。
+     */
+    public GeneratedDraft draftDataset(String topic) {
         SqlDatasetGeneratorPort.Result generated =
                 generators.generate(new SqlDatasetGeneratorPort.Request(topic));
         if (generated.sql() == null || generated.sql().isBlank()) {
             throw new BizException(ErrorCode.INVALID_ARGUMENT,
                     "AI 这次没有生成数据集（可能没配置凭据或上游超时）");
         }
-        // 走上传流程：白名单、大小、干跑、抓结构，一条都不少
         String name = generated.name() == null || generated.name().isBlank()
                 ? "AI 生成的数据集"
                 : generated.name();
-        return uploads.upload(userId, name, generated.sql(), visibility);
+        return new GeneratedDraft(name, generated.sql());
+    }
+
+    /** 待用户确认的草稿：名字 + 完整建表与插数语句。 */
+    public record GeneratedDraft(String name, String sql) {
     }
 
     private CodeRun.Result runOn(long userId, String datasetKey, String sql) {

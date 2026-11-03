@@ -136,13 +136,6 @@ interface AssistantContextApi extends AssistantContextValue {
   pendingDatasetSql: PendingPrompt | null
   applyDatasetSql: (text: string) => void
   clearPendingDatasetSql: (id: number) => void
-  /**
-   * 发送前的向导卡（WORK-063）。页面决定选项，用户在卡上选完点「生成」才发一条消息；
-   * **不进会话历史**——关掉面板即丢弃。
-   */
-  guide: AssistantGuide | null
-  openGuide: (guide: AssistantGuide) => void
-  clearGuide: (id: number) => void
   /** 追加到编辑器（与 `applySql` 的"替换"相对）。 */
   pendingAppendSql: PendingPrompt | null
   appendSql: (text: string) => void
@@ -187,7 +180,6 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const [pendingSql, setPendingSql] = useState<PendingPrompt | null>(null)
   const [pendingDatasetSql, setPendingDatasetSql] = useState<PendingPrompt | null>(null)
   const [pendingAppendSql, setPendingAppendSql] = useState<PendingPrompt | null>(null)
-  const [guide, setGuide] = useState<AssistantGuide | null>(null)
 
   // setEntry 必须**稳定**：调用方（条目页）把它放进 useEffect 的依赖里，
   // 每次渲染都换一个新函数会让那个 effect 反复跑。
@@ -232,16 +224,6 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
   const clearPendingAppendSql = useCallback((id: number) => {
     setPendingAppendSql((current) => (current?.id === id ? null : current))
-  }, [])
-
-  const openGuide = useCallback((next: AssistantGuide) => {
-    setGuide(next)
-    // 与 ask 同一套打开逻辑，但**不发消息**：发送要等用户点「生成」
-    setRevealSeq((current) => current + 1)
-  }, [])
-
-  const clearGuide = useCallback((id: number) => {
-    setGuide((current) => (current?.id === id ? null : current))
   }, [])
 
   const applyDatasetSql = useCallback((text: string) => {
@@ -292,9 +274,6 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       pendingDatasetSql,
       applyDatasetSql,
       clearPendingDatasetSql,
-      guide,
-      openGuide,
-      clearGuide,
       pendingAppendSql,
       appendSql,
       clearPendingAppendSql,
@@ -320,9 +299,6 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       pendingDatasetSql,
       applyDatasetSql,
       clearPendingDatasetSql,
-      guide,
-      openGuide,
-      clearGuide,
       pendingAppendSql,
       appendSql,
       clearPendingAppendSql,

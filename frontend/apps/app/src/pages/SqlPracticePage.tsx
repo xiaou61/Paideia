@@ -1,5 +1,5 @@
 import { createKnowledgeApi } from '@paideia/knowledge'
-import { useAssistantContext } from '@paideia/assistant'
+import { GuideCard, useAssistantContext, type AssistantGuide } from '@paideia/assistant'
 // 只引 schema 子入口：它是纯函数、不含 CodeMirror，静态引入不会把编辑器带进主 chunk。
 // 编辑器/结果表/执行计划/侧栏都走下面的 lazy()。
 import {
@@ -36,7 +36,66 @@ import { DatasetDesigner } from '../components/DatasetDesigner'
 import { LearnerHeader } from '../components/LearnerHeader'
 import { errorMessage } from '@paideia/core'
 
-const knowledge = createKnowledgeApi(api)/**
+const knowledge = createKnowledgeApi(api)
+
+/**
+ * 「让 AI 生成数据集」的四组选项（WORK-065）。
+ *
+ * <p>生成走**非聊天**的结构化接口（`/api/v1/sql-datasets/draft`）：模型只回 `{name, sql}`，
+ * 不会写一篇讲解；选项说明逐组给在卡片里，选完点「生成」→ SQL 直接填进「写 SQL」，改完再保存。
+ */
+const DATASET_DESIGN_GUIDE: AssistantGuide = {
+  id: 1,
+  title: '先定四件事，再生成 SQL',
+  prompt:
+    '帮我造一个 SQL 练习数据集。我已经选好了下面的内容，不要再问我问题。'
+    + '数据你自己逐行想好：外键要指向真实存在的 id、日期不要超过今天、状态用真实取值；'
+    + '为了练 JOIN 可以故意留几条对不上的行，并在回答里说清留了哪几条。'
+    + '把表结构与每行数据一起交给 planner_build_dataset 拼装，不要凭记忆写建表语句。',
+  groups: [
+    {
+      key: 'theme',
+      label: '主题',
+      options: ['电商订单', '图书借阅', '员工与薪资', '物流运单', '博客与评论', '在线课程', '医院挂号', '酒店预订'],
+      hints: {
+        '电商订单': '客户 / 订单 / 订单明细，最经典的 JOIN 数据集',
+        '图书借阅': '读者 / 图书 / 借阅记录，适合练"没借过书的人"',
+        '员工与薪资': '部门 / 员工 / 薪资记录，适合 GROUP BY 与自连接',
+        '物流运单': '运单 / 包裹 / 路由节点，适合多级 JOIN',
+        '博客与评论': '作者 / 文章 / 评论，适合 LEFT JOIN 找零评论',
+        '在线课程': '学员 / 课程 / 报名与成绩',
+        '医院挂号': '患者 / 科室 / 挂号记录',
+        '酒店预订': '客人 / 房间 / 预订记录',
+      },
+    },
+    {
+      key: 'topic',
+      label: '练什么',
+      options: ['单表过滤与排序', 'JOIN 与聚合', '窗口函数', 'NULL 与日期', '子查询与派生表'],
+      hints: {
+        '单表过滤与排序': 'WHERE / ORDER BY / LIMIT，先熟悉数据长什么样',
+        'JOIN 与聚合': '多表连接 + GROUP BY / HAVING，最常用的组合',
+        '窗口函数': 'ROW_NUMBER / RANK / 累计求和，按组排名',
+        'NULL 与日期': 'IS NULL / COALESCE / 日期差，最容易踩坑的一块',
+        '子查询与派生表': 'IN / EXISTS / 相关子查询，先写小结再拼',
+      },
+    },
+    {
+      key: 'tables',
+      label: '几张表',
+      options: ['1', '2', '3'],
+      hints: { '1': '单表：先练过滤与排序', '2': '两张表：JOIN 的最小组合', '3': '三张表：多级连接与"先聚合再 JOIN"' },
+    },
+    {
+      key: 'rows',
+      label: '每表行数',
+      options: ['10', '30', '50'],
+      hints: { '10': '够看清每一行，生成最快', '30': '能看出分布差异，生成稍慢', '50': '接近真实数据量，生成最慢' },
+    },
+  ],
+}
+
+/**
  * 工作台组件必须**懒加载**（WORK-035 T-01 / AC-001）：CodeMirror 精简版 gzip 后约 137 kB，
  * 是本站唯一的重前端依赖。静态 import 会让每个进入首页的人为它付费。
  *
@@ -102,7 +161,6 @@ export function SqlPracticePage() {
     pendingDatasetSql,
     clearPendingDatasetSql,
     ask,
-    openGuide,
   } = useAssistantContext()
   const queryClient = useQueryClient()
   const [searchParams] = useSearchParams()
@@ -220,6 +278,8 @@ export function SqlPracticePage() {
   const [datasetNameInput, setDatasetNameInput] = useState('')
   const [datasetMode, setDatasetMode] = useState<'new' | 'existing'>('new')
   const [datasetDialogOpen, setDatasetDialogOpen] = useState(false)
+  /** 弹窗里的「AI 生成」步骤（选项 → 生成中 → 回填 SQL）。 */
+  const [designing, setDesigning] = useState(false)
   const [addRows, setAddRows] = useState(5)
 
   /**
@@ -275,65 +335,23 @@ export function SqlPracticePage() {
   })
 
   /**
-   * 「让 AI 设计」（WORK-053；2026-11-02 改成直开助手；2026-11-03 改引导式）。
+   * 「让 AI 生成数据集」（WORK-065）：弹窗里先给四组选项 → 生成 → SQL 填进「写 SQL」。
    *
-   * <p>**先给选项再生成**（WORK-063）：面板里出现三组选项（练什么 / 几张表 / 每表行数），
-   * 选完点「生成」才发一条消息。选项是页面固定的，不让模型先回一轮文字反问——省一次等待。
-   * 生成的 SQL 可从回答里「插入编辑器」「继续编辑」，或经「存为数据集」回到弹窗保存。
+   * <p>**不走聊天**：生成器是结构化输出（`{name, sql}`），不会像助手那样附一篇讲解；
+   * 保存仍由用户点「确认保存」，走白名单 + 沙箱干跑。
    */
-  const askAiToDesign = () => {
-    setDatasetDialogOpen(false)
-    openGuide({
-      id: Date.now(),
-      title: '先定四件事，再生成 SQL',
-      prompt:
-        '帮我造一个 SQL 练习数据集。我已经选好了下面的内容，不要再问我问题。'
-        + '数据你自己逐行想好：外键要指向真实存在的 id、日期不要超过今天、状态用真实取值；'
-        + '为了练 JOIN 可以故意留几条对不上的行，并在回答里说清留了哪几条。'
-        + '把表结构与每行数据一起交给 planner_build_dataset 拼装，不要凭记忆写建表语句。',
-      groups: [
-        {
-          key: 'theme',
-          label: '主题',
-          options: ['电商订单', '图书借阅', '员工与薪资', '物流运单', '博客与评论', '在线课程', '医院挂号', '酒店预订'],
-          hints: {
-            '电商订单': '客户 / 订单 / 订单明细，最经典的 JOIN 数据集',
-            '图书借阅': '读者 / 图书 / 借阅记录，适合练"没借过书的人"',
-            '员工与薪资': '部门 / 员工 / 薪资记录，适合 GROUP BY 与自连接',
-            '物流运单': '运单 / 包裹 / 路由节点，适合多级 JOIN',
-            '博客与评论': '作者 / 文章 / 评论，适合 LEFT JOIN 找零评论',
-            '在线课程': '学员 / 课程 / 报名与成绩',
-            '医院挂号': '患者 / 科室 / 挂号记录',
-            '酒店预订': '客人 / 房间 / 预订记录',
-          },
-        },
-        {
-          key: 'topic',
-          label: '练什么',
-          options: ['单表过滤与排序', 'JOIN 与聚合', '窗口函数', 'NULL 与日期', '子查询与派生表'],
-          hints: {
-            '单表过滤与排序': 'WHERE / ORDER BY / LIMIT，先熟悉数据长什么样',
-            'JOIN 与聚合': '多表连接 + GROUP BY / HAVING，最常用的组合',
-            '窗口函数': 'ROW_NUMBER / RANK / 累计求和，按组排名',
-            'NULL 与日期': 'IS NULL / COALESCE / 日期差，最容易踩坑的一块',
-            '子查询与派生表': 'IN / EXISTS / 相关子查询，先写小结再拼',
-          },
-        },
-        {
-          key: 'tables',
-          label: '几张表',
-          options: ['1', '2', '3'],
-          hints: { '1': '单表：先练过滤与排序', '2': '两张表：JOIN 的最小组合', '3': '三张表：多级连接与"先聚合再 JOIN"' },
-        },
-        {
-          key: 'rows',
-          label: '每表行数',
-          options: ['10', '30', '50'],
-          hints: { '10': '够看清每一行，生成最快', '30': '能看出分布差异，生成稍慢', '50': '接近真实数据量，生成最慢' },
-        },
-      ],
-    })
-  }
+  const askAiToDesign = () => setDesigning(true)
+
+  const draftDataset = useMutation({
+    mutationFn: (topic: string) => knowledge.draftSqlDataset(topic),
+    onSuccess: ({ name, sql }) => {
+      setDatasetSql(sql)
+      setDatasetNameInput(name)
+      setDesignerTab('sql')
+      setDesigning(false)
+      setError(null)
+    },
+  })
 
   /**
    * 题目载入后填进编辑器、切到它能用的数据集（WORK-035 T-14）。
@@ -508,8 +526,8 @@ export function SqlPracticePage() {
 
             {/*
               数据集工坊（WORK-035 T-13 / WORK-060；2026-11-02 由展开面板改弹窗）：
-              「自己设计」= 在弹窗里直接写 SQL；「让 AI 设计」= 关弹窗、开助手，
-              先用三组选项问清要练什么，再把 SQL 带回来（WORK-063）。
+              「自己设计」= 在弹窗里直接写 SQL；「让 AI 生成」= 先在弹窗里给四组选项，
+              生成后 SQL 直接回填到「写 SQL」（WORK-065，不走聊天）。
             */}
             <Dialog open={datasetDialogOpen} onOpenChange={setDatasetDialogOpen}>
               <DialogContent
@@ -542,6 +560,26 @@ export function SqlPracticePage() {
                 </div>
 
                 {datasetMode === 'new' ? (
+                  designing ? (
+                    <div className="space-y-3" data-testid="sql-dataset-design">
+                      <GuideCard
+                        guide={DATASET_DESIGN_GUIDE}
+                        disabled={draftDataset.isPending}
+                        onCancel={() => setDesigning(false)}
+                        onSubmit={(topic) => draftDataset.mutate(topic)}
+                      />
+                      {draftDataset.isPending ? (
+                        <p className="text-muted-foreground text-xs" data-testid="sql-dataset-drafting">
+                          正在生成（约 10–30 秒）…
+                        </p>
+                      ) : null}
+                      {draftDataset.isError ? (
+                        <p className="text-destructive text-sm" data-testid="sql-dataset-draft-error">
+                          {errorMessage(draftDataset.error)}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : (
                   <>
                     {/* 编辑方式（2026-11-02）：默认点着建表——不写 SQL 也能造数据集 */}
                     <div className="flex flex-wrap gap-2" role="group" aria-label="编辑方式">
@@ -639,7 +677,7 @@ export function SqlPracticePage() {
                         data-testid="sql-ask-dataset"
                         onClick={askAiToDesign}
                       >
-                        让 AI 设计
+                        让 AI 生成
                       </Button>
                     </div>
                     {/* 弹窗带遮罩，页面主体的错误提示被盖住：失败原因必须也出现在这里（2026-11-03 审查） */}
@@ -652,10 +690,11 @@ export function SqlPracticePage() {
                       只允许建表与插数；保存前会在沙箱里真跑一遍，跑不通不会存。
                     </p>
                     <p className="text-muted-foreground text-xs">
-                      点「让 AI 设计」会打开助手并给出三组选项（练什么、几张表、每表行数）：
-                      选完点「生成」，回答里的 SQL 可以「插入编辑器」或「继续编辑」。
+                      点「让 AI 生成」会先给四组选项（主题、练什么、几张表、每表行数）：选完点「生成」，
+                      SQL 直接填进上面的「写 SQL」里，你改完再点「确认保存」。
                     </p>
                   </>
+                  )
                 ) : (
                   <>
                     <p className="text-muted-foreground text-xs">

@@ -198,7 +198,20 @@ class SqlDatasetController {
         return ApiResponse.ok(new CreatedView(ai.generateDataset(userId, topic, visibility)));
     }
 
+    /**
+     * 只生成、不保存（WORK-065）：向导把 SQL 填进「写 SQL」让人看/改，保存由他点。
+     *
+     * <p>与 `/generate` 的区别只有落不落库；保存仍走上传那条白名单 + 干跑。
+     */
+    @PostMapping("/draft")
+    ApiResponse<SqlAiService.GeneratedDraft> draftDataset(@RequestBody(required = false) DraftRequest body) {
+        return ApiResponse.ok(ai.draftDataset(body == null ? null : body.topic()));
+    }
+
     record CreatedView(String key) {
+    }
+
+    record DraftRequest(@Size(max = 400) String topic) {
     }
 
     record QuestionRequest(@Size(max = 200) String goal) {

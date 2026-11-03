@@ -52,6 +52,8 @@ export interface KnowledgeApi {
 
   /** AI 造数据集并保存（WORK-035 T-13）；可见性由用户在保存前选择。 */
   generateSqlDataset(topic?: string, visibility?: DatasetVisibility): Promise<{ key: string }>
+  /** 只生成不保存（WORK-065）：向导把 SQL 填进「写 SQL」，由用户改完再保存。 */
+  draftSqlDataset(topic: string): Promise<{ name: string; sql: string }>
 
   /** 数据集目录（WORK-060）：内置公开集 + 我的私人集 + 已发布社区集。 */
   datasetCatalog(): Promise<DatasetCatalogItem[]>
@@ -290,6 +292,14 @@ export function createKnowledgeApi(client: ApiClient): KnowledgeApi {
         method: 'POST',
         headers: JSON_HEADERS,
         body: JSON.stringify({ ...(topic === undefined ? {} : { topic }), visibility }),
+      }),
+
+    /** 只生成不保存（WORK-065）。 */
+    draftSqlDataset: (topic) =>
+      client.requestEnvelope<{ name: string; sql: string }>('/api/v1/sql-datasets/draft', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ topic }),
       }),
 
     /** 数据集目录（WORK-060）。 */

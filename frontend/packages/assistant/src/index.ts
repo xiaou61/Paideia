@@ -34,7 +34,8 @@ export {
   type SqlWorkbenchPageContext,
 } from './context'
 export { extractSqlBlock, serializePageContext } from './page-context'
-export type { AssistantContextValue } from './context'
+export type { AssistantContextValue, AssistantGuide } from './context'
+export { GuideCard, composeGuideMessage } from './guide-card'
 export { CreditsPanel } from './credits-panel'
 export { MemoryPanel } from './memory-panel'
 export { parseSseBlock, readEventStream } from './sse'

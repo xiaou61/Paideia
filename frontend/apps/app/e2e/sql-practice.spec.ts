@@ -376,16 +376,29 @@ test.describe('SQL 自由练习', () => {
   })
 
   /**
-   * 「让 AI 设计」引导式生成（WORK-063）。
+   * 「让 AI 生成」三步向导（WORK-065）。
    *
-   * <p>断三件事：点入口只出选项卡、**不发消息**；点「生成」才发一条（内容含选择）；
-   * SQL 回答里的「插入编辑器」是追加、「继续编辑」是替换并把光标落进编辑器。
-   *
-   * <p>模型侧打桩（SSE 返回一个 sql 代码块）：这条验的是交互与接线，不是模型质量。
+   * <p>断三件事：选项在**弹窗里**（不再开助手）；点「生成」把 SQL 直接填进「写 SQL」；
+   * 保存仍由用户点「确认保存」（上传与生成都打桩，只验接线）。
    */
-  test('让 AI 设计：选完选项才发，SQL 可插入或替换编辑器', async ({ page }) => {
+  test('让 AI 生成：弹窗里选四项 → SQL 自动回填 → 确认保存', async ({ page }) => {
     await mockStatus(page)
-    await page.route('**/api/v1/ai/conversations', async (route) => {
+    await page.route('**/api/v1/sql-datasets/draft', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0,
+          message: 'ok',
+          traceId: null,
+          data: {
+            name: 'AI 图书库',
+            sql: "CREATE TABLE books (id INT, title VARCHAR(60));\nINSERT INTO books (id, title) VALUES (1, 'a');",
+          },
+        }),
+      })
+    })
+    await page.route('**/api/v1/sql-datasets', async (route) => {
       if (route.request().method() !== 'POST') {
         await route.fallback()
         return
@@ -393,23 +406,7 @@ test.describe('SQL 自由练习', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ code: 0, message: 'ok', traceId: null, data: { id: 1 } }),
-      })
-    })
-    await page.route('**/api/v1/ai/conversations/1/messages', async (route) => {
-      if (route.request().method() !== 'POST') {
-        await route.fallback()
-        return
-      }
-      await route.fulfill({
-        status: 200,
-        headers: { 'content-type': 'text/event-stream' },
-        // 解析器要求每块带 `event:` 行（见 packages/assistant/src/sse.ts），只写 data: 会被丢掉
-        body:
-          'event: content\n' +
-          'data: {"type":"content","delta":"```sql\\nCREATE TABLE t (id INT);\\n```"}\n\n' +
-          'event: done\n' +
-          'data: {"type":"done"}\n\n',
+        body: JSON.stringify({ code: 0, message: 'ok', traceId: null, data: { key: 'draft-key' } }),
       })
     })
 
@@ -417,10 +414,10 @@ test.describe('SQL 自由练习', () => {
     await page.getByTestId('sql-create-dataset').click()
     await page.getByTestId('sql-ask-dataset').click()
 
-    // 弹窗让位，向导卡出现；输入框是空的——没有预填、更没有自动发
-    await expect(page.getByTestId('sql-dataset-dialog')).toHaveCount(0)
+    // 弹窗还在，选项出现在弹窗里；助手面板没有被打开
+    await expect(page.getByTestId('sql-dataset-dialog')).toBeVisible()
     await expect(page.getByTestId('assistant-guide')).toBeVisible()
-    await expect(page.getByTestId('conversation-input')).toHaveValue('')
+    await expect(page.getByTestId('conversation-panel')).toHaveCount(0)
 
     await page.getByTestId('guide-theme-1').click()
     // 选中项下面要给出说明——只给选项不给含义，用户猜不出"图书借阅"是哪三张表
@@ -429,22 +426,11 @@ test.describe('SQL 自由练习', () => {
     await expect(page.getByTestId('guide-hint-topic')).toContainText('GROUP BY')
     await page.getByTestId('guide-submit').click()
 
-    // 发出的是拼好的那条：选择（含主题）出现在用户消息里
-    await expect(page.getByTestId('conversation-messages')).toContainText('图书借阅')
-    await expect(page.getByTestId('conversation-messages')).toContainText('JOIN 与聚合')
-    await expect(page.getByTestId('conversation-messages')).toContainText('练什么')
-
-    const editor = page.getByTestId('sql-practice-editor')
-    // 插入 = 追加：原草稿还在，SQL 在后面
-    await page.getByTestId('conversation-append-sql').click()
-    await expect(editor).toContainText('SELECT * FROM customers;')
-    await expect(editor).toContainText('CREATE TABLE t (id INT);')
-
-    // 继续编辑 = 替换全文并聚焦
-    await page.getByTestId('conversation-apply-sql').click()
-    await expect(editor).not.toContainText('SELECT * FROM customers;')
-    await expect(editor).toContainText('CREATE TABLE t (id INT);')
-    await expect(page.locator('.cm-content')).toBeFocused()
+    // 生成的 SQL 直接回填到「写 SQL」，名字也填上；保存仍要用户点
+    await expect(page.getByTestId('sql-dataset-sql')).toHaveValue(/CREATE TABLE books/)
+    await expect(page.getByTestId('sql-dataset-name')).toHaveValue('AI 图书库')
+    await page.getByTestId('sql-save-dataset').click()
+    await expect(page.getByTestId('sql-dataset-dialog')).toHaveCount(0)
   })
 })
 
