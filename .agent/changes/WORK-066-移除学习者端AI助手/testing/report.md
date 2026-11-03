@@ -6,7 +6,7 @@ status: passed
 evidence: required
 created: 2026-11-03
 updated: 2026-11-03
-verified_commit: (提交后填)
+verified_commit: 0e65332e
 ---
 
 # 验证报告
