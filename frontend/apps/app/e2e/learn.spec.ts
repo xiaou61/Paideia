@@ -172,4 +172,44 @@ test.describe('从零开始', () => {
     expect(overflow).toBeLessThanOrEqual(1)
   })
 
+
+  /**
+   * 推荐卡的 AI 理由（WORK-066 后新增的唯一 AI 入口）。
+   *
+   * <p>断两件：点按钮才发请求（自动润色等于替用户花钱）；回来的理由按 slug 顶掉规则句。
+   * 平台没配 AI 时服务端返回空数组，卡片继续用规则句——那是降级，不是这条用例的场景。
+   */
+  test('推荐卡：点「让 AI 说说为什么」用 AI 理由替换规则句', async ({ page }) => {
+    await page.route('**/api/v1/learning/advice', async (route) => {
+      const body = JSON.parse(route.request().postData() ?? '{}') as {
+        picks?: { slug: string; name: string }[]
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0,
+          message: 'ok',
+          traceId: null,
+          data: {
+            reasons: (body.picks ?? []).map((pick) => ({
+              slug: pick.slug,
+              reason: `AI 觉得「${pick.name}」最该先学`,
+            })),
+          },
+        }),
+      })
+    })
+
+    await page.goto('/#/learn')
+    const explain = page.getByTestId('learn-advice-explain')
+    test.skip((await explain.count()) === 0, '这个账号当前没有推荐项，观察点不存在')
+
+    const first = page.locator('a[data-testid^="learn-advice-"]').first()
+    const slug = ((await first.getAttribute('data-testid')) ?? '').replace('learn-advice-', '')
+    await expect(page.getByTestId(`learn-advice-reason-${slug}`)).not.toContainText('AI 觉得')
+
+    await explain.click()
+    await expect(page.getByTestId(`learn-advice-reason-${slug}`)).toContainText('最该先学')
+  })
 })

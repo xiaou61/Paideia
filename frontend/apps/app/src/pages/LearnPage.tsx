@@ -25,7 +25,7 @@ import {
   LoadingRow,
   PageHeader,
 } from '@paideia/ui'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import {
   ArrowRight,
   Binary,
@@ -169,6 +169,44 @@ export function LearnPage() {
   const picks = useMemo(() => pickAdvice(scored, 3), [scored])
 
   /**
+   * AI 推荐理由（WORK-047 的 `POST /learning/advice`，WORK-066 之后这里才有了入口）。
+   *
+   * <p>**用户点才调**：一次调用会真花积分，进页面就自动润色等于替用户花钱。
+   * 失败或平台没配 AI 时服务端返回空数组，卡片继续用规则句——所以这只是锦上添花。
+   */
+  const [aiReasons, setAiReasons] = useState<Record<string, string>>({})
+  const [adviceFailed, setAdviceFailed] = useState(false)
+  const explainAdvice = useMutation({
+    mutationFn: () =>
+      learning.advice({
+        role,
+        roleLabel: meta.label,
+        picks: picks.map((pick) => ({
+          slug: pick.slug,
+          name: pick.name,
+          tier: pick.tier,
+          passed: pick.passedCount,
+          total: pick.stageCount,
+        })),
+      }),
+    onSuccess: (result) => {
+      const reasons: Record<string, string> = {}
+      for (const item of result.reasons) {
+        reasons[item.slug] = item.reason
+      }
+      setAiReasons(reasons)
+      setAdviceFailed(Object.keys(reasons).length === 0)
+    },
+    onError: () => setAdviceFailed(true),
+  })
+
+  // 换岗位后旧理由不再成立
+  useEffect(() => {
+    setAiReasons({})
+    setAdviceFailed(false)
+  }, [role])
+
+  /**
    * 三段地图：**按岗位的 rank 排，不按分数排**。
    *
    * <p>分数回答"接下来先学什么"，段内顺序回答"这个岗位的学习次序"。混用会让同一段里的
@@ -230,7 +268,13 @@ export function LearnPage() {
       ) : null}
 
       {meta.available && picks.length > 0 ? (
-        <AdviceCard picks={picks} />
+        <AdviceCard
+          picks={picks}
+          aiReasons={aiReasons}
+          explaining={explainAdvice.isPending}
+          failed={adviceFailed}
+          onExplain={() => explainAdvice.mutate()}
+        />
       ) : null}
 
       {/* 「继续上次」：地图里真正该先点的只有一条，别让人自己在卡片里找"下一关" */}
@@ -358,7 +402,19 @@ function RolePicker({ role, onChoose }: { role: RoleKey; onChoose: (next: RoleKe
  * 卡片本身永远在。所以这里没有任何 loading 与 error 态——那会让一次可选的润色
  * 看起来像页面依赖它。
  */
-function AdviceCard({ picks }: { picks: ScoredTrack[] }) {
+function AdviceCard({
+  picks,
+  aiReasons,
+  explaining,
+  failed,
+  onExplain,
+}: {
+  picks: ScoredTrack[]
+  aiReasons: Record<string, string>
+  explaining: boolean
+  failed: boolean
+  onExplain: () => void
+}) {
   const [showWhy, setShowWhy] = useState(false)
   return (
     <section
@@ -389,7 +445,7 @@ function AdviceCard({ picks }: { picks: ScoredTrack[] }) {
                   className="text-muted-foreground mt-0.5 block text-xs"
                   data-testid={`learn-advice-reason-${pick.slug}`}
                 >
-                  {ruleReason(pick)}
+                  {aiReasons[pick.slug] ?? ruleReason(pick)}
                 </span>
               </span>
               <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
@@ -401,14 +457,30 @@ function AdviceCard({ picks }: { picks: ScoredTrack[] }) {
         ))}
       </ol>
 
-      <button
-        type="button"
-        onClick={() => setShowWhy((value) => !value)}
-        data-testid="learn-advice-why"
-        className="text-muted-foreground hover:text-foreground mt-2 text-xs underline underline-offset-2"
-      >
-        {showWhy ? '收起推荐依据' : '为什么是这三条'}
-      </button>
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={onExplain}
+          disabled={explaining || picks.length === 0}
+          data-testid="learn-advice-explain"
+          className="text-primary hover:text-primary/80 text-xs underline underline-offset-2 disabled:opacity-60"
+        >
+          {explaining ? 'AI 正在写…' : '让 AI 说说为什么'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowWhy((value) => !value)}
+          data-testid="learn-advice-why"
+          className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2"
+        >
+          {showWhy ? '收起推荐依据' : '为什么是这三条'}
+        </button>
+      </div>
+      {failed ? (
+        <p className="text-muted-foreground mt-2 text-xs" data-testid="learn-advice-error">
+          AI 暂时用不了（未配置或额度不足），上面是规则算出来的理由。
+        </p>
+      ) : null}
       {showWhy ? (
         <ul className="text-muted-foreground mt-2 space-y-1 font-mono text-xs">
           {picks.map((pick) => (
