@@ -16,6 +16,14 @@ export function composeGuideMessage(guide: AssistantGuide, choices: Record<strin
   return [guide.prompt, ...lines].join('\n')
 }
 
+/** 选中项的说明；没有就返回 null（TS 的 noUncheckedIndexedAccess 下索引可能 undefined）。 */
+function hintOf(group: AssistantGuide['groups'][number], choice: string | undefined): string | null {
+  if (choice === undefined || group.hints === undefined) {
+    return null
+  }
+  return group.hints[choice] ?? null
+}
+
 export function GuideCard({
   guide,
   disabled,
@@ -56,6 +64,11 @@ export function GuideCard({
               </Button>
             ))}
           </div>
+          {hintOf(group, choices[group.key]) === null ? null : (
+            <p className="text-muted-foreground mt-1 text-[11px] leading-5" data-testid={`guide-hint-${group.key}`}>
+              {hintOf(group, choices[group.key])}
+            </p>
+          )}
         </fieldset>
       ))}
       <div className="flex items-center gap-2">

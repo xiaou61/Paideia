@@ -152,14 +152,15 @@ interface AssistantContextApi extends AssistantContextValue {
 /**
  * 一张"发送前的表单"：标题 + 若干组单选 + 拼消息用的前置说明。
  *
- * <p>选项由页面给（当前固定三组），不让模型生成：省一轮等待，也不会因模型输出格式漂移退化成文字。
+ * <p>选项由页面给（当前固定四组），不让模型生成：省一轮等待，也不会因模型输出格式漂移退化成文字。
+ * `hints` 是**选中项的说明**（例如"图书借阅 = 读者/图书/借阅记录"），没有就不显示。
  */
 export interface AssistantGuide {
   id: number
   title: string
   /** 拼进消息的前置说明（例如"我已经选好了，直接用 planner_build_dataset，不要再问"）。 */
   prompt: string
-  groups: { key: string; label: string; options: string[] }[]
+  groups: { key: string; label: string; options: string[]; hints?: Record<string, string> }[]
 }
 
 const AssistantContext = createContext<AssistantContextApi | null>(null)

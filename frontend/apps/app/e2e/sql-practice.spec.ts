@@ -423,7 +423,10 @@ test.describe('SQL 自由练习', () => {
     await expect(page.getByTestId('conversation-input')).toHaveValue('')
 
     await page.getByTestId('guide-theme-1').click()
+    // 选中项下面要给出说明——只给选项不给含义，用户猜不出"图书借阅"是哪三张表
+    await expect(page.getByTestId('guide-hint-theme')).toContainText('读者 / 图书 / 借阅记录')
     await page.getByTestId('guide-topic-1').click()
+    await expect(page.getByTestId('guide-hint-topic')).toContainText('GROUP BY')
     await page.getByTestId('guide-submit').click()
 
     // 发出的是拼好的那条：选择（含主题）出现在用户消息里
