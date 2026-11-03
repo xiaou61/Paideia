@@ -43,6 +43,9 @@ public interface LearningProgressMapper {
      * <p>line_kind 在**分类**上（V17），不在条目上：这里 JOIN 到分类取。修的是 61b005d1
      * 把 N+1 改 JOIN 时写成 `e.line_kind` 的错误引用——列不存在，整条查询报
      * 「Unknown column」，`/learning/graph` 一系接口直接 500（2026-11-02 全量跑抓出）。
+     *
+     * <p>分类用 **LEFT JOIN**：`knowledge_entries.category_id` 允许 NULL（V3「NULL = 未分类」），
+     * 内连接会把未分类的已发布条目从「我在学什么」里整行丢掉（2026-11-03 审查）。此时 line_kind 为 NULL。
      */
     @Select("""
             SELECT p.id, p.user_id, p.entry_id, p.tour_step, p.challenges_json, p.quizzes_json, p.status,
@@ -50,7 +53,7 @@ public interface LearningProgressMapper {
                    e.title, c.line_kind
             FROM learning_progress p
             JOIN knowledge_entries e ON e.id = p.entry_id
-            JOIN knowledge_categories c ON c.id = e.category_id
+            LEFT JOIN knowledge_categories c ON c.id = e.category_id
             WHERE p.user_id = #{userId} AND e.status = 'published'
             ORDER BY p.updated_at DESC, p.entry_id DESC
             """)

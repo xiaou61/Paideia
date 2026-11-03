@@ -232,4 +232,28 @@ class LearningProgressIntegrationTest {
             jdbcTemplate.update("UPDATE knowledge_categories SET line_kind = ? WHERE id = ?", original, categoryId);
         }
     }
+
+    @Test
+    @DisplayName("未分类的已发布条目也出现在「我在学什么」里")
+    void uncategorizedPublishedEntryStillAppears() throws Exception {
+        // category_id 允许 NULL（V3「NULL = 未分类」）：分类用内连接会把这类条目整行丢掉
+        jdbcTemplate.update("""
+                INSERT INTO knowledge_entries (category_id, title, body, status, published_at)
+                VALUES (NULL, '未分类自查条目', '正文', 'published', NOW(3))
+                """);
+        Long entryId = jdbcTemplate.queryForObject(
+                "SELECT id FROM knowledge_entries WHERE title = '未分类自查条目'", Long.class);
+        jdbcTemplate.update("""
+                INSERT INTO learning_progress (user_id, entry_id, challenges_json, quizzes_json)
+                VALUES (111, ?, '{}', '{}')
+                """, entryId);
+        try {
+            mockMvc.perform(get("/api/v1/learning/progress").header("Authorization", token("111")))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data[?(@.entryId==" + entryId + ")].entryId").exists());
+        } finally {
+            jdbcTemplate.update("DELETE FROM learning_progress WHERE entry_id = ?", entryId);
+            jdbcTemplate.update("DELETE FROM knowledge_entries WHERE id = ?", entryId);
+        }
+    }
 }
