@@ -250,6 +250,17 @@ export function SqlPracticePage() {
       setError(null)
       setDatasetSql('')
       setDatasetNameInput('')
+      // 可见性回到默认私有：上次选了「公开」不该让别人下一次无意中也发布（2026-11-03 审查）
+      setDatasetVisibility('private')
+      setDesignTables([
+        {
+          name: '',
+          columns: [
+            { name: 'id', type: 'INT', primaryKey: true },
+            { name: '', type: 'VARCHAR(50)', primaryKey: false },
+          ],
+        },
+      ])
       setDatasetDialogOpen(false)
       await status.refetch()
       void queryClient.invalidateQueries({ queryKey: ['sql-dataset-catalog'] })
@@ -566,6 +577,12 @@ export function SqlPracticePage() {
                         让 AI 设计
                       </Button>
                     </div>
+                    {/* 弹窗带遮罩，页面主体的错误提示被盖住：失败原因必须也出现在这里（2026-11-03 审查） */}
+                    {saveDataset.isError ? (
+                      <p className="text-destructive text-sm" data-testid="sql-dataset-save-error">
+                        {errorMessage(saveDataset.error)}
+                      </p>
+                    ) : null}
                     <p className="text-muted-foreground text-xs">
                       只允许建表与插数；保存前会在沙箱里真跑一遍，跑不通不会存。
                     </p>

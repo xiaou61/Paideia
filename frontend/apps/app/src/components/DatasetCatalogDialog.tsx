@@ -55,7 +55,8 @@ export function DatasetCatalogDialog({
   })
 
   const items = catalog.data ?? []
-  const publicItems = items.filter((item) => item.visibility === 'public')
+  // 自己发布的公开集会同时满足 public 与 mine：两组互斥，别让同一份数据列两次（2026-11-03 审查）
+  const publicItems = items.filter((item) => item.visibility === 'public' && !item.mine)
   const mine = items.filter((item) => item.mine)
 
   const use = (item: DatasetCatalogItem) => {
