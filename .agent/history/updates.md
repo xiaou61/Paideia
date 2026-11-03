@@ -9780,5 +9780,7 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 问题（用户实测）：向导只有 3 组、主题 5 个起步，且选项没有说明——"图书借阅"是哪三张表用户猜不出；截图里的卡片仍是部署前的旧 bundle（服务器已核实新版本）。
 - 变更：主题扩到 8（电商/图书/员工/物流/博客/课程/挂号/酒店）、练习类型 5（加"子查询与派生表"）；每组选中项下面给一句说明（`AssistantGuide.groups[].hints`）；e2e 断言说明文字。
 - 验证：typecheck 0 错；assistant 79/79；`让 AI 设计` e2e 1/1（含 hint 断言）。
-- 本地提交：见下
-- 远端推送：未执行
+- 本地提交：`(见 git log)`
+- 远端推送：已推送；部署 93.8 秒（Web 重建），线上 bundle `index-B3vCX7S8.js` 已含「先定四件事 / 酒店预订 / guide-hint」（curl 核实）
+- 线上 ego 复验：4 组、主题 8 个、练习 5 个、每组选中项下方有说明；卡片在视口内。截图 `F:/caches/tmp/ego-sql-guide-6.png`
+- 补充事实：线上是纯 HTTP，`navigator.serviceWorker` 不存在（没有 SW），HTML/JS 都是 `Cache-Control: no-store`；用户看到旧卡片只可能是"部署前就打开的标签页没刷新"，不是缓存策略问题
