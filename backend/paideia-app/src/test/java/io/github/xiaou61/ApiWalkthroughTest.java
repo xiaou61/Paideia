@@ -302,6 +302,16 @@ class ApiWalkthroughTest {
                         "quizzes", Map.of("smoke", Map.of("score", 1, "total", 1)))));
         call("我的知识图谱", "GET", "/api/v1/learning/graph", bearer, null);
         call("重置本站", "DELETE", "/api/v1/learning/entries/" + entryId, bearer, null);
+        // ---- 今日计划（WORK-053 阶段二）----
+        // 日期必填：服务端不知道用户时区，"今天"由客户端算（缺参是 400，不是 500）。
+        String today = java.time.LocalDate.now().toString();
+        call("今日计划", "GET", "/api/v1/learning/plan-items?date=" + today, bearer, null);
+        MvcResult planItem = call("采用一条计划", "POST", "/api/v1/learning/plan-items", bearer,
+                json(Map.of("date", today, "goal", "自查：读完一节", "reason", "walkthrough")));
+        long planItemId = idAt(planItem);
+        call("计划项打勾", "PATCH", "/api/v1/learning/plan-items/" + planItemId, bearer,
+                json(Map.of("done", true)));
+        call("删计划项", "DELETE", "/api/v1/learning/plan-items/" + planItemId, bearer, null);
         // WORK-034 S1：到期复习列表（没有到期项时返回空列表，是正常结果）
         call("到期复习列表", "GET", "/api/v1/learning/reviews", bearer, null);
         call("开始复习会话", "POST", "/api/v1/learning/reviews/sessions", bearer, null);
@@ -328,6 +338,8 @@ class ApiWalkthroughTest {
                 json(Map.of("entryId", entryId, "blockKey", "smoke-missing",
                         "questionKey", "smoke-missing#0", "choice", 0)), 400);
         call("练习选题", "GET", "/api/v1/learning/practice/next?conceptIds=" + conceptId,
+                bearer, null);
+        call("我已答过的题", "GET", "/api/v1/learning/entries/" + entryId + "/attempts",
                 bearer, null);
         call("AI 概念候选", "POST",
                 "/api/v1/learning/admin/question-concepts/suggest-ai?entryId=" + entryId,
@@ -393,6 +405,12 @@ class ApiWalkthroughTest {
         call("清空并关闭记忆", "DELETE", "/api/v1/ai/memories", bearer, null);
         call("重新打开记忆", "PUT", "/api/v1/ai/settings", bearer,
                 json(Map.of("memoryEnabled", true, "referenceSavedMemories", true, "referenceChatHistory", true)));
+        // 候选记忆（WORK-050）：后台提取的产物，空列表是正常结果；采纳/拒绝不存在的 id 是 400。
+        call("记忆候选", "GET", "/api/v1/ai/memories/candidates", bearer, null);
+        call("采纳不存在的候选 → 400", "POST",
+                "/api/v1/ai/memories/candidates/999999999/accept", bearer, null, 400);
+        call("拒绝不存在的候选 → 400", "POST",
+                "/api/v1/ai/memories/candidates/999999999/reject", bearer, null, 400);
 
         call("读精简（可能为空）", "GET", "/api/v1/ai/summaries/" + entryId, bearer, null);
         call("生成精简（桩）", "POST", "/api/v1/ai/summaries", bearer,
@@ -635,6 +653,10 @@ class ApiWalkthroughTest {
         // 上传需要真文件与白名单校验，自查不打这条路；其余端点用一个不存在的 key
         // 走 404 分支——端点被走到、鉴权生效、错误语义正确，这就是覆盖要的东西。
         call("我的数据集", "GET", "/api/v1/sql-datasets/mine", bearer, null);
+        call("数据集目录", "GET", "/api/v1/sql-datasets/catalog", bearer, null);
+        call("改可见性（不存在 → 404）", "POST",
+                "/api/v1/sql-datasets/__nonexistent__/visibility", bearer,
+                json(Map.of("visibility", "private")), 404);
         bestEffort("POST", "/api/v1/sql-datasets", bearer);
         bestEffort("POST", "/api/v1/sql-datasets/generate", bearer);
         bestEffort("DELETE", "/api/v1/sql-datasets/__nonexistent__", bearer);
@@ -666,6 +688,9 @@ class ApiWalkthroughTest {
         record("运行代码", "POST", "/api/v1/sandbox/run", sandbox.getResponse().getStatus(),
                 sandbox.getResponse().getStatus() == 503 ? 503 : 200, null);
         noteTouched("POST", "/api/v1/sandbox/run");
+        // Linux 判题（WORK-056）：本地没配 shell 镜像，走"不可用"分支——端点存在、鉴权与错误语义覆盖到。
+        call("Linux 判题（未配置镜像 → 503）", "POST", "/api/v1/sandbox/shell/run", bearer,
+                json(Map.of("code", "echo hi", "judge", "exit 0")), 503);
 
         // ---- 登出：吊销 refresh，但 access 仍在有效期内（JWT 固有取舍）----
         call("登出", "POST", "/api/v1/auth/logout", null, json(Map.of("refreshToken", refresh)));
@@ -709,6 +734,8 @@ class ApiWalkthroughTest {
         call("事件列表", "GET", "/api/v1/ops/admin/incidents", adminToken(), null);
         bestEffort("GET", "/api/v1/ops/admin/incidents/999999999", adminToken());
         bestEffort("POST", "/api/v1/ops/admin/incidents/999999999/notes", adminToken());
+        call("关闭不存在的事件 → 404", "POST", "/api/v1/ops/admin/incidents/999999999/close",
+                adminToken(), null, 404);
         // Grafana 告警进来的入口：不带 X-Paideia-Ops-Token 就是 401，这正是设计。
         // 这里只要求"端点被打到"，不要求它能成功。
         bestEffort("POST", "/api/v1/ops/hooks/grafana", null);
@@ -883,8 +910,10 @@ class ApiWalkthroughTest {
             expected.fieldNames().forEachRemaining(keys::add);
 
             for (String key : keys) {
-                java.util.List<String> now = linesOf(current.get(key));
-                java.util.List<String> before = linesOf(expected.get(key));
+                java.util.List<String> rawNow = linesOf(current.get(key));
+                java.util.List<String> rawBefore = linesOf(expected.get(key));
+                java.util.List<String> now = withoutVariableArrays(rawNow, rawBefore);
+                java.util.List<String> before = withoutVariableArrays(rawBefore, rawNow);
                 if (before.isEmpty() && !now.isEmpty()) {
                     diffs.add("+ 新端点 " + key);
                 } else if (!before.isEmpty() && now.isEmpty()) {
@@ -919,6 +948,35 @@ class ApiWalkthroughTest {
         node.forEach(item -> lines.add(item.asText()));
         java.util.Collections.sort(lines);
         return lines;
+    }
+
+    /**
+     * 空数组是"这次没数据"，不是"元素没有字段"。
+     *
+     * <p>同一份代码在"库空"（单跑本类）与"库里有数据"（全量 -T 1C，别的模块先写过）两种跑法下
+     * 会得到两份互相矛盾的形状：一边是 `x[]: empty`，另一边是 `x[].id: number`。两条都留就会
+     * 让快照永远有一边是红的。任一侧出现 `x[]: empty` 时，把该数组的 `empty` 与元素字段一起剔掉
+     * 再比；**代价**是那一轮不校验这个数组的元素形状（两侧都有数据时仍然逐字段比）。
+     */
+    private static java.util.List<String> withoutVariableArrays(java.util.List<String> lines,
+                                                               java.util.List<String> other) {
+        java.util.Set<String> empties = new java.util.HashSet<>();
+        for (String line : lines) {
+            if (line.endsWith("[]: empty")) {
+                empties.add(line.substring(0, line.lastIndexOf("[]: empty")));
+            }
+        }
+        for (String line : other) {
+            if (line.endsWith("[]: empty")) {
+                empties.add(line.substring(0, line.lastIndexOf("[]: empty")));
+            }
+        }
+        if (empties.isEmpty()) {
+            return lines;
+        }
+        return lines.stream()
+                .filter(line -> empties.stream().noneMatch(prefix -> line.startsWith(prefix + "[]")))
+                .toList();
     }
 
     /**

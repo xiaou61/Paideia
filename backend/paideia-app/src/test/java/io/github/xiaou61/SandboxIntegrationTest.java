@@ -36,7 +36,11 @@ import org.springframework.test.web.servlet.MvcResult;
  *
  * <p>需要真实 MySQL 与 {@code PAIDEIA_TEST_DB_PASSWORD}；未配置时整类跳过。
  */
-@SpringBootTest
+@SpringBootTest(properties = {
+        // 生产配置把两个上限都提到了 1000（WORK-038），这里钉小值：本类验的是"到上限就 429、
+        // 状态如实回报配置"，不是那个数字本身，也不该随 application.yml 的容量调整而变红。
+        "paideia.sandbox.daily-limit=50",
+        "paideia.sandbox.sql-daily-limit=500"})
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @EnabledIfEnvironmentVariable(named = "PAIDEIA_TEST_DB_PASSWORD", matches = ".+")
@@ -201,7 +205,7 @@ class SandboxIntegrationTest {
         when(runner.run(any())).thenReturn(new CodeRun.Result("", "", 1, 5, false, false, false));
         String token = token();
 
-        // 上限 50（application-test 用默认值）：跑到刚好用满
+        // 上限 50（本类配置钉住）：跑到刚好用满
         for (int index = 0; index < 50; index += 1) {
             MvcResult ok = mockMvc.perform(post("/api/v1/sandbox/run")
                             .header("Authorization", token)
