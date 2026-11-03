@@ -19,6 +19,7 @@ verified_commit: d3c7a7c9
 | AC-004 生成失败在弹窗内提示 | 代码路径 `sql-dataset-draft-error` | 未单测 | 复用 `errorMessage`；未写失败分支的 e2e |
 | 后端：只生成不保存 | `mvn -pl paideia-sandbox -am -Dtest=SqlAiServiceTest` | passed | 8/8，新增「只生成不保存」断言 `verifyNoInteractions(uploads)` |
 | 前端类型与单测 | `pnpm typecheck` + assistant 包 | passed | typecheck 0 错；assistant 78/78（移除了向导卡的会话面板用例） |
+| 线上端到端（ego） | 线上真实浏览器：选「酒店预订 + JOIN + 3 表 + 10 行」→ 生成 → 保存 | passed | 生成 **15 秒**，SQL 与名字（酒店预订JOIN聚合练习）回填；保存后右侧显示 **共 3 张表 · 15 列**（bookings 7 / hotels 4 / rooms 4，主键齐全）；截图 `F:/caches/tmp/ego-sql-wizard-2.png` |
 
 ## 未覆盖与已知限制
 

@@ -9805,5 +9805,6 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 变更：点「让 AI 生成」后**在弹窗里**给四组选项（主题/练什么/表数/行数）→ `POST /sql-datasets/draft` 只生成不落库 → SQL 与名字回填「写 SQL」→ 用户改完点「确认保存」（白名单 + 干跑 + 结构快照不变）。助手删除 `guide` API 与面板向导，聊天保留「插入编辑器 / 继续编辑 / 存为数据集」。
 - 决策：表名不加用户标识——每个数据集在自己临时库里跑（practice 或池内随机库），跨数据集不会冲突；UUID key 已够区分。会重名的只是数据集名字。
 - 验证：`SqlAiServiceTest` 8/8（新增"只生成不保存"）、前端 typecheck 0 错、assistant 78/78、`让 AI 生成` e2e 1/1。
-- 本地提交：见下
-- 远端推送：未执行
+- 本地提交：`d3c7a7c9`（+ 报告补 commit）
+- 远端推送：已推送；部署 `d3c7a7c9`（204.5 秒，jar + web 都重建）
+- 线上 ego 复验：弹窗内四组选项 → 选「酒店预订 + JOIN + 3 表 + 10 行」→ **15 秒**生成并回填 SQL/名字 → 点保存 → 右侧 **共 3 张表 · 15 列**（bookings/hotels/rooms，主键齐全）；截图 `F:/caches/tmp/ego-sql-wizard-2.png`
