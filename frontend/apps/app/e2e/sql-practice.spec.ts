@@ -422,10 +422,12 @@ test.describe('SQL 自由练习', () => {
     await expect(page.getByTestId('assistant-guide')).toBeVisible()
     await expect(page.getByTestId('conversation-input')).toHaveValue('')
 
+    await page.getByTestId('guide-theme-1').click()
     await page.getByTestId('guide-topic-1').click()
     await page.getByTestId('guide-submit').click()
 
-    // 发出的是拼好的那条：选择出现在用户消息里
+    // 发出的是拼好的那条：选择（含主题）出现在用户消息里
+    await expect(page.getByTestId('conversation-messages')).toContainText('图书借阅')
     await expect(page.getByTestId('conversation-messages')).toContainText('JOIN 与聚合')
     await expect(page.getByTestId('conversation-messages')).toContainText('练什么')
 

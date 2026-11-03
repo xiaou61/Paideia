@@ -100,6 +100,10 @@ export function ConversationPanel({
   const touchedRef = useRef(false)
   /** 会话切换的请求序号：只让最后一次切换的结果落地。 */
   const requestSeqRef = useRef(0)
+  /** 消息区：打开向导卡后滚到底，别让卡片停在折叠线以下。 */
+  const messagesRef = useRef<HTMLDivElement | null>(null)
+  /** 已经处理过的向导卡 id，防止 startNew 在每次渲染时重跑。 */
+  const guideSeqRef = useRef<number | null>(null)
 
   /** 切到某条会话：读回它的消息（旧 → 新）并记住。 */
   const openConversation = useCallback(
@@ -266,8 +270,26 @@ export function ConversationPanel({
     setListOpen(false)
   }
 
-  const refreshSessions = async () => {
-    try {
+  /**
+   * 每打开一张新向导卡都**从一段新对话开始**（WORK-063 修正）：否则卡片会被上一轮的回答压在
+   * 下面，用户看到的是旧答案 + 一个不显眼的小卡片。卡片出现后再滚到底。
+   *
+   * <p>`startNew` 每次渲染都是新函数，不放进依赖；用上面的 id 守卫代替。
+   */
+  useEffect(() => {
+    if (guide === null || guideSeqRef.current === guide.id) {
+      return
+    }
+    guideSeqRef.current = guide.id
+    startNew()
+    const timer = setTimeout(() => {
+      const container = messagesRef.current
+      container?.scrollTo({ top: container.scrollHeight })
+    }, 50)
+    return () => clearTimeout(timer)
+  }, [guide])
+
+  const refreshSessions = async () => {    try {
       setSessions(await api.conversations())
     } catch {
       // 列表拉不到不影响当前这段对话，静默即可
@@ -504,7 +526,7 @@ export function ConversationPanel({
         </ul>
       ) : null}
 
-      <div className="min-h-[8rem] flex-1 space-y-4 overflow-y-auto" data-testid="conversation-messages">
+      <div ref={messagesRef} className="min-h-[8rem] flex-1 space-y-4 overflow-y-auto" data-testid="conversation-messages">
         {restoring ? (
           <Spinner />
         ) : messages.length === 0 ? (

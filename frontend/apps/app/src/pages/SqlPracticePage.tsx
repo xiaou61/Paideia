@@ -285,13 +285,14 @@ export function SqlPracticePage() {
     setDatasetDialogOpen(false)
     openGuide({
       id: Date.now(),
-      title: '先定三件事，再生成 SQL',
+      title: '先定四件事，再生成 SQL',
       prompt:
         '帮我造一个 SQL 练习数据集。我已经选好了下面的内容，不要再问我问题。'
         + '数据你自己逐行想好：外键要指向真实存在的 id、日期不要超过今天、状态用真实取值；'
         + '为了练 JOIN 可以故意留几条对不上的行，并在回答里说清留了哪几条。'
         + '把表结构与每行数据一起交给 planner_build_dataset 拼装，不要凭记忆写建表语句。',
       groups: [
+        { key: 'theme', label: '主题', options: ['电商订单', '图书借阅', '员工与薪资', '物流运单', '博客与评论'] },
         { key: 'topic', label: '练什么', options: ['单表过滤与排序', 'JOIN 与聚合', '窗口函数', 'NULL 与日期'] },
         { key: 'tables', label: '几张表', options: ['1', '2', '3'] },
         { key: 'rows', label: '每表行数', options: ['10', '30', '50'] },
