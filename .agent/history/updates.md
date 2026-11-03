@@ -9733,3 +9733,12 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - **过程中踩到的坑（写给下一次）**：Playwright 在 Windows 上会漏掉 java 子进程——上一轮 e2e 结束后 8080 仍被占，下一轮 `reuseExistingServer` 复用它（连的是已删库），表现是"登录后停在登录页"。跑 e2e 前先 `netstat -ano | grep :8080`。另外失败的 test-db 运行会累积残留库（本次见到约 300 个 `paideia_run_*`）。
 - 本地提交：`5f546f11`、`e313acae`、`e51101bc`、`62553171`
 - 远端推送：`c2ca182c..62553171` 成功；随后部署 `62553171`（150.2 秒），部署后 health 200 / 0.11 秒、ego 全站点击 58/58、全量后端 1288/0/20
+
+## 2026-11-03 11:45 +0800 · 两处运维债收口（e2e 端口复用、残留测试库）
+
+- 类型：fix + cleanup
+- 变更：两个 `playwright.config.ts` 的后端 webServer 改 `reuseExistingServer: false`——端口被占直接报错，不再静默复用别人的后端（实测输出 `http://127.0.0.1:8080/actuator/health is already used`）。
+- 清理：DROP 全部 `paideia_run_*` 残留库 **263 个 / 519MB**（失败即保留的产物）；`paideia_test` 保留，复查 `run_left=0`。
+- 依据：11:30 一条记录的实测（java 子进程漏在 8080，下一轮复用连到已删库）；用户授权"全删"。
+- 验证：fail-fast 用当时被占的 8080（另一个项目的 eldercare 后端）实测；清理后查 `information_schema` 复核。
+- 本地提交：`b49b1fc2`；远端推送：`9885ebd0..b49b1fc2` 成功
