@@ -53,7 +53,10 @@ test.describe('每日速递', () => {
   test('有历史内容时，进入页面自动落到最近一天而不是空白的今天', async ({ page }) => {
     await page.goto('/#/digest')
     // 日期按钮是异步来的（先取 /digest/dates）：不等到它们出现就数，必然数到 0 而误跳过
-    await expect(page.getByTestId('digest-date-option').first()).toBeVisible({ timeout: 15_000 })
+    // 空库一个日期按钮都没有：等"要么有日期、要么明确空态"，否则下面的 skip 永远走不到
+    await expect(
+      page.getByTestId('digest-date-option').first().or(page.getByTestId('digest-empty')),
+    ).toBeVisible({ timeout: 15_000 })
 
     const dates = page.getByTestId('digest-date-option')
     if ((await dates.count()) === 0) {
@@ -67,7 +70,10 @@ test.describe('每日速递', () => {
 
   test('往日可翻：有更早一天时「更早」能点，且切换后有内容或明确空态', async ({ page }) => {
     await page.goto('/#/digest')
-    await expect(page.getByTestId('digest-date-option').first()).toBeVisible({ timeout: 15_000 })
+    // 空库一个日期按钮都没有：等"要么有日期、要么明确空态"，否则下面的 skip 永远走不到
+    await expect(
+      page.getByTestId('digest-date-option').first().or(page.getByTestId('digest-empty')),
+    ).toBeVisible({ timeout: 15_000 })
 
     const dates = page.getByTestId('digest-date-option')
     if ((await dates.count()) < 2) {
@@ -99,7 +105,10 @@ test.describe('每日速递', () => {
 
   test('每条都有原文链接，且指向外部站点', async ({ page }) => {
     await page.goto('/#/digest')
-    await expect(page.getByTestId('digest-date-option').first()).toBeVisible({ timeout: 15_000 })
+    // 空库一个日期按钮都没有：等"要么有日期、要么明确空态"，否则下面的 skip 永远走不到
+    await expect(
+      page.getByTestId('digest-date-option').first().or(page.getByTestId('digest-empty')),
+    ).toBeVisible({ timeout: 15_000 })
 
     const firstTitle = page.getByTestId('digest-title').first()
     // 等条目真出现（或明确空态），否则 count 会在渲染完成前读到 0
@@ -117,7 +126,10 @@ test.describe('每日速递', () => {
 
   test('GitHub 组有内容时可在今日/本周之间切换', async ({ page }) => {
     await page.goto('/#/digest')
-    await expect(page.getByTestId('digest-date-option').first()).toBeVisible({ timeout: 15_000 })
+    // 空库一个日期按钮都没有：等"要么有日期、要么明确空态"，否则下面的 skip 永远走不到
+    await expect(
+      page.getByTestId('digest-date-option').first().or(page.getByTestId('digest-empty')),
+    ).toBeVisible({ timeout: 15_000 })
 
     // 页面默认落到**最近有内容**的一天，但那天不一定有 GitHub 组（抓取可能只成功了一半）。
     // 依次点日期选项直到找到带 GitHub 组的一天：这样"有内容却没测到"不会伪装成 skip。

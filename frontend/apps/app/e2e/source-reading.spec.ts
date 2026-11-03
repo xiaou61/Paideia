@@ -76,14 +76,16 @@ test('练习与测验：判定与得分都给出明确反馈', async ({ page }) 
   const dialog = page.getByTestId('practice-dialog')
   await expect(dialog).toBeVisible()
   for (const index of [0, 1]) {
-    await dialog.getByTestId(`quiz-option-${index}-0`).click()
+    // 选中即锁定（按钮变 disabled）。普通 click 在锁定瞬间重试会一直等到超时，
+    // 所以跳过可操作性检查：锁定后这一下是无害空操作，答错仍由下面的 quiz-score 断言兜住。
+    await dialog.getByTestId(`quiz-option-${index}-0`).click({ force: true })
   }
   // 最后一题等接口真写完再往下走：紧接着要刷新，抢在写入之前会读到"没答过"
   const lastAttempt = page.waitForResponse(
     (response) =>
       response.url().includes('/api/v1/learning/attempts') && response.request().method() === 'POST',
   )
-  await dialog.getByTestId('quiz-option-2-0').click()
+  await dialog.getByTestId('quiz-option-2-0').click({ force: true })
   await lastAttempt
   await expect(dialog.getByTestId('quiz-score')).toContainText('答对 3 / 3')
   await page.getByTestId('practice-close').click()

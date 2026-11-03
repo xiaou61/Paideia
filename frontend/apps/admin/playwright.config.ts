@@ -31,6 +31,9 @@ export default defineConfig({
   reporter: [['list']],
   use: {
     baseURL: REMOTE_BASE_URL ?? `http://127.0.0.1:${ADMIN_PORT}`,
+    // 首条用例的 goto 会触发 Vite 编译整包，本机冷启动实测超过默认 30 秒（2026-11-03 全量实测）；
+    // 管理端没有 globalSetup 先热身，这条只能靠超时兜住。
+    navigationTimeout: 60_000,
     trace: 'retain-on-failure',
   },
   /** 同学习者端：桌面跑全部既有用例，移动 project 只跑 `*.mobile.spec.ts`（WORK-016）。 */
