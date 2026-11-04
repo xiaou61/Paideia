@@ -10065,3 +10065,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：paideia-ai 410/0/15；KnowledgeRead+AssistantConversation 28/0/0；迁移守卫 9/0/0；MarkdownField 2/2；pnpm -r typecheck 17 包；admin build 通过。
 - 本地提交：待提交
 - 远端推送：未执行
+## 2026-11-04 19:30 +0800 · WORK-072 部署与真实索引验证
+
+- 类型：verification
+- 应用部署：`paideia.service` 已部署，health `UP`；迁移 `20261104160000 - create ai knowledge chunks` 已应用。
+- 本地 Ollama：`paideia-ollama` 容器运行，`bge-m3` 可用，`/api/embed` 1024 维。
+- 真实索引：`ai_knowledge_chunks` 460 chunks / 460 entries；调度日志 `rag.index.completed entries=454 chunks=454`。
+- 黄金集：12 个中文技术问题 Recall@5 = **12/12**。
+- 验证报告：status 由 partial 更新为 **passed**。
+- 本地提交：待提交
+- 远端推送：未执行
