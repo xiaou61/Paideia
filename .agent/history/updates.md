@@ -9886,8 +9886,8 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 决策：提示词正文不挪 `.md`、不做后台在线编辑——理由与代价写进 `WORK-070/requirements.md` 的「不做」。
 - 验证：`paideia-ai` **389 条 / 0 失败 / 15 跳过**；守卫反向验证（把 `digest-v4` 改成 `digestV4`）实测变红后还原复绿；`pnpm --filter @paideia/admin typecheck` 0 错；工作树 `pnpm install` 41.3 秒（全局 store 命中）。
 - 未覆盖：概览页新卡无 e2e（排行卡只在有数据时渲染，加断言会 flaky）；`countByPromptVersion` 的注解 SQL 与既有聚合一样没有单测。
-- 本地提交：(见 git log)
-- 远端推送：未推送（需授权）
+- 本地提交：`62d9f6e0`（代码+测试）、`92ddfc99`（工件）
+- 远端推送：已推送 `99e4d2a3..585f06c1`（合并提交；合并时 updates.md 与另一会话的 WORK-068 记录冲突，按时间戳把本条排在 11:20 位置）
 
 ## 2026-11-04 15:40 +0800 · WORK-068 第二批：三条理论线 + 两条实战线
 
