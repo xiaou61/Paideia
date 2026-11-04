@@ -1,5 +1,6 @@
 package io.github.xiaou61.ai.internal.telemetry;
 
+import io.github.xiaou61.ai.FailureKind;
 import io.github.xiaou61.ai.RunOutcome;
 import io.github.xiaou61.ai.RunRecorder;
 import io.github.xiaou61.ai.RunSpec;
@@ -198,14 +199,24 @@ final class DefaultRunRecorder implements RunRecorder {
 
         @Override
         public void finish(RunOutcome outcome, String errorType) {
+            finish(outcome, errorType, defaultFailureKind(outcome));
+        }
+
+        /**
+         * 带处置语义的终态（WORK-069）。显式给出的处置优先；失败终态没给时按 outcome
+         * 兜底为 {@link FailureKind#RETRYABLE}，保证「失败的 run 不会没有处置」。
+         */
+        @Override
+        public void finish(RunOutcome outcome, String errorType, FailureKind failureKind) {
             if (!finished.compareAndSet(false, true)) {
                 return;
             }
+            FailureKind effective = failureKind == null ? defaultFailureKind(outcome) : failureKind;
             List<PayloadRecord> payloadCopy;
             synchronized (payloads) {
                 payloadCopy = List.copyOf(payloads);
             }
-            RunRecord record = snapshot(outcome.key(), errorType);
+            RunRecord record = snapshot(outcome.key(), errorType, effective);
             String kind = record.kind() == null || record.kind().isBlank() ? "unknown" : record.kind();
             meterRegistry.counter("paideia.ai.runs", "kind", kind, "outcome", outcome.key()).increment();
             if (record.durationMs() != null) {
@@ -215,13 +226,21 @@ final class DefaultRunRecorder implements RunRecorder {
             queue.offer(new RunPayload.RunFinish(record, payloadCopy));
         }
 
+        /** 失败的兜底处置；OK 与用户主动取消不是失败。 */
+        private static FailureKind defaultFailureKind(RunOutcome outcome) {
+            return switch (outcome) {
+                case FAILED, TIMEOUT, INTERRUPTED -> FailureKind.RETRYABLE;
+                case OK, CANCELLED -> null;
+            };
+        }
+
         /** 没 finish 就关：说明调用方走了异常路径。补一条 interrupted，绝不留 running 僵尸。 */
         @Override
         public void close() {
             finish(RunOutcome.INTERRUPTED, "unclosed");
         }
 
-        private RunRecord snapshot(String status, String errorType) {
+        private RunRecord snapshot(String status, String errorType, FailureKind failureKind) {
             Instant endedAt = Instant.now();
             int millis = (int) Duration.between(startedAt, endedAt).toMillis();
             List<SpanRecord> copy;
@@ -231,6 +250,7 @@ final class DefaultRunRecorder implements RunRecorder {
             return new RunRecord(traceId, spec.userId(), spec.conversationId(), spec.kind(),
                     spec.harness(), spec.model(), spec.promptVersion(),
                     startedAt, endedAt, status, errorType,
+                    failureKind == null ? null : failureKind.key(),
                     queueMs, millis, ttftMs,
                     llmRounds.get(), toolCalls.get(),
                     inputTokens, outputTokens, cacheReadTokens, credits,

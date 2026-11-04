@@ -71,6 +71,17 @@ public interface RunRecorder {
         /** 终态 + 低基数错误标识（取自 ErrorCode 或归一值，**不是异常消息**）。 */
         void finish(RunOutcome outcome, String errorType);
 
+        /**
+         * 带处置语义的终态（WORK-069）。
+         *
+         * <p>默认转发到两参方法，既有的采集实现与业务调用点不必一次性改造；需要落
+         * {@code failure_kind} 的实现覆盖它即可。失败终态应尽量给出明确处置；采集层对
+         * 没有显式分类的失败兜底为 {@link FailureKind#RETRYABLE}。
+         */
+        default void finish(RunOutcome outcome, String errorType, FailureKind failureKind) {
+            finish(outcome, errorType);
+        }
+
         @Override
         void close();
     }

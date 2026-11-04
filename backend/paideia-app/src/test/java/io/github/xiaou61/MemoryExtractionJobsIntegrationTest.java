@@ -8,6 +8,8 @@ import static org.mockito.Mockito.when;
 import io.github.xiaou61.ai.MemoryCandidate;
 import io.github.xiaou61.ai.MemoryExtractor;
 import io.github.xiaou61.ai.internal.billing.CreditService;
+import io.github.xiaou61.platform.BizException;
+import io.github.xiaou61.platform.ErrorCode;
 import io.github.xiaou61.ai.internal.conversation.ConversationService;
 import io.github.xiaou61.ai.internal.memory.MemoryExtractionJob;
 import io.github.xiaou61.ai.internal.memory.MemoryExtractionJobs;
@@ -210,6 +212,43 @@ class MemoryExtractionJobsIntegrationTest {
     }
 
     @Test
+    @DisplayName("AC-002：不可重试失败直接 failed，attempts 不再增长、next_attempt_at 不推后，ai_runs 标 needs_human")
+    void permanentFailureStopsRetry() {
+        long conversationId = newConversation();
+        when(extractor.extract(any(), any()))
+                .thenThrow(new BizException(ErrorCode.INVALID_ARGUMENT, "上游拒绝了这组凭据"));
+
+        extraction.scheduleIfDue(user, conversationId);
+
+        if (!Await.until(() -> "failed".equals(jobStatus()), 10_000, 50)) {
+            throw new AssertionError("等永久失败落定超时");
+        }
+        assertThat(jobStatus()).isEqualTo("failed");
+        assertThat(latestJobAttempts()).isEqualTo(1);
+        assertThat(secondsBetweenCreatedAndNextAttempt()).isZero();
+        if (!Await.until(() -> "needs_human".equals(latestRunFailureKind()), 5_000, 50)) {
+            throw new AssertionError("等 ai_runs.failure_kind 落库超时");
+        }
+        assertThat(latestRunFailureKind()).isEqualTo("needs_human");
+    }
+
+    @Test
+    @DisplayName("AC-002：retryable 失败仍按既有退避重排")
+    void retryableFailureStillBacksOff() {
+        long conversationId = newConversation();
+        when(extractor.extract(any(), any())).thenThrow(new IllegalStateException("upstream timeout"));
+
+        extraction.scheduleIfDue(user, conversationId);
+        awaitFailedAttemptOne();
+
+        assertThat(jobStatus()).isEqualTo("pending");
+        assertThat(latestJobAttempts()).isEqualTo(1);
+        assertThat(secondsUntilNextAttemptForUser()).isBetween(
+                (long) properties.getRetryBackoffSeconds() - 10,
+                (long) properties.getRetryBackoffSeconds() + 10);
+    }
+
+    @Test
     @DisplayName("端到端：失败留下的任务被中继拾起重试成功——记忆最终写上、任务行消失")
     void relayRetriesFailedJobToSuccess() {
         long conversationId = newConversation();
@@ -271,6 +310,43 @@ class MemoryExtractionJobsIntegrationTest {
     private String lastErrorOf(MemoryExtractionJob job) {
         return jdbcTemplate.queryForObject(
                 "SELECT last_error FROM ai_memory_extraction_jobs WHERE id = ?", String.class, job.getId());
+    }
+
+    private String jobStatus() {
+        return jdbcTemplate.queryForObject(
+                "SELECT status FROM ai_memory_extraction_jobs WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+                String.class, user);
+    }
+
+    private int latestJobAttempts() {
+        Integer attempts = jdbcTemplate.queryForObject(
+                "SELECT attempts FROM ai_memory_extraction_jobs WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+                Integer.class, user);
+        return attempts == null ? 0 : attempts;
+    }
+
+    private long secondsBetweenCreatedAndNextAttempt() {
+        Long seconds = jdbcTemplate.queryForObject(
+                "SELECT TIMESTAMPDIFF(SECOND, created_at, next_attempt_at) "
+                        + "FROM ai_memory_extraction_jobs WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+                Long.class, user);
+        return seconds == null ? 0 : seconds;
+    }
+
+    private String latestRunFailureKind() {
+        var rows = jdbcTemplate.queryForList(
+                "SELECT failure_kind FROM ai_runs WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+                String.class, user);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    /** 当前用户最新任务距离下一次可尝试还有几秒（按应用视角的 UTC 比较）。 */
+    private long secondsUntilNextAttemptForUser() {
+        Timestamp next = jdbcTemplate.queryForObject(
+                "SELECT next_attempt_at FROM ai_memory_extraction_jobs WHERE user_id = ? "
+                        + "ORDER BY id DESC LIMIT 1",
+                Timestamp.class, user);
+        return next.toInstant().getEpochSecond() - Instant.now().getEpochSecond();
     }
 
     /** 距离下一次可尝试还有几秒（按应用视角的 UTC 比较）。 */

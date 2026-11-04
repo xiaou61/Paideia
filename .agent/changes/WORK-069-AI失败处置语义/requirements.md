@@ -2,11 +2,14 @@
 artifact: requirements
 work_id: WORK-069
 work: AI 失败的处置语义
-status: draft
+status: approved
 created: 2026-11-04
 updated: 2026-11-04
 mode: strict
 mode_reason: 动 ai_runs 表结构（迁移）且改变三条链路的重试行为，属于数据与公共行为变化。
+approved_by: xiaou61
+approved_at: 2026-11-04 14:14:25 +0800
+approver_role: owner
 ---
 
 # 需求
@@ -39,6 +42,7 @@ mode_reason: 动 ai_runs 表结构（迁移）且改变三条链路的重试行�
 - `CampGenerationException.Kind` 三档已经存在，注释明写调用方据此决定是否值得修复重试——但它是 camp 包私有的，不落库、不跨链路。
 - 记忆提取已有退避与 `maxExtractionAttempts` 上限（WORK-061），**所有失败一律进重试**。
 - 面经抓取失败只写日志，用户不可见、事后不可统计。
+- `EssayCollectionService` **当前没有 `RunRecorder` 记录**（全仓没有 `essay_*` 的 `RunKind`）；REQ-004 的“可被统计”需要新增这个采集点，这属于本项实现的一部分，不改变抓取/抽题的业务行为。
 
 ### 用户决定（2026-11-04）
 

@@ -9941,3 +9941,22 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：推送前 rebase 到 0b833efb 并重跑 TechEssayFilterTest+EssayCollectionRoutingTest 12/12；推送 0b833efb..4e4e1fca
 - 本地提交：4e4e1fca
 - 远端推送：已推送 0b833efb..4e4e1fca 到 origin/master（快进，无强推）
+## 2026-11-04 14:10 +0800 · WORK-069 起草方案与设计
+
+- 类型：docs
+- 变更：新建 `proposal.md`、`design.md`、`tasks.md`、`testing/plan.md`，把 REQ-001..REQ-005 落到采集管道、记忆提取、营地出题、面经抓取与管理端查询五块。
+- 决策：`failure_kind` 只加一列、不加索引/CHECK；`RunScope` 用默认三参 `finish` 扩展；记忆提取按 `retryable` / `bad_output` / `needs_human` 分流，营地与面经只记录不改行为。发现 `EssayCollectionService` 当前没有 `RunRecorder`，REQ-004 需要新增采集点。
+- 依据：`requirements.md`；`backend/paideia-ai` 的 `RunRecorder`/`RunRecord`/`MysqlRunSink`/`AiRunMapper`、`MemoryExtractionService`、`CampService`、`EssayCollectionService` 源码；`.agent/rules/always.md` 的迁移与测试纪律。
+- 验证：`project-lifecycle.ps1 validate` 对 WORK-069 只剩“需求尚未形成但已有下游工件”——符合当前阶段；未跑任何构建或测试（本轮只写文档）。
+- 本地提交：未提交（需用户授权）
+- 远端推送：未执行
+
+## 2026-11-04 14:14 +0800 · WORK-069 签署
+
+- 类型：decision
+- 变更：.agent/changes/WORK-069-AI失败处置语义/requirements.md、proposal.md、design.md、tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（owner）；签署字段由命令入口盖章，不由模型写入
+- 依据：四个阶段工件
+- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行

@@ -2,6 +2,7 @@ package io.github.xiaou61.ai.internal.telemetry;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.xiaou61.ai.FailureKind;
 import io.github.xiaou61.ai.RunKind;
 import io.github.xiaou61.ai.RunOutcome;
 import io.github.xiaou61.ai.RunRecorder;
@@ -75,6 +76,31 @@ class DefaultRunRecorderTest {
         RunPayload.RunFinish finish = (RunPayload.RunFinish) queue.accepted().stream()
                 .filter(RunPayload.RunFinish.class::isInstance).findFirst().orElseThrow();
         assertThat(finish.run().status()).isEqualTo("ok");
+    }
+
+    @Test
+    @DisplayName("三参 finish 原样写入 failureKind")
+    void explicitFailureKindWins() {
+        TestQueue queue = new TestQueue(properties());
+        RunRecorder recorder = new DefaultRunRecorder(queue, new TelemetryProperties(), new SimpleMeterRegistry());
+        RunRecorder.RunScope run = recorder.begin(RunSpec.of(RunKind.CHAT, 7L));
+        run.finish(RunOutcome.FAILED, "bad", FailureKind.NEEDS_HUMAN);
+
+        RunPayload.RunFinish finish = (RunPayload.RunFinish) queue.accepted().get(1);
+        assertThat(finish.run().failureKind()).isEqualTo(FailureKind.NEEDS_HUMAN.key());
+    }
+
+    @Test
+    @DisplayName("没有显式分类的失败按 retryable 兜底；成功为 null")
+    void failedOutcomeGetsRetryableFallback() {
+        TestQueue queue = new TestQueue(properties());
+        RunRecorder recorder = new DefaultRunRecorder(queue, new TelemetryProperties(), new SimpleMeterRegistry());
+        recorder.begin(RunSpec.of(RunKind.CHAT, 7L)).finish(RunOutcome.FAILED, "x");
+        recorder.begin(RunSpec.of(RunKind.CHAT, 8L)).finish(RunOutcome.OK, null);
+
+        assertThat(((RunPayload.RunFinish) queue.accepted().get(1)).run().failureKind())
+                .isEqualTo(FailureKind.RETRYABLE.key());
+        assertThat(((RunPayload.RunFinish) queue.accepted().get(3)).run().failureKind()).isNull();
     }
 
     @Test

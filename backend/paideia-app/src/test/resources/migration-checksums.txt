@@ -43,6 +43,7 @@ src/main/resources/db/migration/V20261027170000__create_analytics_events.sql -25
 src/main/resources/db/migration/V20261028150000__memory_relevance_candidates_and_ttl.sql 279443776
 src/main/resources/db/migration/V20261102120000__create_learning_plan_items.sql 526200456
 src/main/resources/db/migration/V20261102200000__create_memory_extraction_jobs.sql -472466624
+src/main/resources/db/migration/V20261104142000__add_ai_runs_failure_kind.sql 1025408658
 src/main/resources/db/migration/V20__add_entry_read_indexes.sql -1148086735
 src/main/resources/db/migration/V21__create_ai_telemetry_tables.sql -891669932
 src/main/resources/db/migration/V22__create_learning_tracks.sql -976007377

@@ -15,7 +15,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.github.xiaou61.ai.FailureKind;
 import io.github.xiaou61.ai.ModelAccess;
+import io.github.xiaou61.ai.RunOutcome;
 import io.github.xiaou61.ai.RunRecorder;
 import io.github.xiaou61.ai.TokenUsage;
 import io.github.xiaou61.ai.ResumeData;
@@ -203,6 +205,19 @@ class CampServiceTest {
 
         verify(credits, times(1)).refund(eq(USER), eq(100L), any(), anyString());
         verify(camps, never()).insertProgram(any());
+        verify(scope).finish(RunOutcome.FAILED, "camp_generate_failed", FailureKind.NEEDS_HUMAN);
+    }
+
+    @Test
+    @DisplayName("模型输出形状不对 → bad_output")
+    void badShapeMapsToBadOutput() {
+        when(generator.diagnostic(anyString(), anyString(), anyInt(), any()))
+                .thenThrow(CampGenerationException.badShape("不是 JSON"));
+
+        assertThatThrownBy(() -> service.create(USER, TEMPLATE_ID, 3))
+                .isInstanceOf(CampGenerationException.class);
+
+        verify(scope).finish(RunOutcome.FAILED, "camp_generate_failed", FailureKind.BAD_OUTPUT);
     }
 
     @Test
@@ -245,6 +260,7 @@ class CampServiceTest {
         verify(credits).settleCamp(eq(USER), eq(100L), anyString(), any(), any(), any());
         verify(credits, never()).refund(anyLong(), anyLong(), any(), anyString());
         verify(camps, never()).insertProgram(any());
+        verify(scope).finish(RunOutcome.FAILED, "camp_generate_failed", FailureKind.BAD_OUTPUT);
     }
 
     @Test

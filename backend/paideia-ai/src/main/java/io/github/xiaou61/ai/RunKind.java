@@ -59,6 +59,12 @@ public final class RunKind {
     /** 运维诊断（WORK-042）。告警或管理员触发的一次性根因分析，与学习行为分开统计。 */
     public static final String OPS_DIAGNOSIS = "ops_diagnosis";
 
+    /** 面经抓取（WORK-069）。无用户归属的平台抓取。 */
+    public static final String ESSAY_COLLECT = "essay_collect";
+
+    /** 面经单篇抽题（WORK-069）。与整次抓取分开：一篇失败不该拖垮其余帖子。 */
+    public static final String ESSAY_EXTRACT = "essay_extract";
+
     private RunKind() {
     }
 }

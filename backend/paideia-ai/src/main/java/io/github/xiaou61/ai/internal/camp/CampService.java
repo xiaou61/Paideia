@@ -192,6 +192,10 @@ public class CampService {
             }
             return new Created(programId, days, validated.accepted().size(),
                     validated.dropped().size(), shortOfTarget);
+        } catch (CampGenerationException failure) {
+            refundFailed(userId, reserved, access, usage, "训练营出卷失败");
+            run.finish(RunOutcome.FAILED, "camp_generate_failed", failure.failureKind());
+            throw failure;
         } catch (RuntimeException failure) {
             refundFailed(userId, reserved, access, usage, "训练营出卷失败");
             run.finish(RunOutcome.FAILED, "camp_generate_failed");
@@ -469,6 +473,10 @@ public class CampService {
             log.info("camp.retest_generated userId={} programId={} items={}", userId, programId, kept.size());
             return new Created(programId, program.getDays(), kept.size(), validated.dropped().size(),
                     kept.size() < diagnostic.size() * SHORT_OF_TARGET_RATIO);
+        } catch (CampGenerationException failure) {
+            refundFailed(userId, reserved, access, usage, "训练营复测失败");
+            run.finish(RunOutcome.FAILED, "camp_retest_failed", failure.failureKind());
+            throw failure;
         } catch (RuntimeException failure) {
             refundFailed(userId, reserved, access, usage, "训练营复测失败");
             run.finish(RunOutcome.FAILED, "camp_retest_failed");

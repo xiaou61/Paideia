@@ -41,6 +41,7 @@ test.describe('AI 调用统计', () => {
 
     await expect(page.getByTestId('runs-filter-kind')).toBeVisible()
     await expect(page.getByTestId('runs-filter-status')).toBeVisible()
+    await expect(page.getByTestId('runs-filter-failure-kind')).toBeVisible()
 
     const table = page.getByTestId('runs-table')
     const empty = page.getByTestId('runs-list-empty')
