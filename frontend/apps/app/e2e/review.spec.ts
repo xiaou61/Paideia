@@ -94,8 +94,8 @@ test.describe('复习', () => {
           traceId: 'e2e',
           data: {
             results: [
-              { itemId: 0, conceptId: 1, correct: true, explanation: '第一题解析' },
-              { itemId: 1, conceptId: 1, correct: false, explanation: '第二题解析' },
+              { itemId: 0, conceptId: 1, correct: true, explanation: '第一题解析', answer: 0 },
+              { itemId: 1, conceptId: 1, correct: false, explanation: '第二题解析', answer: 1 },
             ],
             schedule: [{ entryId: 42, stage: 3, reviewDueAt: '2026-11-12T00:00:00Z' }],
           } satisfies ReviewSubmitResult,
@@ -114,6 +114,22 @@ test.describe('复习', () => {
     await expect(page.getByTestId('review-result')).toBeVisible()
     await expect(page.getByText('第一题解析')).toBeVisible()
     await expect(page.getByText(/下一次复习/)).toBeVisible()
+
+    // WORK-067：错题可以点一次 AI 讲解（打桩，验接线与按题渲染）
+    await page.route('**/api/v1/ai/explain/review-item', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0,
+          message: 'ok',
+          traceId: null,
+          data: { text: 'AI 讲解：你选的那项把边界条件漏了。' },
+        }),
+      })
+    })
+    await page.getByTestId('review-ai-explain').first().click()
+    await expect(page.getByTestId('review-ai-explain-text').first()).toContainText('AI 讲解')
   })
 
   test('空态给出两个去处', async ({ page }) => {

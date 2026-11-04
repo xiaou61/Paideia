@@ -1,8 +1,14 @@
+import { createAssistantApi } from '@paideia/assistant'
 import type { ConceptNode } from '@paideia/knowledge'
+import { Button } from '@paideia/ui'
+import { useMutation } from '@tanstack/react-query'
 import { BookOpen, Clock } from 'lucide-react'
 import { Link } from 'react-router'
 
+import { api } from '../../api'
 import { tierColor, tierStyle } from './tier-style'
+
+const assistant = createAssistantApi(api)
 
 interface Props {
   concept: ConceptNode | null
@@ -58,6 +64,8 @@ export function ConceptDetailPanel({ concept }: Props) {
         <p className="mt-3 text-sm leading-relaxed">{concept.summary}</p>
       ) : null}
 
+      <AiConceptExplain name={concept.name} summary={concept.summary ?? ''} />
+
       <p className="text-muted-foreground mt-3 text-xs">
         看过 {concept.evidence.viewed} 次
         {concept.evidence.assessed === null
@@ -91,5 +99,32 @@ export function ConceptDetailPanel({ concept }: Props) {
         </ul>
       )}
     </aside>
+  )
+}
+
+/** 「AI 用大白话讲讲」（WORK-067）：只把概念名与摘要发上去，不落库。 */
+function AiConceptExplain({ name, summary }: { name: string; summary: string }) {
+  const ask = useMutation({
+    mutationFn: () => assistant.explainConcept({ name, ...(summary === '' ? {} : { summary }) }),
+  })
+  return (
+    <div className="mt-3">
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={ask.isPending}
+        data-testid="concept-ai-explain"
+        onClick={() => ask.mutate()}
+      >
+        {ask.isPending ? 'AI 正在解释…' : 'AI 用大白话讲讲'}
+      </Button>
+      {ask.data === undefined ? null : (
+        <p className="text-muted-foreground mt-2 text-sm leading-6" data-testid="concept-ai-text">
+          {ask.data.text}
+        </p>
+      )}
+      {ask.isError ? <p className="text-destructive mt-2 text-xs">AI 暂时用不了，稍后再试。</p> : null}
+    </div>
   )
 }

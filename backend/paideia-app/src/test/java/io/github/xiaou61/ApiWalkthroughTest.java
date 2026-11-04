@@ -416,6 +416,21 @@ class ApiWalkthroughTest {
         call("生成精简（桩）", "POST", "/api/v1/ai/summaries", bearer,
                 json(Map.of("entryId", entryId, "visibility", "private")));
 
+        // WORK-067：五个"点一下、给一小段"的 AI 入口。测试 profile 里配了一个不可达的平台凭据，
+        // 合法请求会真去打上游——所以这里只用**非法入参**走到 400：端点存在、鉴权生效、校验可读。
+        call("AI 讲解错题（选的已是答案 → 400）", "POST", "/api/v1/ai/explain/review-item", bearer,
+                json(Map.of("stem", "1+1 等于几", "options", List.of("1", "2"), "choice", 1, "answer", 1)), 400);
+        call("AI 下一步（缺进度 → 400）", "POST", "/api/v1/ai/next-step", bearer,
+                json(Map.of("failing", "循环")), 400);
+        call("AI 概念解释（缺名字 → 400）", "POST", "/api/v1/ai/concepts/explain", bearer,
+                json(Map.of("summary", "只有摘要没有名字")), 400);
+        call("AI 笔记要点（缺正文 → 400）", "POST", "/api/v1/ai/notes/points", bearer,
+                json(Map.of("title", "自查")), 400);
+        call("AI 出题（缺正文 → 400）", "POST", "/api/v1/ai/quiz", bearer,
+                json(Map.of("title", "自查")), 400);
+        call("AI 数据集草稿（缺 topic → 400）", "POST", "/api/v1/sql-datasets/draft", bearer,
+                "{}", 400);
+
         MvcResult conversation = call("新建会话", "POST", "/api/v1/ai/conversations", bearer,
                 json(Map.of("entryId", entryId)));
         long conversationId = idAt(conversation);

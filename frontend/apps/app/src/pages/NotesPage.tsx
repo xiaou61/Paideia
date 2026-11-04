@@ -22,6 +22,7 @@ import {
   PageHeader,
   Spinner,
 } from '@paideia/ui'
+import { createAssistantApi } from '@paideia/assistant'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Copy, NotebookPen, Plus, Search, Trash2 } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router'
@@ -29,6 +30,9 @@ import { useEffect, useRef, useState } from 'react'
 
 import { LearnerHeader } from '../components/LearnerHeader'
 import { notes, type NoteSummary } from '../notes-api'
+
+const assistant = createAssistantApi(api)
+import { api } from '../api'
 
 /**
  * 我的笔记：左侧列表、右侧编辑。
@@ -144,6 +148,11 @@ export function NotesPage() {
     queryKey: ['note-shares', selected],
     queryFn: () => notes.activeShares(selected as number),
     enabled: selected !== null,
+  })
+
+  /** AI 提炼要点（WORK-067）：只发当前编辑器里的标题与正文，不落库。 */
+  const aiPoints = useMutation({
+    mutationFn: () => assistant.notePoints({ title, body }),
   })
 
   const createShare = useMutation({
@@ -346,6 +355,15 @@ export function NotesPage() {
                     </Badge>
                   ) : null}
                   {/* 递的是**编辑器里的当前内容**（含未保存的改动）——服务端的笔记工具读不到草稿 */}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={body.trim() === '' || aiPoints.isPending}
+                    data-testid="note-ai-points"
+                    onClick={() => aiPoints.mutate()}
+                  >
+                    {aiPoints.isPending ? 'AI 正在提炼…' : 'AI 提炼要点'}
+                  </Button>
                   <Button size="sm" variant="outline" data-testid="note-share" onClick={() => setShareOpen(true)}>
                     分享
                   </Button>
@@ -379,6 +397,20 @@ export function NotesPage() {
                     <span data-testid="note-entry">来自知识库条目 #{detail.data.entryId}</span>
                   )}
                 </p>
+
+                {aiPoints.data === undefined ? null : (
+                  <div className="border-border bg-muted/30 rounded-lg border p-3" data-testid="note-ai-points-list">
+                    <p className="text-xs font-medium">AI 提炼的要点</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-5 text-sm">
+                      {aiPoints.data.points.map((point) => (
+                        <li key={point}>{point}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {aiPoints.isError ? (
+                  <p className="text-destructive text-xs">AI 暂时用不了，稍后再试。</p>
+                ) : null}
 
                 {/* key 让换一条笔记时编辑/预览回到"编辑"（否则上一条停在预览，下一条一进来就是预览） */}
                 <MarkdownField key={selected ?? 'none'} value={body} onChange={setBody} testIdPrefix="note" />

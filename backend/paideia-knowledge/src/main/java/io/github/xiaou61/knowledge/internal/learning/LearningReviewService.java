@@ -63,7 +63,7 @@ public class LearningReviewService {
     private record PendingMastery(long conceptId, boolean correct, int optionCount) {
     }
 
-    public record ResultView(long itemId, long conceptId, boolean correct, String explanation) {
+    public record ResultView(long itemId, long conceptId, boolean correct, String explanation, int answer) {
     }
 
     public record ScheduleView(long entryId, int stage, Instant reviewDueAt) {
@@ -208,7 +208,7 @@ public class LearningReviewService {
                 throw new BizException(ErrorCode.INVALID_ARGUMENT, "选项越界");
             }
             boolean correct = choice == item.answerIndex();
-            results.add(new ResultView(item.itemId(), item.conceptId(), correct, item.explanation()));
+            results.add(new ResultView(item.itemId(), item.conceptId(), correct, item.explanation(), item.answerIndex()));
             allCorrectByConcept.merge(item.conceptId(), correct, (left, right) -> left && right);
             allCorrectByEntry.merge(item.entryId(), correct, (left, right) -> left && right);
             // 掌握度先收集、**等抢到幂等闸再写**：并发交卷时两个请求都会走到这里，

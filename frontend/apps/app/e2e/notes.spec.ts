@@ -253,3 +253,27 @@ test('新建页没写东西就能直接返回；写了东西才拦一下', async
   await expect(page.locator('body')).not.toContainText(before)
 })
 
+test('AI 提炼要点：点一次列出要点（接口打桩）', async ({ page }) => {
+  await signIn(page)
+  await page.route('**/api/v1/ai/notes/points', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        traceId: null,
+        data: { points: ['第一点：边界条件', '第二点：空列表'] },
+      }),
+    })
+  })
+
+  await page.goto('/#/notes')
+  await expect(page.getByTestId('notes-create')).toBeVisible()
+  await createNote(page, `e2e AI 要点 ${Date.now()}`, '正文里写了边界条件和空列表')
+  await page.getByTestId('note-ai-points').click()
+  await expect(page.getByTestId('note-ai-points-list')).toContainText('边界条件')
+
+  await page.getByTestId('note-delete').click()
+  await page.getByTestId('note-confirm').click()
+})

@@ -15,6 +15,10 @@ import {
   AlertTitle,
   AppShell,
   Button,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   ErrorAlert,
   LoadingRow,
   PageHeader,
@@ -73,6 +77,13 @@ export function KnowledgeEntryPage() {
   const generateSummary = useMutation({
     mutationFn: () => assistantApi.generate(entryId, 'private'),
     onSuccess: (view) => queryClient.setQueryData(['entry-summary', entryId], view),
+  })
+
+  /** AI 出一道题（WORK-067）：用这一条的正文出，题与解析只回这一次，不落库。 */
+  const [quizOpen, setQuizOpen] = useState(false)
+  const [quizChoice, setQuizChoice] = useState<number | null>(null)
+  const aiQuiz = useMutation({
+    mutationFn: () => assistantApi.quiz({ title: entry.data?.title ?? '', body }),
   })
 
   /**
@@ -325,6 +336,7 @@ export function KnowledgeEntryPage() {
             <section className="border-border bg-card mt-8 rounded-xl border p-4" data-testid="entry-summary">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-sm font-medium">AI 摘要</h2>
+                <div className="flex flex-wrap items-center gap-2">
                 <Button
                   type="button"
                   size="sm"
@@ -335,6 +347,20 @@ export function KnowledgeEntryPage() {
                 >
                   {generateSummary.isPending ? '生成中…' : summaryQuery.data == null ? '生成摘要' : '重新生成'}
                 </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  data-testid="entry-quiz-generate"
+                  onClick={() => {
+                    setQuizChoice(null)
+                    setQuizOpen(true)
+                    aiQuiz.mutate()
+                  }}
+                >
+                  AI 出一道题
+                </Button>
+                </div>
               </div>
               {summaryQuery.isPending ? (
                 <p className="text-muted-foreground text-xs">读取中…</p>
@@ -385,6 +411,64 @@ export function KnowledgeEntryPage() {
           </aside>
         </div>
       ) : null}
+      <Dialog
+        open={quizOpen}
+        onOpenChange={(open) => {
+          setQuizOpen(open)
+          if (!open) {
+            setQuizChoice(null)
+          }
+        }}
+      >
+        <DialogContent data-testid="entry-quiz-dialog">
+          <DialogHeader>
+            <DialogTitle>AI 出的题</DialogTitle>
+          </DialogHeader>
+          {aiQuiz.isPending ? (
+            <p className="text-muted-foreground text-sm">AI 正在读这一条并出题…</p>
+          ) : aiQuiz.isError ? (
+            <p className="text-destructive text-sm" data-testid="entry-quiz-error">
+              {errorMessage(aiQuiz.error)}
+            </p>
+          ) : aiQuiz.data === undefined ? null : (
+            <div className="space-y-3">
+              <p className="text-sm font-medium" data-testid="entry-quiz-question">
+                {aiQuiz.data.question}
+              </p>
+              <div className="grid gap-1.5">
+                {aiQuiz.data.options.map((option, index) => {
+                  const chosen = quizChoice === index
+                  const isAnswer = quizChoice !== null && index === aiQuiz.data!.answer
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      disabled={quizChoice !== null}
+                      data-testid={`entry-quiz-option-${index}`}
+                      onClick={() => setQuizChoice(index)}
+                      className={`min-h-11 rounded-md border px-3 py-2 text-left text-sm transition-colors ${
+                        isAnswer
+                          ? 'border-success bg-success/10 text-success'
+                          : chosen
+                            ? 'border-destructive bg-destructive/10 text-destructive'
+                            : 'border-border bg-background hover:bg-muted'
+                      }`}
+                    >
+                      {isAnswer ? '✓ ' : chosen ? '✗ ' : ''}
+                      {option}
+                    </button>
+                  )
+                })}
+              </div>
+              {quizChoice === null ? null : (
+                <p className="text-muted-foreground text-sm leading-6" data-testid="entry-quiz-explain">
+                  {quizChoice === aiQuiz.data.answer ? '答对了。' : '不对。'} {aiQuiz.data.explain}
+                </p>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </AppShell>
   )
 }

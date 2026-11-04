@@ -211,3 +211,31 @@ export interface InterviewEvaluationView {
   evaluation: InterviewEvaluation
   createdAt: string
 }
+
+/** 五个一次性 AI 入口（WORK-067）。都只回一小段，不落库。 */
+export interface AiText {
+  text: string
+}
+
+export interface AiSteps {
+  steps: string[]
+}
+
+export interface AiPoints {
+  points: string[]
+}
+
+export interface AiQuiz {
+  question: string
+  options: string[]
+  answer: number
+  explain: string
+}
+
+export interface ReviewExplainInput {
+  stem: string
+  options: string[]
+  choice: number
+  answer: number
+  explain?: string
+}

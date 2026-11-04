@@ -204,6 +204,8 @@ export interface ReviewResult {
   conceptId: number
   correct: boolean
   explanation: string
+  /** 正确选项下标（交卷后才下发，用于 AI 讲解与回看）。 */
+  answer: number
 }
 
 export interface ReviewSchedule {

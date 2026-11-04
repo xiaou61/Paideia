@@ -3,6 +3,10 @@ import { JSON_HEADERS } from '@paideia/core'
 
 import { readEventStream } from './sse'
 import type {
+  AiPoints,
+  AiQuiz,
+  AiSteps,
+  AiText,
   ChatEvent,
   ConversationView,
   CredentialView,
@@ -13,6 +17,7 @@ import type {
   MemoryClearResult,
   MemorySettings,
   MemoryView,
+  ReviewExplainInput,
   SummaryView,
   SummaryVisibility,
 } from './types'
@@ -77,6 +82,12 @@ export interface AssistantApi {
    * 助手自己无法调用它（端口里没有写工具）。
    */
   remember(text: string): Promise<number>
+  /** 五个一次性 AI 入口（WORK-067）：只回一小段、不落库，每次点击都花积分。 */
+  explainReviewItem(input: ReviewExplainInput): Promise<AiText>
+  nextStep(input: { lines: string; failing?: string; dueReviews?: string; weakConcepts?: string }): Promise<AiSteps>
+  explainConcept(input: { name: string; summary?: string }): Promise<AiText>
+  notePoints(input: { title?: string; body: string }): Promise<AiPoints>
+  quiz(input: { title?: string; body: string }): Promise<AiQuiz>
   /**
    * 发一轮消息，把 SSE 事件逐个回调出去。本方法返回时表示这一轮结束。
    *
@@ -234,5 +245,40 @@ export function createAssistantApi(client: ApiClient): AssistantApi {
           usage,
         })
       })    },
+    explainReviewItem: (input) =>
+      client.requestEnvelope<AiText>('/api/v1/ai/explain/review-item', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(input),
+      }),
+
+    nextStep: (input) =>
+      client.requestEnvelope<AiSteps>('/api/v1/ai/next-step', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(input),
+      }),
+
+    explainConcept: (input) =>
+      client.requestEnvelope<AiText>('/api/v1/ai/concepts/explain', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(input),
+      }),
+
+    notePoints: (input) =>
+      client.requestEnvelope<AiPoints>('/api/v1/ai/notes/points', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(input),
+      }),
+
+    quiz: (input) =>
+      client.requestEnvelope<AiQuiz>('/api/v1/ai/quiz', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(input),
+      }),
+
   }
 }

@@ -62,3 +62,22 @@ test('计划：添加一条 → 刷新仍在 → 勾选完成 → 刷新仍是�
   await page.locator('li', { hasText: goal }).first().getByRole('button', { name: /删除/ }).click()
   await expect(page.getByText(goal)).toHaveCount(0, { timeout: 15_000 })
 })
+
+test('AI 下一步：点按钮后列出三条（接口打桩）', async ({ page }) => {
+  await signIn(page)
+  await page.route('**/api/v1/ai/next-step', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        traceId: null,
+        data: { steps: ['先把卡住的那关过掉', '复习今天到期的三题', '补最弱的概念'] },
+      }),
+    })
+  })
+  await page.goto('/#/progress')
+  await page.getByTestId('progress-ai-next').click()
+  await expect(page.getByTestId('progress-ai-steps')).toContainText('先把卡住的那关过掉')
+})

@@ -292,3 +292,33 @@ test('打开条目会记一次浏览（WORK-021）：请求真的发出去了', 
   await page.reload()
   await viewCall
 })
+
+test('AI 出一道题：弹窗里作答并看到解析（接口打桩）', async ({ page }) => {
+  await signIn(page)
+  await page.route('**/api/v1/ai/quiz', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        message: 'ok',
+        traceId: null,
+        data: {
+          question: '这段代码为什么不会死循环？',
+          options: ['选项一', '选项二', '选项三', '选项四'],
+          answer: 1,
+          explain: '因为边界在递减',
+        },
+      }),
+    })
+  })
+
+  await openAllEntries(page)
+  await firstEntryLink(page).click()
+  await expect(page.getByTestId('markdown-body')).toBeVisible()
+
+  await page.getByTestId('entry-quiz-generate').click()
+  await expect(page.getByTestId('entry-quiz-question')).toContainText('死循环')
+  await page.getByTestId('entry-quiz-option-1').click()
+  await expect(page.getByTestId('entry-quiz-explain')).toContainText('边界在递减')
+})

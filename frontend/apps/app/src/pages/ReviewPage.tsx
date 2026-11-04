@@ -1,3 +1,4 @@
+import { createAssistantApi } from '@paideia/assistant'
 import { createLearningApi, type ReviewSession, type ReviewSubmitResult } from '@paideia/knowledge'
 import {
   Alert,
@@ -25,6 +26,7 @@ import { LearnerHeader } from '../components/LearnerHeader'
 import { errorMessage } from '@paideia/core'
 
 const learning = createLearningApi(api)
+const assistant = createAssistantApi(api)
 
 /**
  * 复习（WORK-034）。
@@ -90,16 +92,29 @@ export function ReviewPage() {
       {result !== null ? (
         <section className="mt-6 space-y-3" data-testid="review-result">
           <h2 className="text-lg font-semibold">这次的结果</h2>
-          {result.results.map((item, i) => (
-            <Card key={item.itemId} className={item.correct ? 'border-success/40' : 'border-destructive/40'}>
-              <CardContent className="pt-5 text-sm">
-                <p className="font-medium">
-                  第 {i + 1} 题 · {item.correct ? '答对了' : '答错了'}
-                </p>
-                <p className="text-muted-foreground mt-1 leading-6">{item.explanation}</p>
-              </CardContent>
-            </Card>
-          ))}
+          {result.results.map((item, i) => {
+            const source = session?.items.find((entry) => entry.itemId === item.itemId)
+            const choice = answers.find((answer) => answer.itemId === item.itemId)?.choice ?? -1
+            return (
+              <Card key={item.itemId} className={item.correct ? 'border-success/40' : 'border-destructive/40'}>
+                <CardContent className="pt-5 text-sm">
+                  <p className="font-medium">
+                    第 {i + 1} 题 · {item.correct ? '答对了' : '答错了'}
+                  </p>
+                  <p className="text-muted-foreground mt-1 leading-6">{item.explanation}</p>
+                  {item.correct || source === undefined || choice < 0 ? null : (
+                    <AiExplain
+                      stem={source.stem}
+                      options={source.options}
+                      choice={choice}
+                      answer={item.answer}
+                      explain={item.explanation}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
           {result.schedule[0] === undefined ? null : (
             <p className="text-muted-foreground text-sm">
               下一次复习：
@@ -262,5 +277,49 @@ export function ReviewPage() {
         </section>
       )}
     </AppShell>
+  )
+}
+
+/**
+ * 「AI 讲解这道错题」（WORK-067）：题面与选项都在客户端，所以只把这一次点击需要的字段发上去，
+ * 服务端不查题库、不落库。失败时只提示，不影响交卷结果本身。
+ */
+function AiExplain({
+  stem,
+  options,
+  choice,
+  answer,
+  explain,
+}: {
+  stem: string
+  options: string[]
+  choice: number
+  answer: number
+  explain: string
+}) {
+  const ask = useMutation({
+    mutationFn: () => assistant.explainReviewItem({ stem, options, choice, answer, explain }),
+  })
+  return (
+    <div className="mt-3">
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={ask.isPending}
+        data-testid="review-ai-explain"
+        onClick={() => ask.mutate()}
+      >
+        {ask.isPending ? 'AI 正在讲…' : 'AI 讲讲这道错题'}
+      </Button>
+      {ask.data === undefined ? null : (
+        <p className="text-muted-foreground mt-2 leading-6" data-testid="review-ai-explain-text">
+          {ask.data.text}
+        </p>
+      )}
+      {ask.isError ? (
+        <p className="text-destructive mt-2 text-xs">{errorMessage(ask.error)}</p>
+      ) : null}
+    </div>
   )
 }

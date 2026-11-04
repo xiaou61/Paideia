@@ -5,6 +5,7 @@ import {
   type PlanItem,
   type TrackSummary,
 } from '@paideia/knowledge'
+import { createAssistantApi } from '@paideia/assistant'
 import {
   Alert,
   AlertDescription,
@@ -29,9 +30,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 
 import { api } from '../api'
+import { errorMessage } from '@paideia/core'
 import { LearnerHeader } from '../components/LearnerHeader'
 
 const learning = createLearningApi(api)
+const assistant = createAssistantApi(api)
 
 /** 每块最多展示几条：这是"记录"不是"报表"，多了反而看不出该做什么。 */
 const LIMIT = 5
@@ -57,6 +60,17 @@ export function ProgressPage() {
     [reviews.data],
   )
   const weakConcepts = useMemo(() => weakestConcepts(graph.data?.concepts ?? []), [graph.data])
+
+  /** AI 下一步（WORK-067）：输入就是这一页已经算好的四块，服务端只把它们改写成三句话。 */
+  const nextStep = useMutation({
+    mutationFn: () =>
+      assistant.nextStep({
+        lines: lines.map((line) => `${line.name} ${line.passed}/${line.stage}`).join('；'),
+        failing: failing.map((item) => `${item.title}（${item.label}）`).join('；'),
+        dueReviews: dueReviews.join('、'),
+        weakConcepts: weakConcepts.map((concept) => `${concept.name} ${concept.score.toFixed(2)}`).join('；'),
+      }),
+  })
 
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
@@ -157,7 +171,37 @@ export function ProgressPage() {
                 </li>
               ))}
             </ul>
-            
+          </CardContent>
+        </Card>
+
+        <Card data-testid="progress-ai">
+          <CardContent className="pt-6">
+            <SectionTitle icon={<Sparkles className="size-4" />} title="AI 下一步" hint="按这四块记录给三条" />
+            <Button
+              className="mt-3"
+              size="sm"
+              variant="outline"
+              disabled={nextStep.isPending}
+              data-testid="progress-ai-next"
+              onClick={() => nextStep.mutate()}
+            >
+              <Sparkles className="size-4" />
+              {nextStep.isPending ? 'AI 正在看记录…' : '让 AI 排一下今天做什么'}
+            </Button>
+            {nextStep.data === undefined ? (
+              <p className="text-muted-foreground mt-3 text-xs">
+                AI 会结合这四块记录排出今天最该做的三件事（一次调用花积分）。
+              </p>
+            ) : (
+              <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm" data-testid="progress-ai-steps">
+                {nextStep.data.steps.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+            )}
+            {nextStep.isError ? (
+              <p className="text-destructive mt-2 text-xs">{errorMessage(nextStep.error)}</p>
+            ) : null}
           </CardContent>
         </Card>
       </div>

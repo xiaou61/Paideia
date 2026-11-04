@@ -205,7 +205,12 @@ class SqlDatasetController {
      */
     @PostMapping("/draft")
     ApiResponse<SqlAiService.GeneratedDraft> draftDataset(@RequestBody(required = false) DraftRequest body) {
-        return ApiResponse.ok(ai.draftDataset(body == null ? null : body.topic()));
+        String topic = body == null ? null : body.topic();
+        if (topic == null || topic.isBlank()) {
+            // 空 topic 是客户端 bug，不该花一次上游调用去发现
+            throw new BizException(ErrorCode.INVALID_ARGUMENT, "topic 不能为空");
+        }
+        return ApiResponse.ok(ai.draftDataset(topic));
     }
 
     record CreatedView(String key) {

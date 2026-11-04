@@ -9839,3 +9839,14 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 本地提交：`(见 git log)`
 - 远端推送：已推送；部署 76.1 秒
 - 线上 ego 复验：`/#/learn` 推荐卡点「让 AI 说说为什么」→ **20 秒**回来，理由从规则句（"这个岗位的入口，你还没开始…"）换成 AI 写的（"算法0/8关还没动，是这岗位的硬底子"）；截图 `F:/caches/tmp/ego-learn-ai-1.png`
+
+## 2026-11-04 09:40 +0800 · WORK-067 五处专用 AI 入口
+
+- 类型：feature
+- 背景：WORK-066 移除通用助手后，页面留下五处"有明确输入输出"的 AI 机会；用户批准全部补上。
+- 变更：新增 `QuickInsightCaller`（五个一次性提示词，复用 `SingleShotModelCaller`）与 `QuickInsightController`（`/api/v1/ai/explain/review-item`、`/next-step`、`/concepts/explain`、`/notes/points`、`/quiz`），统一「取平台凭据 → 预留 → 按用量结算 / 失败退款」；复习交卷结果新增 `answer` 下标（只在交卷后下发）。
+- 前端五处：复习错题「AI 讲讲这道错题」、学习记录「AI 下一步」卡片、图谱概念「AI 用大白话讲讲」、笔记「AI 提炼要点」、条目「AI 出一道题」弹窗。
+- 决策：不建表、不自动调用、不缓存——结果只属于这一次点击；五处共用一套计费与校验。
+- 验证：`QuickInsightCallerTest` 3/3、walkthrough 全接口自查 1/1（五端点 400 + draft 覆盖）、`LearningReviewIntegrationTest` 5/5、前端 typecheck 0 错、四页 e2e 打桩全绿。
+- 本地提交：见下
+- 远端推送：未执行
