@@ -29,6 +29,8 @@ import org.springframework.stereotype.Service;
 public class KnowledgeRagService {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeRagService.class);
+    /** 一次交给本地 embedding 的块数：太小请求多，太大会把 CPU 和内存一次性顶高。 */
+    private static final int EMBED_BATCH = 32;
 
     private final KnowledgeApi knowledge;
     private final KnowledgeChunkMapper chunks;
@@ -60,9 +62,51 @@ public class KnowledgeRagService {
                     chunks.deleteByEntry(stale);
                 }
             }
+            List<PendingEntry> pending = new ArrayList<>();
             for (EntryContent entry : entries) {
-                reindexEntry(entry);
+                collectPending(entry, pending);
             }
+            if (pending.isEmpty()) {
+                return;
+            }
+            List<String> texts = pending.stream()
+                    .flatMap(item -> item.chunks().stream())
+                    .toList();
+            List<float[]> vectors = new ArrayList<>(texts.size());
+            try {
+                for (int start = 0; start < texts.size(); start += EMBED_BATCH) {
+                    vectors.addAll(embedding.embed(
+                            texts.subList(start, Math.min(texts.size(), start + EMBED_BATCH))));
+                }
+            } catch (RuntimeException failure) {
+                // 旧块先不删：等下一轮重试，避免一次上游故障把整条索引清空
+                log.warn("rag.index.batch_skipped entries={} chunks={} cause={}",
+                        pending.size(), texts.size(), failure.toString());
+                return;
+            }
+            if (vectors.size() != texts.size()) {
+                log.warn("rag.index.size_mismatch entries={} chunks={} vectors={}",
+                        pending.size(), texts.size(), vectors.size());
+                return;
+            }
+            int cursor = 0;
+            Instant now = Instant.now();
+            for (PendingEntry item : pending) {
+                chunks.deleteByEntry(item.entry().id());
+                for (int i = 0; i < item.chunks().size(); i++) {
+                    KnowledgeChunk chunk = new KnowledgeChunk();
+                    chunk.setEntryId(item.entry().id());
+                    chunk.setChunkIndex(i);
+                    chunk.setTitle(item.entry().title());
+                    chunk.setContent(item.chunks().get(i));
+                    chunk.setContentHash(item.hashes().get(i));
+                    chunk.setEmbedding(encode(vectors.get(cursor++)));
+                    chunk.setDimension(vectors.get(cursor - 1).length);
+                    chunk.setUpdatedAt(now);
+                    chunks.insert(chunk);
+                }
+            }
+            log.info("rag.index.completed entries={} chunks={}", pending.size(), texts.size());
         } catch (RuntimeException failure) {
             log.warn("rag.index.failed cause={}", failure.toString());
         }
@@ -110,7 +154,7 @@ public class KnowledgeRagService {
         }
     }
 
-    private void reindexEntry(EntryContent entry) {
+    private void collectPending(EntryContent entry, List<PendingEntry> pending) {
         List<String> pieces = Chunker.chunk(entry.title(), entry.body(),
                 properties.getChunkChars(), properties.getChunkOverlap());
         List<String> hashes = pieces.stream().map(KnowledgeRagService::hash).toList();
@@ -121,32 +165,10 @@ public class KnowledgeRagService {
             chunks.deleteByEntry(entry.id());
             return;
         }
-        List<float[]> vectors;
-        try {
-            vectors = embedding.embed(pieces);
-        } catch (RuntimeException failure) {
-            log.warn("rag.index.entry_skipped entryId={} cause={}", entry.id(), failure.toString());
-            return;
-        }
-        if (vectors.size() != pieces.size()) {
-            log.warn("rag.index.size_mismatch entryId={} chunks={} vectors={}",
-                    entry.id(), pieces.size(), vectors.size());
-            return;
-        }
-        chunks.deleteByEntry(entry.id());
-        Instant now = Instant.now();
-        for (int i = 0; i < pieces.size(); i++) {
-            KnowledgeChunk chunk = new KnowledgeChunk();
-            chunk.setEntryId(entry.id());
-            chunk.setChunkIndex(i);
-            chunk.setTitle(entry.title());
-            chunk.setContent(pieces.get(i));
-            chunk.setContentHash(hashes.get(i));
-            chunk.setEmbedding(encode(vectors.get(i)));
-            chunk.setDimension(vectors.get(i).length);
-            chunk.setUpdatedAt(now);
-            chunks.insert(chunk);
-        }
+        pending.add(new PendingEntry(entry, pieces, hashes));
+    }
+
+    private record PendingEntry(EntryContent entry, List<String> chunks, List<String> hashes) {
     }
 
     private static String hash(String value) {
