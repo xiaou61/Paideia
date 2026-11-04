@@ -13,6 +13,7 @@ import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +39,7 @@ public class KnowledgeRagService {
     private final KnowledgeChunkMapper chunks;
     private final EmbeddingClient embedding;
     private final RagProperties properties;
+    private final AtomicBoolean indexing = new AtomicBoolean(false);
 
     KnowledgeRagService(KnowledgeApi knowledge,
                         KnowledgeChunkMapper chunks,
@@ -62,6 +64,18 @@ public class KnowledgeRagService {
     @Scheduled(initialDelayString = "${paideia.ai.rag.initial-delay-ms:30000}",
             fixedDelayString = "${paideia.ai.rag.refresh-ms:600000}")
     public void reindexChanged() {
+        if (!indexing.compareAndSet(false, true)) {
+            log.debug("rag.index.already_running");
+            return;
+        }
+        try {
+            reindexChangedNow();
+        } finally {
+            indexing.set(false);
+        }
+    }
+
+    private void reindexChangedNow() {
         if (!properties.isEnabled() || !embedding.enabled()) {
             log.debug("rag.index.skipped enabled={} embedding={}", properties.isEnabled(), embedding.enabled());
             return;
@@ -167,7 +181,12 @@ public class KnowledgeRagService {
     }
 
     private void collectPending(EntryContent entry, List<PendingEntry> pending) {
-        List<String> pieces = Chunker.chunk(entry.title(), entry.body(),
+        String body = entry.body();
+        int maxEntryChars = properties.getMaxEntryChars();
+        if (maxEntryChars > 0 && body != null && body.length() > maxEntryChars) {
+            body = body.substring(0, maxEntryChars);
+        }
+        List<String> pieces = Chunker.chunk(entry.title(), body,
                 properties.getChunkChars(), properties.getChunkOverlap());
         List<String> hashes = pieces.stream().map(KnowledgeRagService::hash).toList();
         if (hashes.equals(chunks.findHashesByEntry(entry.id()))) {

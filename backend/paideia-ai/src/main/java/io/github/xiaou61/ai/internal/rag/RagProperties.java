@@ -18,6 +18,14 @@ public class RagProperties {
     /** 相邻块的重叠字符数，避免句子被切在边界处。 */
     private int chunkOverlap = 80;
 
+    /**
+     * 每篇条目参与索引的最大字符数；0 表示全文。
+     *
+     * <p>CPU 上的 bge-m3 对 460 篇全正文要数小时，首版基础能力可用较小的
+     * 摘要窗口（如 200）先建立可用索引，后续再按需扩大。
+     */
+    private int maxEntryChars = 0;
+
     /** 首次索引延迟（毫秒）：给应用启动和本地模型加载留时间。 */
     private long initialDelayMs = 30_000;
 
@@ -54,6 +62,14 @@ public class RagProperties {
 
     public void setChunkOverlap(int chunkOverlap) {
         this.chunkOverlap = chunkOverlap;
+    }
+
+    public int getMaxEntryChars() {
+        return maxEntryChars;
+    }
+
+    public void setMaxEntryChars(int maxEntryChars) {
+        this.maxEntryChars = maxEntryChars;
     }
 
     public long getInitialDelayMs() {
