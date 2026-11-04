@@ -70,6 +70,27 @@ public interface TelemetrySummaryMapper {
             @Param("kind") String kind, @Param("status") String status,
             @Param("model") String model, @Param("userId") Long userId);
 
+    /**
+     * 按提示词版本分组（WORK-070）。
+     *
+     * <p>同一场景换过提示词后，两批行只差 `prompt_version`——不按它分组，就永远看不出改动有没有变好。
+     * 没带版本的路径归到 `(unknown)`：它们在 `RunSpec` 里本来就没给版本，不是"版本叫空字符串"。
+     */
+    @Select("""
+            <script>
+            SELECT COALESCE(prompt_version, '(unknown)') AS name, COUNT(*) AS count FROM ai_runs
+            WHERE started_at >= #{from} AND started_at &lt; #{to}
+            <if test="kind != null">AND kind = #{kind}</if>
+            <if test="status != null">AND status = #{status}</if>
+            <if test="model != null">AND model = #{model}</if>
+            <if test="userId != null">AND user_id = #{userId}</if>
+                        GROUP BY prompt_version ORDER BY count DESC LIMIT 20
+            </script>
+            """)
+    List<CountBy> countByPromptVersion(@Param("from") Instant from, @Param("to") Instant to,
+            @Param("kind") String kind, @Param("status") String status,
+            @Param("model") String model, @Param("userId") Long userId);
+
     @Select("""
             SELECT name, COUNT(*) AS count FROM ai_run_spans
             WHERE kind = 'tool' AND started_at >= #{from} AND started_at < #{to}
