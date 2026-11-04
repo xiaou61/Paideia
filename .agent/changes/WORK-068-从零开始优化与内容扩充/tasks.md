@@ -2,9 +2,12 @@
 artifact: tasks
 work_id: WORK-068
 work: 从零开始体验优化与内容扩充
-status: completed
+status: approved
 created: 2026-11-04
 updated: 2026-11-04
+approved_by: xiaou61
+approved_at: 2026-11-04 15:30:18 +0800
+approver_role: owner
 ---
 
 # 任务

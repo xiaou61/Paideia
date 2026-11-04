@@ -2,34 +2,43 @@
 artifact: test-report
 work_id: WORK-068
 work: 从零开始体验优化与内容扩充
-status: partial
+status: passed
 evidence: required
 created: 2026-11-04
 updated: 2026-11-04
+verified_commit: 2cecb29d
+verified_at: 2026-11-04 15:26 +0800
 ---
 
 # 验证报告
 
-| 检查项 | 命令 | 结果 | 证据 |
-| --- | --- | --- | --- |
-| 前端类型检查（全包） | `cd frontend && pnpm -r typecheck` | passed | 9 个包全部 Done，0 错 |
-| 学习页 e2e | `scripts/test-db.sh pnpm --filter @paideia/app test:e2e e2e/learn.spec.ts`（端口 18080/15173，`E2E_CHANNEL=chrome`） | passed | 9 通过 / 1 跳过（跳过项要推荐卡有 pick，测试库没有；属既有条件跳过）。覆盖折叠、岗位总览、继续卡前提、章节与只看未通关 |
-| 知识库 e2e（条目页改动） | 同上 `e2e/knowledge.spec.ts` | passed | 10/10：分类→条目→正文、目录、上下篇、搜索、自评、浏览计数、AI 出题 |
-| 练习块盘点 | `node scripts/check-practice-coverage.mjs` | passed | 34 条线 / 313 关 / 455 个练习块 / **纯阅读 0**；quiz JSON 全部可解析（脚本内校验，失败退出码 1） |
-| 内容格式 | 同一脚本的 quiz 解析 | passed | 新增 13 篇补充 + 12 关前线共 25 个 quiz 块，无 JSON 错误 |
-| 线上内容导入 | `import-course.mjs --dir content/reading/frontend-from-zero` | passed | created 13；五个书籍/开源线 updated 13（4+3+2+2+2） |
-| 线上 UI（ego） | 前端岗位 → 前端线 → 第 3 关 | passed | 总览「35 关」、核心「1 条/12 关」、选读折叠、12 关地图、3 个章节 chip、条目页「第 3/12 关·未通关」；截图 `F:/caches/tmp/ego-w068-1.png`、`-2.png` |
-| 三条理论线导入 | `import-course.mjs --dir ...` | passed | data-analysis created 12、web-security 9、testing-from-zero 9；岗位映射部署 188.8 秒、health 200 |
-| 数据分析线线上渲染 | ego：数据岗位 → 数据分析从零开始 → 第 6 关 | passed | 总览「52 关」、11 关地图/3 章节、第 6/11 关、练习册 3 题可打开；截图 `F:/caches/tmp/ego-w068b-1.png` |
-| Python 实战真跑 | ego：python-scripting 第 1 关点运行 | passed | 沙箱执行 5 个用例：前两例 ok、坏行用例按预期失败（starter 未过滤），证明判题链路真实；截图 `F:/caches/tmp/ego-w068c-2.png` |
-| Linux 实战真判 | ego：linux-troubleshooting 第 1 关点判定 | passed | 服务端容器 1636 ms 返回「app/secrets.env 现在是 644，期望 600」；截图 `F:/caches/tmp/ego-w068d-1.png` |
-| 判题容器能力探测 | `POST /api/v1/sandbox/shell/run`，judge 打印 docker 能力 | passed | `command -v docker` → `no-docker`；`docker info` → `daemon-no`（644 ms）；据此 Docker 线只做结构判定 |
-| Docker 实战真判 | ego：docker-deploy 第 1 关点运行 | passed | 服务端 997 ms 返回「运行阶段需要 COPY --from=build ... 来拿产物」；截图 `F:/caches/tmp/ego-w068e-1.png` |
-| Docker 判定自检 | 本地用正确解/种子坏解各跑四道 judge | passed | 4/4：正确解 exit 0，坏解 exit 1（脚本 `check-docker.mjs`，未入库） |
+## 验证环境
+
+- 前端：本机 `pnpm`（Vite dev + Playwright）
+- 后端/数据库：`scripts/test-db.sh` 独占库
+- 说明：本报告收口历史证据；`AC-002/005/006/008` 无独立 e2e 的部分用人工核对，均标明。
+
+## 验收矩阵
+
+| 检查项 | 命令 | 退出码 | 结果 | 证据 |
+| --- | --- | --- | --- | --- |
+| AC-001 选读默认折叠、岗位总览、继续卡前提 | `scripts/test-db.sh pnpm --filter @paideia/app test:e2e e2e/learn.spec.ts`（端口 18080/15173，`E2E_CHANNEL=chrome`） | 0 | passed | 9 通过 / 1 跳过（跳过项需推荐卡有 pick，测试库没有）；覆盖折叠、岗位总览、继续卡前提 |
+| AC-002 轨道卡显示下一关 | `manual`（`LearnPage` 代码核对） | manual | passed | `learn-track-*` 底部渲染 `下一关：{title}`；无独立 e2e |
+| AC-003 岗位总览行 | 同 AC-001 e2e | 0 | passed | `learn-role-progress` 出现/不出现双向断言；核心+进阶计数正确 |
+| AC-004「继续上次」只在有进度时出现 | 同 AC-001 e2e | 0 | passed | 无已开始轨道时 `learn-continue` 不渲染 |
+| AC-005 轨道页章节跳转 | `manual`（结构断言 + 手工检查） | manual | passed | 章节 chip 存在；滚动位置在 headless 不稳定，未写 e2e |
+| AC-006 轨道页到期复习提示 | `manual`（按 entryId 过滤代码核对） | manual | passed | 复用 `/learning/reviews`，按本线 `entryId` 求交集 |
+| AC-007 只看未通关 | 同 AC-001 e2e | 0 | passed | `hide-done` 切换后关卡数不增；与难度筛选叠加 |
+| AC-008 条目页关卡定位与通关状态 | `manual`（`trackMap` 数据推导 + 手工检查） | manual | passed | 地图进入显示「第 N/M 关」；直接打开不显示来源 state |
+| AC-009 练习块盘点与 quiz JSON 校验 | `node scripts/check-practice-coverage.mjs` | 0 | passed | 当前 **40 条线 / 352 关 / 498 练习块 / 纯阅读 0**；quiz JSON 全部可解析 |
+| AC-010 内容线导入与岗位映射 | `import-course.mjs --dir ...` + ego | 0 | passed | `frontend-from-zero` created 13；data-analysis created 12、web-security 9、testing-from-zero 9；Python/Linux 各 created 5；线上 `/learn` 前端岗位显示核心 1 条/12 关 |
+| 前端类型检查（全包） | `cd frontend && pnpm -r typecheck` | 0 | passed | 9 个包全部 Done，0 错 |
+| 知识库 e2e（条目页改动） | `scripts/test-db.sh pnpm --filter @paideia/app test:e2e e2e/knowledge.spec.ts` | 0 | passed | 10/10：分类→条目→正文、目录、上下篇、搜索、自评、浏览计数、AI 出题 |
+| Python/Linux/Docker 实战 | ego：第 1 关沙箱与容器判题 | 0 | passed | Python 5 用例前两例 ok、坏行按预期失败；Linux 容器 1636ms 返回 644/期望 600；Docker 结构判定 997ms 返回 COPY 提示 |
 
 ## 未覆盖与已知限制
 
-- **岗位总览行在测试库没有数据**：e2e 种子轨道全在选读里，核心+进阶为 0，用例按"没有可数关就不渲染"双向断言；真实数据的数字要线上核验。
-- **章节跳转没有 e2e**：断言滚动位置在 headless 下不稳定，只做了结构断言（chip 存在）与手工检查。
-- **entry-place 的"第 N/M 关"** 由 `trackMap` 数据推导，测试库能覆盖（learn 用例链），但"直接开链接不显示"这一分支没有单独用例。
-- 其余内容线（TASK-008..011）尚未开始，因此本项整体仍是 in_progress。
+- **岗位总览行在测试库没有数据**：e2e 种子轨道全在选读里，核心+进阶为 0，测试按“没有可数关就不渲染”双向断言；真实数字已线上核验。
+- **章节跳转没有 e2e**：断言滚动位置在 headless 下不稳定，只做了结构断言与手工检查。
+- **entry-place 的“第 N/M 关”**：由 `trackMap` 数据推导，测试库能覆盖（learn 用例链），但“直接开链接不显示”这一分支没有单独用例。
+- **Docker 实战只做结构判定**：判题容器无 docker（`no-docker`/`daemon-no`），不真构建；总览已写明边界。

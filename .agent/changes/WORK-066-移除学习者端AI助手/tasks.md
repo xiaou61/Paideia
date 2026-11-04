@@ -5,6 +5,9 @@ work: 移除学习者端 AI 助手，入口改成专用流程
 status: approved
 created: 2026-11-03
 updated: 2026-11-03
+approved_by: xiaou61
+approved_at: 2026-11-04 15:30:09 +0800
+approver_role: owner
 ---
 
 # 任务（草案，待裁决）

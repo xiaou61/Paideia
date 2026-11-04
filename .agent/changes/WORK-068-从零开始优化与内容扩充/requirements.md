@@ -5,9 +5,20 @@ work: 从零开始体验优化与内容扩充
 status: approved
 created: 2026-11-04
 updated: 2026-11-04
+approved_by: xiaou61
+approved_at: 2026-11-04 15:30:18 +0800
+approver_role: owner
 ---
 
 # 需求
+
+## 目标
+
+围绕「从零开始」的地图与阅读体验完成 18 项用户视角优化，并补齐前端、数据分析、Web 安全、测试、Python、Linux、Docker 等内容线，使学习者从入口到实战都有可走的路径。
+
+## 验收标准
+
+各 REQ 下的 `AC-001..AC-010` 即本项验收标准；内容线以线上导入结果与练习盘点脚本为准。
 
 ## REQ-001 选读默认折叠
 

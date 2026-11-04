@@ -9986,3 +9986,40 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：release 190.1 秒；health 阶段 23 秒通过；SSH 复核 `http://127.0.0.1:8081/actuator/health` 返回 `{"status":"UP"}`。
 - 本地提交：待提交（仅更新历史）
 - 远端推送：master 已推送到 origin（`6986abb7`）
+
+## 2026-11-04 15:28:11 +0800 · WORK-071 · 签署 .agent/changes/WORK-071-提示词卫生/requirements.md、.agent/changes/WORK-071-提示词卫生/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-071-提示词卫生/requirements.md、.agent/changes/WORK-071-提示词卫生/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（owner）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-071-提示词卫生/requirements.md、.agent/changes/WORK-071-提示词卫生/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，2 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-11-04 15:30:09 +0800 · WORK-066 · 签署 .agent/changes/WORK-066-移除学习者端AI助手/requirements.md、.agent/changes/WORK-066-移除学习者端AI助手/proposal.md、.agent/changes/WORK-066-移除学习者端AI助手/design.md、.agent/changes/WORK-066-移除学习者端AI助手/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-066-移除学习者端AI助手/requirements.md、.agent/changes/WORK-066-移除学习者端AI助手/proposal.md、.agent/changes/WORK-066-移除学习者端AI助手/design.md、.agent/changes/WORK-066-移除学习者端AI助手/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（owner）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-066-移除学习者端AI助手/requirements.md、.agent/changes/WORK-066-移除学习者端AI助手/proposal.md、.agent/changes/WORK-066-移除学习者端AI助手/design.md、.agent/changes/WORK-066-移除学习者端AI助手/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+
+## 2026-11-04 15:30:18 +0800 · WORK-068 · 签署 .agent/changes/WORK-068-从零开始优化与内容扩充/requirements.md、.agent/changes/WORK-068-从零开始优化与内容扩充/proposal.md、.agent/changes/WORK-068-从零开始优化与内容扩充/design.md、.agent/changes/WORK-068-从零开始优化与内容扩充/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-068-从零开始优化与内容扩充/requirements.md、.agent/changes/WORK-068-从零开始优化与内容扩充/proposal.md、.agent/changes/WORK-068-从零开始优化与内容扩充/design.md、.agent/changes/WORK-068-从零开始优化与内容扩充/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（owner）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-068-从零开始优化与内容扩充/requirements.md、.agent/changes/WORK-068-从零开始优化与内容扩充/proposal.md、.agent/changes/WORK-068-从零开始优化与内容扩充/design.md、.agent/changes/WORK-068-从零开始优化与内容扩充/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+## 2026-11-04 15:31 +0800 · 工作项收口（WORK-053 / 063–068 / 071）
+
+- 类型：maintenance
+- 变更：为 WORK-053、WORK-063、WORK-064、WORK-065、WORK-066、WORK-067 补结构化验收证据表/退出码列并绑定当前 master；修复 WORK-068 的 tasks frontmatter 状态、补齐验收证据表；修复 WORK-071 的需求/任务签署、TASK-007 与验证报告提交锚点。全部为 `.agent/` 工件，无源码改动。
+- 验证：`project_status.py --brief` → state=idle、completed_count=70、work_items=0；`project_validate.py` → 通过（仅保留历史 requirements 决策分层格式警告）。
+- 本地提交：待提交
+- 远端推送：未执行

@@ -6,7 +6,8 @@ status: passed
 evidence: required
 created: 2026-11-04
 updated: 2026-11-04
-verified_commit: (见 git log)
+verified_commit: 2cecb29d
+verified_at: 2026-11-04 15:26 +0800
 ---
 
 # 验证报告
