@@ -10058,3 +10058,10 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 未完成：本地 Ollama 容器/模型与真实召回质量尚未在服务器部署验证；报告按实际证据记录。
 - 本地提交：待提交
 - 远端推送：未执行
+## 2026-11-04 16:20 +0800 · WORK-072 验证报告（partial）
+
+- 类型：verification
+- 变更：新增 `testing/report.md`，按实际证据记录自动化结果；本地 Ollama 部署、真实全量索引/黄金集召回未执行，整体标记 partial。
+- 验证：paideia-ai 410/0/15；KnowledgeRead+AssistantConversation 28/0/0；迁移守卫 9/0/0；MarkdownField 2/2；pnpm -r typecheck 17 包；admin build 通过。
+- 本地提交：待提交
+- 远端推送：未执行
