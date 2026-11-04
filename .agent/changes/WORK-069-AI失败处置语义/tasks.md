@@ -156,7 +156,7 @@ approver_role: owner
 - 测试：`AiObservabilityIntegrationTest.failureKindFilterReturnsOnlyMatchingRows`（同时断言 `byFailureKind` 计数）；前端 `pnpm --filter @paideia/admin typecheck`；`ai-runs.spec.ts`（若可运行）只跑该文件。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=AiObservabilityIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test`；`cd frontend && pnpm --filter @paideia/admin typecheck`。
 
-### TASK-006 | pending | 收口与证据
+### TASK-006 | done | 收口与证据
 
 - 对应：全部 AC
 - 依赖：TASK-001..TASK-005

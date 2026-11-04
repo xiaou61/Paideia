@@ -9960,3 +9960,12 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
+## 2026-11-04 15:04 +0800 · WORK-069 实现完成
+
+- 类型：implementation
+- 变更：`ai_runs` 新增 `failure_kind`；`FailureKind` 端口枚举与 `RunScope.finish(outcome,errorType,failureKind)` 默认方法；`DefaultRunRecorder`/`RunRecord`/`MysqlSink`/`AiRunMapper` 全链路落库；记忆提取新增分类器与 `failPermanently`；营地三档 Kind 映射；面经抓取/抽题新增 `RunRecorder` 采集；管理端明细筛选与概览 `byFailureKind` 排行。
+- 决策：永久失败不烧 attempts/next_attempt；其它链路只记录不改重试；`failure_kind` 不加索引/CHECK、不回填历史。
+- 依据：`WORK-069` requirements/proposal/design/tasks；`.agent/rules/always.md` 的迁移与测试纪律。
+- 验证：`paideia-ai` 405/0 failed/15 skipped；非 app 全量 BUILD SUCCESS；`MemoryExtractionJobsIntegrationTest` 10/0/0（含反向验证红→绿）；`AiObservabilityIntegrationTest` 12/0/0；`EssayCollectionIntegrationTest` 3/0/0；迁移三守卫 8/0/0；app 守卫 26/0/0；`pnpm -r typecheck` 0 error；admin build 30.49 秒。`pnpm -r test` 有 2 条 `packages/knowledge` 预存失败（master 同样复现，与本项无关）；管理端 e2e 未运行。
+- 本地提交：`23e2e368`（实现）；验证报告随后单独提交
+- 远端推送：未执行
