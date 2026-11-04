@@ -39,11 +39,11 @@ for (const root of ROOTS) {
     const body = await readFile(file, 'utf8')
     const count = (body.match(PRACTICE) ?? []).length
     // 围栏内容是 JSON：裸双引号（尤其中文里手写的 "xxx"）会让整关小测解析失败
-    for (const match of body.matchAll(/^```quiz\n([\s\S]*?)^```$/gm)) {
+    for (const match of body.matchAll(/^```(quiz|code-challenge)\n([\s\S]*?)^```$/gm)) {
       try {
-        JSON.parse(match[1])
+        JSON.parse(match[2])
       } catch (error) {
-        console.error(`${file}: quiz JSON 不合法 — ${error.message}`)
+        console.error(`${file}: ${match[1]} JSON 不合法 — ${error.message}`)
         process.exitCode = 1
       }
     }
