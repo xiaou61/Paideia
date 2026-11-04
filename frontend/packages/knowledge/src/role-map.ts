@@ -48,8 +48,8 @@ export const ROLES: readonly RoleMeta[] = [
   {
     key: 'frontend',
     label: '前端开发',
-    blurb: '做界面与交互。这个岗位的内容还在建设中。',
-    available: false,
+    blurb: '做界面与交互：结构、样式、浏览器行为，以及把数据变成界面。',
+    available: true,
   },
 ]
 
@@ -73,10 +73,9 @@ const TIERS: Record<RoleKey, { core: readonly string[]; advanced: readonly strin
     core: ['sql-practice', 'mysql-from-zero'],
     advanced: ['redis', 'system-design', 'algorithms'],
   },
-  // 前端岗位**没有任何专属内容**（22 条线里 slug 含 front/react/css 的为 0）。
-  // 但不能留空表：空表意味着"全部落进选读"，顺序就退化成后端/算法那套，等于给前端的人
-  // 推荐 Java 与 Python。这里放三条与岗位无关的通用线，页面对 available=false 另有一句说明。
-  frontend: { core: ['git', 'network-basics', 'algorithms'], advanced: [] },
+  // 前端岗位的专属线（WORK-068）：先走完 12 关再碰其他。
+  // 进阶放三条跨岗位但前端天天用的：HTTP/网络、Git、系统设计（前端也要讲缓存与分层）。
+  frontend: { core: ['frontend-from-zero'], advanced: ['network-basics', 'git', 'system-design'] },
 }
 
 export function roleMeta(role: RoleKey): RoleMeta {

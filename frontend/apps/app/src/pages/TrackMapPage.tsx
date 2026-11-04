@@ -10,8 +10,8 @@ import {
   PageHeader,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Check, Milestone, Play } from 'lucide-react'
-import { useState } from 'react'
+import { ArrowLeft, Check, Milestone, Play, RotateCcw } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
 
 import { api } from '../api'
@@ -74,6 +74,15 @@ export function TrackMapPage() {
   // 难度筛选：null = 全部。用户要能"只看入门"或"只看深入"，
   // 而地图本身不因此重排（顺序就是学习路径，筛选只减不加）。
   const [levelFilter, setLevelFilter] = useState<string | null>(null)
+  // 37 关的线上，通关一半之后"还剩哪些"比"走到哪"更难找
+  const [hideDone, setHideDone] = useState(false)
+
+  // 到期复习：按 entryId 与本轨道取交集。复习入口在 /review 一处，这里只提示。
+  const reviews = useQuery({ queryKey: ['learning-reviews'], queryFn: () => learning.reviews() })
+  const dueHere = useMemo(() => {
+    const ids = new Set(map.data?.chapters.flatMap((chapter) => chapter.stages.map((s) => s.entryId)) ?? [])
+    return (reviews.data?.items ?? []).filter((item) => ids.has(item.entryId))
+  }, [reviews.data, map.data])
 
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />}>
@@ -130,6 +139,20 @@ export function TrackMapPage() {
             </p>
           )}
 
+          {/* 到期复习：只提示这一条线里的，点过去由 /review 统一处理 */}
+          {dueHere.length === 0 ? null : (
+            <Link
+              to="/review"
+              data-testid="track-due-reviews"
+              className="border-warning/30 bg-warning/[0.06] hover:border-warning/60 mb-4 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors"
+            >
+              <RotateCcw className="text-warning size-4 shrink-0" />
+              <span>
+                这条线有 <span className="font-medium tabular-nums">{dueHere.length}</span> 个到期复习项，先巩固再往下走
+              </span>
+            </Link>
+          )}
+
           {/* 难度筛选：把"快速入门"与"深入"分开看 */}
           <div className="mb-4 flex flex-wrap items-center gap-2" data-testid="level-filter">
             <span className="text-muted-foreground text-xs">难度</span>
@@ -164,7 +187,40 @@ export function TrackMapPage() {
                 </button>
               )
             })}
+            <button
+              type="button"
+              data-testid="hide-done"
+              aria-pressed={hideDone}
+              onClick={() => { setHideDone((value) => !value) }}
+              className={`ml-auto rounded-md border px-2.5 py-1 text-xs transition-colors ${
+                hideDone ? 'border-primary bg-primary/10 text-primary' : 'border-border'
+              }`}
+            >
+              只看未通关
+            </button>
           </div>
+
+          {/* 章节跳转：37 关一屏放不下，先给一张"目录"而不是逼人滚 */}
+          {map.data.chapters.filter((chapter) => chapter.chapter !== '').length >= 2 ? (
+            <div className="mb-4 flex flex-wrap gap-1.5" data-testid="chapter-jump">
+              <span className="text-muted-foreground self-center text-xs">章节</span>
+              {map.data.chapters.map((chapter, index) =>
+                chapter.chapter === '' ? null : (
+                  <button
+                    key={`${chapter.chapter}-${index}`}
+                    type="button"
+                    data-testid={`chapter-jump-${index}`}
+                    onClick={() => {
+                      document.getElementById(`chapter-${index}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }}
+                    className="border-border hover:border-primary/50 hover:text-primary rounded-md border px-2 py-1 text-xs transition-colors"
+                  >
+                    {chapter.chapter}
+                  </button>
+                ),
+              )}
+            </div>
+          ) : null}
 
           {/*
             路径容器：`relative` 是脊线的定位基准。脊线是一条绝对定位的竖线，
@@ -182,7 +238,7 @@ export function TrackMapPage() {
               className="bg-border absolute top-3 bottom-3 left-[17px] w-0.5"
             />
             {map.data.chapters.map((chapter, chapterIndex) => (
-              <section key={`${chapter.chapter}-${chapterIndex}`} className="relative">
+              <section key={`${chapter.chapter}-${chapterIndex}`} id={`chapter-${chapterIndex}`} className="relative scroll-mt-4">
                 {chapter.chapter === '' ? null : (
                   // 章节是脊线上的里程碑：带背景色把脊线"打断"，图标压在线上
                   <h2 className="bg-background relative z-10 mb-1 flex items-center gap-2 py-1.5 text-sm font-semibold">
@@ -192,7 +248,11 @@ export function TrackMapPage() {
                 )}
                 <ol>
                   {chapter.stages
-                    .filter((stage) => levelFilter === null || stage.level === levelFilter)
+                    .filter(
+                      (stage) =>
+                        (levelFilter === null || stage.level === levelFilter) &&
+                        (!hideDone || stage.status !== 'done'),
+                    )
                     .map((stage) => (
                     <li key={stage.entryId} className="relative">
                       <StageCell
@@ -232,51 +292,45 @@ function StageCell({
   const level = levelMeta(stage.level)
 
   return (
-    // 外层是 div：里面要放「问助手」按钮（WORK-058），按钮套在链接里是嵌套可交互内容。
-    // 关卡格本身仍是 <a>（e2e 与键盘都靠这一点），只是按钮成了它的兄弟节点。
-    <div className="group relative flex items-center gap-3 py-2.5">
-      <Link
-        to={`/knowledge/entries/${stage.entryId}`}
-        // 带上来源：正文页据此把"返回知识库"换成"返回这条轨道的关卡地图"
-        state={{ fromTrackSlug: trackSlug, fromTrackName: trackName }}
-        className={`flex min-w-0 flex-1 items-center gap-3 transition-colors ${
-          done ? '' : 'hover:bg-accent/50 -mx-2 rounded-lg px-2'
+    <Link
+      to={`/knowledge/entries/${stage.entryId}`}
+      // 带上来源：正文页据此把"返回知识库"换成"返回这条轨道的关卡地图"
+      state={{ fromTrackSlug: trackSlug, fromTrackName: trackName }}
+      className={`group relative flex min-w-0 items-center gap-3 py-2.5 ${
+        done ? '' : 'hover:bg-accent/50 -mx-2 rounded-lg px-2'
+      }`}
+      data-testid={`stage-${stage.seq}`}
+      data-status={stage.status}
+    >
+      {/* 节点：压在脊线上。ring 用背景色是为了"切断"脊线，让节点看起来在线上而不是被线穿过。
+          尺寸 36px（原 40px）：节点之间的空隙是脊线唯一露出来的地方，节点越大空隙越小——
+          实测 40px + py-1.5 时节点间只剩 2px，脊线完全看不见。 */}
+      <span
+        className={`relative z-10 flex size-9 shrink-0 items-center justify-center rounded-full ring-[3px] ring-background transition-transform group-hover:scale-105 ${
+          done
+            ? 'bg-success text-success-foreground'
+            : 'bg-primary text-primary-foreground shadow-md'
         }`}
-        data-testid={`stage-${stage.seq}`}
-        data-status={stage.status}
+        data-testid={`stage-state-${stage.seq}`}
       >
-        {/* 节点：压在脊线上。ring 用背景色是为了"切断"脊线，让节点看起来在线上而不是被线穿过。
-            尺寸 36px（原 40px）：节点之间的空隙是脊线唯一露出来的地方，节点越大空隙越小——
-            实测 40px + py-1.5 时节点间只剩 2px，脊线完全看不见。 */}
-        <span
-          className={`relative z-10 flex size-9 shrink-0 items-center justify-center rounded-full ring-[3px] ring-background transition-transform group-hover:scale-105 ${
-            done
-              ? 'bg-success text-success-foreground'
-              : 'bg-primary text-primary-foreground shadow-md'
-          }`}
-          data-testid={`stage-state-${stage.seq}`}
-        >
-          {done ? <Check className="size-3.5" /> : <Play className="size-3.5" />}
-        </span>
+        {done ? <Check className="size-3.5" /> : <Play className="size-3.5" />}
+      </span>
 
-        <span className="min-w-0 flex-1 py-1.5">
-          <span className="flex flex-wrap items-center gap-2">
-            <span className={`text-sm ${done ? 'text-muted-foreground' : 'font-medium'}`}>
-              <span className="text-muted-foreground tabular-nums">{stage.seq}.</span> {stage.title}
-            </span>
-            <span
-              className={`rounded border px-1.5 py-0.5 text-[10px] leading-none ${level.tone}`}
-              data-testid={`stage-level-${stage.seq}`}
-              title={level.hint}
-            >
-              {level.label}
-            </span>
-            {done ? <span className="text-success text-[11px]">已通关</span> : null}
+      <span className="min-w-0 flex-1 py-1.5">
+        <span className="flex flex-wrap items-center gap-2">
+          <span className={`text-sm ${done ? 'text-muted-foreground' : 'font-medium'}`}>
+            <span className="text-muted-foreground tabular-nums">{stage.seq}.</span> {stage.title}
           </span>
+          <span
+            className={`rounded border px-1.5 py-0.5 text-[10px] leading-none ${level.tone}`}
+            data-testid={`stage-level-${stage.seq}`}
+            title={level.hint}
+          >
+            {level.label}
+          </span>
+          {done ? <span className="text-success text-[11px]">已通关</span> : null}
         </span>
-      </Link>
-
-      {/* 这一关可以被单独递给助手：不用先点进去——"卡在第 13 关"这类问题在选关时就有 */}
-    </div>
+      </span>
+    </Link>
   )
 }

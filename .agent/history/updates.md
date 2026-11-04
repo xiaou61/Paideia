@@ -9851,3 +9851,18 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 本地提交：`29adbeea`（+ 报告补 commit）
 - 远端推送：已推送；部署 188.1 秒（jar + web），health 200
 - 线上 ego 复验（真实模型）：学习记录「AI 下一步」返回三条且带具体数字；条目「AI 出一道题」返回一条本条目相关的 Spring 题与解析（答对后显示解释）；截图 `F:/caches/tmp/ego-ai5-1.png`、`-2.png`
+
+## 2026-11-04 11:30 +0800 · WORK-068 从零开始优化（第一批：地图体验 + 内容守卫 + 前端线）
+
+- 类型：feature
+- 背景：用户要求「从零开始」至少 10 个用户视角优化点并补内容线，裁决「全部都做」。合并为 18 项，本批完成地图/阅读体验 9 项、练习盘点与补齐、以及 `frontend-from-zero` 一条线。
+- 变更（前端）：`LearnPage` 选读用原生 `<details>` 默认折叠、岗位总览行（核心+进阶 N 关/已通关 M/百分比）、继续卡只在有进度时渲染；`TrackMapPage` 章节 chip 跳转、本线到期复习提示（按 entryId 过滤 `/learning/reviews`）、只看未通关开关；`KnowledgeEntryPage` 从地图进入时显示「线路名 第 N/M 关」与通关状态（`trackMap` 走同一 queryKey 缓存）。
+- 变更（内容）：新增 `scripts/check-practice-coverage.mjs`（按线盘点 + quiz JSON 校验，坏 JSON 退出码 1）；给 13 篇无练习的关补 quiz（open-source 4、books-ddia 3、clean-code 2、man-month 2、thinking 2），全库 313 关纯阅读归零；新增 `frontend-from-zero` 总览 + 12 关，每关 3 题 quiz。
+- 变更（映射）：`role-map.ts` 前端岗位 `available: true`，核心 `frontend-from-zero`，进阶 network-basics/git/system-design。
+- 验证：前端 9 包 typecheck 0 错；learn e2e 9 通过/1 跳过（推荐卡无 pick，条件跳过）；knowledge e2e 10/10；盘点脚本退出码 0、纯阅读 0。
+- 未完成：data-analysis / web-security / testing-from-zero 三条理论线与三条实战线；内容导入与前端部署。
+- 本地提交：`3da1459a`
+- 远端推送：未推送（需授权）
+- 部署：`scripts/release.ps1` 104.0 秒（前端 162 个文件变化，后端 0），health 200
+- 内容导入线上：`frontend-from-zero` created 13；open-source 更新 4、books-ddia 3、clean-code 2、man-month 2、thinking 2
+- 线上 ego 复验：前端岗位显示「核心 + 进阶共 35 关 · 已通关 0 关（0%）」、核心 1 条/12 关、选读折叠（展开）、继续卡不出现；轨道页 12 关/3 个章节 chip；第 3 关条目页显示「前端从零开始 第 3/12 关 · 未通关」；截图 `F:/caches/tmp/ego-w068-1.png`、`-2.png`

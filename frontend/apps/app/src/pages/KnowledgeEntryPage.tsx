@@ -161,6 +161,28 @@ export function KnowledgeEntryPage() {
     retry: false,
   })
 
+  /**
+   * 「这是第几关」（WORK-068）：只有从关卡地图点进来才知道自己在路上的位置。
+   * 地图数据在轨道页已经取过，正常路径是缓存命中；直接开链接时多一次查询，可以接受。
+   */
+  const trackMap = useQuery({
+    queryKey: ['learning-track', fromTrack?.fromTrackSlug ?? ''],
+    queryFn: () => learning.trackMap(fromTrack?.fromTrackSlug ?? ''),
+    enabled: Boolean(fromTrack?.fromTrackSlug),
+  })
+  const place = useMemo(() => {
+    if (trackMap.data === undefined) {
+      return null
+    }
+    for (const chapter of trackMap.data.chapters) {
+      const stage = chapter.stages.find((item) => item.entryId === entryId)
+      if (stage !== undefined) {
+        return { seq: stage.seq, total: trackMap.data.stageCount, done: stage.status === 'done' }
+      }
+    }
+    return null
+  }, [trackMap.data, entryId])
+
   const progressPort = useMemo(() => {
     if (!valid || serverProgress.isPending || entry.data === undefined) {
       return undefined
@@ -268,6 +290,39 @@ export function KnowledgeEntryPage() {
               </Link>
             )}
             <PageHeader title={entry.data.title} />
+
+            {/*
+              「第几关 + 通关状态」（WORK-068）：从地图点进来时最想知道的是"走了一半没有"。
+              直接开链接的条目不显示"第 N/M 关"——那时它不属于任何一条路。
+            */}
+            {fromTrack?.fromTrackSlug || serverProgress.data?.status === 'passed' ? (
+              <div
+                className="text-muted-foreground mb-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
+                data-testid="entry-place"
+              >
+                {fromTrack?.fromTrackSlug ? (
+                  <span>
+                    「{fromTrack.fromTrackName ?? '学习轨道'}」
+                    {place === null ? null : (
+                      <>
+                        {' '}
+                        第 <span className="text-foreground font-medium tabular-nums">{place.seq}</span>/
+                        <span className="tabular-nums">{place.total}</span> 关
+                      </>
+                    )}
+                  </span>
+                ) : null}
+                {place?.done === true || serverProgress.data?.status === 'passed' ? (
+                  <span className="text-success text-xs" data-testid="entry-passed">
+                    已通关
+                  </span>
+                ) : (
+                  <span className="text-xs" data-testid="entry-passed">
+                    未通关
+                  </span>
+                )}
+              </div>
+            ) : null}
 
             {/*
               来源链接（WORK-025）：抓来的面经帖标出原帖，让读者能回原处核对。

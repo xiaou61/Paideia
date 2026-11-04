@@ -124,18 +124,16 @@ export function LearnPage() {
   })
 
   /**
-   * 「继续上次」选哪条：优先**已经开始但没走完**的（有进度说明用户在意它），
-   * 否则取第一条还没开始的。已全部通关的不进继续条——那是在催人重刷。
+   * 「继续上次」只给**真正开始过**的人：没进度的新用户看见"继续上次"会以为系统记错了，
+   * 他们的入口是下面的推荐卡。已全部通关的也不进——那是在催人重刷。
    */
   const next = useMemo(() => {
     const list = tracks.data ?? []
-    const started = list.find(
-      (track) => track.passedCount > 0 && track.passedCount < track.stageCount && track.nextTitle !== null,
+    return (
+      list.find(
+        (track) => track.passedCount > 0 && track.passedCount < track.stageCount && track.nextTitle !== null,
+      ) ?? null
     )
-    if (started !== undefined) {
-      return started
-    }
-    return list.find((track) => track.nextTitle !== null) ?? null
   }, [tracks.data])
 
   /**
@@ -232,6 +230,13 @@ export function LearnPage() {
     }
   }, [tracks.data, role])
 
+  /** 核心 + 进阶的合计：选读 17 条不该稀释"这个岗位到底有多少要走"。 */
+  const roleTotals = useMemo(() => {
+    const list = [...sections.core, ...sections.advanced]
+    const stages = list.reduce((sum, track) => sum + track.stageCount, 0)
+    const passed = list.reduce((sum, track) => sum + track.passedCount, 0)
+    return { stages, passed }
+  }, [sections])
 
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
@@ -241,6 +246,13 @@ export function LearnPage() {
       />
 
       <RolePicker role={role} onChoose={chooseRole} />
+
+      {tracks.isSuccess && roleTotals.stages > 0 ? (
+        <p className="text-muted-foreground mb-4 text-sm" data-testid="learn-role-progress">
+          核心 + 进阶共 {roleTotals.stages} 关 · 已通关 {roleTotals.passed} 关（
+          {Math.round((roleTotals.passed / roleTotals.stages) * 100)}%）
+        </p>
+      ) : null}
 
       {!meta.available ? (
         <Alert className="mb-6" data-testid="learn-role-empty">
@@ -322,6 +334,7 @@ export function LearnPage() {
             hint="加分项，不是门槛。面试前翻一翻，或者遇到具体问题时再回来。"
             tracks={sections.optional}
             emptyText="没有选读内容。"
+            collapsible
           />
         </>
       ) : null}
@@ -500,31 +513,49 @@ function AdviceCard({
  * <p>读写都吞异常：隐私模式或配额满时按"没有缓存"处理——一个可选的缓存不该让整页报错。
  */
 
-/** 一栏轨道：理论或实战。空的时候给明确空状态，不留一片空白。 */
+/**
+ * 一栏轨道：理论或实战。空的时候给明确空状态，不留一片空白。
+ *
+ * <p>`collapsible` 只给选读用：17 条选读全部铺开时，一屏全是卡，核心那三条反被推上去。
+ * 用原生 `<details>`，折叠状态直接拿到键盘与读屏语义，不用自己补 aria。
+ */
 function TrackSection({
   testId,
   title,
   hint,
   tracks,
   emptyText,
+  collapsible = false,
 }: {
   testId: string
   title: string
   hint: string
   tracks: TrackSummary[]
   emptyText?: string
+  collapsible?: boolean
 }) {
+  const [open, setOpen] = useState(!collapsible)
   const passed = tracks.reduce((sum, track) => sum + track.passedCount, 0)
   const stages = tracks.reduce((sum, track) => sum + track.stageCount, 0)
   return (
-    <section className="mt-2 mb-8" data-testid={testId}>
-      <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+    <details
+      className="mt-2 mb-8"
+      data-testid={testId}
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 [&::-webkit-details-marker]:hidden">
         <h2 className="text-lg font-semibold">{title}</h2>
         <span className="text-muted-foreground text-sm" data-testid={`${testId}-count`}>
           {tracks.length} 条 · {stages} 关 · 已通关 {passed}
         </span>
-      </div>
-      <p className="text-muted-foreground mb-4 text-sm">{hint}</p>
+        {collapsible ? (
+          <span className="text-primary text-xs" data-testid={`${testId}-toggle`}>
+            {open ? '收起' : '展开'}
+          </span>
+        ) : null}
+      </summary>
+      <p className="text-muted-foreground mt-1 mb-4 text-sm">{hint}</p>
       {tracks.length === 0 ? (
         <p className="border-border text-muted-foreground rounded-xl border border-dashed p-5 text-sm"
            data-testid={`${testId}-empty`}>
@@ -539,7 +570,7 @@ function TrackSection({
           ))}
         </div>
       )}
-    </section>
+    </details>
   )
 }
 

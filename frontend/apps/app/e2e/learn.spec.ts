@@ -14,9 +14,15 @@ import { signIn } from './session'
  * 但页面结构仍然成立。
  */
 
-/** 第一张轨道卡。 */
-function firstTrack(page: Page) {
-  return page.locator('[data-testid^="learn-track-"]').first()
+/**
+ * 第一张**可见**的轨道卡。选读区默认折叠，而测试库里的种子轨道可能全在选读里，
+ * 所以没有可见卡片时先把选读展开——折叠本身由 REQ-001 的用例单独断言。
+ */
+async function firstTrack(page: Page) {
+  if ((await page.locator('[data-testid^="learn-track-"]:visible').count()) === 0) {
+    await page.getByTestId('learn-optional-toggle').click()
+  }
+  return page.locator('[data-testid^="learn-track-"]:visible').first()
 }
 
 test.describe('从零开始', () => {
@@ -33,7 +39,7 @@ test.describe('从零开始', () => {
     await expect(page.getByRole('heading', { name: /从零开始/ })).toBeVisible()
 
     // 轨道集合来自服务端：只要求"至少有一条"
-    await expect(firstTrack(page)).toBeVisible({ timeout: 15_000 })
+    await expect(await firstTrack(page)).toBeVisible({ timeout: 15_000 })
   })
 
   test('岗位选择器与三段地图都在，切岗位后选中态跟着变', async ({ page }) => {
@@ -64,6 +70,31 @@ test.describe('从零开始', () => {
     await expect(from).toHaveAttribute('aria-pressed', 'true')
   })
 
+  test('选读默认折叠、岗位总览与只看未通关', async ({ page }) => {
+    await page.goto('/#/learn')
+    await expect(page.getByTestId('learn-optional-toggle')).toBeVisible({ timeout: 15_000 })
+    // 测试库可能没有核心/进阶轨道：没有可数的关时这一行本就不该出现
+    const coreTracks = page.locator('[data-testid="learn-core"] [data-testid^="learn-track-"]')
+    if ((await coreTracks.count()) === 0) {
+      await expect(page.getByTestId('learn-role-progress')).toHaveCount(0)
+    } else {
+      await expect(page.getByTestId('learn-role-progress')).toBeVisible()
+    }
+    await expect(page.getByTestId('learn-optional-toggle')).toHaveText('展开')
+    await expect(page.getByTestId('learn-optional-toggle')).toBeVisible()
+
+    await page.getByTestId('learn-optional-toggle').click()
+    await expect(page.getByTestId('learn-optional-toggle')).toHaveText('收起')
+
+    await (await firstTrack(page)).click()
+    await expect(page.getByTestId('track-map')).toBeVisible({ timeout: 15_000 })
+    const before = await page.locator('[data-testid^="stage-"][data-status]').count()
+    await page.getByTestId('hide-done').click()
+    await expect(page.getByTestId('hide-done')).toHaveAttribute('aria-pressed', 'true')
+    const after = await page.locator('[data-testid^="stage-"][data-status]').count()
+    expect(after).toBeLessThanOrEqual(before)
+  })
+
   test('推荐卡：每条理由都带真实数字，不是空泛的鼓励', async ({ page }) => {
     await page.goto('/#/learn')
     const reasons = page.locator('[data-testid^="learn-advice-reason-"]')
@@ -81,7 +112,7 @@ test.describe('从零开始', () => {
 
   test('点轨道进入关卡地图，地图里有关卡', async ({ page }) => {
     await page.goto('/#/learn')
-    const track = firstTrack(page)
+    const track = await firstTrack(page)
     await expect(track).toBeVisible({ timeout: 15_000 })
     await track.click()
 
@@ -93,7 +124,7 @@ test.describe('从零开始', () => {
 
   test('关卡全部可进：只有 done 与 current，没有锁定态', async ({ page }) => {
     await page.goto('/#/learn')
-    await firstTrack(page).click()
+    await (await firstTrack(page)).click()
     await expect(page.getByTestId('track-map')).toBeVisible({ timeout: 15_000 })
 
     // 带 data-status 的才是关卡格；`stage-state-N` / `stage-level-N` 是格子内部的图标与徽章
@@ -115,7 +146,7 @@ test.describe('从零开始', () => {
 
   test('从任意一关都能点到正文（含最后一关）', async ({ page }) => {
     await page.goto('/#/learn')
-    await firstTrack(page).click()
+    await (await firstTrack(page)).click()
     await expect(page.getByTestId('track-map')).toBeVisible({ timeout: 15_000 })
 
     // 直接点最后一关：没有解锁门槛，它必须能进
@@ -129,7 +160,7 @@ test.describe('从零开始', () => {
 
   test('难度可见且能筛选：入门与深入分得开', async ({ page }) => {
     await page.goto('/#/learn')
-    await firstTrack(page).click()
+    await (await firstTrack(page)).click()
     await expect(page.getByTestId('track-map')).toBeVisible({ timeout: 15_000 })
 
     // 每关都有难度徽章，且文案是大白话
@@ -158,13 +189,13 @@ test.describe('从零开始', () => {
   test('轨道与地图在 360px 下不横向溢出', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 780 })
     await page.goto('/#/learn')
-    await firstTrack(page).waitFor({ timeout: 15_000 })
+    await (await firstTrack(page)).waitFor({ timeout: 15_000 })
     let overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     )
     expect(overflow).toBeLessThanOrEqual(1)
 
-    await firstTrack(page).click()
+    await (await firstTrack(page)).click()
     await page.getByTestId('track-map').waitFor({ timeout: 15_000 })
     overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
