@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
 import { MarkdownField } from './markdown-field'
 
@@ -15,6 +15,8 @@ function Harness({ onUpload }: { onUpload?: (file: File) => Promise<{ url: strin
     />
   )
 }
+
+afterEach(() => cleanup())
 
 describe('MarkdownField', () => {
   it('toolbar inserts markdown at the current cursor', () => {
@@ -31,5 +33,17 @@ describe('MarkdownField', () => {
 
     rerender(<Harness onUpload={async () => ({ url: '/x.png', name: 'x.png' })} />)
     expect(screen.getByText('可粘贴/拖入图片或 PDF')).toBeTruthy()
+  })
+
+  it('upload failure keeps the body unchanged', async () => {
+    render(<Harness onUpload={async () => Promise.reject(new Error('upload failed'))} />)
+    const body = screen.getByTestId('md-test-body') as HTMLTextAreaElement
+    fireEvent.change(body, { target: { value: '原正文' } })
+    fireEvent.drop(body, {
+      dataTransfer: { files: [new File(['x'], 'x.png', { type: 'image/png' })] },
+    })
+
+    expect(await screen.findByTestId('md-test-upload-error')).toBeTruthy()
+    expect(body.value).toBe('原正文')
   })
 })

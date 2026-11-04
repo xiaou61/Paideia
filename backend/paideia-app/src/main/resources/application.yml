@@ -155,6 +155,8 @@ paideia:
       top-k: 6
       chunk-chars: 500
       chunk-overlap: 80
+      # CPU 上的首版索引窗口：每篇取标题 + 前 200 字建块；0 = 全文（慢）。
+      max-entry-chars: 200
       initial-delay-ms: 30000
       refresh-ms: 600000
   knowledge:
