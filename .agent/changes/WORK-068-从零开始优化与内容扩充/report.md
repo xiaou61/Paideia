@@ -31,10 +31,11 @@ updated: 2026-11-04
 - `data-analysis` 11 关、`web-security` 8 关、`testing-from-zero` 8 关，均已导入线上并接入岗位映射（数据岗位核心、后端进阶、前端进阶）。
 - `python-scripting` 4 关：`verify: run`，线上沙箱真跑（含坏行用例按预期失败）。
 - `linux-troubleshooting` 4 关：`kind: shell`，判定在服务端容器执行，线上实测 1636 ms 返回权限不匹配信息。
+- `docker-deploy` 4 关：`kind: shell`，检查 Dockerfile / Compose 的结构与关键指令。**判题容器没有 docker（实测 `no-docker` / `daemon-no`），所以不真构建**——它验证"该长什么样"，不验证"真能跑"；这一点写在总览里。
 
-## 未完成
+## 已知限制
 
-- Docker 部署实战：实测判题容器没有 docker（`no-docker` / `daemon-no`），无法真跑构建；只做 Dockerfile 文本检查会退化成背指令，故不做。
+- Docker 实战只做结构判定，不真构建（环境无 docker）；真机构建需在用户自己的 Docker 环境完成。
 
 ## 关键决定
 
