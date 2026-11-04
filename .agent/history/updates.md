@@ -10031,3 +10031,12 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：`project_status.py --brief` 显示 WORK-072 requirements/draft，next_work_id=WORK-073；尚未实现或跑测试。
 - 本地提交：待提交
 - 远端推送：未执行
+## 2026-11-04 16:00 +0800 · WORK-072 并入 Markdown 编辑器与 Redis 缓存
+
+- 类型：decision
+- 变更：WORK-072 由「本地 RAG 检索基础」扩展为「技术基础能力：RAG + Markdown 编辑器 + Redis 缓存」，目录同步重命名；requirements 增加 REQ-010..REQ-014 / AC-008..AC-012。
+- 决策：第 4 项继续 Markdown、做轻量工具栏与粘贴/拖拽上传，不做 WYSIWYG；第 5 项用 Redis 缓存分类树与已发布条目摘要/元数据，写后失效、故障回退 MySQL。
+- 依据：2026-11-04 用户连续确认。
+- 验证：`project_status.py --brief` 显示 WORK-072 requirements/draft，next_work_id=WORK-073；尚未实现或跑测试。
+- 本地提交：待提交
+- 远端推送：未执行
