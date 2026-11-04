@@ -9969,3 +9969,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：`paideia-ai` 405/0 failed/15 skipped；非 app 全量 BUILD SUCCESS；`MemoryExtractionJobsIntegrationTest` 10/0/0（含反向验证红→绿）；`AiObservabilityIntegrationTest` 12/0/0；`EssayCollectionIntegrationTest` 3/0/0；迁移三守卫 8/0/0；app 守卫 26/0/0；`pnpm -r typecheck` 0 error；admin build 30.49 秒。`pnpm -r test` 有 2 条 `packages/knowledge` 预存失败（master 同样复现，与本项无关）；管理端 e2e 未运行。
 - 本地提交：`23e2e368`（实现）；验证报告随后单独提交
 - 远端推送：未执行
+
+## 2026-11-04 15:09:24 +0800 · WORK-069 · 远端推送核验
+
+- 类型：verification
+- 变更：核对分支 master 的远端提交
+- 决策：以 git ls-remote 返回的远端提交为准
+- 依据：Git 远端 origin / 分支 master
+- 验证：远端 HEAD=c88bd38eb7c250af1e4f5e6ccd03e9e231afa00e
+- 本地提交：c88bd38eb7c250af1e4f5e6ccd03e9e231afa00e
+- 远端推送：已验证；远端 HEAD=c88bd38eb7c250af1e4f5e6ccd03e9e231afa00e
