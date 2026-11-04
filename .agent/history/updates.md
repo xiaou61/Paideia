@@ -9921,3 +9921,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：回读 frontmatter：approved_by=xiaou61，2 个工件同批签署
 - 本地提交：待用户授权/未提交
 - 远端推送：未执行
+
+## 2026-11-04 11:22:41 +0800 · WORK-070 · Laya 面经分流与过滤计数
+
+- 类型：implementation
+- 变更：TechEssayFilter 返回 Verdict（技术/主题/边界/问模型/改判）；EssayCollectionService 按 topic 选分类并回退，日志加边界/问模型/改判/分流四数；新增 EssayCollectionRoutingTest（5 条）与 ConceptRerankLiveTest（默认跳过）
+- 决策：分流仅在配置 category-slugs 时生效，且不自动建分类（空分类会进导航）；知识点重排只做离线对照，不进产品代码
+- 依据：.agent/changes/WORK-070-Laya面经分流与知识点重排对照/requirements.md、tasks.md
+- 验证：RoutingTest 5/5；TechEssayFilterTest 7/7；EssayCollectionIntegrationTest 3/3；对照实验基线 0.8302 vs 重排 0.6730（159 题/154 成功/89.8s）→ 不采用
+- 本地提交：98c84267
+- 远端推送：未推送（需授权）
