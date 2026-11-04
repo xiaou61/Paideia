@@ -9979,3 +9979,10 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：远端 HEAD=c88bd38eb7c250af1e4f5e6ccd03e9e231afa00e
 - 本地提交：c88bd38eb7c250af1e4f5e6ccd03e9e231afa00e
 - 远端推送：已验证；远端 HEAD=c88bd38eb7c250af1e4f5e6ccd03e9e231afa00e
+## 2026-11-04 15:16 +0800 · WORK-069 部署
+
+- 类型：maintenance
+- 变更：从 master `6986abb7` 执行 `scripts/release.ps1`；后端 jar 变化 4 个文件、web 变化 79 个文件（删除 78 个），含 WORK-069 后端与管理端前端。
+- 验证：release 190.1 秒；health 阶段 23 秒通过；SSH 复核 `http://127.0.0.1:8081/actuator/health` 返回 `{"status":"UP"}`。
+- 本地提交：待提交（仅更新历史）
+- 远端推送：master 已推送到 origin（`6986abb7`）
