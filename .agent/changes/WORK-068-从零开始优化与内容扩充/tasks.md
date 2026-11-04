@@ -26,6 +26,6 @@ updated: 2026-11-04
 - [x] TASK-010 `testing-from-zero` 线：8 关（测试价值、单测、替身、集成、e2e、数据、覆盖率、维护）。
 - [x] TASK-011a `python-scripting`：4 关（CSV 汇总、词频、JSON 日志、分组报告），`verify: run`；线上沙箱实跑通过。
 - [x] TASK-011b `linux-troubleshooting`：4 关（权限、磁盘、脚本执行、环境变量），`kind: shell` 由服务端真实判题；线上实跑通过。
-- [ ] TASK-011c Docker 部署实战：**未写**。判题容器是否有 docker daemon 未验证；若只能做 Dockerfile 文本检查，会退化成背指令而不是部署，等确认环境后再做。
+- [ ] TASK-011c Docker 部署实战：**不写**。已实测判题容器 `command -v docker` → `no-docker`、`docker info` → `daemon-no`（644 ms）；只能做 Dockerfile 文本检查，会退化成背指令而不是部署。
 - [x] TASK-012 内容导入线上（dry-run → 正式）并验证 `/learn` 前端岗位。三条理论线 created 12/9/9；两条实战线 created 5/5。
 - [x] TASK-013 前端 UI 改动部署（104 秒，health 200）。

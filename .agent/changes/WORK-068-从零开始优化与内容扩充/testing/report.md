@@ -23,6 +23,7 @@ updated: 2026-11-04
 | 数据分析线线上渲染 | ego：数据岗位 → 数据分析从零开始 → 第 6 关 | passed | 总览「52 关」、11 关地图/3 章节、第 6/11 关、练习册 3 题可打开；截图 `F:/caches/tmp/ego-w068b-1.png` |
 | Python 实战真跑 | ego：python-scripting 第 1 关点运行 | passed | 沙箱执行 5 个用例：前两例 ok、坏行用例按预期失败（starter 未过滤），证明判题链路真实；截图 `F:/caches/tmp/ego-w068c-2.png` |
 | Linux 实战真判 | ego：linux-troubleshooting 第 1 关点判定 | passed | 服务端容器 1636 ms 返回「app/secrets.env 现在是 644，期望 600」；截图 `F:/caches/tmp/ego-w068d-1.png` |
+| 判题容器能力探测 | `POST /api/v1/sandbox/shell/run`，judge 打印 docker 能力 | passed | `command -v docker` → `no-docker`；`docker info` → `daemon-no`（644 ms）；据此不写 Docker 实战线 |
 
 ## 未覆盖与已知限制
 

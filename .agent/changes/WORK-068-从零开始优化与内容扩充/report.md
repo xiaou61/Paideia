@@ -34,7 +34,7 @@ updated: 2026-11-04
 
 ## 未完成
 
-- Docker 部署实战：判题容器是否有 docker daemon 未验证；只做 Dockerfile 文本检查会退化成背指令，暂不写。
+- Docker 部署实战：实测判题容器没有 docker（`no-docker` / `daemon-no`），无法真跑构建；只做 Dockerfile 文本检查会退化成背指令，故不做。
 
 ## 关键决定
 

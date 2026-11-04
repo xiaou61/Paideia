@@ -9888,6 +9888,6 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 守卫：`check-practice-coverage.mjs` 现在同时解析 `quiz` 与 `code-challenge` 的 JSON，坏 JSON 退出码 1。
 - 验证：全库 39 条线 / 348 关 / 494 练习块 / **纯阅读 0**；三条理论线导入 created 12/9/9；两条实战线 created 5/5；部署 188.8 秒、health 200。
 - 线上实测：数据岗位「52 关」、数据分析线 11 关；Python 第 1 关沙箱真跑（前两例 ok、坏行例按预期失败）；Linux 第 1 关容器判题 1636 ms 返回「644，期望 600」。
-- 未完成：Docker 部署实战（判题容器是否有 docker daemon 未验证；纯文本检查会退化成背指令，暂不写）。
+- 未完成：Docker 部署实战——已实测判题容器 `command -v docker` → `no-docker`、`docker info` → `daemon-no`，无法真跑构建；只做 Dockerfile 文本检查会退化成背指令，故不做。
 - 本地提交：`bc53cc8d`（三条理论线）、`b7d46e11`（两条实战线）
 - 远端推送：未推送（需授权）
