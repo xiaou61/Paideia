@@ -10023,3 +10023,11 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：`project_status.py --brief` → state=idle、completed_count=70、work_items=0；`project_validate.py` → 通过（仅保留历史 requirements 决策分层格式警告）。
 - 本地提交：待提交
 - 远端推送：未执行
+## 2026-11-04 15:55 +0800 · WORK-072 建立本地 RAG 检索基础
+
+- 类型：decision
+- 变更：新建 `WORK-072-本地RAG检索基础/requirements.md`；scope 为本地 Ollama + bge-m3、已发布知识条目索引、Top-K 注入与参考条目链接。
+- 决策：单实例不引入 RabbitMQ/outbox；语料不含个人笔记/记忆/简历/对话；每次 AI 回答自动检索；不建独立向量库。
+- 验证：`project_status.py --brief` 显示 WORK-072 requirements/draft，next_work_id=WORK-073；尚未实现或跑测试。
+- 本地提交：待提交
+- 远端推送：未执行
