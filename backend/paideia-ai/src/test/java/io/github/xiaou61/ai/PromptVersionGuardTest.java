@@ -16,7 +16,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 提示词版本号守卫（WORK-070）。
+ * 提示词版本号守卫（WORK-071）。
  *
  * <p><b>为什么扫源码而不反射</b>：提示词类大多是包私有的，反射要先把类名硬编码一遍——那就等于
  * 每加一个提示词都要记得改这个测试，守卫也就失去意义。扫源码能自动发现新文件。

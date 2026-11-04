@@ -1,6 +1,6 @@
 ---
 artifact: requirements
-work_id: WORK-070
+work_id: WORK-071
 work: 提示词卫生：复用、版本守卫、按版本可见
 status: draft
 created: 2026-11-04

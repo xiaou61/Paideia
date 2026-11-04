@@ -9878,14 +9878,15 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 本地提交：`bc577212`
 - 远端推送：未推送（需授权）
 
-## 2026-11-04 11:20 +0800 · WORK-070 提示词卫生（复用常量 + 版本守卫 + 按版本排行）
+## 2026-11-04 11:20 +0800 · WORK-071 提示词卫生（复用常量 + 版本守卫 + 按版本排行）
 
 - 类型：refactor（+ 一个只读统计维度）
 - 背景：调研提示词管理时发现三件事：五处逐字相同的输入侧围栏、版本号靠自觉、管理端有四个 AI 页面但没有"按提示词版本"这一维。
 - 变更：`PromptFences.DATA_ONLY` 收口五处围栏；`PromptVersionGuardTest` 扫 `*Prompt*.java` 强制 `VERSION` 且命名 `<场景>-v<数字>`（`HarnessPrompts` 白名单）；`SummaryPrompt.VERSION` 由裸 `v2` 改为 `summary-card-v2`；`TelemetrySummaryMapper.countByPromptVersion` + `Overview.byPromptVersion` + 管理端「按提示词版本」排行卡。
-- 决策：提示词正文不挪 `.md`、不做后台在线编辑——理由与代价写进 `WORK-070/requirements.md` 的「不做」。
+- 决策：提示词正文不挪 `.md`、不做后台在线编辑——理由与代价写进 `WORK-071/requirements.md` 的「不做」。
 - 验证：`paideia-ai` **389 条 / 0 失败 / 15 跳过**；守卫反向验证（把 `digest-v4` 改成 `digestV4`）实测变红后还原复绿；`pnpm --filter @paideia/admin typecheck` 0 错；工作树 `pnpm install` 41.3 秒（全局 store 命中）。
 - 未覆盖：概览页新卡无 e2e（排行卡只在有数据时渲染，加断言会 flaky）；`countByPromptVersion` 的注解 SQL 与既有聚合一样没有单测。
+- 让号：原编号 WORK-070，因另一会话的「Laya 面经分流与知识点重排对照」也占用 070（在未合并分支上），改为 WORK-071；路径与 8 处引用同步改名，代码只动注释。
 - 本地提交：`62d9f6e0`（代码+测试）、`92ddfc99`（工件）
 - 远端推送：已推送 `99e4d2a3..585f06c1`（合并提交；合并时 updates.md 与另一会话的 WORK-068 记录冲突，按时间戳把本条排在 11:20 位置）
 

@@ -71,7 +71,7 @@ public interface TelemetrySummaryMapper {
             @Param("model") String model, @Param("userId") Long userId);
 
     /**
-     * 按提示词版本分组（WORK-070）。
+     * 按提示词版本分组（WORK-071）。
      *
      * <p>同一场景换过提示词后，两批行只差 `prompt_version`——不按它分组，就永远看不出改动有没有变好。
      * 没带版本的路径归到 `(unknown)`：它们在 `RunSpec` 里本来就没给版本，不是"版本叫空字符串"。
