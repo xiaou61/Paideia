@@ -16,6 +16,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -45,6 +47,14 @@ public class KnowledgeRagService {
         this.chunks = chunks;
         this.embedding = embedding;
         this.properties = properties;
+        log.info("rag.service.init enabled={} embedding={} topK={}",
+                properties.isEnabled(), embedding.enabled(), properties.getTopK());
+    }
+
+    /** 启动后主动跑一次；不能只依赖定时任务第一次延迟。 */
+    @EventListener(ApplicationReadyEvent.class)
+    public void indexOnReady() {
+        reindexChanged();
     }
 
     /** 定时增量索引：只重建 hash 变化的条目，失败不影响旧索引。 */
@@ -52,6 +62,7 @@ public class KnowledgeRagService {
             fixedDelayString = "${paideia.ai.rag.refresh-ms:600000}")
     public void reindexChanged() {
         if (!properties.isEnabled() || !embedding.enabled()) {
+            log.debug("rag.index.skipped enabled={} embedding={}", properties.isEnabled(), embedding.enabled());
             return;
         }
         try {
