@@ -4,6 +4,7 @@ work_id: WORK-070
 work: Laya 面经分流与知识点重排对照
 status: passed
 evidence: required
+verified_commit: 98c84267
 created: 2026-11-04
 updated: 2026-11-04
 ---
