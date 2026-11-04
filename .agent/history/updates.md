@@ -9877,3 +9877,17 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-ai -am test` → 388 条、0 失败、15 跳过（均为需要真上游的 live 测试）。缓存键变更另行验：`-Dtest=AiSummaryIntegrationTest` → **7 条、0 失败、0 跳过**（57.4 秒）。两次都走独占库，用完自动删。
 - 本地提交：`bc577212`
 - 远端推送：未推送（需授权）
+
+## 2026-11-04 15:40 +0800 · WORK-068 第二批：三条理论线 + 两条实战线
+
+- 类型：feature
+- 背景：用户要求继续做完 WORK-068 剩余内容线。
+- 内容（理论）：`data-analysis` 11 关（口径、表格模型、读数据、清洗、聚合、连接、时间、可视化、因果、完整分析）、`web-security` 8 关（信任边界、注入、XSS、CSRF、越权、密钥、供应链、上线检查）、`testing-from-zero` 8 关（价值、单测、替身、集成、e2e、数据、覆盖率、维护）。
+- 内容（实战）：`python-scripting` 4 关（CSV/词频/JSON 日志/分组报告，`verify: run`）；`linux-troubleshooting` 4 关（权限/磁盘/脚本执行/环境变量，`kind: shell` 服务端判题）。
+- 映射：数据岗位核心 + `data-analysis`；后端进阶 + `web-security`/`testing-from-zero`；前端进阶 + `web-security`。
+- 守卫：`check-practice-coverage.mjs` 现在同时解析 `quiz` 与 `code-challenge` 的 JSON，坏 JSON 退出码 1。
+- 验证：全库 39 条线 / 348 关 / 494 练习块 / **纯阅读 0**；三条理论线导入 created 12/9/9；两条实战线 created 5/5；部署 188.8 秒、health 200。
+- 线上实测：数据岗位「52 关」、数据分析线 11 关；Python 第 1 关沙箱真跑（前两例 ok、坏行例按预期失败）；Linux 第 1 关容器判题 1636 ms 返回「644，期望 600」。
+- 未完成：Docker 部署实战（判题容器是否有 docker daemon 未验证；纯文本检查会退化成背指令，暂不写）。
+- 本地提交：`bc53cc8d`（三条理论线）、`b7d46e11`（两条实战线）
+- 远端推送：未推送（需授权）

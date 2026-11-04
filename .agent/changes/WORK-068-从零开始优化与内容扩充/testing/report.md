@@ -19,6 +19,10 @@ updated: 2026-11-04
 | 内容格式 | 同一脚本的 quiz 解析 | passed | 新增 13 篇补充 + 12 关前线共 25 个 quiz 块，无 JSON 错误 |
 | 线上内容导入 | `import-course.mjs --dir content/reading/frontend-from-zero` | passed | created 13；五个书籍/开源线 updated 13（4+3+2+2+2） |
 | 线上 UI（ego） | 前端岗位 → 前端线 → 第 3 关 | passed | 总览「35 关」、核心「1 条/12 关」、选读折叠、12 关地图、3 个章节 chip、条目页「第 3/12 关·未通关」；截图 `F:/caches/tmp/ego-w068-1.png`、`-2.png` |
+| 三条理论线导入 | `import-course.mjs --dir ...` | passed | data-analysis created 12、web-security 9、testing-from-zero 9；岗位映射部署 188.8 秒、health 200 |
+| 数据分析线线上渲染 | ego：数据岗位 → 数据分析从零开始 → 第 6 关 | passed | 总览「52 关」、11 关地图/3 章节、第 6/11 关、练习册 3 题可打开；截图 `F:/caches/tmp/ego-w068b-1.png` |
+| Python 实战真跑 | ego：python-scripting 第 1 关点运行 | passed | 沙箱执行 5 个用例：前两例 ok、坏行用例按预期失败（starter 未过滤），证明判题链路真实；截图 `F:/caches/tmp/ego-w068c-2.png` |
+| Linux 实战真判 | ego：linux-troubleshooting 第 1 关点判定 | passed | 服务端容器 1636 ms 返回「app/secrets.env 现在是 644，期望 600」；截图 `F:/caches/tmp/ego-w068d-1.png` |
 
 ## 未覆盖与已知限制
 

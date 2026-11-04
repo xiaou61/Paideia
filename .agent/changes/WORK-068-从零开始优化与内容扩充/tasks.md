@@ -21,9 +21,11 @@ updated: 2026-11-04
 
 ## 待办
 
-- [ ] TASK-008 `data-analysis` 线：10–12 关（pandas 心智、清洗、聚合、可视化、口径与陷阱），每关 1 组 quiz。
-- [ ] TASK-009 `web-security` 线：8 关（信任边界、注入、XSS、CSRF、越权、密钥、依赖、上线检查）。
-- [ ] TASK-010 `testing-from-zero` 线：8 关（测试金字塔、单测、集成、e2e、测试数据、不稳定测试、覆盖率、什么时候不测）。
-- [ ] TASK-011 三条实战线：Python 脚本 / Docker 部署 / Linux 排障，各 4–5 关，声明 `line_mode: practice` 与 `verify`。
-- [x] TASK-012 内容导入线上（dry-run → 正式）并验证 `/learn` 前端岗位。
+- [x] TASK-008 `data-analysis` 线：11 关（口径、表格模型、读数据、清洗、聚合、连接、时间、可视化、因果、完整分析），每关 1 组 quiz。
+- [x] TASK-009 `web-security` 线：8 关（信任边界、注入、XSS、CSRF、越权、密钥、依赖、上线检查）。
+- [x] TASK-010 `testing-from-zero` 线：8 关（测试价值、单测、替身、集成、e2e、数据、覆盖率、维护）。
+- [x] TASK-011a `python-scripting`：4 关（CSV 汇总、词频、JSON 日志、分组报告），`verify: run`；线上沙箱实跑通过。
+- [x] TASK-011b `linux-troubleshooting`：4 关（权限、磁盘、脚本执行、环境变量），`kind: shell` 由服务端真实判题；线上实跑通过。
+- [ ] TASK-011c Docker 部署实战：**未写**。判题容器是否有 docker daemon 未验证；若只能做 Dockerfile 文本检查，会退化成背指令而不是部署，等确认环境后再做。
+- [x] TASK-012 内容导入线上（dry-run → 正式）并验证 `/learn` 前端岗位。三条理论线 created 12/9/9；两条实战线 created 5/5。
 - [x] TASK-013 前端 UI 改动部署（104 秒，health 200）。

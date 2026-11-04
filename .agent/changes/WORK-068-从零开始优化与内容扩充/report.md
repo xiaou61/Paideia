@@ -26,12 +26,15 @@ updated: 2026-11-04
 - 新线 `frontend-from-zero`：总览 + 12 关（浏览器渲染链路、HTML 语义、盒模型与层叠、Flex/Grid、响应式、JS 值与函数、DOM 与事件、异步 fetch、数据页面、React 心智、状态与副作用、调试与上线），每关 3 题 quiz。
 - `role-map.ts`：前端岗位 `available: true`，核心指向新线；进阶为网络、Git、系统设计。
 
-## 未完成（TASK-008..013）
+### 第二批（同一天）
 
-- `data-analysis`、`web-security`、`testing-from-zero` 三条理论线，以及 Python/Docker/Linux 三条实战线；
-- 内容导入线上与前端部署。
+- `data-analysis` 11 关、`web-security` 8 关、`testing-from-zero` 8 关，均已导入线上并接入岗位映射（数据岗位核心、后端进阶、前端进阶）。
+- `python-scripting` 4 关：`verify: run`，线上沙箱真跑（含坏行用例按预期失败）。
+- `linux-troubleshooting` 4 关：`kind: shell`，判定在服务端容器执行，线上实测 1636 ms 返回权限不匹配信息。
 
-这些是内容工作量，不是技术阻塞；按"一条线一条线推"的节奏继续，避免批量产出浅内容。
+## 未完成
+
+- Docker 部署实战：判题容器是否有 docker daemon 未验证；只做 Dockerfile 文本检查会退化成背指令，暂不写。
 
 ## 关键决定
 
