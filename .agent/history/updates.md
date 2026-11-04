@@ -9931,3 +9931,13 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：RoutingTest 5/5；TechEssayFilterTest 7/7；EssayCollectionIntegrationTest 3/3；对照实验基线 0.8302 vs 重排 0.6730（159 题/154 成功/89.8s）→ 不采用
 - 本地提交：98c84267
 - 远端推送：未推送（需授权）
+
+## 2026-11-04 11:30:05 +0800 · WORK-070 · Laya 面经分流与过滤计数推送
+
+- 类型：maintenance
+- 变更：4 个提交推入 master：feat(decision) 分流与计数、补记、报告绑定提交、验收标准改列表
+- 决策：主树被另一会话占用（索引里有未提交的 WORK-070→071 改名与三个源文件），因此在 worktree 里 rebase 后直接快进推 master，不碰主树索引
+- 依据：.agent/changes/WORK-070-Laya面经分流与知识点重排对照/
+- 验证：推送前 rebase 到 0b833efb 并重跑 TechEssayFilterTest+EssayCollectionRoutingTest 12/12；推送 0b833efb..4e4e1fca
+- 本地提交：4e4e1fca
+- 远端推送：已推送 0b833efb..4e4e1fca 到 origin/master（快进，无强推）
