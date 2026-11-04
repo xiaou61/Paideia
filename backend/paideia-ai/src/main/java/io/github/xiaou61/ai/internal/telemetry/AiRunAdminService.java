@@ -2,6 +2,7 @@ package io.github.xiaou61.ai.internal.telemetry;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.xiaou61.ai.FailureKind;
 import io.github.xiaou61.ai.internal.billing.BillingProperties;
 import io.github.xiaou61.platform.PageQuery;
 import io.github.xiaou61.platform.PageResult;
@@ -81,6 +82,7 @@ public class AiRunAdminService {
                     List<TelemetrySummaryMapper.CountBy> byKind,
                     List<TelemetrySummaryMapper.CountBy> byModel,
                     List<TelemetrySummaryMapper.CountBy> byPromptVersion,
+                    List<TelemetrySummaryMapper.CountBy> byFailureKind,
                     List<TelemetrySummaryMapper.CountBy> errorTypes,
                     List<TelemetrySummaryMapper.CountBy> tools) {
     }
@@ -124,7 +126,7 @@ public class AiRunAdminService {
     }
 
     public record RunSummary(String traceId, long userId, Long conversationId, String kind, String harness,
-                      String model, String status, String errorType,
+                      String model, String status, String errorType, String failureKind,
                       Instant startedAt, Instant endedAt,
                       Integer durationMs, Integer ttftMs, int llmRounds, int toolCalls,
                       int inputTokens, int outputTokens, int credits) {
@@ -230,6 +232,7 @@ public class AiRunAdminService {
                 summary.countByKind(window.from(), window.to(), k, s, m, userId),
                 summary.countByModel(window.from(), window.to(), k, s, m, userId),
                 summary.countByPromptVersion(window.from(), window.to(), k, s, m, userId),
+                summary.countByFailureKind(window.from(), window.to(), k, s, m, userId),
                 summary.countByErrorType(window.from(), window.to(), k, s, m, userId),
                 summary.countByTool(window.from(), window.to()));
     }
@@ -419,7 +422,13 @@ public class AiRunAdminService {
 
     public PageResult<RunSummary> page(Instant from, Instant to, String kind, String status,
                                 Long userId, String model, PageQuery query) {
-        return page(from, to, kind, status, userId, model, null, query);
+        return page(from, to, kind, status, null, userId, model, null, query);
+    }
+
+    /** 旧调用方的兼容入口：没有 failureKind 筛选。 */
+    public PageResult<RunSummary> page(Instant from, Instant to, String kind, String status,
+                                Long userId, String model, String tracePrefix, PageQuery query) {
+        return page(from, to, kind, status, null, userId, model, tracePrefix, query);
     }
 
     /**
@@ -429,7 +438,8 @@ public class AiRunAdminService {
      * `LIKE 'x%'` 还能走 `uk_ai_runs_trace`（范围扫描），`%x%` 会退化成全表扫。
      */
     public PageResult<RunSummary> page(Instant from, Instant to, String kind, String status,
-                                Long userId, String model, String tracePrefix, PageQuery query) {
+                                String failureKind, Long userId, String model, String tracePrefix,
+                                PageQuery query) {
         Window window = window(from, to);
         String prefix = blankToNull(tracePrefix);
         prefix = prefix == null ? null : prefix.trim();
@@ -437,12 +447,12 @@ public class AiRunAdminService {
             prefix = null;
         }
         List<RunSummary> items = runs.page(window.from(), window.to(), blankToNull(kind),
-                        blankToNull(status), userId, blankToNull(model), prefix,
+                        blankToNull(status), blankToNull(failureKind), userId, blankToNull(model), prefix,
                         query.limit(), query.offset()).stream()
                 .map(AiRunAdminService::toSummary)
                 .toList();
         long total = runs.countPage(window.from(), window.to(), blankToNull(kind),
-                blankToNull(status), userId, blankToNull(model), prefix);
+                blankToNull(status), blankToNull(failureKind), userId, blankToNull(model), prefix);
         return PageResult.of(total, query, items);
     }
 
@@ -480,6 +490,8 @@ public class AiRunAdminService {
                 "kinds", summary.distinctKinds(window.from(), window.to()),
                 "models", summary.distinctModels(window.from(), window.to()),
                 "statuses", summary.countByStatus(window.from(), window.to()),
+                "failureKinds", List.of(FailureKind.RETRYABLE.key(), FailureKind.BAD_OUTPUT.key(),
+                        FailureKind.NEEDS_HUMAN.key()),
                 "from", window.from(),
                 "to", window.to());
     }
@@ -487,7 +499,8 @@ public class AiRunAdminService {
     private static RunSummary toSummary(AiRunMapper.AiRunRow row) {
         return new RunSummary(row.getTraceId(), row.getUserId() == null ? 0 : row.getUserId(),
                 row.getConversationId(), row.getKind(), row.getHarness(), row.getModel(),
-                row.getStatus(), row.getErrorType(), row.getStartedAt(), row.getEndedAt(),
+                row.getStatus(), row.getErrorType(), row.getFailureKind(),
+                row.getStartedAt(), row.getEndedAt(),
                 row.getDurationMs(), row.getTtftMs(), orZero(row.getLlmRounds()),
                 orZero(row.getToolCalls()), orZero(row.getInputTokens()),
                 orZero(row.getOutputTokens()), orZero(row.getCredits()));

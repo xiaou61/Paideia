@@ -59,7 +59,7 @@ class AiAdminToolsTest {
                 from, to, false, 120L,
                 new AiRunAdminService.StatusCounts(110L, 8L, 2L, 0L, 0L, 0L),
                 0.9166, 120, 900, 80, 300, 5000, 2000, 1000, 900, 800, 0.5, 1.0,
-                List.of(), List.of(), List.of(), List.of(), List.of()));
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of()));
         when(runs.health()).thenReturn(new AiRunAdminService.Health(
                 true, 1.0, 2, 100, 0, 0, to));
         when(runs.reconcile(from, to)).thenReturn(new AiRunAdminService.Reconcile(

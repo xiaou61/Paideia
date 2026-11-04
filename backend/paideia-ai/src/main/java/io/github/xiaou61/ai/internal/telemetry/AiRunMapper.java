@@ -42,7 +42,8 @@ public interface AiRunMapper {
     /** 写终态。**带 status='running' 条件**：已采样的行被删掉后不该被这条"复活"成终态。 */
     @Update("""
             UPDATE ai_runs SET
-                status = #{status}, error_type = #{errorType}, ended_at = #{endedAt},
+                status = #{status}, error_type = #{errorType}, failure_kind = #{failureKind},
+                ended_at = #{endedAt},
                 queue_ms = #{queueMs}, duration_ms = #{durationMs}, ttft_ms = #{ttftMs},
                 llm_rounds = #{llmRounds}, tool_calls = #{toolCalls},
                 input_tokens = #{inputTokens}, output_tokens = #{outputTokens},
@@ -67,7 +68,7 @@ public interface AiRunMapper {
 
     @Select("""
             SELECT id, trace_id, user_id, conversation_id, kind, harness, model, prompt_version,
-                   status, error_type, started_at, ended_at, queue_ms, duration_ms, ttft_ms,
+                   status, error_type, failure_kind, started_at, ended_at, queue_ms, duration_ms, ttft_ms,
                    llm_rounds, tool_calls, input_tokens, output_tokens, cache_read_tokens,
                    credits, attrs AS attrsJson
             FROM ai_runs WHERE trace_id = #{traceId}
@@ -77,13 +78,14 @@ public interface AiRunMapper {
     @Select("""
             <script>
             SELECT id, trace_id, user_id, conversation_id, kind, harness, model, prompt_version,
-                   status, error_type, started_at, ended_at, queue_ms, duration_ms, ttft_ms,
+                   status, error_type, failure_kind, started_at, ended_at, queue_ms, duration_ms, ttft_ms,
                    llm_rounds, tool_calls, input_tokens, output_tokens, cache_read_tokens,
                    credits, attrs AS attrsJson
             FROM ai_runs
             WHERE started_at &gt;= #{from} AND started_at &lt; #{to}
             <if test="kind != null">AND kind = #{kind}</if>
             <if test="status != null">AND status = #{status}</if>
+            <if test="failureKind != null">AND failure_kind = #{failureKind}</if>
             <if test="userId != null">AND user_id = #{userId}</if>
             <if test="model != null">AND model = #{model}</if>
             <if test="tracePrefix != null">AND trace_id LIKE CONCAT(#{tracePrefix}, '%')</if>
@@ -93,6 +95,7 @@ public interface AiRunMapper {
             """)
     List<AiRunRow> page(@Param("from") Instant from, @Param("to") Instant to,
                         @Param("kind") String kind, @Param("status") String status,
+                        @Param("failureKind") String failureKind,
                         @Param("userId") Long userId, @Param("model") String model,
                         @Param("tracePrefix") String tracePrefix,
                         @Param("limit") int limit, @Param("offset") long offset);
@@ -103,6 +106,7 @@ public interface AiRunMapper {
             WHERE started_at &gt;= #{from} AND started_at &lt; #{to}
             <if test="kind != null">AND kind = #{kind}</if>
             <if test="status != null">AND status = #{status}</if>
+            <if test="failureKind != null">AND failure_kind = #{failureKind}</if>
             <if test="userId != null">AND user_id = #{userId}</if>
             <if test="model != null">AND model = #{model}</if>
             <if test="tracePrefix != null">AND trace_id LIKE CONCAT(#{tracePrefix}, '%')</if>
@@ -110,6 +114,7 @@ public interface AiRunMapper {
             """)
     long countPage(@Param("from") Instant from, @Param("to") Instant to,
                    @Param("kind") String kind, @Param("status") String status,
+                   @Param("failureKind") String failureKind,
                    @Param("userId") Long userId, @Param("model") String model,
                    @Param("tracePrefix") String tracePrefix);
 
@@ -146,6 +151,7 @@ public interface AiRunMapper {
         private String promptVersion;
         private String status;
         private String errorType;
+        private String failureKind;
         private Instant startedAt;
         private Instant endedAt;
         private Integer queueMs;
@@ -179,6 +185,8 @@ public interface AiRunMapper {
         public void setStatus(String status) { this.status = status; }
         public String getErrorType() { return errorType; }
         public void setErrorType(String errorType) { this.errorType = errorType; }
+        public String getFailureKind() { return failureKind; }
+        public void setFailureKind(String failureKind) { this.failureKind = failureKind; }
         public Instant getStartedAt() { return startedAt; }
         public void setStartedAt(Instant startedAt) { this.startedAt = startedAt; }
         public Instant getEndedAt() { return endedAt; }

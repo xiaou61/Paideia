@@ -91,6 +91,7 @@ class MysqlRunSink implements RunSink {
         row.setPromptVersion(run.promptVersion());
         row.setStatus(run.status());
         row.setErrorType(run.errorType());
+        row.setFailureKind(run.failureKind());
         row.setStartedAt(run.startedAt());
         row.setEndedAt(run.endedAt());
         row.setQueueMs(run.queueMs());

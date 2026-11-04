@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.github.xiaou61.ai.ModelAccess;
+import io.github.xiaou61.ai.RunRecorder;
 import io.github.xiaou61.ai.internal.credential.CredentialService;
 import io.github.xiaou61.ai.internal.decision.ContentClassification;
 import io.github.xiaou61.ai.internal.decision.ContentClassifier;
@@ -131,8 +132,12 @@ class EssayCollectionRoutingTest {
         when(credentials.access(0)).thenReturn(
                 Optional.of(new ModelAccess("http://127.0.0.1:1", "test-model", "k")));
 
+        RunRecorder recorder = mock(RunRecorder.class);
+        RunRecorder.RunScope scope = mock(RunRecorder.RunScope.class);
+        when(recorder.begin(any())).thenReturn(scope);
+
         return new EssayCollectionService(properties, source, new TechEssayFilter(classifier),
-                extractor, knowledge, credentials).runOnce();
+                extractor, knowledge, credentials, recorder).runOnce();
     }
 
     private static ContentClassifier classifierReturning(String topic) {

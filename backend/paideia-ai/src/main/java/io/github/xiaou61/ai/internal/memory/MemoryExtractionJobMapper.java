@@ -64,6 +64,19 @@ interface MemoryExtractionJobMapper {
                    @Param("nextAttemptAt") Instant nextAttemptAt,
                    @Param("lastError") String lastError);
 
+    /**
+     * 不可重试失败：直接 failed。
+     *
+     * <p>**不动 attempts 与 next_attempt_at**——它们记录的是已经发生的尝试与既有排期；
+     * 永久失败不需要再推一次时间。只清 locked_at 并按 running 条件守卫，避免回收后的行被误杀。
+     */
+    @Update("""
+            UPDATE ai_memory_extraction_jobs
+            SET status = 'failed', last_error = #{lastError}, locked_at = NULL
+            WHERE id = #{id} AND status = 'running'
+            """)
+    int failPermanently(@Param("id") long id, @Param("lastError") String lastError);
+
     /** 到期待办（中继拾取）。 */
     @Select("""
             SELECT id, user_id, conversation_id, from_message_id, to_message_id, attempts

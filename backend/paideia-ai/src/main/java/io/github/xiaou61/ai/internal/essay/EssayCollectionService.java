@@ -1,6 +1,11 @@
 package io.github.xiaou61.ai.internal.essay;
 
+import io.github.xiaou61.ai.FailureKind;
 import io.github.xiaou61.ai.ModelAccess;
+import io.github.xiaou61.ai.RunKind;
+import io.github.xiaou61.ai.RunOutcome;
+import io.github.xiaou61.ai.RunRecorder;
+import io.github.xiaou61.ai.RunSpec;
 import io.github.xiaou61.ai.internal.credential.CredentialService;
 import io.github.xiaou61.ai.internal.decision.TechEssayFilter;
 import io.github.xiaou61.knowledge.KnowledgeApi;
@@ -44,19 +49,22 @@ public class EssayCollectionService {
     private final EssayExtractor extractor;
     private final KnowledgeApi knowledge;
     private final CredentialService credentials;
+    private final RunRecorder recorder;
 
     EssayCollectionService(EssayProperties properties,
                            EssaySource source,
                            TechEssayFilter filter,
                            EssayExtractor extractor,
                            KnowledgeApi knowledge,
-                           CredentialService credentials) {
+                           CredentialService credentials,
+                           RunRecorder recorder) {
         this.properties = properties;
         this.source = source;
         this.filter = filter;
         this.extractor = extractor;
         this.knowledge = knowledge;
         this.credentials = credentials;
+        this.recorder = recorder;
     }
 
     /**
@@ -96,11 +104,16 @@ public class EssayCollectionService {
 
         long since = Instant.now().minus(Duration.ofDays(properties.getLookbackDays())).toEpochMilli();
         List<FetchedPost> posts;
+        var fetchRun = recorder.begin(RunSpec.of(RunKind.ESSAY_COLLECT, 0L));
         try {
             posts = source.fetchSince(since, properties.getMaxPages());
+            fetchRun.finish(RunOutcome.OK, null);
         } catch (RuntimeException exception) {
+            fetchRun.finish(RunOutcome.FAILED, "essay_fetch_failed", FailureKind.RETRYABLE);
             log.warn("面经抓取失败，本次跳过：{}", exception.getMessage());
             return RunResult.skipped("抓取失败");
+        } finally {
+            fetchRun.close();
         }
         if (posts.isEmpty()) {
             return new RunResult(0, 0, new FilterStats(0, 0, 0, 0), 0, 0, 0, 0, "本次没有新帖");
@@ -143,6 +156,9 @@ public class EssayCollectionService {
             if (!categoryId.equals(defaultCategoryId)) {
                 routed++;
             }
+            var extractRun = recorder.begin(RunSpec.of(RunKind.ESSAY_EXTRACT, 0L)
+                    .withModel(access.get().model())
+                    .withPromptVersion(EssayExtractionPrompt.VERSION));
             try {
                 EssayExtractionPrompt.Extraction result =
                         extractor.extract(post, access.get(), properties.getTimeoutSeconds());
@@ -165,10 +181,15 @@ public class EssayCollectionService {
                         duplicated++;
                     }
                 }
+                extractRun.finish(RunOutcome.OK, null);
             } catch (RuntimeException exception) {
                 // 单篇失败不影响其它帖子：一天十篇里坏一篇，其余照收。
+                // WORK-069：抽题失败按 bad_output 记录；这不改变“不重试”的现有行为。
+                extractRun.finish(RunOutcome.FAILED, "essay_extract_failed", FailureKind.BAD_OUTPUT);
                 failed++;
                 log.warn("面经抽题失败（{}）：{}", post.externalId(), exception.getMessage());
+            } finally {
+                extractRun.close();
             }
         }
 

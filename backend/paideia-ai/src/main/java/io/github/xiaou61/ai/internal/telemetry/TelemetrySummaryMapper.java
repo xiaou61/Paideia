@@ -91,6 +91,27 @@ public interface TelemetrySummaryMapper {
             @Param("kind") String kind, @Param("status") String status,
             @Param("model") String model, @Param("userId") Long userId);
 
+    /**
+     * 按失败处置分组（WORK-069）。
+     *
+     * <p>与其它排行同一组筛选；不把 NULL 混进 `(unknown)`——NULL 表示历史行或未接入链路的
+     * 「未记录」，不是一种处置。
+     */
+    @Select("""
+            <script>
+            SELECT failure_kind AS name, COUNT(*) AS count FROM ai_runs
+            WHERE started_at >= #{from} AND started_at &lt; #{to} AND failure_kind IS NOT NULL
+            <if test="kind != null">AND kind = #{kind}</if>
+            <if test="status != null">AND status = #{status}</if>
+            <if test="model != null">AND model = #{model}</if>
+            <if test="userId != null">AND user_id = #{userId}</if>
+                        GROUP BY failure_kind ORDER BY count DESC
+            </script>
+            """)
+    List<CountBy> countByFailureKind(@Param("from") Instant from, @Param("to") Instant to,
+            @Param("kind") String kind, @Param("status") String status,
+            @Param("model") String model, @Param("userId") Long userId);
+
     @Select("""
             SELECT name, COUNT(*) AS count FROM ai_run_spans
             WHERE kind = 'tool' AND started_at >= #{from} AND started_at < #{to}

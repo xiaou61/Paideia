@@ -48,6 +48,7 @@ interface RunSummary {
   model: string | null
   status: string
   errorType: string | null
+  failureKind: string | null
   startedAt: string
   endedAt: string | null
   durationMs: number | null
@@ -111,6 +112,7 @@ interface Meta {
   kinds: { name: string; count: number }[]
   models: { name: string; count: number }[]
   statuses: { name: string; count: number }[]
+  failureKinds: string[]
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -121,6 +123,14 @@ const KIND_LABEL: Record<string, string> = {
   resume_import: '简历解析',
   resume_optimize: '简历优化',
   entry_summary: '条目精简',
+  essay_collect: '面经抓取',
+  essay_extract: '面经抽题',
+}
+
+const FAILURE_KIND_LABEL: Record<string, string> = {
+  retryable: '可重试',
+  bad_output: '输出不合规',
+  needs_human: '需人工',
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -162,6 +172,7 @@ const PAGE_SIZE = 50
 export function AiRunsListPage() {
   const [kind, setKind] = useState('')
   const [status, setStatus] = useState('')
+  const [failureKind, setFailureKind] = useState('')
   const [userId, setUserId] = useState('')
   const [traceId, setTraceId] = useState('')
   const [hour, setHour] = useState<string>('7d')
@@ -174,11 +185,12 @@ export function AiRunsListPage() {
   })
 
   const list = useQuery({
-    queryKey: ['ai-runs-list', kind, status, userId, traceId, hour, page],
+    queryKey: ['ai-runs-list', kind, status, failureKind, userId, traceId, hour, page],
     queryFn: () => {
       const params = new URLSearchParams()
       if (kind !== '') params.set('kind', kind)
       if (status !== '') params.set('status', status)
+      if (failureKind !== '') params.set('failureKind', failureKind)
       if (userId.trim() !== '') params.set('userId', userId.trim())
       if (traceId.trim() !== '') params.set('traceId', traceId.trim())
       params.set('page', String(page))
@@ -264,6 +276,29 @@ export function AiRunsListPage() {
                 {(meta.data?.statuses ?? []).map((item) => (
                   <SelectItem key={item.name} value={item.name}>
                     {STATUS_LABEL[item.name] ?? item.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+          <label className="space-y-1 text-xs">
+            <span className="text-muted-foreground block">失败处置</span>
+            <Select
+              items={[{ value: '', label: '全部' }, ...(meta.data?.failureKinds ?? []).map((value) => ({
+                value,
+                label: FAILURE_KIND_LABEL[value] ?? value,
+              }))]}
+              value={failureKind}
+              onValueChange={(value) => { setFailureKind(value as string); setPage(1) }}
+            >
+              <SelectTrigger size="sm" className="w-32" data-testid="runs-filter-failure-kind">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">全部</SelectItem>
+                {(meta.data?.failureKinds ?? []).map((value) => (
+                  <SelectItem key={value} value={value}>
+                    {FAILURE_KIND_LABEL[value] ?? value}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -364,6 +399,11 @@ function Row({ row, expanded, onToggle }: { row: RunSummary; expanded: boolean; 
           </Badge>
           {row.errorType === null ? null : (
             <span className="text-muted-foreground ml-1 text-[10px]">{row.errorType}</span>
+          )}
+          {row.failureKind === null ? null : (
+            <span className="text-muted-foreground ml-1 text-[10px]">
+              {FAILURE_KIND_LABEL[row.failureKind] ?? row.failureKind}
+            </span>
           )}
         </TableCell>
         <TableCell className="text-right text-xs tabular-nums">{ms(row.durationMs)}</TableCell>

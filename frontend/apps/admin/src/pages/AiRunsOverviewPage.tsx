@@ -71,6 +71,7 @@ interface Overview {
   byKind: CountBy[]
   byModel: CountBy[]
   byPromptVersion: CountBy[]
+  byFailureKind: CountBy[]
   errorTypes: CountBy[]
   tools: CountBy[]
 }
@@ -118,6 +119,14 @@ const KIND_LABEL: Record<string, string> = {
   resume_import: '简历解析',
   resume_optimize: '简历优化',
   entry_summary: '条目精简',
+  essay_collect: '面经抓取',
+  essay_extract: '面经抽题',
+}
+
+const FAILURE_KIND_LABEL: Record<string, string> = {
+  retryable: '可重试',
+  bad_output: '输出不合规',
+  needs_human: '需人工',
 }
 
 /** 毫秒显示：小于 1 秒给 ms，否则给秒（一位小数）。空值给破折号，不显示 null。 */
@@ -364,6 +373,9 @@ export function AiRunsOverviewPage() {
               <div className="grid gap-4 lg:grid-cols-2">
                 <RankCard title="按提示词版本" rows={data.byPromptVersion} label={(name) => name}
                   testId="runs-by-prompt-version" emptyHint="这段时间没有带版本的调用" />
+                <RankCard title="按失败处置" rows={data.byFailureKind}
+                  label={(name) => FAILURE_KIND_LABEL[name] ?? name}
+                  testId="runs-by-failure-kind" emptyHint="这段时间没有失败记录" />
               </div>
 
               <Card>

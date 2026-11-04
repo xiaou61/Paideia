@@ -4,8 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.xiaou61.ai.MemoryCandidate;
 import io.github.xiaou61.ai.internal.support.ModelJson;
-import io.github.xiaou61.platform.BizException;
-import io.github.xiaou61.platform.ErrorCode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -192,7 +190,7 @@ public class MemoryCandidateParser {
         return ModelJson.textOrNull(node, field);
     }
 
-    private static BizException failure(String reason) {
-        return new BizException(ErrorCode.INTERNAL, "记忆整理没有返回可用结果（" + reason + "）");
+    private static MemoryOutputException failure(String reason) {
+        return new MemoryOutputException("记忆整理没有返回可用结果（" + reason + "）");
     }
 }

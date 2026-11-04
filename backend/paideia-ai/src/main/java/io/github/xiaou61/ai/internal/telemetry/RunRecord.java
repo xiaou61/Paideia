@@ -26,6 +26,7 @@ public record RunRecord(
         Instant endedAt,
         String status,
         String errorType,
+        String failureKind,
         Integer queueMs,
         Integer durationMs,
         Integer ttftMs,
@@ -47,7 +48,7 @@ public record RunRecord(
     static RunRecord running(String traceId, RunSpec spec, Instant startedAt) {
         return new RunRecord(traceId, spec.userId(), spec.conversationId(), spec.kind(),
                 spec.harness(), spec.model(), spec.promptVersion(),
-                startedAt, null, "running", null,
+                startedAt, null, "running", null, null,
                 null, null, null, 0, 0, 0, 0, 0, 0,
                 Map.of(), List.of());
     }

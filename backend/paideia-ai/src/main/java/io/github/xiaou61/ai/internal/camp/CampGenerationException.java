@@ -1,5 +1,6 @@
 package io.github.xiaou61.ai.internal.camp;
 
+import io.github.xiaou61.ai.FailureKind;
 import io.github.xiaou61.platform.ErrorCode;
 
 /**
@@ -31,6 +32,19 @@ public final class CampGenerationException extends RuntimeException {
 
     public Kind kind() {
         return kind;
+    }
+
+    /**
+     * 这次失败对应的处置（WORK-069）。
+     *
+     * <p>`EMPTY_RESPONSE` 通常是 max_tokens 被思考吃满，调大配置才可能变好；`BAD_SHAPE` 与
+     * `NO_VALID_ITEM` 是模型输出不合规，同配置重来没有意义——都按 `bad_output` 记录。
+     */
+    public FailureKind failureKind() {
+        return switch (kind) {
+            case EMPTY_RESPONSE -> FailureKind.NEEDS_HUMAN;
+            case BAD_SHAPE, NO_VALID_ITEM -> FailureKind.BAD_OUTPUT;
+        };
     }
 
     public static CampGenerationException emptyResponse() {

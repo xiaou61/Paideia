@@ -78,7 +78,7 @@ class AiRunAdminController {
         return ApiResponse.ok(service.reconcile(from, to));
     }
 
-    /** 明细列表：时间窗 + 场景 + 状态 + 用户 + 模型，另可给 traceId 前缀，分页。 */
+    /** 明细列表：时间窗 + 场景 + 状态 + 失败处置 + 用户 + 模型，另可给 traceId 前缀，分页。 */
     @GetMapping
     ApiResponse<PageResult<AiRunAdminService.RunSummary>> page(
             @RequestParam(name = "from", required = false)
@@ -87,12 +87,13 @@ class AiRunAdminController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
             @RequestParam(name = "kind", required = false) String kind,
             @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "failureKind", required = false) String failureKind,
             @RequestParam(name = "userId", required = false) Long userId,
             @RequestParam(name = "model", required = false) String model,
             @RequestParam(name = "traceId", required = false) String traceId,
             @RequestParam(name = "page", required = false) Integer page,
             @RequestParam(name = "size", required = false) Integer size) {
-        return ApiResponse.ok(service.page(from, to, kind, status, userId, model, traceId,
+        return ApiResponse.ok(service.page(from, to, kind, status, failureKind, userId, model, traceId,
                 PageQuery.of(page, size, null)));
     }
 

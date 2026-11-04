@@ -1,5 +1,6 @@
 package io.github.xiaou61.ai.internal.memory;
 
+import io.github.xiaou61.ai.FailureKind;
 import io.github.xiaou61.ai.MemoryCandidate;
 import io.github.xiaou61.ai.MemoryExtractor;
 import io.github.xiaou61.ai.ModelAccess;
@@ -197,10 +198,16 @@ public class MemoryExtractionService {
                         job.getAttempts());
             } catch (RuntimeException failure) {
                 settleOrRefund(userId, reserved, usage, slice.upToMessageId(), access.get());
-                jobs.fail(job.getId(), job.getAttempts(), failure.getMessage());
-                run.finish(io.github.xiaou61.ai.RunOutcome.FAILED, "extraction_failed");
-                log.warn("ai.memory.extraction_failed userId={} conversationId={} attempt={} reason={}",
-                        userId, slice.conversationId(), job.getAttempts(), failure.getMessage());
+                FailureKind failureKind = MemoryFailureClassifier.classify(failure);
+                if (failureKind.isRetryable()) {
+                    jobs.fail(job.getId(), job.getAttempts(), failure.getMessage());
+                } else {
+                    jobs.failPermanently(job.getId(), failure.getMessage());
+                }
+                run.finish(io.github.xiaou61.ai.RunOutcome.FAILED, "extraction_failed", failureKind);
+                log.warn("ai.memory.extraction_failed userId={} conversationId={} attempt={} kind={} reason={}",
+                        userId, slice.conversationId(), job.getAttempts(), failureKind.key(),
+                        failure.getMessage());
             } finally {
                 run.close();
             }

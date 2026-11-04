@@ -139,6 +139,44 @@ class AiObservabilityIntegrationTest {
     }
 
     @Test
+    @DisplayName("WORK-069 AC-005：failure_kind 筛选只返回对应行，概览按处置计数")
+    void failureKindFilterReturnsOnlyMatchingRows() {
+        wipe();
+        try {
+            Instant now = Instant.now();
+            String badOutput = UUID.randomUUID().toString().replace("-", "");
+            String needsHuman = UUID.randomUUID().toString().replace("-", "");
+            jdbc.update("""
+                    INSERT INTO ai_runs
+                      (trace_id, user_id, kind, status, failure_kind, started_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """, badOutput, USER, "chat", "failed", "bad_output",
+                    java.sql.Timestamp.from(now.minus(1, ChronoUnit.HOURS)));
+            jdbc.update("""
+                    INSERT INTO ai_runs
+                      (trace_id, user_id, kind, status, failure_kind, started_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """, needsHuman, USER, "chat", "failed", "needs_human",
+                    java.sql.Timestamp.from(now.minus(2, ChronoUnit.HOURS)));
+
+            var page = admin.page(now.minus(1, ChronoUnit.DAYS), now, "chat", "failed",
+                    "bad_output", USER, null, null, PageQuery.of(1, 10, null));
+            assertThat(page.total()).isEqualTo(1);
+            assertThat(page.items()).extracting(AiRunAdminService.RunSummary::failureKind)
+                    .containsExactly("bad_output");
+
+            var overview = admin.overview(now.minus(1, ChronoUnit.DAYS), now, null, null, null, USER);
+            assertThat(overview.byFailureKind())
+                    .anySatisfy(row -> {
+                        assertThat(row.name()).isEqualTo("bad_output");
+                        assertThat(row.count()).isEqualTo(1);
+                    });
+        } finally {
+            wipe();
+        }
+    }
+
+    @Test
     @DisplayName("AC-004 缓存命中合计与节省比例来自真实列")
     void cacheTokensAreExposed() {
         wipe();

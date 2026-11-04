@@ -96,6 +96,17 @@ public class MemoryExtractionJobs {
         }
     }
 
+    /**
+     * 不可重试失败：直接 failed，不再退避。
+     *
+     * <p>与 {@link #fail} 的分工是处置语义，不是错误归因：`bad_output` 与 `needs_human`
+     * 再来一次也不会变好，继续烧 attempts 只会拖到上限才失败。任务行保留供诊断。
+     */
+    public void failPermanently(long jobId, String reason) {
+        mapper.failPermanently(jobId, trim(reason));
+        log.warn("ai.memory.job_failed_permanently jobId={} reason={}", jobId, reason);
+    }
+
     public List<MemoryExtractionJob> due(int limit) {
         return mapper.due(Instant.now(), limit);
     }
