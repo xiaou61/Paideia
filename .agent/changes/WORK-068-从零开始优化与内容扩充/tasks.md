@@ -2,7 +2,7 @@
 artifact: tasks
 work_id: WORK-068
 work: 从零开始体验优化与内容扩充
-status: in_progress
+status: completed
 created: 2026-11-04
 updated: 2026-11-04
 ---

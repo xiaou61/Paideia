@@ -25,6 +25,7 @@ updated: 2026-11-04
 | Linux 实战真判 | ego：linux-troubleshooting 第 1 关点判定 | passed | 服务端容器 1636 ms 返回「app/secrets.env 现在是 644，期望 600」；截图 `F:/caches/tmp/ego-w068d-1.png` |
 | 判题容器能力探测 | `POST /api/v1/sandbox/shell/run`，judge 打印 docker 能力 | passed | `command -v docker` → `no-docker`；`docker info` → `daemon-no`（644 ms）；据此 Docker 线只做结构判定 |
 | Docker 实战真判 | ego：docker-deploy 第 1 关点运行 | passed | 服务端 997 ms 返回「运行阶段需要 COPY --from=build ... 来拿产物」；截图 `F:/caches/tmp/ego-w068e-1.png` |
+| Docker 判定自检 | 本地用正确解/种子坏解各跑四道 judge | passed | 4/4：正确解 exit 0，坏解 exit 1（脚本 `check-docker.mjs`，未入库） |
 
 ## 未覆盖与已知限制
 
