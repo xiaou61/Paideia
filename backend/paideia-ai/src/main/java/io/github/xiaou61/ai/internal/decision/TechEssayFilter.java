@@ -22,6 +22,10 @@ import org.springframework.stereotype.Component;
  *
  * <p>顺序是刻意的：规则零成本、零延迟、不会挂，先让它把大量明显的帖子分掉；只有处在边界上的
  * 才值得花 200ms 问一次模型。反过来（先问模型）等于给每一条都付一次延迟。
+ *
+ * <p><b>一个例外</b>（WORK-070）：调用方要按主题分流时（{@code needTopic}），规则已判定的技术帖
+ * 也会被问一次——只取它判出的主题，判定结论仍按规则。不这么做的话，命中 ≥5 种的帖子根本不会
+ * 带 topic，分流等于没有。
  */
 @Component
 public class TechEssayFilter {
@@ -47,29 +51,59 @@ public class TechEssayFilter {
 
     private final ContentClassifier classifier;
 
-    TechEssayFilter(ContentClassifier classifier) {
+    public TechEssayFilter(ContentClassifier classifier) {
         this.classifier = classifier;
     }
 
     /**
-     * @param text 面经正文
-     * @return 是否值得进入 AI 解析
+     * 一次判定的结果。
+     *
+     * @param technical      是否值得进入 AI 解析
+     * @param topic          模型判出的主题；没问、或模型没判出来时为空串
+     * @param borderline     是否落在规则判不准的边界地带（1~阈值+1 种技术词）
+     * @param askedModel     是否真的调用了模型
+     * @param changedByModel 模型结论与规则兜底结论是否不同
      */
-    public boolean isTechnical(String text) {
+    public record Verdict(boolean technical, String topic, boolean borderline,
+                          boolean askedModel, boolean changedByModel) {
+
+        static final Verdict NOT_TECHNICAL = new Verdict(false, "", false, false, false);
+    }
+
+    /**
+     * @param text      面经正文
+     * @param needTopic 配了按主题分流（WORK-070）时为 true。那时**连规则已判定的技术帖也要问一次
+     *                  主题**——否则绝大多数帖子（命中 ≥5 种）根本不会带 topic，分流形同虚设。
+     *                  默认为 false，保持"明显的帖子零模型调用"。
+     */
+    public Verdict judge(String text, boolean needTopic) {
         if (text == null || text.isBlank()) {
-            return false;
+            return Verdict.NOT_TECHNICAL;
         }
         // 规则先判：命中数离阈值足够远时直接下结论，不问模型。
         int hits = countDistinctTerms(text);
         if (hits >= MIN_DISTINCT_TERMS + 2) {
-            return true;
+            if (!needTopic) {
+                return new Verdict(true, "", false, false, false);
+            }
+            return new Verdict(true, topicOf(classifier.classify(text)), false, true, false);
         }
         if (hits == 0) {
-            return false;
+            return Verdict.NOT_TECHNICAL;
         }
         // 边界地带（1~阈值+1）交给模型；模型没给出判断就按规则走。
+        boolean byRule = hits >= MIN_DISTINCT_TERMS;
         Optional<ContentClassification> judged = classifier.classify(text);
-        return judged.map(ContentClassification::technical).orElse(hits >= MIN_DISTINCT_TERMS);
+        return new Verdict(
+                judged.map(ContentClassification::technical).orElse(byRule),
+                topicOf(judged),
+                true,
+                true,
+                judged.map(item -> item.technical() != byRule).orElse(false));
+    }
+
+    private static String topicOf(Optional<ContentClassification> judged) {
+        return judged.map(ContentClassification::topic).orElse("");
     }
 
     /** 命中多少个**不同**的技术词（大小写不敏感，每个词只数一次）。 */

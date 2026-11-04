@@ -102,6 +102,10 @@ paideia:
       max-pages: 3
       # 抓来的内容进哪个分类。**不自动建分类**：不存在时任务跳过并记录。
       category-slug: essay-java
+      # 按判定主题分流（WORK-070）：topic → 分类 slug；没配到的 topic 回退上面的 category-slug。
+      # **默认空**：为空时不额外问主题，行为与改动前逐条一致。
+      # 要启用先建好对应分类——这里不建，空分类会直接出现在学习者导航里（CategoryTree 不过滤空节点）。
+      category-slugs: {}
       # 抓来直接发布还是先进草稿。默认草稿——无人值守的自动入库，先让人过一眼更稳。
       publish-directly: false
       # 成本闸：单次最多解析多少题、最多处理多少帖。

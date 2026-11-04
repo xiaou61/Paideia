@@ -61,7 +61,7 @@ class LayaContentClassifierLiveTest {
         assertThat(filter.countDistinctTerms(advice))
                 .as("规则层命中 0 种技术词，所以不会调用模型")
                 .isZero();
-        assertThat(filter.isTechnical(advice)).isFalse();
+        assertThat(filter.judge(advice, false).technical()).isFalse();
     }
 
     @Test

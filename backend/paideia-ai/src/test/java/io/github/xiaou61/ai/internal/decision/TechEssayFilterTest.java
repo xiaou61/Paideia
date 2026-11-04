@@ -10,6 +10,9 @@ import org.junit.jupiter.api.Test;
  *
  * <p>两条线都要测：规则本身判得准，以及**模型不可用时不影响结论**——后者是这条链能不能
  * 放在定时任务里的前提，模型挂了不该让整批内容丢。
+ *
+ * <p>WORK-070 起返回值带上了「是否问了模型 / 是否改判 / 主题」，这些数字要进跑批日志，
+ * 所以断言改成逐字段检查，而不是只看布尔结论。
  */
 class TechEssayFilterTest {
 
@@ -29,14 +32,21 @@ class TechEssayFilterTest {
     @Test
     void realTechnicalPostIsAcceptedByRuleAlone() {
         TechEssayFilter filter = new TechEssayFilter(UNAVAILABLE);
-        String post = "面经：1、HashMap为什么线程不安全 2、说说JVM内存模型 3、MySQL索引失效的场景 4、Spring事务传播";
-        assertThat(filter.isTechnical(post)).isTrue();
+        // 命中 6 种英文技术词，离阈值（3）足够远，规则自己就下结论
+        String post = "面经：HashMap JVM MySQL Spring Redis Kafka 都在问";
+        TechEssayFilter.Verdict verdict = filter.judge(post, false);
+
+        assertThat(verdict.technical()).isTrue();
+        // 规则自己就判定了，不该去问模型，也就没有 topic
+        assertThat(verdict.askedModel()).isFalse();
+        assertThat(verdict.borderline()).isFalse();
+        assertThat(verdict.topic()).isEmpty();
     }
 
     @Test
     void pureInformationPostIsRejectedByRuleAlone() {
         TechEssayFilter filter = new TechEssayFilter(UNAVAILABLE);
-        assertThat(filter.isTechnical("今日战绩：1面 1offer，终于找到实习了！感谢牛客")).isFalse();
+        assertThat(filter.judge("今日战绩：1面 1offer，终于找到实习了！感谢牛客", false).technical()).isFalse();
     }
 
     @Test
@@ -45,22 +55,44 @@ class TechEssayFilterTest {
         ContentClassifier counting = text -> {
             throw new AssertionError("命中 0 个技术词时不该调用模型");
         };
-        assertThat(new TechEssayFilter(counting).isTechnical("今天天气不错，去公园走走")).isFalse();
+        assertThat(new TechEssayFilter(counting).judge("今天天气不错，去公园走走", false).technical()).isFalse();
     }
 
     @Test
     void borderlineCaseDefersToModel() {
         // 只命中 1 种（java），落在边界地带：规则判不出，应当问模型。
         String borderline = "我是java开发，聊聊求职";
-        assertThat(new TechEssayFilter(ALWAYS_TECH).isTechnical(borderline)).isTrue();
-        // 同一个输入，模型不可用时退回规则：1 种 < 3，判成非技术。
-        assertThat(new TechEssayFilter(UNAVAILABLE).isTechnical(borderline)).isFalse();
+        TechEssayFilter.Verdict rescued = new TechEssayFilter(ALWAYS_TECH).judge(borderline, false);
+        assertThat(rescued.technical()).isTrue();
+        assertThat(rescued.borderline()).isTrue();
+        assertThat(rescued.askedModel()).isTrue();
+        // 规则兜底会判 false（1 种 < 3），模型判 true —— 这就是一次改判
+        assertThat(rescued.changedByModel()).isTrue();
+
+        // 同一个输入，模型不可用时退回规则：1 种 < 3，判成非技术。没给结论不算改判。
+        TechEssayFilter.Verdict fallback = new TechEssayFilter(UNAVAILABLE).judge(borderline, false);
+        assertThat(fallback.technical()).isFalse();
+        assertThat(fallback.askedModel()).isTrue();
+        assertThat(fallback.changedByModel()).isFalse();
+    }
+
+    @Test
+    void needTopicAsksModelEvenForClearlyTechnicalPost() {
+        TechEssayFilter filter = new TechEssayFilter(ALWAYS_TECH);
+        String clear = "面经：HashMap JVM MySQL Spring Redis Kafka 都在问";
+
+        // 不分流时不问；要分流时问一次，只为了拿 topic，结论仍按规则。
+        TechEssayFilter.Verdict routed = filter.judge(clear, true);
+        assertThat(routed.technical()).isTrue();
+        assertThat(routed.askedModel()).isTrue();
+        assertThat(routed.changedByModel()).isFalse();
+        assertThat(routed.topic()).isEqualTo("java");
     }
 
     @Test
     void blankTextIsNeverTechnical() {
         TechEssayFilter filter = new TechEssayFilter(ALWAYS_TECH);
-        assertThat(filter.isTechnical(null)).isFalse();
-        assertThat(filter.isTechnical("   ")).isFalse();
+        assertThat(filter.judge(null, false).technical()).isFalse();
+        assertThat(filter.judge("   ", false).technical()).isFalse();
     }
 }

@@ -59,12 +59,19 @@ public class EssayCollectionService {
         this.credentials = credentials;
     }
 
+    /**
+     * 过滤阶段的可观测数字（WORK-070）。模型只能把 false 翻成 true——它只在"技术且概率够"时
+     * 返回结论，所以 {@code changedByModel} 反映的是"规则判否、模型救回来"的帖子数。
+     */
+    public record FilterStats(int borderline, int askedModel, int changedByModel, int routed) {
+    }
+
     /** 一次运行的统计，供日志与测试断言。 */
-    public record RunResult(int fetched, int skippedNonTechnical, int extracted, int created,
-                            int duplicated, int failed, String skipReason) {
+    public record RunResult(int fetched, int skippedNonTechnical, FilterStats filter, int extracted,
+                            int created, int duplicated, int failed, String skipReason) {
 
         static RunResult skipped(String reason) {
-            return new RunResult(0, 0, 0, 0, 0, 0, reason);
+            return new RunResult(0, 0, new FilterStats(0, 0, 0, 0), 0, 0, 0, 0, reason);
         }
     }
 
@@ -78,8 +85,8 @@ public class EssayCollectionService {
         if (!properties.isEnabled()) {
             return RunResult.skipped("未启用");
         }
-        Long categoryId = resolveCategoryId();
-        if (categoryId == null) {
+        Long defaultCategoryId = categoryIdOf(properties.getCategorySlug());
+        if (defaultCategoryId == null) {
             return RunResult.skipped("分类不存在：" + properties.getCategorySlug());
         }
         Optional<ModelAccess> access = credentials.access(0);
@@ -96,15 +103,21 @@ public class EssayCollectionService {
             return RunResult.skipped("抓取失败");
         }
         if (posts.isEmpty()) {
-            return new RunResult(0, 0, 0, 0, 0, 0, "本次没有新帖");
+            return new RunResult(0, 0, new FilterStats(0, 0, 0, 0), 0, 0, 0, 0, "本次没有新帖");
         }
 
+        // 配了分流才问主题：默认空 map 时行为与改动前逐条一致。
+        boolean needTopic = !properties.getCategorySlugs().isEmpty();
         int skipped = 0;
         int extracted = 0;
         int created = 0;
         int duplicated = 0;
         int failed = 0;
         int handled = 0;
+        int borderline = 0;
+        int askedModel = 0;
+        int changedByModel = 0;
+        int routed = 0;
 
         for (FetchedPost post : posts) {
             if (handled >= properties.getMaxPostsPerRun() || created >= properties.getMaxQuestionsPerRun()) {
@@ -112,9 +125,23 @@ public class EssayCollectionService {
             }
             handled++;
 
-            if (!filter.isTechnical(post.body())) {
+            TechEssayFilter.Verdict verdict = filter.judge(post.body(), needTopic);
+            if (verdict.borderline()) {
+                borderline++;
+            }
+            if (verdict.askedModel()) {
+                askedModel++;
+            }
+            if (verdict.changedByModel()) {
+                changedByModel++;
+            }
+            if (!verdict.technical()) {
                 skipped++;
                 continue;
+            }
+            Long categoryId = categoryIdFor(verdict.topic(), defaultCategoryId);
+            if (!categoryId.equals(defaultCategoryId)) {
+                routed++;
             }
             try {
                 EssayExtractionPrompt.Extraction result =
@@ -145,9 +172,13 @@ public class EssayCollectionService {
             }
         }
 
-        log.info("八股文抓取完成：抓 {} 篇，跳过非技术 {} 篇，抽出 {} 题，新建 {} 条，重复 {} 条，失败 {} 篇",
-                posts.size(), skipped, extracted, created, duplicated, failed);
-        return new RunResult(posts.size(), skipped, extracted, created, duplicated, failed, null);
+        log.info("八股文抓取完成：抓 {} 篇，跳过非技术 {} 篇（边界 {} / 问模型 {} / 改判 {} / 分流 {}），"
+                        + "抽出 {} 题，新建 {} 条，重复 {} 条，失败 {} 篇",
+                posts.size(), skipped, borderline, askedModel, changedByModel, routed,
+                extracted, created, duplicated, failed);
+        return new RunResult(posts.size(), skipped,
+                new FilterStats(borderline, askedModel, changedByModel, routed),
+                extracted, created, duplicated, failed, null);
     }
 
     /**
@@ -202,10 +233,23 @@ public class EssayCollectionService {
         }
     }
 
-    /** 按 slug 找分类 id；找不到返回 null（**不自动建分类**——建分类是人的决定）。 */
-    private Long resolveCategoryId() {
+    /**
+     * 按判定主题选分类（WORK-070）：没配这个 topic、或目标分类不存在，都回退默认分类。
+     * **不自动建分类**——建分类是人的决定。
+     */
+    Long categoryIdFor(String topic, long fallbackId) {
+        String slug = topic == null || topic.isBlank() ? null : properties.getCategorySlugs().get(topic);
+        if (slug == null) {
+            return fallbackId;
+        }
+        Long id = categoryIdOf(slug);
+        return id == null ? fallbackId : id;
+    }
+
+    /** 按 slug 找分类 id；找不到返回 null。 */
+    private Long categoryIdOf(String slug) {
         return knowledge.listCategories().stream()
-                .filter(node -> properties.getCategorySlug().equals(node.slug()))
+                .filter(node -> slug.equals(node.slug()))
                 .map(KnowledgeApi.CategoryNode::id)
                 .findFirst()
                 .orElse(null);
