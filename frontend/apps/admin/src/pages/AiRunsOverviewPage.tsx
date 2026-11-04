@@ -70,6 +70,7 @@ interface Overview {
   sampling: number
   byKind: CountBy[]
   byModel: CountBy[]
+  byPromptVersion: CountBy[]
   errorTypes: CountBy[]
   tools: CountBy[]
 }
@@ -359,6 +360,10 @@ export function AiRunsOverviewPage() {
                 <RankCard title="按模型" rows={data.byModel} label={(name) => name} testId="runs-by-model" />
                 <RankCard title="工具调用" rows={data.tools} label={(name) => name}
                   testId="runs-tools" emptyHint="这段时间没有工具调用" />
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <RankCard title="按提示词版本" rows={data.byPromptVersion} label={(name) => name}
+                  testId="runs-by-prompt-version" emptyHint="这段时间没有带版本的调用" />
               </div>
 
               <Card>

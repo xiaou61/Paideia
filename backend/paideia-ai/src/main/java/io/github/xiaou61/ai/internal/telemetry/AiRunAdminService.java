@@ -80,6 +80,7 @@ public class AiRunAdminService {
                     double sampling,
                     List<TelemetrySummaryMapper.CountBy> byKind,
                     List<TelemetrySummaryMapper.CountBy> byModel,
+                    List<TelemetrySummaryMapper.CountBy> byPromptVersion,
                     List<TelemetrySummaryMapper.CountBy> errorTypes,
                     List<TelemetrySummaryMapper.CountBy> tools) {
     }
@@ -228,6 +229,7 @@ public class AiRunAdminService {
                 // 顶部卡片是筛选后的、下面四个排行还是全平台的，同一屏两个口径。
                 summary.countByKind(window.from(), window.to(), k, s, m, userId),
                 summary.countByModel(window.from(), window.to(), k, s, m, userId),
+                summary.countByPromptVersion(window.from(), window.to(), k, s, m, userId),
                 summary.countByErrorType(window.from(), window.to(), k, s, m, userId),
                 summary.countByTool(window.from(), window.to()));
     }
