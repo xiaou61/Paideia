@@ -6,7 +6,7 @@ status: passed
 evidence: required
 created: 2026-11-04
 updated: 2026-11-04
-verified_commit: (提交后填)
+verified_commit: 29adbeea
 ---
 
 # 验证报告
