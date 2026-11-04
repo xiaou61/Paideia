@@ -63,19 +63,19 @@ export const DEFAULT_ROLE: RoleKey = 'backend'
 const TIERS: Record<RoleKey, { core: readonly string[]; advanced: readonly string[] }> = {
   backend: {
     core: ['java-from-zero', 'spring-from-zero', 'redis', 'mysql-from-zero', 'network-basics'],
-    advanced: ['spring', 'concurrency', 'jvm', 'system-design', 'os', 'linux-from-zero', 'docker'],
+    advanced: ['spring', 'concurrency', 'jvm', 'system-design', 'os', 'linux-from-zero', 'docker', 'web-security', 'testing-from-zero'],
   },
   'ai-algo': {
     core: ['algorithms', 'python-from-zero', 'ai'],
     advanced: ['patterns', 'agents', 'system-design'],
   },
   data: {
-    core: ['sql-practice', 'mysql-from-zero'],
+    core: ['sql-practice', 'mysql-from-zero', 'data-analysis'],
     advanced: ['redis', 'system-design', 'algorithms'],
   },
   // 前端岗位的专属线（WORK-068）：先走完 12 关再碰其他。
   // 进阶放三条跨岗位但前端天天用的：HTTP/网络、Git、系统设计（前端也要讲缓存与分层）。
-  frontend: { core: ['frontend-from-zero'], advanced: ['network-basics', 'git', 'system-design'] },
+  frontend: { core: ['frontend-from-zero'], advanced: ['network-basics', 'git', 'system-design', 'web-security'] },
 }
 
 export function roleMeta(role: RoleKey): RoleMeta {
