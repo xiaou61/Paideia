@@ -17,7 +17,8 @@ verified_commit: 29adbeea
 | 五个端点可达且校验可读 | `-Dtest=ApiWalkthroughTest`（全接口自查） | passed | 1/1（65 秒）：五个端点各以非法入参打到 400；`/sql-datasets/draft` 缺 topic 也补上了覆盖 |
 | 复习交卷结果新增 answer | `-Dtest=LearningReviewIntegrationTest` | passed | 5/5 |
 | 前端类型检查 | `pnpm typecheck` | passed | 0 错（五处入口 + 客户端方法） |
-| 四页 e2e（打桩 AI） | `playwright test review/progress/notes/knowledge` | passed | 见下：错题讲解、下一步三条、笔记要点、条目出题 |
+| 四页 e2e（打桩 AI） | `playwright test review/progress/notes/knowledge` | passed | 25 通过 / 1 失败（我的笔记用例没先导航到列表页）；修复后 notes 7/7；review 5/5、progress 5/5、knowledge 全绿 |
+| 线上端到端（ego，真实调用） | 学习记录「AI 下一步」、条目「AI 出一道题」 | passed | 下一步返回三条且带数字（"垃圾回收 0.28"等）；出题返回一条本条目相关的 Spring 题与解析；截图 `F:/caches/tmp/ego-ai5-1.png`、`-2.png` |
 
 ## 未覆盖与已知限制
 

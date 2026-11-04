@@ -9848,5 +9848,6 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 前端五处：复习错题「AI 讲讲这道错题」、学习记录「AI 下一步」卡片、图谱概念「AI 用大白话讲讲」、笔记「AI 提炼要点」、条目「AI 出一道题」弹窗。
 - 决策：不建表、不自动调用、不缓存——结果只属于这一次点击；五处共用一套计费与校验。
 - 验证：`QuickInsightCallerTest` 3/3、walkthrough 全接口自查 1/1（五端点 400 + draft 覆盖）、`LearningReviewIntegrationTest` 5/5、前端 typecheck 0 错、四页 e2e 打桩全绿。
-- 本地提交：见下
-- 远端推送：未执行
+- 本地提交：`29adbeea`（+ 报告补 commit）
+- 远端推送：已推送；部署 188.1 秒（jar + web），health 200
+- 线上 ego 复验（真实模型）：学习记录「AI 下一步」返回三条且带具体数字；条目「AI 出一道题」返回一条本条目相关的 Spring 题与解析（答对后显示解释）；截图 `F:/caches/tmp/ego-ai5-1.png`、`-2.png`
