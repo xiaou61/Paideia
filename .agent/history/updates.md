@@ -9861,7 +9861,7 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 变更（映射）：`role-map.ts` 前端岗位 `available: true`，核心 `frontend-from-zero`，进阶 network-basics/git/system-design。
 - 验证：前端 9 包 typecheck 0 错；learn e2e 9 通过/1 跳过（推荐卡无 pick，条件跳过）；knowledge e2e 10/10；盘点脚本退出码 0、纯阅读 0。
 - 未完成：data-analysis / web-security / testing-from-zero 三条理论线与三条实战线；内容导入与前端部署。
-- 本地提交：`3da1459a`
+- 本地提交：`1b8bd258`
 - 远端推送：未推送（需授权）
 - 部署：`scripts/release.ps1` 104.0 秒（前端 162 个文件变化，后端 0），health 200
 - 内容导入线上：`frontend-from-zero` created 13；open-source 更新 4、books-ddia 3、clean-code 2、man-month 2、thinking 2
