@@ -54,7 +54,8 @@ public class KnowledgeRagService {
     /** 启动后主动跑一次；不能只依赖定时任务第一次延迟。 */
     @EventListener(ApplicationReadyEvent.class)
     public void indexOnReady() {
-        reindexChanged();
+        // 索引 460 篇条目可能要几分钟，不能阻塞启动健康检查；放到独立线程跑。
+        java.util.concurrent.CompletableFuture.runAsync(this::reindexChanged);
     }
 
     /** 定时增量索引：只重建 hash 变化的条目，失败不影响旧索引。 */
