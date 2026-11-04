@@ -2,11 +2,14 @@
 artifact: requirements
 work_id: WORK-072
 work: 技术基础能力：RAG + Markdown 编辑器 + Redis 缓存
-status: draft
+status: approved
 created: 2026-11-04
 updated: 2026-11-04
 mode: strict
 mode_reason: 新增本地 embedding 服务、向量索引表、Markdown 编辑器增强与 Redis 缓存，涉及数据、检索行为、编辑体验和性能变化。
+approved_by: xiaou61
+approved_at: 2026-11-04 16:01:18 +0800
+approver_role: owner
 ---
 
 # 需求

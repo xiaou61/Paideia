@@ -90,6 +90,15 @@ public interface EntryMapper {
             """)
     Optional<Entry> findPublishedById(@Param("id") Long id);
 
+    /** RAG 索引使用的全量已发布正文（WORK-072）。 */
+    @Select("""
+            SELECT id, title, body, updated_at
+            FROM knowledge_entries
+            WHERE status = 'published'
+            ORDER BY id
+            """)
+    List<Entry> findAllPublishedWithBody();
+
     /**
      * 同分类内的上一篇／下一篇，按 (published_at, id) 排序。
      *

@@ -144,6 +144,23 @@ paideia:
       stuck-after-hours: 6
       # 单次批处理条数上限。
       batch-size: 50
+    embedding:
+      # WORK-072：本地 Ollama；只绑定回环地址。未部署时可把 enabled 置 false。
+      enabled: ${PAIDEIA_EMBEDDING_ENABLED:true}
+      base-url: ${PAIDEIA_EMBEDDING_BASE_URL:http://127.0.0.1:11434}
+      model: ${PAIDEIA_EMBEDDING_MODEL:bge-m3}
+      timeout-seconds: 60
+    rag:
+      enabled: ${PAIDEIA_RAG_ENABLED:true}
+      top-k: 6
+      chunk-chars: 500
+      chunk-overlap: 80
+      initial-delay-ms: 30000
+      refresh-ms: 600000
+  knowledge:
+    cache:
+      # WORK-072：分类树/条目摘要的 Redis 缓存；未部署 Redis 时置 false 或让其自动回退。
+      enabled: ${PAIDEIA_KNOWLEDGE_CACHE_ENABLED:true}
   web:
     cors:
       # 默认不放行任何跨域来源。需要时在此加入前端与桌面壳的来源；

@@ -3,6 +3,7 @@ package io.github.xiaou61.knowledge.internal;
 import io.github.xiaou61.knowledge.EntryContent;
 import io.github.xiaou61.knowledge.KnowledgeApi;
 import io.github.xiaou61.knowledge.internal.assessment.SelfAssessmentService;
+import io.github.xiaou61.knowledge.internal.cache.KnowledgeRedisCache;
 import io.github.xiaou61.knowledge.internal.category.Category;
 import io.github.xiaou61.knowledge.internal.category.CategoryService;
 import io.github.xiaou61.knowledge.internal.concept.ConceptLinkMapper;
@@ -14,6 +15,7 @@ import io.github.xiaou61.knowledge.internal.entry.EntryService;
 import io.github.xiaou61.knowledge.internal.learning.LearningProgressService;
 import io.github.xiaou61.platform.PageQuery;
 import io.github.xiaou61.platform.PageResult;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -23,6 +25,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.type.TypeReference;
 
 /**
  * 对外契约的实现。
@@ -46,6 +49,7 @@ class KnowledgeApiImplementation implements KnowledgeApi {
     private final CategoryService categoryService;
     private final SelfAssessmentService selfAssessments;
     private final LearningProgressService learningProgress;
+    private final KnowledgeRedisCache cache;
 
     KnowledgeApiImplementation(EntryMapper entryMapper,
                                ConceptMapper conceptMapper,
@@ -53,7 +57,8 @@ class KnowledgeApiImplementation implements KnowledgeApi {
                                EntryService entryService,
                                CategoryService categoryService,
                                SelfAssessmentService selfAssessments,
-                               LearningProgressService learningProgress) {
+                               LearningProgressService learningProgress,
+                               KnowledgeRedisCache cache) {
         this.entryMapper = entryMapper;
         this.conceptMapper = conceptMapper;
         this.conceptLinkMapper = conceptLinkMapper;
@@ -61,6 +66,7 @@ class KnowledgeApiImplementation implements KnowledgeApi {
         this.categoryService = categoryService;
         this.selfAssessments = selfAssessments;
         this.learningProgress = learningProgress;
+        this.cache = cache;
     }
 
     @Override
@@ -77,19 +83,44 @@ class KnowledgeApiImplementation implements KnowledgeApi {
 
     @Override
     public List<EntryBrief> searchPublished(String keyword, int limit) {
+        int sane = saneLimit(limit);
+        String key = "knowledge:entry-briefs:v1:" + Integer.toHexString((keyword + ":" + sane).hashCode());
+        List<EntryBrief> cached = cache.get(key, new TypeReference<>() {
+        });
+        if (cached != null) {
+            return cached;
+        }
         // 走既有的分页查询：它内部已经按 SearchQuery 判定全文还是 LIKE，且只返回已发布
         PageResult<EntryService.EntrySummary> page =
-                entryService.listPublished(null, keyword, PageQuery.of(1, saneLimit(limit), null));
-        return page.items().stream()
+                entryService.listPublished(null, keyword, PageQuery.of(1, sane, null));
+        List<EntryBrief> result = page.items().stream()
                 .map(item -> new EntryBrief(item.id(), item.title()))
+                .toList();
+        cache.put(key, result, Duration.ofMinutes(5));
+        return result;
+    }
+
+    @Override
+    public List<EntryContent> publishedContents() {
+        return entryMapper.findAllPublishedWithBody().stream()
+                .map(it -> new EntryContent(it.getId(), it.getTitle(),
+                        it.getBody() == null ? "" : it.getBody(), it.getUpdatedAt()))
                 .toList();
     }
 
     @Override
     public List<CategoryNode> listCategories() {
-        return categoryService.all().stream()
+        String key = "knowledge:categories:v1";
+        List<CategoryNode> cached = cache.get(key, new TypeReference<>() {
+        });
+        if (cached != null) {
+            return cached;
+        }
+        List<CategoryNode> result = categoryService.all().stream()
                 .map(KnowledgeApiImplementation::toNode)
                 .toList();
+        cache.put(key, result, Duration.ofMinutes(10));
+        return result;
     }
 
     @Override
@@ -110,6 +141,7 @@ class KnowledgeApiImplementation implements KnowledgeApi {
         entry.setFingerprint(input.fingerprint());
         entry.setPublishedAt("published".equals(input.status()) ? Instant.now() : null);
         entryMapper.insert(entry);
+        cache.evictEntryBriefs();
         return new CreateOutcome(entry.getId(), true);
     }
 

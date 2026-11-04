@@ -35,6 +35,16 @@ public interface KnowledgeApi {
      */
     List<EntryBrief> searchPublished(String keyword, int limit);
 
+    /**
+     * 全部已发布条目的标题与正文（WORK-072）。
+     *
+     * <p>只服务本地 RAG 索引：调用方必须只索引 public 内容，不能拿它遍历草稿。
+     * 默认空实现让测试桩与其它实现不必关心这个可选能力。
+     */
+    default List<EntryContent> publishedContents() {
+        return List.of();
+    }
+
     /** 分类的全量扁平列表（带 parentId，层级由调用方自己拼）。只读。 */
     List<CategoryNode> listCategories();
 

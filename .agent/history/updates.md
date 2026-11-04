@@ -10040,3 +10040,21 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证：`project_status.py --brief` 显示 WORK-072 requirements/draft，next_work_id=WORK-073；尚未实现或跑测试。
 - 本地提交：待提交
 - 远端推送：未执行
+
+## 2026-11-04 16:01:19 +0800 · WORK-072 · 签署 .agent/changes/WORK-072-技术基础能力/requirements.md、.agent/changes/WORK-072-技术基础能力/proposal.md、.agent/changes/WORK-072-技术基础能力/design.md、.agent/changes/WORK-072-技术基础能力/tasks.md
+
+- 类型：decision
+- 变更：.agent/changes/WORK-072-技术基础能力/requirements.md、.agent/changes/WORK-072-技术基础能力/proposal.md、.agent/changes/WORK-072-技术基础能力/design.md、.agent/changes/WORK-072-技术基础能力/tasks.md 由 xiaou61 签署为 approved
+- 决策：审批人 xiaou61（owner）；签署字段由命令入口盖章，不由模型写入
+- 依据：.agent/changes/WORK-072-技术基础能力/requirements.md、.agent/changes/WORK-072-技术基础能力/proposal.md、.agent/changes/WORK-072-技术基础能力/design.md、.agent/changes/WORK-072-技术基础能力/tasks.md
+- 验证：回读 frontmatter：approved_by=xiaou61，4 个工件同批签署
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
+## 2026-11-04 16:18 +0800 · WORK-072 实现
+
+- 类型：change
+- 变更：新增本地 embedding/RAG（Ollama 客户端、chunks 表、切块索引、Top-K 注入与引用降级）；MarkdownField 工具栏与粘贴/拖拽上传；Redis 分类树/条目摘要缓存及写后失效。
+- 验证：`paideia-ai` 410 tests（0 failed / 15 skipped）；`KnowledgeReadIntegrationTest + AssistantConversationIntegrationTest` 28/0/0；迁移守卫 9/0/0；`pnpm -r typecheck` 17 包通过；MarkdownField 2/2；admin build 通过。
+- 未完成：本地 Ollama 容器/模型与真实召回质量尚未在服务器部署验证；报告按实际证据记录。
+- 本地提交：待提交
+- 远端推送：未执行

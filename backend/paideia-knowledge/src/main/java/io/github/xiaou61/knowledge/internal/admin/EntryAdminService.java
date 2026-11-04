@@ -1,5 +1,6 @@
 package io.github.xiaou61.knowledge.internal.admin;
 
+import io.github.xiaou61.knowledge.internal.cache.KnowledgeRedisCache;
 import io.github.xiaou61.knowledge.internal.category.Category;
 import io.github.xiaou61.knowledge.internal.category.CategoryMapper;
 import io.github.xiaou61.knowledge.internal.entry.Entry;
@@ -36,11 +37,14 @@ public class EntryAdminService {
     private final EntryMapper entryMapper;
     private final CategoryMapper categoryMapper;
     private final RelationMapper relationMapper;
+    private final KnowledgeRedisCache cache;
 
-    EntryAdminService(EntryMapper entryMapper, CategoryMapper categoryMapper, RelationMapper relationMapper) {
+    EntryAdminService(EntryMapper entryMapper, CategoryMapper categoryMapper, RelationMapper relationMapper,
+                      KnowledgeRedisCache cache) {
         this.entryMapper = entryMapper;
         this.categoryMapper = categoryMapper;
         this.relationMapper = relationMapper;
+        this.cache = cache;
     }
 
     public record AdminEntrySummary(
@@ -79,6 +83,7 @@ public class EntryAdminService {
         entry.setStatus(normalized);
         entry.setPublishedAt(STATUS_PUBLISHED.equals(normalized) ? Instant.now() : null);
         entryMapper.insert(entry);
+        cache.evictEntryBriefs();
         return entry.getId();
     }
 
@@ -108,6 +113,7 @@ public class EntryAdminService {
         }
 
         entryMapper.update(existing);
+        cache.evictEntryBriefs();
     }
 
     /** 删条目：关系由外键 {@code ON DELETE CASCADE} 一起清掉（悬空的关系没有意义）。 */
@@ -116,6 +122,7 @@ public class EntryAdminService {
         if (entryMapper.deleteById(id) == 0) {
             throw notFound("条目不存在");
         }
+        cache.evictEntryBriefs();
     }
 
     public PageResult<AdminEntrySummary> page(String status, PageQuery page) {

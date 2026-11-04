@@ -233,7 +233,8 @@ class AssistantConversationController {
             assistant.stream(
                     new AssistantConversation.Request(userId, turn.history(), turn.userMessage(),
                             turn.entryTitle(), turn.entryBody(), turn.learningSummary(),
-                            turn.memorySnippets(), turn.harness(), turn.pageContext()),
+                            turn.memorySnippets(), turn.harness(), turn.pageContext(),
+                            turn.knowledgeContext()),
                     turn.access(),
                     run,
                     new AssistantConversation.Listener() {

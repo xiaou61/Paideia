@@ -568,6 +568,12 @@ function EntryForm({
     onError,
   })
 
+  // MarkdownField 的粘贴/拖拽上传由组件自己把引用插到光标处；这里只负责上传，不再二次插到末尾。
+  const uploadInline = useMutation({
+    mutationFn: (file: File) => admin.uploadFile(file),
+    onError,
+  })
+
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
     save.mutate()
@@ -650,6 +656,10 @@ function EntryForm({
                 mediaBaseUrl={API_BASE_URL}
                 rows={14}
                 placeholder="用 markdown 写正文…"
+                onUpload={async (file) => {
+                  const uploaded = await uploadInline.mutateAsync(file)
+                  return { url: uploaded.url, name: uploaded.originalName }
+                }}
               />
             </div>
 

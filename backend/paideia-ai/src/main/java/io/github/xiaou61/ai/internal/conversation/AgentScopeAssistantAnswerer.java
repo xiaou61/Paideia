@@ -45,13 +45,16 @@ class AgentScopeAssistantAnswerer implements AssistantAnswerer {
     private final ConversationProperties properties;
     private final GuardedHttpTransport transport;
     private final AgentToolBridge tools;
+    private final io.github.xiaou61.ai.internal.rag.KnowledgeRagService rag;
 
     AgentScopeAssistantAnswerer(ConversationProperties properties,
                                 GuardedHttpTransport transport,
-                                AgentToolBridge tools) {
+                                AgentToolBridge tools,
+                                io.github.xiaou61.ai.internal.rag.KnowledgeRagService rag) {
         this.properties = properties;
         this.transport = transport;
         this.tools = tools;
+        this.rag = rag;
     }
 
     @Override
@@ -74,9 +77,13 @@ class AgentScopeAssistantAnswerer implements AssistantAnswerer {
                 .build();
         Model model = buildModel(access, options);
 
+        String knowledgeContext = rag.retrieveContext(trimmed);
+        String system = HarnessPrompts.system(Harness.ASSISTANT);
+        if (!knowledgeContext.isBlank()) {
+            system += "\n\n" + ConversationPrompt.knowledge(knowledgeContext);
+        }
         List<Msg> conversation = new ArrayList<>();
-        conversation.add(Msg.builder().role(MsgRole.SYSTEM)
-                .textContent(HarnessPrompts.system(Harness.ASSISTANT)).build());
+        conversation.add(Msg.builder().role(MsgRole.SYSTEM).textContent(system).build());
         conversation.add(Msg.builder().role(MsgRole.USER).textContent(trimmed).build());
 
         List<ToolSchema> core = tools.core(Harness.ASSISTANT);

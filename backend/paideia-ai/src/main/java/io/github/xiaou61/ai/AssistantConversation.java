@@ -56,7 +56,9 @@ public interface AssistantConversation {
                     * <p>**只进提示词，不落库**——会话历史里不该出现"某次页面上写了什么"。
                     * `null` 表示当前页面没有场景（绝大多数页面）。
                     */
-                   String pageContext) {
+                   String pageContext,
+                   /** RAG 检索上下文（WORK-072）；只进提示词，不落库。 */
+                   String knowledgeContext) {
 
         public Request {
             history = history == null ? List.of() : List.copyOf(history);
@@ -64,12 +66,12 @@ public interface AssistantConversation {
             harness = harness == null ? Harness.ASSISTANT : harness;
         }
 
-        /** 不带页面场景的形态：既有调用点与测试用它。 */
+        /** 不带页面场景/RAG 的形态：既有调用点与测试用它。 */
         public Request(long userId, List<ConversationTurn> history, String userMessage,
                        String entryTitle, String entryBody, String learningSummary,
                        List<String> memorySnippets, Harness harness) {
             this(userId, history, userMessage, entryTitle, entryBody, learningSummary,
-                    memorySnippets, harness, null);
+                    memorySnippets, harness, null, null);
         }
 
         /**
@@ -86,6 +88,11 @@ public interface AssistantConversation {
         /** 有没有页面场景。实现据此决定是否把它放进提示词。 */
         public boolean hasPageContext() {
             return pageContext != null && !pageContext.isBlank();
+        }
+
+        /** 有没有 RAG 检索上下文。 */
+        public boolean hasKnowledgeContext() {
+            return knowledgeContext != null && !knowledgeContext.isBlank();
         }
 
         /** 有没有条目上下文。实现据此决定是否把正文放进提示词。 */

@@ -1,5 +1,6 @@
 package io.github.xiaou61.knowledge.internal.admin;
 
+import io.github.xiaou61.knowledge.internal.cache.KnowledgeRedisCache;
 import io.github.xiaou61.knowledge.internal.category.Category;
 import io.github.xiaou61.knowledge.internal.category.CategoryMapper;
 import io.github.xiaou61.knowledge.internal.category.CategoryTree;
@@ -31,10 +32,12 @@ public class CategoryAdminService {
 
     private final CategoryMapper categoryMapper;
     private final EntryMapper entryMapper;
+    private final KnowledgeRedisCache cache;
 
-    CategoryAdminService(CategoryMapper categoryMapper, EntryMapper entryMapper) {
+    CategoryAdminService(CategoryMapper categoryMapper, EntryMapper entryMapper, KnowledgeRedisCache cache) {
         this.categoryMapper = categoryMapper;
         this.entryMapper = entryMapper;
+        this.cache = cache;
     }
 
     @Transactional
@@ -59,6 +62,7 @@ public class CategoryAdminService {
             // 并发下两个请求同时通过上面的检查；唯一索引是最后一道闸
             throw conflict("分类标识已被占用");
         }
+        cache.evictCategories();
         return category;
     }
 
@@ -85,6 +89,7 @@ public class CategoryAdminService {
         } catch (DuplicateKeyException exception) {
             throw conflict("分类标识已被占用");
         }
+        cache.evictCategories();
     }
 
     @Transactional
@@ -99,6 +104,7 @@ public class CategoryAdminService {
             throw conflict("该分类下还有条目，请先把它们移到别的分类");
         }
         categoryMapper.deleteById(id);
+        cache.evictCategories();
     }
 
     /** 父必须真实存在；{@code selfId} 非空时还要保证新父不在自己的子树里（否则成环）。 */

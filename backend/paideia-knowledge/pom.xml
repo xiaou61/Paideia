@@ -51,6 +51,11 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-jackson</artifactId>
     </dependency>
+    <!-- WORK-072：分类树与条目摘要的 Redis 只读缓存。 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-redis</artifactId>
+    </dependency>
 
     <!--
       对象存储（WORK-007）。**只本模块依赖**：附件读写是这一个模块的事，别的模块通过

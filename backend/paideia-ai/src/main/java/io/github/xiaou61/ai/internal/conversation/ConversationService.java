@@ -45,6 +45,7 @@ public class ConversationService {
     private final CredentialService credentials;
     private final KnowledgeApi knowledge;
     private final MemoryStore memories;
+    private final io.github.xiaou61.ai.internal.rag.KnowledgeRagService rag;
     /** 解析落库的用量 JSON 用。自带一份即可，不必依赖容器里的 ObjectMapper。 */
     private static final ObjectMapper USAGE_JSON = new ObjectMapper();
 
@@ -59,6 +60,7 @@ public class ConversationService {
                         CredentialService credentials,
                         KnowledgeApi knowledge,
                         MemoryStore memories,
+                        io.github.xiaou61.ai.internal.rag.KnowledgeRagService rag,
                         UserRateLimiter limiter,
                         CreditService credits,
                         AiSettingsStore settingsStore) {
@@ -68,6 +70,7 @@ public class ConversationService {
         this.credentials = credentials;
         this.knowledge = knowledge;
         this.memories = memories;
+        this.rag = rag;
         this.limiter = limiter;
         this.credits = credits;
         this.settingsStore = settingsStore;
@@ -194,15 +197,17 @@ public class ConversationService {
                                   long reservedCredits,
                                   Harness harness,
                                   /** 页面场景（WORK-035 T-15）。只进提示词，不落库。 */
-                                  String pageContext) {
+                                  String pageContext,
+                                  /** RAG 检索上下文（WORK-072）。只进提示词，不落库。 */
+                                  String knowledgeContext) {
 
-        /** 不带页面场景的形态：既有调用点与测试用它。 */
+        /** 不带页面场景/RAG 的形态：既有调用点与测试用它。 */
         public TurnPreparation(long conversationId, List<ConversationTurn> history, String userMessage,
                                String entryTitle, String entryBody, String learningSummary,
                                List<String> memorySnippets, ModelAccess access, long reservedCredits,
                                Harness harness) {
             this(conversationId, history, userMessage, entryTitle, entryBody, learningSummary,
-                    memorySnippets, access, reservedCredits, harness, null);
+                    memorySnippets, access, reservedCredits, harness, null, null);
         }
     }
 
@@ -290,6 +295,8 @@ public class ConversationService {
         // 同样排在写库之前：它只读，且能抛（DB 异常），不能留到预留之后
         EntryContext entry = entryContext(conversation.getEntryId());
         List<String> snippets = memory(settings, userId, trimmed);
+        // RAG 只读且失败自降级；放在写库与预扣之前，与历史/记忆/学情同一顺序
+        String knowledgeContext = rag.retrieveContext(trimmed);
         Harness harness = Harness.ofOrDefault(conversation.getHarness());
         // 学情在写库与预扣**之前**取：它只读，且能抛（DB 异常），不能留到 reserve 之后。
         // 只有导师行为需要它——其它行为的提示词里没有对应的段落，注入反而浪费上下文。
@@ -312,7 +319,7 @@ public class ConversationService {
                         ? pageContext.substring(0, MAX_PAGE_CONTEXT_CHARS)
                         : pageContext;
         return new TurnPreparation(conversationId, history, trimmed, entry.title(), entry.body(),
-                learning, snippets, access.get(), reserved, harness, context);
+                learning, snippets, access.get(), reserved, harness, context, knowledgeContext);
     }
 
     /**

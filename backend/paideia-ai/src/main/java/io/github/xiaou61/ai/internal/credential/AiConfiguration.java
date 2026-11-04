@@ -14,6 +14,8 @@ import org.springframework.context.annotation.Configuration;
  * 在这里再声明一次只会得到两个同类型的 Bean，让注入变成歧义。
  */
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties({AiProperties.class, ConversationProperties.class, MemoryProperties.class})
+@EnableConfigurationProperties({AiProperties.class, ConversationProperties.class, MemoryProperties.class,
+        io.github.xiaou61.ai.internal.rag.EmbeddingProperties.class,
+        io.github.xiaou61.ai.internal.rag.RagProperties.class})
 public class AiConfiguration {
 }

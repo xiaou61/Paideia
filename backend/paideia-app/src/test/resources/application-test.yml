@@ -59,7 +59,15 @@ paideia:
     # 集成测试会真的往这个目录写附件。放临时目录：测试产物不该留在仓库里，
     # 也不该和生产/本地开发用的目录混在一起。
     upload-dir: ${java.io.tmpdir}/paideia-test-uploads
+    cache:
+      # 测试环境没有 Redis；显式关闭，缓存组件自动回退直读数据库。
+      enabled: false
   ai:
+    # 测试环境没有本地 Ollama；RAG 显式关闭，相关单测用桩注入 EmbeddingClient。
+    embedding:
+      enabled: false
+    rag:
+      enabled: false
     # 平台统一持有的上游凭据（WORK-009）。测试里**从不真的打到上游**——会话与精简都把端口/模型桩掉了；
     # 这里只需要"配置齐全"，好让"平台尚未配置"那条分支不被误触发（那条分支由用例临时清空它来验）。
     # 地址取 1.1.1.1：SSRF 校验只放行公网地址，写 localhost 会让上下文起不来。

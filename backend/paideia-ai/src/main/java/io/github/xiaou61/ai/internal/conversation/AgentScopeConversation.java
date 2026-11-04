@@ -172,6 +172,9 @@ class AgentScopeConversation implements AssistantConversation {
         if (request.hasPageContext()) {
             prompt.append("\n\n").append(ConversationPrompt.pageContext(request.pageContext()));
         }
+        if (request.hasKnowledgeContext()) {
+            prompt.append("\n\n").append(ConversationPrompt.knowledge(request.knowledgeContext()));
+        }
         if (request.harness() == Harness.TUTOR && request.learningSummary() != null
                 && !request.learningSummary().isBlank()) {
             prompt.append("\n\n").append(TutorPrompt.learningContext(request.learningSummary()));

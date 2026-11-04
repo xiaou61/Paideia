@@ -1,7 +1,11 @@
 package io.github.xiaou61.knowledge.internal.category;
 
+import io.github.xiaou61.knowledge.internal.cache.KnowledgeRedisCache;
+import java.time.Duration;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.type.TypeReference;
 
 /**
  * 分类的读取用例。
@@ -12,10 +16,20 @@ import org.springframework.stereotype.Service;
 @Service
 public class CategoryService {
 
-    private final CategoryMapper categoryMapper;
+    private static final String TREE_CACHE_KEY = "knowledge:category-tree:v1";
 
+    private final CategoryMapper categoryMapper;
+    private final KnowledgeRedisCache cache;
+
+    /** 保留给纯单测的构造；Spring 运行时用下面带缓存的两个参数版本。 */
     CategoryService(CategoryMapper categoryMapper) {
+        this(categoryMapper, null);
+    }
+
+    @Autowired
+    CategoryService(CategoryMapper categoryMapper, KnowledgeRedisCache cache) {
         this.categoryMapper = categoryMapper;
+        this.cache = cache;
     }
 
     /** 扁平全量，按展示顺序。装树、取子树、取分类名都基于这一份。 */
@@ -32,7 +46,17 @@ public class CategoryService {
      * 引导式入口仍然只有 `/learn`（关卡地图），知识库这边是"按分类翻阅"的另一条路。
      */
     public List<CategoryTree.Node> tree() {
-        return CategoryTree.assemble(categoryMapper.findAll());
+        if (cache == null) {
+            return CategoryTree.assemble(categoryMapper.findAll());
+        }
+        List<CategoryTree.Node> cached = cache.get(TREE_CACHE_KEY, new TypeReference<>() {
+        });
+        if (cached != null) {
+            return cached;
+        }
+        List<CategoryTree.Node> result = CategoryTree.assemble(categoryMapper.findAll());
+        cache.put(TREE_CACHE_KEY, result, Duration.ofMinutes(10));
+        return result;
     }
 
     /**
@@ -45,6 +69,16 @@ public class CategoryService {
      * 关心的是"全部"，而 `tree()` 以后可能再按浏览语义调整。
      */
     public List<CategoryTree.Node> fullTree() {
-        return CategoryTree.assemble(categoryMapper.findAll());
+        if (cache == null) {
+            return CategoryTree.assemble(categoryMapper.findAll());
+        }
+        List<CategoryTree.Node> cached = cache.get(TREE_CACHE_KEY, new TypeReference<>() {
+        });
+        if (cached != null) {
+            return cached;
+        }
+        List<CategoryTree.Node> result = CategoryTree.assemble(categoryMapper.findAll());
+        cache.put(TREE_CACHE_KEY, result, Duration.ofMinutes(10));
+        return result;
     }
 }
