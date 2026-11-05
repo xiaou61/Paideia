@@ -13,6 +13,8 @@ status: published
 骨架里已经有一个能启动的 Spring Boot 应用：`HelloController` 把 `/hello/{name}` 交给 `Greeter`。
 现在 `Greeter` 的输出不对——它说 `hi zoe`，而且没处理名字里的空白与大小写。
 
+可以把它想成一家分工明确的餐厅：前台只管把客人领进来，真正做菜的是后厨，菜不好吃别去找前台。机制上，`/hello/{name}` 这个请求先由 `HelloController` 接住，它只负责把路径里的 `name` 传下去，真正拼出返回内容的是 `Greeter` 的 `greet` 方法。
+
 让它满足两件事：
 
 1. `GET /hello/zoe` 返回 `hello zoe`（不是 `hi zoe`）；

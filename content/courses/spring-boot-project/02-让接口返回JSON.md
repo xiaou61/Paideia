@@ -12,6 +12,8 @@ status: published
 
 上一关返回的是一段字符串。真实接口基本都返回 JSON——前端要拿到**字段**，而不是自己切字符串。
 
+可以把它想成寄快递：把东西按格子装箱、贴好标签再发出去，收件人一看标签就知道哪件是什么，不用自己拆包分拣。机制上，控制器返回一个对象，Spring 会用 Jackson 把这个对象的字段按名字序列化成 JSON，并自动把响应的 `Content-Type` 设成 `application/json`。
+
 把 `/api/greeting` 改成返回 JSON：
 
 ```text
