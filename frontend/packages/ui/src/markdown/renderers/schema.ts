@@ -203,6 +203,194 @@ export function parseCodeMap(code: string): ParseResult<CodeMap> {
   })
 }
 
+/* ------------------------------------------------------------------ 流程播放器（code-flow） */
+
+/**
+ * 流程播放器：把「架构地图 + 代码走读 + 会话日志」合成一个同屏步进的块。
+ *
+ * <p>与 `code-tour` 的关系：步进模型、代码行高亮、预测/状态都一致；额外多了两样——
+ * 每一步能声明**哪些节点/连线高亮**（`nodes` / `edges`）与**底部会话日志**（`log`）。
+ * 代码用块内 `code`（示意片段即可），不强制真实仓库；有 `repo/commit/file` 时页脚给原文链接。
+ */
+export interface FlowNode {
+  id: string
+  label: string
+  layer: number
+  order: number
+  sub?: string
+  file?: string
+  line?: number
+  /** 点击该节点跳到第几步（0 起）。可选。 */
+  step?: number
+}
+
+export interface FlowEdge {
+  from: string
+  to: string
+  label?: string
+}
+
+export interface FlowLogRow {
+  k: string
+  v: string
+}
+
+export interface FlowStep {
+  title: string
+  /** 顶部工具条里的一句话；不写则用 explain。 */
+  desc?: string
+  explain?: string
+  /** 代码区标题显示的文件路径；不写用流程级 file。 */
+  file?: string
+  /** 本段代码的起始行号（用于左侧行号列）。 */
+  line?: number
+  code?: string
+  language?: string
+  /** 1-based 块内行号。 */
+  focus?: number[]
+  /** 本步高亮的节点 id。 */
+  nodes?: string[]
+  /** 本步高亮的连线，写成 "from>to"。 */
+  edges?: string[]
+  log?: FlowLogRow[]
+  predict?: Predict
+  state?: StepState
+}
+
+export interface CodeFlow {
+  id: string
+  title?: string
+  repo?: string
+  commit?: string
+  license?: string
+  file?: string
+  nodes: FlowNode[]
+  edges: FlowEdge[]
+  steps: FlowStep[]
+}
+
+export function parseCodeFlow(code: string): ParseResult<CodeFlow> {
+  return parseWith(code, (input) => {
+    const raw = asObject(input, '流程播放器')
+    const ids = new Set<string>()
+    const nodes = asArray(raw['nodes'], 'nodes', 1, LIMITS.mapNodes).map((item, index) => {
+      const node = asObject(item, `nodes[${index}]`)
+      const id = asText(node['id'], `nodes[${index}].id`, LIMITS.id)
+      need(!ids.has(id), `nodes[${index}].id 与前面的节点重复：${id}`)
+      ids.add(id)
+      return {
+        id,
+        label: asText(node['label'], `nodes[${index}].label`, LIMITS.title),
+        layer: asInteger(node['layer'], `nodes[${index}].layer`, 0, LIMITS.mapLayer),
+        order: asInteger(node['order'], `nodes[${index}].order`, 0, LIMITS.mapLayer),
+        sub: optionalText(node['sub'], `nodes[${index}].sub`, 40),
+        file: optionalText(node['file'], `nodes[${index}].file`, LIMITS.file),
+        line: node['line'] === undefined ? undefined : asInteger(node['line'], `nodes[${index}].line`, 1, 100_000_000),
+        step: node['step'] === undefined ? undefined : asInteger(node['step'], `nodes[${index}].step`, 0, LIMITS.steps - 1),
+      }
+    })
+
+    const edgeKeys = new Set<string>()
+    const edges = asArray(raw['edges'] ?? [], 'edges', 0, LIMITS.mapEdges).map((item, index) => {
+      const edge = asObject(item, `edges[${index}]`)
+      const from = asText(edge['from'], `edges[${index}].from`, LIMITS.id)
+      const to = asText(edge['to'], `edges[${index}].to`, LIMITS.id)
+      need(ids.has(from), `edges[${index}].from 指向不存在的节点：${from}`)
+      need(ids.has(to), `edges[${index}].to 指向不存在的节点：${to}`)
+      edgeKeys.add(`${from}>${to}`)
+      return { from, to, label: optionalText(edge['label'], `edges[${index}].label`, 40) }
+    })
+
+    const repo = optionalText(raw['repo'], 'repo', LIMITS.repo)
+    if (repo !== undefined) {
+      need(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo), 'repo 必须写成 owner/name')
+    }
+    const commit = optionalText(raw['commit'], 'commit', 40)
+    if (commit !== undefined) {
+      need(/^[0-9a-f]{7,40}$/.test(commit), 'commit 必须是 7–40 位小写十六进制（固定 commit，不跟分支）')
+    }
+
+    const steps = asArray(raw['steps'], 'steps', 1, LIMITS.steps).map((item, index) => {
+      const where = `steps[${index}]`
+      const step = asObject(item, where)
+
+      const stepCode = step['code'] === undefined ? undefined : asText(step['code'], `${where}.code`, LIMITS.codeChars)
+      const lines = stepCode === undefined ? 0 : lineCount(stepCode)
+      need(stepCode === undefined || lines <= LIMITS.codeLines, `${where}.code 超过 ${LIMITS.codeLines} 行，请拆成两步`)
+      const focus = step['focus'] === undefined
+        ? undefined
+        : asArray(step['focus'], `${where}.focus`, 0, LIMITS.focus).map((value, position) =>
+            asInteger(value, `${where}.focus[${position}]`, 1, Math.max(lines, 1)),
+          )
+
+      const stepNodes = step['nodes'] === undefined
+        ? undefined
+        : asArray(step['nodes'], `${where}.nodes`, 0, LIMITS.mapNodes).map((value, position) => {
+            const id = asText(value, `${where}.nodes[${position}]`, LIMITS.id)
+            need(ids.has(id), `${where}.nodes[${position}] 指向不存在的节点：${id}`)
+            return id
+          })
+
+      const stepEdges = step['edges'] === undefined
+        ? undefined
+        : asArray(step['edges'], `${where}.edges`, 0, LIMITS.mapEdges).map((value, position) => {
+            const key = asText(value, `${where}.edges[${position}]`, LIMITS.id * 2 + 1)
+            need(edgeKeys.has(key), `${where}.edges[${position}] 不是已声明的连线：${key}`)
+            return key
+          })
+
+      const log = step['log'] === undefined
+        ? undefined
+        : asArray(step['log'], `${where}.log`, 0, 12).map((row, position) => {
+            const entry = asObject(row, `${where}.log[${position}]`)
+            return {
+              k: asText(entry['k'], `${where}.log[${position}].k`, 24),
+              v: asText(entry['v'], `${where}.log[${position}].v`, 200),
+            }
+          })
+
+      return {
+        title: asText(step['title'], `${where}.title`, LIMITS.title),
+        desc: optionalText(step['desc'], `${where}.desc`, 300),
+        explain: optionalText(step['explain'], `${where}.explain`, LIMITS.explain),
+        file: optionalText(step['file'], `${where}.file`, LIMITS.file),
+        line: step['line'] === undefined ? undefined : asInteger(step['line'], `${where}.line`, 1, 100_000_000),
+        code: stepCode,
+        language: optionalText(step['language'], `${where}.language`, 40),
+        focus,
+        nodes: stepNodes,
+        edges: stepEdges,
+        log,
+        predict: step['predict'] === undefined ? undefined : parsePredict(step['predict'], `${where}.predict`),
+        state: step['state'] === undefined ? undefined : parseState(step['state'], `${where}.state`),
+      }
+    })
+
+    return {
+      id: asText(raw['id'], 'id', LIMITS.id),
+      title: optionalText(raw['title'], 'title', LIMITS.title),
+      repo,
+      commit,
+      license: optionalText(raw['license'], 'license', LIMITS.license),
+      file: optionalText(raw['file'], 'file', LIMITS.file),
+      nodes,
+      edges,
+      steps,
+    }
+  })
+}
+
+/** 本步的 GitHub 原文链接；没有 repo/commit/file 时返回 undefined（示意片段）。 */
+export function flowPermalink(flow: CodeFlow, step: FlowStep): string | undefined {
+  const file = step.file ?? flow.file
+  if (flow.repo === undefined || flow.commit === undefined || file === undefined) {
+    return undefined
+  }
+  const start = step.line ?? 1
+  const end = start + (step.code === undefined ? 0 : lineCount(step.code) - 1)
+  return `https://github.com/${flow.repo}/blob/${flow.commit}/${file}#L${start}-L${end}`
+}
+
 /* ------------------------------------------------------------------ 代码走读 */
 
 export interface Predict {

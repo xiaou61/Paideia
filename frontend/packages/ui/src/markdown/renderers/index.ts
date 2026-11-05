@@ -2,6 +2,7 @@ import type { CustomRenderer, CustomRendererProps } from 'streamdown'
 
 import { guard } from './blocks'
 import { CodeChallenge } from './code-challenge'
+import { CodeFlow } from './code-flow'
 import { CodeMap } from './code-map'
 import { CodeTour } from './code-tour'
 import { LearningPath } from './learning-path'
@@ -20,6 +21,8 @@ import { SourceWalk } from './source-walk'
  */
 export const SourceReadingTour = guard('代码走读', CodeTour)
 export const SourceReadingMap = guard('架构地图', CodeMap)
+/** 流程播放器（左图 + 右码 + 步进 + 日志）：code-map 与 code-tour 的同屏合体。 */
+export const SourceReadingFlow = guard('流程播放器', CodeFlow)
 export const SourceReadingPath = guard('学习路径', LearningPath)
 export const SourceReadingChallenge = guard('动手练习', CodeChallenge)
 export const SourceReadingQuiz = guard('小测', Quiz)
@@ -30,6 +33,7 @@ export const DocumentSourceWalk = guard('源码精读', SourceWalk)
 export const documentRenderers: CustomRenderer[] = [
   { language: ['code-tour', 'tour'], component: SourceReadingTour },
   { language: ['code-map'], component: SourceReadingMap },
+  { language: ['code-flow'], component: SourceReadingFlow },
   { language: ['learning-path'], component: SourceReadingPath },
   { language: ['code-challenge', 'challenge'], component: SourceReadingChallenge },
   { language: ['quiz'], component: SourceReadingQuiz },

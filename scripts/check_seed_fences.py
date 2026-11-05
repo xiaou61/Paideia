@@ -38,7 +38,7 @@ print('body len', len(body))
 fences = re.findall(r"```([\w-]+)\n(.*?)```", body, re.S)
 print('fences:', [(name, len(content)) for name, content in fences])
 for name, content in fences:
-    if name in ('code-tour', 'code-map', 'code-challenge', 'quiz', 'learning-path'):
+    if name in ('code-tour', 'code-map', 'code-flow', 'code-challenge', 'quiz', 'learning-path'):
         try:
             obj = json.loads(content)
             print('OK', name, 'keys=', list(obj)[:6])

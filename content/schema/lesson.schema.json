@@ -49,6 +49,7 @@
     "go",
     "css",
     "code-map",
+    "code-flow",
     "nginx",
     "json",
     "ini",
@@ -68,6 +69,7 @@
     "learning-path",
     "source-walk",
     "code-map",
+    "code-flow",
     "sql-challenge"
   ]
 }
