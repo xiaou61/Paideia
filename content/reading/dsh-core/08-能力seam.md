@@ -13,21 +13,64 @@ status: published
 
 三者合起来才叫一个 **seam**（接缝）。任何单一角色都不是 seam。seam 是 DSH 能"换一个提供方就换掉整个产品"的原因。
 
-```sketch
+```code-flow
 {
+  "id": "dsh-08-seam",
   "title": "一个能力，三种角色",
-  "rows": [
-    [
-      { "id": "def", "title": "Definition", "sub": "接口 + 类型", "tone": "violet" }
-    ],
-    [
-      { "id": "prov", "title": "Provider", "sub": "本地实现", "tone": "blue" },
-      { "id": "cons", "title": "Consumer", "sub": "暴露给模型", "tone": "green" }
-    ]
+  "nodes": [
+    { "id": "def", "label": "Definition", "sub": "接口 + 类型", "layer": 0, "order": 0 },
+    { "id": "prov", "label": "Provider", "sub": "本地实现", "layer": 1, "order": 0 },
+    { "id": "cons", "label": "Consumer", "sub": "暴露给模型", "layer": 1, "order": 1 }
   ],
-  "arrows": [
+  "edges": [
     { "from": "prov", "to": "def", "label": "实现" },
     { "from": "cons", "to": "def", "label": "依赖" }
+  ],
+  "steps": [
+    {
+      "title": "Definition：接口与类型",
+      "desc": "定义 shell 服务和请求/结果类型",
+      "file": "packages/dsh-shell/src/index.ts",
+      "code": "export abstract class ShellService extends Service {\n  constructor(ctx) { super(ctx, 'shell') }\n  abstract run(request: ShellRequest): Promise<ShellResult>\n}",
+      "focus": [2, 3],
+      "nodes": ["def"],
+      "edges": [],
+      "log": [{ "k": "定义", "v": "shell 服务" }],
+      "explain": "定义很少变，提供方与消费方都只依赖它。"
+    },
+    {
+      "title": "Provider：实现它",
+      "desc": "在本机真正执行命令",
+      "file": "packages/dsh-bash-local/src/index.ts",
+      "code": "class BashLocal extends ShellService {\n  async run(request) {\n    // 真正在本机执行\n  }\n}",
+      "focus": [2],
+      "nodes": ["prov", "def"],
+      "edges": ["prov>def"],
+      "log": [{ "k": "提供方", "v": "bash-local" }],
+      "explain": "换一个提供 shell 的包，就是换掉整个能力。"
+    },
+    {
+      "title": "Consumer：包装成工具",
+      "desc": "把能力暴露成模型能调的 bash 工具",
+      "file": "packages/dsh-tool-bash/src/index.ts",
+      "code": "export const inject = ['tools', 'shell']\nexport function apply(ctx) {\n  ctx.tools.register(defineTool({ /* 调 ctx.shell.run */ }))\n}",
+      "focus": [1, 3],
+      "nodes": ["cons", "def"],
+      "edges": ["cons>def"],
+      "log": [{ "k": "消费方", "v": "tool-bash" }],
+      "explain": "消费方只 inject 定义名，不知道背后是本机还是沙箱。"
+    },
+    {
+      "title": "换提供方，消费方不动",
+      "desc": "只改 cordis.yml 的一行",
+      "file": "cordis.yml",
+      "code": "# 把本机执行换成沙箱执行\n- name: '@deepseek-ai/dsh-bash-sandbox'",
+      "focus": [2],
+      "nodes": ["prov", "cons", "def"],
+      "edges": ["prov>def", "cons>def"],
+      "log": [{ "k": "状态", "v": "已切到沙箱" }],
+      "explain": "工具代码一行不动——只要它走的是 ctx.shell 这个 seam。"
+    }
   ]
 }
 ```
