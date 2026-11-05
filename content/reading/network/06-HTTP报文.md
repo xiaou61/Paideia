@@ -26,6 +26,8 @@ status: published
 }
 ```
 
+打个比方，HTTP 报文像一封格式固定的信：开头一句话写明要办什么事，中间一行行列清说明，空一行做分隔，最后才是信纸正文。协议里，这四块依次是起始行、首部、空行和正文。
+
 ```text
 GET /api/user?id=7 HTTP/1.1        ← 请求行
 Host: example.com                   ← 首部
