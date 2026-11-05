@@ -30,6 +30,8 @@ status: published
 
 新手最常遇到的两个问题都在 cron 上：**时间写了但没跑**、**跑了但什么都不对**。根因几乎总是同一个：**cron 的环境和你终端的完全不一样**。
 
+打个比方：cron 像一个按时上门、但不认识你的钟点工，只会照单干活，不会用你家的工具、也不吃你家的饭。真实机制是 cron 由后台守护进程按时间表 fork 出一个几乎空环境的新进程，PATH 和工作目录都取最保守的默认值。
+
 ## 为什么 cron 让人困惑
 
 因为 cron 启动的进程**不在你的登录会话里**：
@@ -88,7 +90,7 @@ $ sudo crontab -e -u paideia   # 编辑指定用户的任务
 0 3 * * * paideia /opt/paideia/backup.sh
 ```
 
-区别值得知道：`crontab -e` 是"这个用户自己的任务"，`/etc/cron.d/` 的是"系统配置"，能进版本管理与部署脚本（不要手改 `/etc/crontab`，那是给发行版用的）。
+区别值得知道：`crontab -e` 是"这个用户自己的任务"，`/etc/cron.d/` 的是"系统配置"，能进版本管理与部署脚本。不要手改 `/etc/crontab`，那是给发行版用的。
 
 ### 让 cron 任务可靠的四件事
 
@@ -141,7 +143,7 @@ $ journalctl -u cron -n 50     # 有没有执行记录
 $ grep CRON /var/log/syslog | tail -20
 ```
 
-能看到 `(paideia) CMD (/opt/paideia/backup.sh)` 说明 **cron 触发了**，问题在脚本自己（路径、权限、环境）。看不到这一行说明**没触发**（时间写错、crontab 没保存、服务没在跑）。
+能看到 `(paideia) CMD (/opt/paideia/backup.sh)` 说明 **cron 触发了**。问题在脚本自己（路径、权限、环境）。看不到这一行说明**没触发**（时间写错、crontab 没保存、服务没在跑）。
 
 这一条分界能把问题砍掉一半，先做它。
 
@@ -203,7 +205,7 @@ $ systemd-analyze calendar "*-*-* 03:00:00"
 
 它会告诉你"下次什么时候触发"，写完一定跑一次，比猜准。
 
-`RandomizedDelaySec` 值得加：几百台机器都用 `0 3 * * *` 会同时打一个共享资源（备份服务器、对象存储），加几百秒抖动就把峰削平了。
+`RandomizedDelaySec` 值得加：几百台机器都用 `0 3 * * *` 会同时打一个共享资源（备份服务器、对象存储）。加几百秒抖动就把峰削平了。
 
 ### 该选哪个
 
@@ -241,11 +243,11 @@ $ systemd-analyze calendar "*-*-* 03:00:00"
 ### 误区：cron 每分钟跑，任务一定每分钟都在跑
 
 **你以为**：`* * * * *` 表示"每分钟执行一次，直到完成"。
-**其实**：cron 是"每分钟**触发**一次"。上一次还在跑，下一次照样启动一个新进程，于是同一个任务叠加几十份。它们抢同一个文件、抢同一把数据库连接，症状是"数据重复""负载莫名升高"。
+**其实**：cron 是"每分钟**触发**一次"。上一次还在跑，下一次照样启动一个新进程，于是同一个任务叠加几十份。它们抢同一个文件、抢同一把数据库连接。症状是"数据重复""负载莫名升高"。
 **怎么验证**：`ps -ef | grep 脚本名` 看同时有几个；给任务加 `flock -n`（本关讲过）就能杜绝。
 
 ### 误区：`systemctl enable` 之后 timer 就会按点跑
 
 **你以为**：enable 了 timer 就生效。
-**其实**：要 enable 的是 **`.timer` 单元**，不是 `.service`。`systemctl enable paideia-backup.service` 只是让 service 能手动启动，timer 根本没被安排。启用后 `systemctl list-timers` 里必须能看到它，并且有 `NEXT` 时间。
+**其实**：要 enable 的是 **`.timer` 单元**，不是 `.service`。`systemctl enable paideia-backup.service` 只是让 service 能手动启动，timer 根本没被安排。启用后 `systemctl list-timers` 里必须能看到它。并且有 `NEXT` 时间。
 **怎么验证**：`systemctl list-timers --all | grep paideia`；没有就是没启用对单元。

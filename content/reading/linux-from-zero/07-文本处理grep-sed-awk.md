@@ -9,7 +9,7 @@ status: published
 
 ## 这一关在解决什么
 
-Linux 上几乎所有东西都是文本：配置、日志、CSV、`/proc` 里的状态。所以"从一堆文本里捞出你要的那几行、改掉某个字段、按列汇总"是最高频的操作，而这三个命令就是干这个的：
+Linux 上几乎所有东西都是文本：配置、日志、CSV、`/proc` 里的状态。所以"从一堆文本里捞出你要的那几行、改掉某个字段、按列汇总"是最高频的操作。这三个命令就是干这个的：
 
 ```sketch
 {
@@ -34,9 +34,11 @@ Linux 上几乎所有东西都是文本：配置、日志、CSV、`/proc` 里的
 
 配合第 06 关的管道，你就能一条命令回答"昨天哪个 IP 打我们最多""有多少个 5xx"这类问题。
 
+打个比方：这三个命令像流水线上的三道工序，`grep` 负责挑出料，`sed` 负责打磨，`awk` 负责称重统计。真实机制是它们都从 stdin 逐行读入、处理完写到 stdout，所以能用管道一环扣一环串起来，谁也不用知道前后是谁。
+
 ## 为什么是这三个而不是 Python
 
-因为**这几件事不需要写程序**。一行 `grep -c ERROR app.log` 是 0.02 秒的事，写个 Python 脚本要建文件、读文件、正则、打印，还要维护。判据是：**一次性的、几十 MB 以内的文本查询用三个命令；反复用的、需要逻辑分支的写成脚本。**
+因为**这几件事不需要写程序**。一行 `grep -c ERROR app.log` 是 0.02 秒的事。写个 Python 脚本要建文件、读文件、正则、打印，还要维护。判据是：**一次性的、几十 MB 以内的文本查询用三个命令；反复用的、需要逻辑分支的写成脚本。**
 
 ## 讲解
 
@@ -55,7 +57,7 @@ $ grep -A3 -B1 "Exception" app.log  # 命中行后 3 行、前 1 行（-C3 是�
 
 `-A/-B/-C` 是看异常堆栈的关键：报错那一行往往没信息，要看它后面的调用栈。
 
-**基础正则 vs 扩展正则**：`grep` 默认用 BRE（basic），`+ ? | ( )` 这些得转义才能当元字符；`grep -E`（等价 `egrep`）用 ERE，写起来像你熟悉的那些正则：
+**基础正则 vs 扩展正则**：`grep` 默认用 BRE（basic），`+ ? | ( )` 这些得转义才能当元字符。`grep -E`（等价 `egrep`）用 ERE，写起来像你熟悉的那些正则：
 
 ```text
 $ grep -E "ERROR|WARN" app.log        # 或
@@ -104,7 +106,7 @@ $ sed '/^$/d' app.conf           # 删掉空行
 $ sed -n '/ERROR/,/END/p' app.log  # 打印两个标记之间的内容
 ```
 
-一条实用组合——**去掉配置文件里的注释和空行**，方便看清到底配了什么：
+一条实用组合：**去掉配置文件里的注释和空行**，方便看清到底配了什么：
 
 ```text
 $ sed '/^[[:space:]]*#/d;/^[[:space:]]*$/d' /etc/nginx/nginx.conf
@@ -142,7 +144,7 @@ $ awk 'length($0) > 200 {n++} END {print n}' app.log     # 超长行有几条
 
 ### 一条命令回答一个真问题
 
-假设你有 Nginx 的 access log，格式是标准的 `$remote_addr - - [$time] "METHOD path HTTP/1.1" status bytes`（共 9 列，`$1` 是 IP，`$9` 是状态码）。几个真实需求：
+假设你有 Nginx 的 access log，格式是标准的 `$remote_addr - - [$time] "METHOD path HTTP/1.1" status bytes`。它一共 9 列，`$1` 是 IP，`$9` 是状态码。几个真实需求：
 
 ```text
 # 1. 请求量前 10 的 IP
@@ -161,9 +163,9 @@ awk '{sum += $10} END {printf "%.1f MB\n", sum/1024/1024}' access.log
 awk -F'[][:/ ]+' '{print $3":"$4}' access.log | sort | uniq -c
 ```
 
-前两条里都有一个容易忘的地方：**`uniq` 只合并相邻的重复行**，所以必须先 `sort`。写成 `awk ... | uniq -c` 会得到一堆断断续续的重复项，看起来像统计错了——这大概是这三个命令里最常见的坑。
+前两条里都有一个容易忘的地方：**`uniq` 只合并相邻的重复行**，所以必须先 `sort`。写成 `awk ... | uniq -c` 会得到一堆断断续续的重复项，看起来像统计错了。这大概是这三个命令里最常见的坑。
 
-第 5 条的 `-F'[][:/ ]+'` 是把 `[`、`]`、`:`、`/`、空格都当分隔符（正则字符类），这样时间戳会被切成独立的字段。
+第 5 条的 `-F'[][:/ ]+'` 是把 `[`、`]`、`:`、`/`、空格都当分隔符（正则字符类）。这样时间戳会被切成独立的字段。
 
 ### 配角：`sort`、`uniq`、`cut`、`head`、`tail`、`tr`、`wc`
 
@@ -176,7 +178,7 @@ awk -F'[][:/ ]+' '{print $3":"$4}' access.log | sort | uniq -c
 | `tr` | 字符替换 | `tr 'a-z' 'A-Z'`、`tr -d '\r'`（去掉 Windows 换行里的 CR） |
 | `wc` | 计数 | `-l` 行、`-w` 词、`-c` 字节 |
 
-`tr -d '\r'` 值得单独记：从 Windows 传过来的脚本，行尾是 `\r\n`，bash 会把 `\r` 当成命令的一部分，报 `$'\r': command not found` 或 `bad interpreter`。修法就是 `tr -d '\r' < a.sh > a.sh.new`。
+`tr -d '\r'` 值得单独记：从 Windows 传过来的脚本，行尾是 `\r\n`。bash 会把 `\r` 当成命令的一部分，报 `$'\r': command not found` 或 `bad interpreter`。修法就是 `tr -d '\r' < a.sh > a.sh.new`。
 
 ## 动手
 
@@ -231,11 +233,11 @@ awk -F'[][:/ ]+' '{print $3":"$4}' access.log | sort | uniq -c
 ### 误区：`grep -r` 在整个仓库里搜就够了
 
 **你以为**：`grep -r 关键词 .` 最简单。
-**其实**：它会把 `node_modules`、`target`、`.git`、二进制文件全扫一遍，慢几十倍，还会因为"Binary file matches"刷屏。加 `--include` 限定扩展名，或者用 `grep -rn --exclude-dir={node_modules,target,.git}`。
+**其实**：它会把 `node_modules`、`target`、`.git`、二进制文件全扫一遍，慢几十倍。还会因为"Binary file matches"刷屏。加 `--include` 限定扩展名，或者用 `grep -rn --exclude-dir={node_modules,target,.git}`。
 **怎么验证**：在有大依赖的项目里分别跑一次带与不带 `--include` 的版本，用 `time` 对比。
 
 ### 误区：`awk` 的 `$1` 和 shell 的 `$1` 是一回事
 
 **你以为**：`awk '{print $1}'` 里的 `$1` 是脚本的第一个参数。
-**其实**：在**单引号**里，`$1` 是 `awk` 自己的第一列，shell 不会展开。这也是为什么 awk 脚本外面几乎总是单引号——换成双引号，`$1` 会先被 shell 换成脚本参数，然后 awk 拿到一个空字段。真要在 awk 里用 shell 变量，用 `-v` 传：`awk -v name="$NAME" '{print name, $1}'`。
+**其实**：在**单引号**里，`$1` 是 `awk` 自己的第一列，shell 不会展开。这也是为什么 awk 脚本外面几乎总是单引号。换成双引号，`$1` 会先被 shell 换成脚本参数，然后 awk 拿到一个空字段。真要在 awk 里用 shell 变量，用 `-v` 传：`awk -v name="$NAME" '{print name, $1}'`。
 **怎么验证**：`echo "a b" | awk "{print \$1}"` 与 `echo "a b" | awk '{print $1}'` 对比，前者容易因为引号问题出错。

@@ -9,7 +9,7 @@ status: published
 
 ## 这一关在解决什么
 
-`nohup ./app.sh &` 能跑，但机器一重启就没了、崩了不会自己起来、日志混在某个文件里、`ps` 里也看不出它是谁。**把这些"能跑"升级成"能长期活着"，就是 systemd 的职责。**
+`nohup ./app.sh &` 能跑。但机器一重启就没了，崩了不会自己起来，日志混在某个文件里，`ps` 里也看不出它是谁。**把这些"能跑"升级成"能长期活着"，就是 systemd 的职责。**
 
 ```sketch
 {
@@ -30,12 +30,14 @@ status: published
 
 这一关给你一份能直接改用的 unit 文件，和三个必须知道的行为：改完要 `daemon-reload`、`ExecStart` 必须是绝对路径、单元里读不到你的 shell 环境变量。
 
+打个比方：systemd 像一个常驻的管家，负责把你要的东西一开机就摆好、倒了再扶起来。真实机制是，systemd 作为 1 号进程启动后常驻内存，按 unit 文件的描述启动、监控进程，并在它退出时按策略重启。
+
 ## 为什么是 systemd
 
 它取代了老的 SysV init 脚本，主要解决三件事：
 
 - **依赖与并行**：老式脚本靠编号（`S20` 排在 `S21` 前），systemd 声明 `After=`、`Wants=` 之后能并行启动无依赖的服务，开机快得多。
-- **cgroup 管理**：每个服务放进自己的 cgroup，能精确知道"这个服务用了多少内存、起过哪些子进程"，`systemctl stop` 能把整棵进程树一次清掉（第 09 关讲的"杀一整组"它默认就做）。
+- **cgroup 管理**：每个服务放进自己的 cgroup，能精确知道"这个服务用了多少内存、起过哪些子进程"。`systemctl stop` 能把整棵进程树一次清掉（第 09 关讲的"杀一整组"它默认就做）。
 - **统一的日志**：服务的 stdout/stderr 自动进 journal，不用自己在脚本里重定向。
 
 ## 讲解
@@ -60,7 +62,7 @@ systemd 管的一切都是"单元"（unit），一个单元一个文件：
 | `/usr/lib/systemd/system/` | 包管理器装的（apt 装的服务在这） | 中 |
 | `~/.config/systemd/user/` | 用户级服务（`systemctl --user`） | 仅该用户 |
 
-**自己的服务写在 `/etc/systemd/system/`**。要改包管理器装的单元，也在这里放一个同名文件覆盖，不要去改 `/usr/lib` 下的原件——升级时会被覆盖回去。
+**自己的服务写在 `/etc/systemd/system/`**。要改包管理器装的单元，也在这里放一个同名文件覆盖，不要去改 `/usr/lib` 下的原件。升级时会被覆盖回去。
 
 ### 一份能直接用的 unit
 
@@ -107,9 +109,9 @@ WantedBy=multi-user.target
 | `Requires=X` | **强依赖**：X 失败我就不启动；X 停止时我也被停 |
 | `Documentation` | 文档地址，`systemctl status` 里可点 |
 
-`After` 和 `Requires` 是两件不同的事，这也是最容易配错的地方：只写 `After=mysql.service` 只是"排在 mysql 后面"，mysql 没起来它照样启动然后连不上库。要"mysql 必须可用"得写 `Requires=` + `After=`（或 `BindsTo=`）。
+`After` 和 `Requires` 是两件不同的事，这也是最容易配错的地方。只写 `After=mysql.service` 只是"排在 mysql 后面"，mysql 没起来它照样启动然后连不上库。要"mysql 必须可用"得写 `Requires=` + `After=`（或 `BindsTo=`）。
 
-`network-online.target` 与 `network.target` 也别混：前者等网络**真正可用**（拿到地址），后者只是"网络子系统初始化完了"。依赖外部服务的程序要用 `network-online.target`。
+`network-online.target` 与 `network.target` 也别混。前者等网络**真正可用**（拿到地址），后者只是"网络子系统初始化完了"。依赖外部服务的程序要用 `network-online.target`。
 
 **[Service] 段——怎么跑**
 
@@ -152,7 +154,7 @@ ExecStart=/bin/sh -c 'cd /opt/app && ./start.sh && echo done'   # 要用 shell �
 ExecStart=/opt/app/start.sh                                     # 或者把逻辑写进脚本
 ```
 
-`ExecStart=/opt/app/start.sh > /var/log/app.log` 这种写法里的 `>` **不会被解释**——它只会被当成一个奇怪的参数传给程序。重定向要用 `StandardOutput=file:/var/log/app.log`，或者在脚本内部做。
+`ExecStart=/opt/app/start.sh > /var/log/app.log` 这种写法里的 `>` **不会被解释**。它只会被当成一个奇怪的参数传给程序。重定向要用 `StandardOutput=file:/var/log/app.log`，或者在脚本内部做。
 
 同理，单元里也**没有** `$PATH` 里的命令、没有你在 `.bashrc` 里 export 的变量。要环境变量就显式写 `Environment=` 或 `EnvironmentFile=`。
 
@@ -189,7 +191,7 @@ $ systemctl list-units --failed     # 哪些服务起不来
              └─9840 mysqld --defaults-file=/opt/paideia/my.cnf
 ```
 
-四行信息量最大：`Loaded` 看它从哪个文件加载、是否自启；`Active` 看状态和跑了多久；`Main PID` 是主进程；`CGroup` 里能看到它启动的**全部子进程**——这在排查"服务起了但端口被谁占着"时很关键。
+四行信息量最大。`Loaded` 看它从哪个文件加载、是否自启；`Active` 看状态和跑了多久；`Main PID` 是主进程。`CGroup` 里能看到它启动的**全部子进程**，这在排查"服务起了但端口被谁占着"时很关键。
 
 ### 出问题先看三处
 
@@ -227,7 +229,7 @@ ReadWritePaths=/var/lib/paideia /var/log/paideia
 - `PrivateTmp`：给它一个私有的 `/tmp`，和其他进程隔离。
 - `ProtectSystem=strict`：整个文件系统只读，只有 `ReadWritePaths` 里的可写。
 
-这几项能挡住"服务被攻破后顺手改系统文件"的一大类后果，代价很小。注意 `ProtectSystem=strict` 之后要显式列出所有需要写的目录，漏了会报"只读文件系统"。
+这几项能挡住"服务被攻破后顺手改系统文件"的一大类后果，代价很小。注意 `ProtectSystem=strict` 之后要显式列出所有需要写的目录。漏了会报"只读文件系统"。
 
 ## 动手
 
@@ -271,13 +273,13 @@ ReadWritePaths=/var/lib/paideia /var/log/paideia
 ### 误区：把 `nohup` 换成 systemd 就自动重启了
 
 **你以为**：写成服务就有了高可用。
-**其实**：默认 `Restart=no`，进程崩了就是 `failed`，不会自己起来。要自动重启必须显式写 `Restart=on-failure`（或 `always`）并配 `RestartSec`。而 `Restart=always` 遇到"启动即崩"会快速重试，被 systemd 拦在 `start request repeated too quickly`——那说明问题在程序自己，不在重启策略。
+**其实**：默认 `Restart=no`，进程崩了就是 `failed`，不会自己起来。要自动重启必须显式写 `Restart=on-failure`（或 `always`）并配 `RestartSec`。而 `Restart=always` 遇到"启动即崩"会快速重试，被 systemd 拦在 `start request repeated too quickly`。那说明问题在程序自己，不在重启策略。
 **怎么验证**：`systemctl show paideia -p Restart` 看当前值；`kill` 掉主进程后 `status` 会在几秒内显示 `activating (auto-restart)`。
 
 ### 误区：unit 文件里能直接用 shell 变量
 
 **你以为**：`Environment=JAVA_HOME=/opt/jdk21` 之后 `ExecStart=$JAVA_HOME/bin/java` 就成立。
-**其实**：`$JAVA_HOME` 这种**变量展开在 `ExecStart` 里支持**（systemd 会展开 `Environment=` 定义过的变量），但不支持管道、重定向、`&&`、通配符——那些是 shell 的语法，systemd 不启动 shell。想用 shell 特性就显式 `/bin/sh -c '...'`。
+**其实**：`$JAVA_HOME` 这种**变量展开在 `ExecStart` 里支持**（systemd 会展开 `Environment=` 定义过的变量），但不支持管道、重定向、`&&`、通配符。那些是 shell 的语法，systemd 不启动 shell。想用 shell 特性就显式 `/bin/sh -c '...'`。
 **怎么验证**：写 `ExecStart=/opt/app/start.sh > /tmp/x.log`，`status` 会显示它把 `>` 当参数传给了脚本；改成 `StandardOutput=file:/tmp/x.log` 才生效。
 
 ### 误区：`systemctl enable` 之后服务就在跑
