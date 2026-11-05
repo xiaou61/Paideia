@@ -3,15 +3,15 @@ export const meta = { module: 'learn', side: 'learner' }
 export const cases = [
   {
     id: 'learn-tracks',
-    title: '从零开始：轨道列表有核心/进阶分段',
+    title: '从零开始：主题目录与搜索框可见',
     write: false,
     async run(s) {
       await s.step('打开学习页', async () => {
         await s.goto('/#/learn')
         await s.expectText('从零开始')
       })
-      await s.step('分段标题可见', async () => {
-        await s.expectText('核心')
+      await s.step('搜索与分类工具条可见', async () => {
+        await s.waitFor('[data-testid="learn-search"]', 'visible', 20_000)
       })
     },
   },

@@ -22,6 +22,7 @@ import {
   Card,
   CardContent,
   ErrorAlert,
+  Input,
   LoadingRow,
   PageHeader,
 } from '@paideia/ui'
@@ -45,11 +46,12 @@ import {
   GitBranch,
   Layers,
   Leaf,
-  Map,
+  Map as MapIcon,
   Monitor,
   Network,
   Play,
   Puzzle,
+  Search,
   Table2,
   Target,
   Terminal,
@@ -60,7 +62,7 @@ import { Link } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
-import { errorMessage } from '@paideia/core'
+import { OTHER_GROUP, TRACK_GROUPS, groupDefOf, groupKeyOf } from '../learn-track-groups'
 
 const learning = createLearningApi(api)
 const identity = createIdentityApi(api)
@@ -106,9 +108,9 @@ const TRACK_ICONS: Record<string, typeof BookOpenCheck> = {
  * 用户明确要求"从零开始不要是知识库"——沿着一条轨道一关一关往下走，和"挑一篇文章读"
  * 是两件事，前者需要关卡、顺序与前置依赖，后者只需要分类与列表。
  *
- * <p>**分成理论栏与实战栏**（WORK-038）：理论读完能解释，实战做完能验收。两栏只是分组，
- * 不做任何门禁——用户可以从任何一边进。空轨道也列出来：让它显示"内容准备中"
- * 比让它消失更像一个产品。
+ * <p><b>主题分类 + 搜索</b>（本次）：轨道涨到三十几条后，"核心/进阶/选读"三层已经不够
+ * 用来找东西了。这一页改成**按主题分组的目录**，顶部给搜索框与分类 chip；岗位仍只影响
+ * 推荐顺序与卡上的「核心/进阶」标记，不构成门禁。
  */
 export function LearnPage() {
   const tracks = useQuery({
@@ -166,6 +168,10 @@ export function LearnPage() {
   )
   const picks = useMemo(() => pickAdvice(scored, 3), [scored])
 
+  /** 目录筛选：搜索词 + 主题分类。默认「全部」，只影响这一页怎么找内容，不影响岗位推荐。 */
+  const [query, setQuery] = useState('')
+  const [groupKey, setGroupKey] = useState<string>('all')
+
   /**
    * AI 推荐理由（WORK-047 的 `POST /learning/advice`，WORK-066 之后这里才有了入口）。
    *
@@ -208,7 +214,7 @@ export function LearnPage() {
    * 三段地图：**按岗位的 rank 排，不按分数排**。
    *
    * <p>分数回答"接下来先学什么"，段内顺序回答"这个岗位的学习次序"。混用会让同一段里的
-   * 卡片顺序每次进来都变，看起来像随机。
+   * 卡片顺序每次进来都变，看起来像随机。这里只用于合计进度与推荐，不再直接铺三层。
    */
   const sections = useMemo(() => {
     const buckets: Record<TrackTier, { track: TrackSummary; rank: number }[]> = {
@@ -230,7 +236,7 @@ export function LearnPage() {
     }
   }, [tracks.data, role])
 
-  /** 核心 + 进阶的合计：选读 17 条不该稀释"这个岗位到底有多少要走"。 */
+  /** 核心 + 进阶的合计：选读不该稀释"这个岗位到底有多少要走"。 */
   const roleTotals = useMemo(() => {
     const list = [...sections.core, ...sections.advanced]
     const stages = list.reduce((sum, track) => sum + track.stageCount, 0)
@@ -238,11 +244,58 @@ export function LearnPage() {
     return { stages, passed }
   }, [sections])
 
+  /**
+   * 主题目录：先按搜索词与所选分类过滤，再按主题分组。
+   *
+   * <p>组内排序用**岗位 rank**（核心在前），同 rank 按名字——让"这个岗位该先看的"
+   * 在每个主题里也浮上来，而不是被字母序打散。
+   */
+  const catalog = useMemo(() => {
+    const keyword = query.trim().toLowerCase()
+    const grouped = new Map<string, TrackSummary[]>()
+    for (const track of tracks.data ?? []) {
+      if (groupKey !== 'all' && groupKeyOf(track.slug) !== groupKey) continue
+      if (keyword !== '') {
+        const haystack = `${track.name} ${track.summary ?? ''} ${track.slug}`.toLowerCase()
+        if (!haystack.includes(keyword)) continue
+      }
+      const key = groupKeyOf(track.slug)
+      const list = grouped.get(key)
+      if (list) list.push(track)
+      else grouped.set(key, [track])
+    }
+    const order = [...TRACK_GROUPS.map((group) => group.key), OTHER_GROUP.key]
+    return order
+      .filter((key) => (grouped.get(key)?.length ?? 0) > 0)
+      .map((key) => {
+        const def = groupDefOf(key)
+        const list = grouped.get(key) ?? []
+        list.sort((left, right) => {
+          const rankLeft = tierOf(role, left.slug).rank
+          const rankRight = tierOf(role, right.slug).rank
+          return rankLeft - rankRight || left.name.localeCompare(right.name)
+        })
+        return { key, label: def.label, hint: def.hint, tracks: list }
+      })
+  }, [tracks.data, query, groupKey, role])
+
+  /** 每个分类下的轨道总数（不随搜索变化），供分类 chip 显示数量。 */
+  const groupCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const track of tracks.data ?? []) {
+      const key = groupKeyOf(track.slug)
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+    return counts
+  }, [tracks.data])
+
+  const matchedCount = catalog.reduce((sum, group) => sum + group.tracks.length, 0)
+
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
       <PageHeader
         title="从零开始"
-        description="选一个岗位，按它的顺序走。岗位只影响推荐顺序，不影响你能看什么。"
+        description="按主题找，或被岗位推荐带路。岗位只影响推荐顺序，不影响你能看什么。"
       />
 
       <RolePicker role={role} onChoose={chooseRole} />
@@ -258,8 +311,7 @@ export function LearnPage() {
         <Alert className="mb-6" data-testid="learn-role-empty">
           <AlertTitle>{meta.label}的内容还在建设中</AlertTitle>
           <AlertDescription>
-            这个岗位暂时没有专属内容，下面按 Git、网络、算法三条通用线排序；其余都在「选读」里，
-            不影响你能看什么。
+            这个岗位暂时没有专属内容，下面按主题排列全部轨道；岗位推荐会跳过它，不影响你能看什么。
           </AlertDescription>
         </Alert>
       ) : null}
@@ -312,31 +364,35 @@ export function LearnPage() {
         </Link>
       ) : null}
 
-      {tracks.isSuccess ? (
-        <>
-          <TrackSection
-            testId="learn-core"
-            title="核心"
-            hint="这个岗位没人能跳过的部分。先走完这几条，再谈其他。"
-            tracks={sections.core}
-            emptyText="这个岗位的核心内容还没导入。"
+      {tracks.isSuccess && tracks.data.length > 0 ? (
+        <div data-testid="learn-catalog">
+          <CatalogToolbar
+            query={query}
+            onQuery={setQuery}
+            groupKey={groupKey}
+            onGroup={setGroupKey}
+            counts={groupCounts}
+            total={tracks.data.length}
+            matched={matchedCount}
           />
-          <TrackSection
-            testId="learn-advanced"
-            title="进阶"
-            hint="有核心打底之后才看得懂的部分，顺序没有硬性要求。"
-            tracks={sections.advanced}
-            emptyText="进阶内容还在准备中。"
-          />
-          <TrackSection
-            testId="learn-optional"
-            title="选读"
-            hint="加分项，不是门槛。面试前翻一翻，或者遇到具体问题时再回来。"
-            tracks={sections.optional}
-            emptyText="没有选读内容。"
-            collapsible
-          />
-        </>
+          {catalog.length === 0 ? (
+            <Alert data-testid="learn-no-match">
+              <AlertTitle>没有匹配的轨道</AlertTitle>
+              <AlertDescription>换个关键词，或点「全部」看看所有分类。</AlertDescription>
+            </Alert>
+          ) : (
+            catalog.map((group) => (
+              <CategorySection
+                key={group.key}
+                groupKey={group.key}
+                title={group.label}
+                hint={group.hint}
+                tracks={group.tracks}
+                role={role}
+              />
+            ))
+          )}
+        </div>
       ) : null}
 
       {/* 训练营（WORK-029）：它是"还没有任何学习记录的人"的入口，
@@ -360,7 +416,7 @@ export function LearnPage() {
 
       <Card className="mt-6">
         <CardContent className="flex items-start gap-3 py-4">
-          <Map className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+          <MapIcon className="text-muted-foreground mt-0.5 size-4 shrink-0" />
           <p className="text-muted-foreground text-sm">
             想看自己的学习痕迹？<Link to="/graph" className="text-primary underline-offset-2 hover:underline">
               知识图谱
@@ -405,6 +461,136 @@ function RolePicker({ role, onChoose }: { role: RoleKey; onChoose: (next: RoleKe
       </div>
       <p className="text-muted-foreground mt-2 text-xs">{roleMeta(role).blurb}</p>
     </div>
+  )
+}
+
+/**
+ * 目录工具栏：搜索框 + 主题分类 chip。
+ *
+ * <p>分类 chip 只显示"有轨道"的分组，避免一排空分类。选中态同时用底色和 `aria-pressed`
+ * 表达，不单靠颜色。
+ */
+function CatalogToolbar({
+  query,
+  onQuery,
+  groupKey,
+  onGroup,
+  counts,
+  total,
+  matched,
+}: {
+  query: string
+  onQuery: (next: string) => void
+  groupKey: string
+  onGroup: (next: string) => void
+  counts: Map<string, number>
+  total: number
+  matched: number
+}) {
+  const chips = [
+    { key: 'all', label: '全部', count: total },
+    ...TRACK_GROUPS.filter((group) => (counts.get(group.key) ?? 0) > 0).map((group) => ({
+      key: group.key,
+      label: group.label,
+      count: counts.get(group.key) ?? 0,
+    })),
+  ]
+  const otherCount = counts.get(OTHER_GROUP.key) ?? 0
+  if (otherCount > 0) {
+    chips.push({ key: OTHER_GROUP.key, label: OTHER_GROUP.label, count: otherCount })
+  }
+
+  return (
+    <section className="mb-6" data-testid="learn-catalog-tools">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+          <Input
+            data-testid="learn-search"
+            type="search"
+            value={query}
+            onChange={(event) => onQuery(event.target.value)}
+            placeholder="搜索轨道：Java、Docker、智能体…"
+            aria-label="搜索学习轨道"
+            className="h-10 pl-9"
+          />
+        </div>
+        <span className="text-muted-foreground shrink-0 text-sm" data-testid="learn-search-count">
+          共 {matched} 条
+        </span>
+      </div>
+
+      <div role="group" aria-label="按主题筛选" className="mt-3 flex flex-wrap gap-2">
+        {chips.map((chip) => {
+          const active = groupKey === chip.key
+          return (
+            <button
+              key={chip.key}
+              type="button"
+              data-testid={`learn-category-${chip.key}`}
+              aria-pressed={active}
+              onClick={() => onGroup(chip.key)}
+              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                active
+                  ? 'border-primary bg-primary/10 text-primary font-medium'
+                  : 'border-border bg-card hover:border-primary/40'
+              }`}
+            >
+              {chip.label}
+              <span className="text-muted-foreground ml-1 text-xs tabular-nums">{chip.count}</span>
+            </button>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+/**
+ * 一个主题分类：可折叠的标题 + 卡片网格。
+ *
+ * <p>分成多段后一屏会很长，所以每段都做成原生 `<details>`（默认展开、可收起），
+ * 折叠状态直接拿到键盘与读屏语义，不用自己补 aria。
+ */
+function CategorySection({
+  groupKey,
+  title,
+  hint,
+  tracks,
+  role,
+}: {
+  groupKey: string
+  title: string
+  hint: string
+  tracks: TrackSummary[]
+  role: RoleKey
+}) {
+  const [open, setOpen] = useState(true)
+  const passed = tracks.reduce((sum, track) => sum + track.passedCount, 0)
+  const stages = tracks.reduce((sum, track) => sum + track.stageCount, 0)
+  return (
+    <details
+      className="mt-2 mb-8"
+      data-testid={`learn-group-${groupKey}`}
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 [&::-webkit-details-marker]:hidden">
+        <h2 className="text-lg font-semibold">{title}</h2>
+        <span className="text-muted-foreground text-sm" data-testid={`learn-group-${groupKey}-count`}>
+          {tracks.length} 条 · {stages} 关 · 已通关 {passed}
+        </span>
+        <span className="text-primary text-xs">{open ? '收起' : '展开'}</span>
+      </summary>
+      <p className="text-muted-foreground mt-1 mb-4 text-sm">{hint}</p>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {/* 基宽必须显式 `grid-cols-1`：隐式列是 auto（按 min-content 撑），360px 下卡片
+            会被内容撑到 394px、整页横向滚 50px。`grid-cols-1` 是 minmax(0,1fr)，卡片才肯缩。 */}
+        {tracks.map((track) => (
+          <TrackCard key={track.id} track={track} role={role} />
+        ))}
+      </div>
+    </details>
   )
 }
 
@@ -508,73 +694,6 @@ function AdviceCard({
 }
 
 /**
- * 推荐理由的本地缓存：键里带岗位与自然日，所以同一份理由一天只买一次。
- *
- * <p>读写都吞异常：隐私模式或配额满时按"没有缓存"处理——一个可选的缓存不该让整页报错。
- */
-
-/**
- * 一栏轨道：理论或实战。空的时候给明确空状态，不留一片空白。
- *
- * <p>`collapsible` 只给选读用：17 条选读全部铺开时，一屏全是卡，核心那三条反被推上去。
- * 用原生 `<details>`，折叠状态直接拿到键盘与读屏语义，不用自己补 aria。
- */
-function TrackSection({
-  testId,
-  title,
-  hint,
-  tracks,
-  emptyText,
-  collapsible = false,
-}: {
-  testId: string
-  title: string
-  hint: string
-  tracks: TrackSummary[]
-  emptyText?: string
-  collapsible?: boolean
-}) {
-  const [open, setOpen] = useState(!collapsible)
-  const passed = tracks.reduce((sum, track) => sum + track.passedCount, 0)
-  const stages = tracks.reduce((sum, track) => sum + track.stageCount, 0)
-  return (
-    <details
-      className="mt-2 mb-8"
-      data-testid={testId}
-      open={open}
-      onToggle={(event) => setOpen(event.currentTarget.open)}
-    >
-      <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 [&::-webkit-details-marker]:hidden">
-        <h2 className="text-lg font-semibold">{title}</h2>
-        <span className="text-muted-foreground text-sm" data-testid={`${testId}-count`}>
-          {tracks.length} 条 · {stages} 关 · 已通关 {passed}
-        </span>
-        {collapsible ? (
-          <span className="text-primary text-xs" data-testid={`${testId}-toggle`}>
-            {open ? '收起' : '展开'}
-          </span>
-        ) : null}
-      </summary>
-      <p className="text-muted-foreground mt-1 mb-4 text-sm">{hint}</p>
-      {tracks.length === 0 ? (
-        <p className="border-border text-muted-foreground rounded-xl border border-dashed p-5 text-sm"
-           data-testid={`${testId}-empty`}>
-          {emptyText ?? '还没有内容。'}
-        </p>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {/* 基宽必须显式 `grid-cols-1`：隐式列是 auto（按 min-content 撑），360px 下卡片
-              会被内容撑到 394px、整页横向滚 50px。`grid-cols-1` 是 minmax(0,1fr)，卡片才肯缩。 */}
-          {tracks.map((track) => (
-            <TrackCard key={track.id} track={track} />
-          ))}
-        </div>
-      )}
-    </details>
-  )
-}
-
-/**
  * 一张轨道卡。
  *
  * <p>三条与"千篇一律"直接相关的决定：
@@ -586,14 +705,18 @@ function TrackSection({
  *   <li>**正在学的那条给状态徽章**（已通关 / 进行中 / 待开始）。一屏 12 张卡里
  *       只有一条是"你正在做的"，它必须自己站出来。</li>
  * </ol>
+ *
+ * <p>另加一个极轻的「核心 / 进阶」小标：分类分组后，岗位优先级不该丢，但它只做提示，
+ * 不是门禁。
  */
-function TrackCard({ track }: { track: TrackSummary }) {
+function TrackCard({ track, role }: { track: TrackSummary; role: RoleKey }) {
   const percent = track.stageCount === 0
     ? 0
     : Math.round((track.passedCount / track.stageCount) * 100)
   const Icon = TRACK_ICONS[track.slug] ?? (track.mode === 'practice' ? Code2 : BookOpenCheck)
   const done = track.stageCount > 0 && track.passedCount === track.stageCount
   const started = track.passedCount > 0 && !done
+  const { tier } = tierOf(role, track.slug)
   return (
     <Link
       to={`/learn/${track.slug}`}
@@ -614,6 +737,11 @@ function TrackCard({ track }: { track: TrackSummary }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h3 className="min-w-0 truncate text-base font-medium">{track.name}</h3>
+            {tier === 'core' ? (
+              <span className="text-primary shrink-0 text-xs">核心</span>
+            ) : tier === 'advanced' ? (
+              <span className="text-muted-foreground shrink-0 text-xs">进阶</span>
+            ) : null}
             {done ? (
               <span className="text-success flex shrink-0 items-center gap-1 text-xs">
                 <CheckCircle2 className="size-3.5" />

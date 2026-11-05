@@ -15,13 +15,9 @@ import { signIn } from './session'
  */
 
 /**
- * 第一张**可见**的轨道卡。选读区默认折叠，而测试库里的种子轨道可能全在选读里，
- * 所以没有可见卡片时先把选读展开——折叠本身由 REQ-001 的用例单独断言。
+ * 第一张**可见**的轨道卡。目录按主题分组，全部默认展开，所以直接取第一张可见的卡。
  */
 async function firstTrack(page: Page) {
-  if ((await page.locator('[data-testid^="learn-track-"]:visible').count()) === 0) {
-    await page.getByTestId('learn-optional-toggle').click()
-  }
   return page.locator('[data-testid^="learn-track-"]:visible').first()
 }
 
@@ -42,14 +38,14 @@ test.describe('从零开始', () => {
     await expect(await firstTrack(page)).toBeVisible({ timeout: 15_000 })
   })
 
-  test('岗位选择器与三段地图都在，切岗位后选中态跟着变', async ({ page }) => {
+  test('岗位选择器与主题目录都在，切岗位后选中态跟着变', async ({ page }) => {
     await page.goto('/#/learn')
 
     await expect(page.getByTestId('learn-roles')).toBeVisible({ timeout: 15_000 })
-    // 三段始终渲染（空段给明确空状态），所以这不依赖库里有没有内容
-    await expect(page.getByTestId('learn-core')).toBeVisible()
-    await expect(page.getByTestId('learn-advanced')).toBeVisible()
-    await expect(page.getByTestId('learn-optional')).toBeVisible()
+    // 主题目录始终渲染（无轨道时另有空状态用例），分类 chip 至少有一个
+    await expect(page.getByTestId('learn-catalog-tools')).toBeVisible()
+    await expect(page.getByTestId('learn-search')).toBeVisible()
+    await expect(page.locator('[data-testid^="learn-category-"]').first()).toBeVisible()
 
     // 岗位选择是**存在账号上**的（WORK-047 落库），所以不能假设默认是哪一个：
     // 上一轮跑过这条用例的账号可能已经把目标岗位改走了。先确认"恰好一个被选中"。
@@ -70,22 +66,30 @@ test.describe('从零开始', () => {
     await expect(from).toHaveAttribute('aria-pressed', 'true')
   })
 
-  test('选读默认折叠、岗位总览与只看未通关', async ({ page }) => {
+  test('搜索与主题筛选能收窄目录，空结果有提示', async ({ page }) => {
     await page.goto('/#/learn')
-    await expect(page.getByTestId('learn-optional-toggle')).toBeVisible({ timeout: 15_000 })
-    // 测试库可能没有核心/进阶轨道：没有可数的关时这一行本就不该出现
-    const coreTracks = page.locator('[data-testid="learn-core"] [data-testid^="learn-track-"]')
-    if ((await coreTracks.count()) === 0) {
-      await expect(page.getByTestId('learn-role-progress')).toHaveCount(0)
-    } else {
-      await expect(page.getByTestId('learn-role-progress')).toBeVisible()
+    const search = page.getByTestId('learn-search')
+    await expect(search).toBeVisible({ timeout: 15_000 })
+    await expect(page.locator('[data-testid^="learn-category-"]').first()).toBeVisible()
+
+    // 搜一个不可能存在的词：不崩，给明确空状态
+    await search.fill('zzz-没有这条轨道')
+    await expect(page.getByTestId('learn-no-match')).toBeVisible()
+
+    // 清空后恢复出卡片
+    await search.fill('')
+    await expect(page.locator('[data-testid^="learn-track-"]:visible').first()).toBeVisible({ timeout: 10_000 })
+
+    // 选一个具体分类：只剩有轨道的分组，且至少一条卡
+    const chip = page.locator('[data-testid^="learn-category-"]:not([data-testid="learn-category-all"])').first()
+    if ((await chip.count()) > 0) {
+      await chip.click()
+      await expect(page.locator('[data-testid^="learn-group-"]:visible').first()).toBeVisible({ timeout: 10_000 })
+      await expect(page.locator('[data-testid^="learn-track-"]:visible').first()).toBeVisible()
+      await page.getByTestId('learn-category-all').click()
     }
-    await expect(page.getByTestId('learn-optional-toggle')).toHaveText('展开')
-    await expect(page.getByTestId('learn-optional-toggle')).toBeVisible()
 
-    await page.getByTestId('learn-optional-toggle').click()
-    await expect(page.getByTestId('learn-optional-toggle')).toHaveText('收起')
-
+    // 目录仍能进关卡地图，并保留「只看未通关」
     await (await firstTrack(page)).click()
     await expect(page.getByTestId('track-map')).toBeVisible({ timeout: 15_000 })
     const before = await page.locator('[data-testid^="stage-"][data-status]').count()

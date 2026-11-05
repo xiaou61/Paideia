@@ -90,15 +90,15 @@ test.describe('导航覆盖', () => {
    * <p>改成断"落到了正确的页、且页面给了确定的结论"：有轨道就显示轨道，没有就显示空状态。
    * 两者都能证明入口是通的，而两者都不依赖库里恰好有什么。
    *
-   * <p>WORK-038 之后轨道分两栏，`learn-tracks` 不再是单一容器；WORK-047 又改成按岗位的三段，
-   * 所以锚点换成**始终渲染的「核心」段**——它不依赖库里恰好有什么。
+   * <p>WORK-038 之后轨道分两栏，WORK-047 改成按岗位的三段；本次又改成「主题分类目录 + 搜索」。
+   * 所以锚点换成本次新增的**目录工具栏**（有轨道时出现，没轨道时出现空状态），两者都不依赖具体课名。
    */
   test('「从零开始」点进去落到学习页，且有轨道或明确空状态', async ({ page }) => {
     await page.goto('/#/')
     await clickNav(page, 'learner-nav-learn')
     await expect(page).toHaveURL(/#\/learn/)
 
-    const tracks = page.getByTestId('learn-core')
+    const tracks = page.getByTestId('learn-catalog-tools')
     const empty = page.getByTestId('learn-empty')
     // 加载中（learn-state）不算结论，所以等到两者之一出现为止
     await expect(tracks.or(empty)).toBeVisible({ timeout: 15_000 })
