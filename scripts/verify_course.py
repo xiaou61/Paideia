@@ -467,7 +467,15 @@ def main() -> int:
         print(f"目录不存在：{root}", file=sys.stderr)
         return 2
 
-    files = sorted(path for path in root.rglob("*.md") if path.name != "README.md")
+    # 由各自专门的验证器覆盖、不适用课程模板的线（目录名）：
+    #   spring-boot-project：WORK-055 的实战项目线，由 scripts/verify_spring_project.py 真跑 mvn 覆盖，
+    #                        verify_course 不校验它的「七小节 / quiz / learning-path」模板。
+    excluded_lines = {"spring-boot-project"}
+    files = sorted(
+        path
+        for path in root.rglob("*.md")
+        if path.name != "README.md" and not (excluded_lines & set(path.relative_to(root).parts))
+    )
     if not files:
         print(f"没有找到课程文件（{root}）——空目录视为通过")
         return 0
