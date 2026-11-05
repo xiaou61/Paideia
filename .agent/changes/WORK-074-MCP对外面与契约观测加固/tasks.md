@@ -5,6 +5,9 @@ work: MCP 对外面与契约观测加固
 status: approved
 created: 2026-11-05
 updated: 2026-11-05
+approved_by: xiaou61
+approved_at: 2026-11-05 17:05:17 +0800
+approver_role: owner
 ---
 
 # 实施任务
