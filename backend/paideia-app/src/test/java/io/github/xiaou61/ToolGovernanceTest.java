@@ -97,4 +97,21 @@ class ToolGovernanceTest {
         Files.writeString(out, sb.toString(), StandardCharsets.UTF_8);
         assertThat(Files.readString(out)).contains("| 工具 |");
     }
+
+    @Test
+    @DisplayName("每个工具对普通只读视图的可见性正确（只读可见、写/管理/非只读不可见）")
+    void everyToolHasCorrectReadVisibility() {
+        List<ToolDescriptor> readView =
+                catalog.view(ToolQuery.view(Set.of(), false, "learner", Set.of(ToolScope.READ)));
+        java.util.Set<String> visible = readView.stream().map(ToolDescriptor::name)
+                .collect(java.util.stream.Collectors.toSet());
+        for (ToolDescriptor d : catalog.snapshot()) {
+            if (d.scope() == ToolScope.READ && d.readOnly()) {
+                assertThat(visible).as("只读工具 %s 应在普通只读视图里可见", d.name()).contains(d.name());
+            } else {
+                assertThat(visible).as("非只读/写/管理工具 %s 不应出现在普通只读视图", d.name())
+                        .doesNotContain(d.name());
+            }
+        }
+    }
 }

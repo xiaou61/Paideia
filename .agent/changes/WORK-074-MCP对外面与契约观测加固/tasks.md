@@ -41,11 +41,12 @@ approver_role: owner
 - 新建：`backend/paideia-app/src/test/java/io/github/xiaou61/ToolGovernanceTest.java`；生成 `docs/architecture/tool-inventory.md`
 - 验证：**已实跑**——本地 Maven 连服务器临时独占库执行 `ToolGovernanceTest`：`Tests run: 4, Failures: 0, Errors: 0, Skipped: 0`，BUILD SUCCESS；生成 `docs/architecture/tool-inventory.md`，**运行时注册 67 个工具**（22 个源文件）。临时库/账号已清理。
 
-### TASK-B2 | pending | tool 契约测试（无副作用拒绝矩阵）
+### TASK-B2 | done | tool 契约测试（无副作用拒绝矩阵）
 - 对应：REQ-002、AC-002
 - 依赖：B1
-- 新建：`backend/paideia-mcp/src/test/java/io/github/xiaou61/mcp/internal/McpToolContractTest.java`
-- 验证：`cd backend && ../scripts/test-db.sh mvn -B -pl paideia-mcp -am -Dtest=McpToolContractTest ... test` → 通过
+- 复用：`backend/paideia-mcp/src/test/java/io/github/xiaou61/mcp/internal/McpToolInvokerTest.java` **已完整覆盖**拒绝矩阵（未知工具/视图不可见/scope/ADMIN/限流/配额/被拒不执行/被拒不烧配额/指标标签无用户输入，共 15 用例，纯单测无副作用）。
+- 修改：`ToolGovernanceTest` 增加 `everyToolHasCorrectReadVisibility`——对真实 67 个工具逐个断言"只读可见、写/管理/非只读不可见"，把契约覆盖到**每个注册工具**。
+- 验证：`ToolGovernanceTest` 全绿（含新用例）
 
 ### TASK-B3 | pending | REST↔tool 收敛审计
 - 对应：REQ-003、AC-003
