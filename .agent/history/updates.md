@@ -10081,4 +10081,9 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 依据：`backend/pom.xml`（12 模块）、`frontend/packages|apps`（16 个 workspace 包）、`docs/architecture/01-module-dependencies.md`、`04-frontend-packages.md`、各模块 `src/main` 与 `src/test` 目录、`frontend/apps/*/src/router.tsx`、`.agent/html/`。
 - 验证：逐项核对路径存在；模块数 12/12、包数 16/16；测试类与 e2e 文件按实际目录计数；纯文档改动，未改代码、未跑测试。
 - 本地提交：待用户授权/未提交
-- 远端推送：未执行
+- 远端推送：未执行## 2026-11-05 11:22 +0800 · 索引刷新提交与推送
+- 类型：commit
+- 变更：提交 `.agent/INDEX.md`、`.agent/README.md`、`.agent/history/updates.md` 三个文件，提交号 `a411e76d`。
+- 验证：`git push origin master` 成功，远端更新 `0e84ac70..a411e76d`。
+- 本地提交：a411e76d
+- 远端推送：已执行（origin/master）
