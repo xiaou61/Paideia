@@ -91,7 +91,7 @@ redis-cli BGREWRITEAOF    # 重写：把流水账压成能重建当前状态的�
 
 ## 混合持久化：现在默认的形态
 
-Redis 4.0 之后，开启 AOF 时默认使用混合格式（`aof-use-rdb-preamble yes`）：AOF 文件的开头是一份 RDB 快照（重写那一刻的全量），后面接 AOF 格式的增量命令。
+Redis 4.0 之后，开启 AOF 时默认使用混合格式（`aof-use-rdb-preamble yes`）。AOF 文件的开头是一份 RDB 快照（重写那一刻的全量），后面接 AOF 格式的增量命令。
 
 恢复时先加载前半段快照（快），再重放后半段增量（少）。既有 RDB 的恢复速度，又有 AOF 的低丢失。
 
@@ -172,7 +172,7 @@ redis-cli GET k1     # 大概率还在
 ### 误区：AOF 一定比 RDB 安全
 
 **你以为**：AOF 记每条命令，所以更可靠。
-**其实**：AOF 文件更大、恢复更慢，而且如果磁盘写满，AOF 写入失败会让 Redis 直接拒绝写入（`aof_last_write_status:err`）。RDB 在小数据量、可容忍分钟级丢失时反而更省事。
+**其实**：AOF 文件更大、恢复更慢。而且如果磁盘写满，AOF 写入失败会让 Redis 直接拒绝写入（`aof_last_write_status:err`）。RDB 在小数据量、可容忍分钟级丢失时反而更省事。
 **怎么验证**：`INFO persistence` 看 `aof_last_write_status` 与 `rdb_last_bgsave_status`，两者都要盯。
 
 ### 误区：BGSAVE 不阻塞
