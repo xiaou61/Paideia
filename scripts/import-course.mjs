@@ -22,6 +22,7 @@
  *   ... node scripts/import-course.mjs --base-url http://127.0.0.1:8081
  */
 
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
@@ -460,6 +461,31 @@ async function importLanguage(client, language, lessons, options, allEntries) {
   return { created: created.length, updated: updates, relations, stages: stages.length }
 }
 
+/**
+ * 内容目录的确定性哈希（WORK-074 C4）：按相对路径排序，逐个把"相对路径 + 内容"喂进 sha256。
+ * 供仓库侧 `check-content-drift.mjs` 判断"源改了但没导入"。
+ */
+function contentHash(dir) {
+  const files = []
+  const collect = (d) => {
+    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+      const full = path.join(d, entry.name)
+      if (entry.isDirectory()) collect(full)
+      else if (entry.name.endsWith('.md') && entry.name !== 'README.md') files.push(full)
+    }
+  }
+  collect(dir)
+  files.sort()
+  const hash = crypto.createHash('sha256')
+  for (const file of files) {
+    hash.update(path.relative(dir, file).split(path.sep).join('/'))
+    hash.update('\0')
+    hash.update(fs.readFileSync(file))
+    hash.update('\0')
+  }
+  return hash.digest('hex')
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2))
 
@@ -509,6 +535,7 @@ async function main() {
     try {
       await client.post('/api/v1/ops/admin/content-import', {
         source: options.dir,
+        sourceHash: contentHash(options.dir),
         created: totals.created,
         updated: totals.updated,
         relations: totals.relations,

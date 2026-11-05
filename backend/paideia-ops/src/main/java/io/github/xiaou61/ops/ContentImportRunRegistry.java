@@ -8,11 +8,11 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 
 /**
- * 最近若干次内容导入运行的汇总（WORK-074 C3）。
+ * 最近若干次内容导入运行的汇总（WORK-074 C3/C4）。
  *
- * <p><b>为什么是进程内环形</b>：内容是"改 md → 跑导入脚本"，一次运行就是一条业务事实，量极小
- * （一天几次）。为它开一张表 + 迁移不划算；而"最近发生了什么"是管理端真正要看的。
- * 长期趋势（漂移）交给 Prometheus 指标，那里才需要跨重启。
+ * <p>进程内环形、重启清空——够回答"最近导入发生了什么"，并给"距上次导入多久"这个时效指标提供数据源。
+ * 真正的漂移判定在仓库侧（`scripts/check-content-drift.mjs` 用 `sourceHash` 比对），因为部署机看不到
+ * 仓库内容。
  */
 @Component
 class ContentImportRunRegistry {
@@ -21,8 +21,8 @@ class ContentImportRunRegistry {
 
     private final Deque<ContentImportRun> runs = new ArrayDeque<>();
 
-    synchronized void record(String source, int created, int updated, int relations) {
-        runs.addFirst(new ContentImportRun(source, created, updated, relations, Instant.now()));
+    synchronized void record(String source, String sourceHash, int created, int updated, int relations) {
+        runs.addFirst(new ContentImportRun(source, sourceHash, created, updated, relations, Instant.now()));
         while (runs.size() > MAX) {
             runs.removeLast();
         }
@@ -34,5 +34,13 @@ class ContentImportRunRegistry {
 
     synchronized int size() {
         return runs.size();
+    }
+
+    synchronized Instant lastAt() {
+        return runs.isEmpty() ? null : runs.peekFirst().at();
+    }
+
+    synchronized String lastHash() {
+        return runs.isEmpty() ? null : runs.peekFirst().sourceHash();
     }
 }

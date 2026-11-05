@@ -1,0 +1,19 @@
+# 内容导入时效告警规则（WORK-074 C4，供 Grafana/Prometheus 选用）
+#
+# 背景：部署机看不到仓库 content/，"源改了没导入"由仓库侧 `scripts/check-content-drift.mjs` 判定；
+# 这里补一条**部署机可见**的时效告警：内容很久没导入了（多半是改了内容却忘了跑导入）。
+#
+# 指标：paideia.content.days_since_last_import（Gauge，天；-1=从未导入），由 ContentImportMetrics 暴露。
+# 与 WORK-028 现有四条告警同一通道（Grafana 邮件）；落盘前请按 /opt/paideia-ops 的实际规则文件格式并入。
+
+groups:
+  - name: paideia-content-import
+    rules:
+      - alert: ContentImportStale
+        expr: paideia_content_days_since_last_import > 7
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "内容已超过 7 天未导入"
+          description: "paideia.content.days_since_last_import={{ $value }}；若近期改过 content/，请运行 scripts/import-course.mjs；也可用 scripts/check-content-drift.mjs 核对漂移。"

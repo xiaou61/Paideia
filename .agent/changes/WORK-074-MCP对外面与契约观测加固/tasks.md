@@ -70,11 +70,12 @@ updated: 2026-11-05
 - 验证：MCP——`McpToolInvokerTest` 20/20；导入——`ContentImportRunRegistryTest` 2/2，`ApiSurfaceTest` 7/7（新端点带 `@ApiAccess(ADMIN)` 通过接口守卫，上下文正常启动）。
 - 说明：导入汇总经 ops/admin 端点可见（POST 上报 / GET 查询）；Analytics **页面**的可视化卡片留作前端后续小改（数据已可查）。
 
-### TASK-007 | pending | 导入漂移 Grafana 告警
+### TASK-007 | done | 导入漂移告警（服务端时效 Gauge + 仓库侧哈希比对 + Grafana 规则）
 - 对应：REQ-007、AC-007
 - 依赖：TASK-006
-- 新建/修改：后端口径 + Grafana 规则
-- 验证：构造漂移 → 规则 firing/邮件
+- 新建/修改：`ContentImportRun.sourceHash` + 注册表 `lastAt/lastHash`；`ContentImportMetrics` 暴露 Gauge `paideia.content.days_since_last_import`；`import-course.mjs` 上报 `sourceHash`；新增 `scripts/check-content-drift.mjs`（仓库侧哈希比对，漂移退出 1，`--hash-only` 自检）；`deploy/ops/content-import-drift-alert.yaml`（Grafana 时效规则）。
+- 验证：`ContentImportRunRegistryTest` 3/3 + `ContentImportMetricsTest` 1/1（Gauge -1→0）；`check-content-drift.mjs --hash-only` 两次一致（64 位 sha256）。
+- 说明：部署机看不到仓库内容，**真正的"源改了没导入"由仓库侧脚本判定**（Grafana 只做"很久没导入"时效告警）。**live Grafana 触发与端到端漂移脚本需把新后端部署到服务器后才可验**（本轮未部署/未 push）。
 
 ## 完成条件
 
