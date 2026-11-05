@@ -503,6 +503,20 @@ async function main() {
   console.log(
     `\n${options.dryRun ? '[dry-run] ' : ''}created ${totals.created} / updated ${totals.updated} / relations ${totals.relations}`,
   )
+
+  // 导入汇总上报给管理端（WORK-074 C3）。**best-effort**：上报失败不影响已完成的导入。
+  if (client) {
+    try {
+      await client.post('/api/v1/ops/admin/content-import', {
+        source: options.dir,
+        created: totals.created,
+        updated: totals.updated,
+        relations: totals.relations,
+      })
+    } catch (error) {
+      console.warn(`  ! 导入汇总上报失败（不影响导入）：${error.message}`)
+    }
+  }
 }
 
 main().catch((error) => {

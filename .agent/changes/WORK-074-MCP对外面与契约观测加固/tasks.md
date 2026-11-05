@@ -63,12 +63,12 @@ updated: 2026-11-05
 - 修改：`CrossModuleContractTest` 增加 ai.internal 扫描例
 - 验证：反向——注入 `// import io.github.xiaou61.ai.internal...` 后 `noAiInternalImportsFromOtherModules` 红；`git checkout` 还原后绿。含 `ScheduledTaskRecorder` 仅 ops 实现的断言。
 
-### TASK-006 | in_progress | 指标（MCP 扩展 + 内容导入 Analytics）
+### TASK-006 | done | 指标（MCP 扩展 + 内容导入）
 - 对应：REQ-006、AC-006
 - 依赖：TASK-002
-- 修改：`McpMetrics`/`McpToolInvoker`；`import-course.mjs`；`paideia-ops` Analytics
-- 进展：**MCP 部分完成**——`McpMetrics.callsByTool` 增加 `paideia.mcp.tool.by_tool{tool,result}`，`McpToolInvoker` 记录，`McpToolInvokerTest` 20/20（含 `callsAreCountedPerTool`）。**导入 Analytics 部分待续。**
-- 验证（MCP）：`mvn -o -pl paideia-mcp -am -Dtest=McpToolInvokerTest test` → 20 passed
+- 修改：`McpMetrics`/`McpToolInvoker`（按 tool 计数 `paideia.mcp.tool.by_tool`）；`paideia-ops` 新增 `ContentImportRun`/`ContentImportRunRegistry`/`ContentImportController`（`/api/v1/ops/admin/content-import` POST 上报 / GET 最近）；`scripts/import-course.mjs` 导入后 best-effort 上报。
+- 验证：MCP——`McpToolInvokerTest` 20/20；导入——`ContentImportRunRegistryTest` 2/2，`ApiSurfaceTest` 7/7（新端点带 `@ApiAccess(ADMIN)` 通过接口守卫，上下文正常启动）。
+- 说明：导入汇总经 ops/admin 端点可见（POST 上报 / GET 查询）；Analytics **页面**的可视化卡片留作前端后续小改（数据已可查）。
 
 ### TASK-007 | pending | 导入漂移 Grafana 告警
 - 对应：REQ-007、AC-007
