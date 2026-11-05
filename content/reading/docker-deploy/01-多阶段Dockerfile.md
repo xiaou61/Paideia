@@ -16,9 +16,40 @@ status: published
 - 进程以**非 root** 用户运行；
 - 声明 `EXPOSE 8080`，有 `HEALTHCHECK` 与 `ENTRYPOINT`。
 
+打个比方：多阶段像盖楼用的脚手架，楼盖好就把脚手架拆走，交付的楼里不留钢管和水泥袋。真实机制是：Docker 每个 `FROM` 是一个独立阶段，最终镜像只保留最后一个阶段的文件系统。
+
+```sketch
+{
+  "title": "多阶段：工具留在构建阶段",
+  "rows": [
+    [
+      { "id": "maven", "title": "构建阶段", "sub": "maven + JDK", "tone": "violet" },
+      { "id": "jar", "title": "app.jar", "sub": "编译产物", "tone": "violet" }
+    ],
+    [
+      { "id": "jre", "title": "运行阶段", "sub": "JRE 镜像", "tone": "blue" },
+      { "id": "copy", "title": "COPY --from", "sub": "只带产物", "tone": "blue" }
+    ],
+    [
+      { "id": "user", "title": "USER 1000", "sub": "非 root 运行", "tone": "green" },
+      { "id": "expose", "title": "EXPOSE 8080", "sub": "声明端口", "tone": "green" },
+      { "id": "health", "title": "HEALTHCHECK", "sub": "判断真健康", "tone": "green" },
+      { "id": "entry", "title": "ENTRYPOINT", "sub": "启动进程", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "maven", "to": "jar", "label": "打包" },
+    { "from": "jar", "to": "copy", "label": "跨阶段复制" },
+    { "from": "jre", "to": "copy", "label": "装进运行镜像" },
+    { "from": "copy", "to": "user", "label": "再降权" },
+    { "from": "user", "to": "entry", "label": "启动" }
+  ]
+}
+```
+
 ## 先想清楚
 
-多阶段的收益只有一个：**运行镜像里没有构建工具**。JDK + Maven 镜像通常 500MB 起，JRE 镜像一百多 MB；少的东西不只是体积，还有攻击面（编译器、shell 工具、包管理器）。
+多阶段的收益只有一个：**运行镜像里没有构建工具**。JDK + Maven 镜像通常 500MB 起，JRE 镜像一百多 MB。少的还不只是体积，攻击面也一起小了：编译器、shell 工具、包管理器都不在运行镜像里。
 
 ```dockerfile
 FROM maven:3.9-eclipse-temurin-21 AS build

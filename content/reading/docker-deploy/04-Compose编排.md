@@ -27,6 +27,38 @@ services:
 - `app` 等数据库**健康**后再启动，而不是"容器起来了"就启动；
 - 数据库数据落到命名卷 `db-data`。
 
+打个比方：起服务像开饭，数据库是后厨，得等后厨真的能出菜，前厅才开门迎客。真实机制是：`depends_on` 默认只等容器进程起来，`condition: service_healthy` 才会等健康检查通过。
+
+```sketch
+{
+  "title": "Compose 启动顺序",
+  "rows": [
+    [
+      { "id": "db", "title": "db 服务", "sub": "mysql:8.0", "tone": "blue" },
+      { "id": "hc", "title": "healthcheck", "sub": "mysqladmin ping", "tone": "blue" },
+      { "id": "healthy", "title": "变成 healthy", "sub": "能接受连接", "tone": "green" }
+    ],
+    [
+      { "id": "app", "title": "app 服务", "sub": "build .", "tone": "violet" },
+      { "id": "dep", "title": "depends_on", "sub": "condition service_healthy", "tone": "violet" },
+      { "id": "start", "title": "app 启动", "sub": "连得上数据库", "tone": "green" }
+    ],
+    [
+      { "id": "vol", "title": "命名卷 db-data", "sub": "挂 /var/lib/mysql", "tone": "amber" },
+      { "id": "persist", "title": "down 后还在", "sub": "down -v 才删", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "db", "to": "hc" },
+    { "from": "hc", "to": "healthy" },
+    { "from": "healthy", "to": "dep", "label": "等健康" },
+    { "from": "app", "to": "dep" },
+    { "from": "dep", "to": "start" },
+    { "from": "vol", "to": "persist" }
+  ]
+}
+```
+
 ## 先想清楚
 
 `depends_on` 默认只等"容器启动"，不等"服务可用"。MySQL 容器启动后还要初始化几十秒，这时 app 连上去会报 `Connection refused`。

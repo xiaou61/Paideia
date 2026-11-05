@@ -26,6 +26,37 @@ max=<最大 duration>
 - 只统计 `INFO` / `WARN` / `ERROR` 三个级别，其余级别忽略；
 - 没有有效行时：`total=0`、三个计数为 0、`max=0`。
 
+打个比方：日志处理像安检，每个人（每行）依次过几道闸机，过不了的就放一边，不影响后面的人。真实机制是：每行先 `json.loads`，再校验 `level` 与 `duration` 类型，不合格直接 `continue`。
+
+```sketch
+{
+  "title": "每行依次过四道关",
+  "rows": [
+    [
+      { "id": "line", "title": "读一行", "sub": "strip 去空白", "tone": "gray" },
+      { "id": "blank", "title": "空行?", "sub": "是则跳过", "tone": "blue" },
+      { "id": "load", "title": "json.loads", "sub": "失败则跳过", "tone": "blue" }
+    ],
+    [
+      { "id": "level", "title": "level 合法?", "sub": "只收三级别", "tone": "violet" },
+      { "id": "dur", "title": "duration 是 int?", "sub": "排除 bool", "tone": "violet" }
+    ],
+    [
+      { "id": "agg", "title": "累加计数", "sub": "total 与 max", "tone": "green" },
+      { "id": "out", "title": "输出五行", "sub": "固定顺序", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "line", "to": "blank" },
+    { "from": "blank", "to": "load", "label": "非空" },
+    { "from": "load", "to": "level", "label": "解析成功" },
+    { "from": "level", "to": "dur" },
+    { "from": "dur", "to": "agg" },
+    { "from": "agg", "to": "out" }
+  ]
+}
+```
+
 ## 先想清楚
 
 日志处理的默认策略应该是**逐行容错**：一行坏了，跳过它，继续下一条。真实日志里总有截断的行、夹杂的调试输出。
@@ -48,7 +79,7 @@ for line in sys.stdin:
     ...
 ```
 
-`isinstance(duration, bool)` 这个判断容易被忘：Python 里 `True` 是 `int` 的子类，`isinstance(True, int)` 为真。
+`isinstance(duration, bool)` 这个判断容易被忘。Python 里 `True` 是 `int` 的子类，`isinstance(True, int)` 为真。
 
 ## 自己写
 
