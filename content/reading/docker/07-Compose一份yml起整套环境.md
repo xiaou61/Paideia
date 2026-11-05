@@ -13,6 +13,8 @@ status: published
 
 Compose 把这些收进**一个 yml 文件**：`docker compose up -d` 起全部，`down` 收全部。
 
+打个比方：Compose 像一张装修施工图——不用在现场一条条口头交代工人，图纸一摊，整屋怎么改一目了然。真实机制是：Compose 把服务、网络、卷、依赖写进一个声明式文件，`up -d` 按它一次性建好整套环境。
+
 ```sketch
 {
   "title": "七条 run 收进一个 yml",
@@ -126,7 +128,7 @@ depends_on:
     condition: service_healthy   # 等 db 的 healthcheck 通过
 ```
 
-这是最容易踩的坑：**第一种写法只保证容器被启动，不保证数据库能接受连接**。PostgreSQL 容器启动要几秒初始化，API 在这几秒里连不上就会崩溃，然后 `restart` 又把它拉起来——你看到的是"日志里一直连不上，过一会儿自己好了"。
+这是最容易踩的坑：**第一种写法只保证容器被启动，不保证数据库能接受连接**。PostgreSQL 容器启动要几秒初始化，API 在这几秒里连不上就会崩溃，然后 `restart` 又把它拉起来。你看到的是"日志里一直连不上，过一会儿自己好了"。
 
 要真正等就两个条件一起给：目标服务有 `healthcheck`，依赖方写 `condition: service_healthy`。
 

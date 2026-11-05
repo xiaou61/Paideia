@@ -13,6 +13,8 @@ status: published
 
 这一关给一套固定顺序：**先看状态与退出码，再看日志，再看配置，最后才进去**。
 
+打个比方：排查容器像医生看病——先量体温（看状态与退出码），再验血（看日志），再做 CT（看配置），最后才动手术（进容器）。真实机制是：`docker exec` 只对运行中的容器有效，容器已退出时只能靠 `logs`/`inspect`/`cp`。
+
 ```sketch
 {
   "title": "排查顺序：状态 → 日志 → 配置 → 进去",
@@ -206,7 +208,7 @@ $ docker run --rm --network container:api nicolaka/netshoot ss -lntp
 ### 误区：镜像里装个 bash/curl 方便排查
 
 **你以为**：出问题能进去看，值得。
-**其实**：调试工具让镜像变大、攻击面变宽（curl 能下载并执行任意东西），而且**生产上真出事时你未必能进得去**（容器已停、或集群不给你 exec）。更稳的做法是把排查能力放在外面：`docker logs`、`docker inspect`、`docker cp`、共享网络命名空间的工具容器。
+**其实**：调试工具让镜像变大、攻击面变宽（curl 能下载并执行任意东西）。而且**生产上真出事时你未必能进得去**（容器已停、或集群不给你 exec）。更稳的做法是把排查能力放在外面：`docker logs`、`docker inspect`、`docker cp`、共享网络命名空间的工具容器。
 **怎么验证**：`docker run --rm --network container:api nicolaka/netshoot ss -lntp` 一行就能看到目标容器的监听，完全不需要它自带工具。
 
 ### 误区：`docker logs -f` 看到最后一行就是"最新状态"
@@ -218,5 +220,5 @@ $ docker run --rm --network container:api nicolaka/netshoot ss -lntp
 ### 误区：`docker restart` 能修好一切
 
 **你以为**：出问题就重启，简单。
-**其实**：重启会丢掉可写层里没挂载的改动（第 05 关）、清空内存里的状态（缓存、连接池、未完成的任务），而且**不改变根因**——如果是配置错，重启后照样错，只是把日志里的第一条错误冲掉了。先按本关的顺序留下证据（`docker inspect` 的输出、日志片段），再考虑重启。
+**其实**：重启会丢掉可写层里没挂载的改动（第 05 关）、清空内存里的状态（缓存、连接池、未完成的任务）。而且**不改变根因**——如果是配置错，重启后照样错，只是把日志里的第一条错误冲掉了。先按本关的顺序留下证据（`docker inspect` 的输出、日志片段），再考虑重启。
 **怎么验证**：`docker inspect --format '{{.RestartCount}} {{.State.StartedAt}}'`，重启次数高说明每次都在修表面。

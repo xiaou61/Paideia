@@ -33,6 +33,8 @@ status: published
 - 多阶段构建怎么把 500MB 的构建工具留在构建阶段、不进运行镜像；
 - `.dockerignore` 为什么是必须的。
 
+打个比方：Dockerfile 像一张菜谱——写清"先备什么料、再下什么锅"，谁照着做都能端出同一道菜。真实机制是：Docker 逐条执行 Dockerfile 指令，每条产生一个镜像层，同样的输入得到同样的镜像。
+
 ## 为什么要写成文件
 
 因为**可复现**。手工改容器做出来的镜像没人说得清它是怎么来的；Dockerfile 是一份能被 review、被版本管理、被任何人一键重建的记录。
@@ -195,7 +197,7 @@ $ docker build --progress=plain --no-cache -t myapp:v1 .
 ### 误区：`RUN apt-get update` 和 `RUN apt-get install` 分两条写更清楚
 
 **你以为**：分开写可读性好。
-**其实**：`update` 那一层会被缓存，几个月后 `install` 层重新构建时用的是**过期的索引**，于是装到旧版本，甚至报 404（包已经被仓库下架）。正确写法是合成一条：
+**其实**：`update` 那一层会被缓存。几个月后 `install` 层重新构建时用的是**过期的索引**，于是装到旧版本，甚至报 404（包已经被仓库下架）。正确写法是合成一条：
 
 ```dockerfile
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
@@ -213,5 +215,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 ### 误区：`ADD` 比 `COPY` 更强，用 `ADD` 就行
 
 **你以为**：功能多是好事。
-**其实**：`ADD` 会自动解压本地 tar、还会从 URL 下载——这两条"自动"都是隐式行为：从 URL 下载的文件**权限是 600**、不会校验哈希、每次构建都重新下载（缓存失效）。除了"确实要解压 tar 包"这一种情况，`COPY` 更可预测。
+**其实**：`ADD` 会自动解压本地 tar，还会从 URL 下载。这两条"自动"都是隐式行为：从 URL 下载的文件**权限是 600**、不会校验哈希、每次构建都重新下载（缓存失效）。除了"确实要解压 tar 包"这一种情况，`COPY` 更可预测。
 **怎么验证**：`ADD https://example.com/x.sh /x.sh` 之后 `docker run --rm 镜像 ls -l /x.sh`，会看到 `-rw-------`，与 `COPY` 的权限不同。

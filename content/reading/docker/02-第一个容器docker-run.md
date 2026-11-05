@@ -44,6 +44,8 @@ Hello from Docker!
 
 这一条命令背后是：**拉镜像 → 创建容器（加可写层）→ 启动它 → 把输出接到你的终端**。对应四个可单独执行的命令 `docker pull`、`docker create`、`docker start`、`docker attach`。理解这个分解，后面所有操作都能对上号。
 
+打个比方：`docker run` 像点一份套餐——后厨先取料（拉镜像）、装盘（建可写层）、上桌（启动）、再摆到你面前（接终端），你只喊了一句"来一份"。真实机制是：Docker 把 `pull`、`create`、`start`、`attach` 四个动作合成了一条命令，日常不用分别敲。
+
 ## 讲解
 
 ### 四组参数
