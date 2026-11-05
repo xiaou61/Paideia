@@ -51,7 +51,7 @@
     <b>这不是形式主义，是发生过的事故。</b>本仓库是公开仓库：一旦凭据进入 Git 历史，删文件不解决问题（历史、fork、缓存仍可检索），<b>只有轮换凭据才算处理完</b>。而且并发会话会把你的工作区改动卷进它的 <code>git add</code>——所以不能只扫自己写的文件，要扫 <code>git diff --cached</code>。
   </div>
   <ul>
-    <li>禁止进入任何被跟踪文件：凭据、密钥、令牌、密码、私钥、连接串、服务器地址。包括源码、配置、文档、<code>.agent/</code> 工件、更新历史、提交信息、Issue 与 PR 正文。</li>
+    <li>禁止进入任何被跟踪文件：凭据、密钥、令牌、密码、私钥、连接串、服务器地址。包括源码、配置、文档、<code>.agent/</code> 工件、提交信息、Issue 与 PR 正文。</li>
     <li>本地敏感配置放<b>被忽略</b>的文件（<code>.env.local</code>、<code>application-local.yml</code>、<code>*.local.*</code>），仓库里只留占位示例。</li>
     <li>引用密钥只写环境变量名，不写值。</li>
   </ul>
@@ -107,9 +107,9 @@
     </ul>
   </div>
 
-  <h2>每次实际修改都要留一行</h2>
-  <p>改完追加 <code>.agent/history/updates.md</code>：变更、决策、依据、验证、本地提交边界、远端推送状态。它不是流水账——<b>半年后「这条规则为什么存在」的答案在这里</b>，而不在提交标题里。</p>
-  <p>写的时候注意一条：<b>heredoc 里有反引号时要用 <code>&lt;&lt;'EOF'</code>（带引号）</b>，否则反引号会被当命令替换执行，内容静默丢失。</p>
+  <h2>每次实际修改都要留一条提交</h2>
+  <p>改完把变更、决策、依据、验证和提交边界写进 Git 提交信息（标题 + 正文）。<b>半年后「这条规则为什么存在」的答案在提交历史和已批准工件里</b>，不在单独的流水账里。</p>
+  <p>写提交信息时注意一条：<b>heredoc 里有反引号时要用 <code>&lt;&lt;'EOF'</code>（带引号）</b>，否则反引号会被当命令替换执行，内容静默丢失。</p>
 
   <h2>自查清单</h2>
   <div class="notes">
@@ -118,7 +118,7 @@
       <li><code>git diff --cached</code> 扫过凭据了吗？</li>
       <li>并发会话在工作区里时，我提交的路径是显式列出来的吗？</li>
       <li>是推送/部署吗？——<b>有单独授权吗？</b></li>
-      <li><code>updates.md</code> 追加了吗？</li>
+      <li>提交信息写清变更、依据和验证了吗？</li>
     </ul>
   </div>
 
@@ -129,7 +129,7 @@
       <li><code>.agent/rules/always.md</code> — 提交授权、审查工具与报告归档</li>
       <li><code>.agent/notes/dev-workflow.md</code> — 发版耗时拆解、工作树磁盘占用</li>
       <li><code>scripts/release.ps1</code> — 发版全流程</li>
-      <li><code>.agent/history/updates.md</code> — 每条规则与每次变更的来历</li>
+      <li><code>git log</code> — 每次变更的提交记录与依据</li>
     </ul>
   </div>
 </main>

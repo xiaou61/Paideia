@@ -24,7 +24,6 @@ updated: 2026-11-05
 | 项目理解型 HTML | `.agent/html/index.html`（入口，含 `nav.js`；18 篇专题） |
 | 架构与流程图 | `docs/architecture/`（mermaid；四张结构图由 `scripts/gen-arch-diagram.mjs` 生成，见该目录 `README.md`） |
 | 课程与阅读内容 | `content/courses/`、`content/reading/`、`content/source/` |
-| 更新历史 | `.agent/history/updates.md`（Git 历史视图如需重建，用 `.agent/scripts/generate_core_history.py --output <路径>` 生成，当前未入库） |
 
 ## 模块索引
 

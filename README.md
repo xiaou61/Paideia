@@ -178,7 +178,7 @@ cd frontend && ../scripts/test-db.sh pnpm --filter @paideia/admin test:e2e
 
 ## 文档与协作
 
-工程约定、决策记录、需求工件在 `.agent/`：常驻规范看 [`.agent/rules/always.md`](.agent/rules/always.md)，模块导航看 [`.agent/INDEX.md`](.agent/INDEX.md)，变更历史看 [`.agent/history/updates.md`](.agent/history/updates.md)。仓库是公开的，**任何凭据都不写入被 Git 跟踪的文件**。
+工程约定、决策记录、需求工件在 `.agent/`：常驻规范看 [`.agent/rules/always.md`](.agent/rules/always.md)，模块导航看 [`.agent/INDEX.md`](.agent/INDEX.md)，变更历史看 Git 提交记录。仓库是公开的，**任何凭据都不写入被 Git 跟踪的文件**。
 
 ## 授权
 
