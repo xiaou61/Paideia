@@ -10075,3 +10075,10 @@ systemctl is-active 与 journalctl 尾部，不要只看超时。
 - 验证报告：status 由 partial 更新为 **passed**。
 - 本地提交：待提交
 - 远端推送：未执行
+## 2026-11-05 11:20 +0800 · .agent/INDEX.md 全量刷新（模块与导航核对）
+- 类型：change
+- 变更：重写 `.agent/INDEX.md` 模块索引——后端补入 `paideia-knowledge`、`paideia-note`、`paideia-sandbox`、`paideia-mcp`、`paideia-ops` 五个缺失模块（共 12 个 Maven 模块），前端补入 `identity`、`resume`、`sql-workbench` 三个缺失库包（共 11 库 + 5 端）；按当前代码核对各模块/包的路径、职责、测试位置与代表工作项；修正已不存在的 `.agent/history/core-components.md` 引用，更新 HTML 理解材料为 18 篇并新增 `docs/architecture/`、`content/` 导航。同步修正 `.agent/README.md` 中同一处过期引用。
+- 依据：`backend/pom.xml`（12 模块）、`frontend/packages|apps`（16 个 workspace 包）、`docs/architecture/01-module-dependencies.md`、`04-frontend-packages.md`、各模块 `src/main` 与 `src/test` 目录、`frontend/apps/*/src/router.tsx`、`.agent/html/`。
+- 验证：逐项核对路径存在；模块数 12/12、包数 16/16；测试类与 e2e 文件按实际目录计数；纯文档改动，未改代码、未跑测试。
+- 本地提交：待用户授权/未提交
+- 远端推送：未执行
