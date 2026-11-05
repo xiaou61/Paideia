@@ -41,7 +41,9 @@ Paideia 是「千人千面的 AI 个性化学习平台」。目标不是把同�
 - **课程内容源在 `content/courses/`**（2026-10-19 由 WORK-020 确立）：改课程走 PR 改 markdown，
   再跑 `node scripts/import-course.mjs` 导入，**不在管理端手抄**。改完先跑
   `python scripts/verify_course.py`（它会真执行课程里的示例并比对输出）。
-  新增一条学习线只需要建内容目录 + 跑导入，**不改后端/前端/迁移**。
+  **结构与块统一校验**：`node scripts/check-content.mjs --scope content`（schema 见
+  `content/schema/lesson.schema.json`；`import-course.mjs` 写入前与 `release.ps1` 发版前都会自动跑；
+  要连带真执行示例再加 `--exec`）。新增一条学习线只需要建内容目录 + 跑导入，**不改后端/前端/迁移**。
 - 编码约定（与数据库选型无关，属于通用纪律）：
   - 所有 SQL 只写在 mapper 中，不在 Java 代码里拼接。
   - 时间统一存 UTC，不调用数据库的 `NOW()`/`SYSDATE()` 取业务时间。**建表默认值 `DEFAULT CURRENT_TIMESTAMP(3)` 同样属于"让数据库取时间"**，它按**会话时区**算：服务器 MySQL 的会话时区是 `SYSTEM`（+08:00），因此每个 JDBC 连接串必须同时写 `connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true`——**两个参数缺一不可**，少了后者就是"驱动按 UTC 解释、会话按本地时间写"，所有时间静默快 8 小时（2026-10-10 实测发现并已修，含存量回拨）。服务器没有装载时区表（`SET time_zone='UTC'` 报 1298），驱动会自行折算成 `+00:00` 偏移形式，所以不必装 tz 表。

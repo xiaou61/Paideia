@@ -21,11 +21,13 @@
     powershell -File scripts/release.ps1 -WithWeb        # 强制重建前端（明明没改也要重打）
     powershell -File scripts/release.ps1 -WithTests      # 发版前先跑全量后端测试
     powershell -File scripts/release.ps1 -Server <别名>  # 默认 codenest-online
+    powershell -File scripts/release.ps1 -ValidateOnly   # 只跑内容校验，不打包、不连服务器（WORK-073）
 #>
 param(
     [switch]$SkipWeb,
     [switch]$WithWeb,
     [switch]$WithTests,
+    [switch]$ValidateOnly,
     [string]$Server = 'codenest-online',
     [int]$Port = 8081,
     [string]$RemoteDir = '/opt/paideia-app',
@@ -49,6 +51,12 @@ $bsdtar = Join-Path $env:SystemRoot 'System32\tar.exe'
 $lastReleaseMarker = Join-Path $repo 'backend\paideia-app\target\.last-release-commit'
 
 if (-not (Test-Path $QuickServerScript)) { throw "找不到 quick-server 脚本：$QuickServerScript" }
+
+# 发布前内容校验（WORK-073 TASK-006）：打包与部署之前先跑统一内容校验，有 error 立即终止。
+# -ValidateOnly 只跑这一步就退出，便于本地验证与 CI 式预检（不会打包、不会连服务器）。
+& node (Join-Path $repo 'scripts\check-content.mjs') --scope content
+if ($LASTEXITCODE -ne 0) { throw "内容校验未通过（退出码 $LASTEXITCODE），已终止发版。" }
+if ($ValidateOnly) { Write-Host '仅校验（-ValidateOnly）：内容校验通过，退出，未打包未部署。'; return }
 
 function Step([string]$name, [scriptblock]$action) {
     $sw = [System.Diagnostics.Stopwatch]::StartNew()

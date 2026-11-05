@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "description": "content/ 学习内容的机读契约（WORK-073）。frontmatter 字段与围栏块类型在此声明；结构化块（structuredBlocks）的 JSON 字段规则由 scripts/check-content.mjs 依本文件实现。",
+  "fields": {
+    "title": { "type": "string", "required": true },
+    "category": { "type": "string", "required": true },
+    "order": { "type": "integer", "required": true, "min": 0 },
+    "minutes": { "type": "integer", "required": true, "min": 0 },
+    "status": { "type": "string", "required": true, "enum": ["published"] },
+    "level": { "type": "string", "enum": ["beginner", "intermediate", "advanced"] },
+    "chapter": { "type": "string" },
+    "prerequisite": { "type": "string" },
+    "line_name": { "type": "string" },
+    "line_sort": { "type": "integer" },
+    "line_kind": { "type": "string", "enum": ["course", "reading"] },
+    "line_summary": { "type": "string" },
+    "line_mode": { "type": "string", "enum": ["practice", "theory"] },
+    "line_theory": {
+      "type": "string",
+      "enum": [
+        "spring-from-zero",
+        "docker",
+        "java-from-zero",
+        "linux-from-zero",
+        "python-from-zero",
+        "mysql-from-zero"
+      ]
+    },
+    "verify": { "type": "string", "enum": ["project", "run", "sql"] },
+    "line_parent": { "type": "string", "enum": ["books", "source"] },
+    "line_parent_name": { "type": "string", "enum": ["书籍详解", "源码精读"] }
+  },
+  "blocks": [
+    "text",
+    "java",
+    "sketch",
+    "quiz",
+    "code-challenge",
+    "python",
+    "sql",
+    "bash",
+    "js",
+    "yaml",
+    "learning-path",
+    "dockerfile",
+    "mermaid",
+    "source-walk",
+    "ts",
+    "go",
+    "css",
+    "code-map",
+    "nginx",
+    "json",
+    "ini",
+    "jsx",
+    "sql-challenge",
+    "html",
+    "xml",
+    "markdown",
+    "tsx",
+    "sh",
+    "lua"
+  ],
+  "structuredBlocks": [
+    "quiz",
+    "code-challenge",
+    "sketch",
+    "learning-path",
+    "source-walk",
+    "code-map",
+    "sql-challenge"
+  ]
+}

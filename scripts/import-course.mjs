@@ -26,6 +26,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import { validateContent } from './check-content.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -461,6 +462,19 @@ async function importLanguage(client, language, lessons, options, allEntries) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2))
+
+  // 写入前先做统一内容校验（WORK-073 TASK-005）：有 error 即中止，不发起任何写请求。
+  {
+    const scope = path.relative(ROOT, options.dir) || 'content'
+    const { errors } = await validateContent({ scope })
+    if (errors.length > 0) {
+      console.error(`内容校验未通过（${errors.length} 个问题），已中止导入，库未做任何变更：`)
+      for (const e of errors.slice(0, 50)) console.error(`  ${e.file}:${e.line}  ${e.rule}  ${e.message}`)
+      if (errors.length > 50) console.error(`  … 其余 ${errors.length - 50} 条省略`)
+      process.exit(1)
+    }
+  }
+
   const languages = collectLessons(options.dir)
   if (languages.size === 0) {
     console.log(`没有找到课程（${options.dir}）`)
