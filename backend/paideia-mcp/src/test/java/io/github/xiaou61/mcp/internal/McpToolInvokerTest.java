@@ -354,4 +354,15 @@ class McpToolInvokerTest {
         registry.getMeters().forEach(meter -> meter.getId().getTags().forEach(tag ->
                 assertThat(tag.getValue()).doesNotContain("某个用户的搜索词")));
     }
+
+    /** WORK-074 C3：按 tool 维度的调用计数可查（Prometheus `paideia.mcp.tool.by_tool`）。 */
+    @Test
+    void callsAreCountedPerTool() {
+        invoker(100).invoke(READER, McpViews.parse("/x/knowledge").orElseThrow(),
+                "knowledge_search", Map.of());
+
+        assertThat(registry.get("paideia.mcp.tool.by_tool")
+                .tag("tool", "knowledge_search").tag("result", McpMetrics.OK).counter().count())
+                .isEqualTo(1.0);
+    }
 }

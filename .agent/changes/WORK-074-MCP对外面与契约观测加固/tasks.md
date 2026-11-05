@@ -63,11 +63,12 @@ updated: 2026-11-05
 - 修改：`CrossModuleContractTest` 增加 ai.internal 扫描例
 - 验证：反向——注入 `// import io.github.xiaou61.ai.internal...` 后 `noAiInternalImportsFromOtherModules` 红；`git checkout` 还原后绿。含 `ScheduledTaskRecorder` 仅 ops 实现的断言。
 
-### TASK-006 | pending | 指标（MCP 扩展 + 内容导入 Analytics）
+### TASK-006 | in_progress | 指标（MCP 扩展 + 内容导入 Analytics）
 - 对应：REQ-006、AC-006
 - 依赖：TASK-002
 - 修改：`McpMetrics`/`McpToolInvoker`；`import-course.mjs`；`paideia-ops` Analytics
-- 验证：指标可在 Prometheus 查询；导入统计在 Analytics 可见
+- 进展：**MCP 部分完成**——`McpMetrics.callsByTool` 增加 `paideia.mcp.tool.by_tool{tool,result}`，`McpToolInvoker` 记录，`McpToolInvokerTest` 20/20（含 `callsAreCountedPerTool`）。**导入 Analytics 部分待续。**
+- 验证（MCP）：`mvn -o -pl paideia-mcp -am -Dtest=McpToolInvokerTest test` → 20 passed
 
 ### TASK-007 | pending | 导入漂移 Grafana 告警
 - 对应：REQ-007、AC-007

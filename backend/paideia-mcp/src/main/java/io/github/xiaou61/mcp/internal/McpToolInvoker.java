@@ -170,6 +170,7 @@ class McpToolInvoker {
                     .map(tool -> tool.descriptor().toolset())
                     .orElse("unknown");
             metrics.calls(toolset, resultClass(result, denial));
+            metrics.callsByTool(toolName, resultClass(result, denial));
             metrics.duration(toolName, seconds);
             if (denial.denied()) {
                 metrics.denied(denial.key());

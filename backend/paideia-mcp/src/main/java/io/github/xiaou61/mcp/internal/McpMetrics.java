@@ -31,6 +31,16 @@ class McpMetrics {
         registry.counter("paideia.mcp.tool.calls", "toolset", toolset, "result", result).increment();
     }
 
+    /**
+     * 按**工具维度**的调用计数（WORK-074 C3）。
+     *
+     * <p>比按 toolset 更细：toolset 只能说"知识库这一组怎么样"，定位不到"具体哪个工具在失败"。
+     * tool 名是有限枚举（注册工具数），做标签安全。
+     */
+    void callsByTool(String tool, String result) {
+        registry.counter("paideia.mcp.tool.by_tool", "tool", tool, "result", result).increment();
+    }
+
     /** 单个工具的耗时（秒）。 */
     void duration(String tool, double seconds) {
         registry.timer("paideia.mcp.tool.duration", "tool", tool).record(
