@@ -9,7 +9,9 @@ status: published
 
 ## 这一关要做什么
 
-LRU（Least Recently Used）：容量满了，淘汰**最久没被使用**的那个。难点不在"存"，在"最近使用"要被 `get` 和 `put` 同时更新——只用一个 `HashMap` 存得下所有 key，却完全不知道谁该走。
+LRU（Least Recently Used）：容量满了，淘汰**最久没被使用**的那个。难点不在"存"，在"最近使用"要被 `get` 和 `put` 同时更新。只用一个 `HashMap` 存得下所有 key，却完全不知道谁该走。
+
+打个比方：LRU 像一张只摆得下几份文件的办公桌，桌面满了就先收走最久没碰的那份；机制上，用哈希表做到 O(1) 定位，再用一条双向链表维护"最近使用"的顺序，get 与 put 都要把节点挪到最新的一端。
 
 ```sketch
 {
@@ -30,7 +32,7 @@ LRU（Least Recently Used）：容量满了，淘汰**最久没被使用**的那
 
 **目标**：实现 `LRUCache`——构造时给容量；`get(key)` 不存在返回 `-1`；`put(key, value)` 在 key 已存在时只更新值并把它变成最近使用；容量超出时淘汰最久未使用的那个。
 
-你的文件固定叫 `Main.java`，所以缓存类写成 `Main` 的静态内部类 `Main.LRUCache`；测试入口 `TestMain.java` 是**只读**的，它直接 `new Main.LRUCache(...)`，逐条打印 `ok: <用例名>` 或 `fail: <用例名>`。
+你的文件固定叫 `Main.java`，所以缓存类写成 `Main` 的静态内部类 `Main.LRUCache`。测试入口 `TestMain.java` 是**只读**的，它直接 `new Main.LRUCache(...)`，逐条打印 `ok: <用例名>` 或 `fail: <用例名>`。
 
 ```code-challenge
 {
