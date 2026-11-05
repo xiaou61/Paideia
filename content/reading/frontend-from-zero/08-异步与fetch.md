@@ -16,6 +16,33 @@ status: published
 2. 用 `fetch` 取数据时，哪些错误**不会**被 `catch` 到；
 3. 一个能用的请求必须处理哪几种状态。
 
+打个比方：`fetch` 像寄快递，只有快递根本没送出去（网络层失败）才算"寄失败"；对方签收了一张"查无此人"的单子（404/500），系统仍显示"已送达"。真实机制是 `fetch` 只在网络层失败时 reject，HTTP 错误要自己看 `res.ok`。
+
+```sketch
+{
+  "title": "异步取数：从 Promise 到四态",
+  "rows": [
+    [
+      { "id": "nonblock", "title": "不阻塞", "sub": "1 2 3 的顺序", "tone": "blue" },
+      { "id": "promise", "title": "Promise 三态", "sub": "pending/fulfilled/rejected", "tone": "blue" },
+      { "id": "fetchpit", "title": "fetch 的坑", "sub": "HTTP 错误不 reject", "tone": "amber" }
+    ],
+    [
+      { "id": "abort", "title": "超时与取消", "sub": "AbortController", "tone": "violet" },
+      { "id": "concurrent", "title": "并发请求", "sub": "Promise.all", "tone": "violet" },
+      { "id": "fourstate", "title": "页面四态", "sub": "加载/成功/空/失败", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "nonblock", "to": "promise", "label": "等待" },
+    { "from": "promise", "to": "fetchpit", "label": "实际用" },
+    { "from": "fetchpit", "to": "abort", "label": "补超时" },
+    { "from": "abort", "to": "concurrent" },
+    { "from": "concurrent", "to": "fourstate", "label": "界面呈现" }
+  ]
+}
+```
+
 ## 讲解
 
 ### 先理解"不阻塞"
@@ -75,7 +102,7 @@ async function getJson(url) {
 }
 ```
 
-否则你会把一段 500 的 HTML 错误页当 JSON 解析，得到 `Unexpected token '<'`——这个报错看起来像前端 bug，实际是后端 500。
+否则你会把一段 500 的 HTML 错误页当 JSON 解析，得到 `Unexpected token '<'`。这个报错看起来像前端 bug，实际是后端 500。
 
 ### 超时与取消
 
@@ -118,7 +145,7 @@ const [state, setState] = useState({ status: 'idle', data: null, error: null })
 - **成功但为空**：明确说"还没有内容"，而不是一片空白；
 - **失败**：说清是网络问题还是服务问题，给"重试"。
 
-只写"成功"分支的页面，在弱网和空数据下看起来就是坏的——这四态是产品要求，不是锦上添花。
+只写"成功"分支的页面，在弱网和空数据下看起来就是坏的。这四态是产品要求，不是锦上添花。
 
 ## 常见误区
 

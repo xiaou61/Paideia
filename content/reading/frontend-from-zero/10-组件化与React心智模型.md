@@ -16,6 +16,32 @@ status: published
 
 这一关不背 API，只建立三个概念：组件、props、渲染。
 
+打个比方：以前手写 DOM 像自己搬砖砌墙，React 像给装修队一张效果图——你说"这个状态该长什么样"，它去改墙。真实机制是 UI = f(state)：组件是返回结构的函数，React 对比前后两次结果只改变化的 DOM。
+
+```sketch
+{
+  "title": "React 心智：组件·props·渲染",
+  "rows": [
+    [
+      { "id": "component", "title": "组件", "sub": "返回结构的函数", "tone": "blue" },
+      { "id": "props", "title": "props", "sub": "从外往里·只读", "tone": "blue" },
+      { "id": "render", "title": "渲染", "sub": "一次算出整棵结构", "tone": "violet" }
+    ],
+    [
+      { "id": "key", "title": "key", "sub": "列表项的身份", "tone": "green" },
+      { "id": "controlled", "title": "受控组件", "sub": "值由状态决定", "tone": "green" },
+      { "id": "split", "title": "组件怎么切", "sub": "一个变化原因", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "props", "to": "render", "label": "喂输入" },
+    { "from": "component", "to": "render", "label": "调用" },
+    { "from": "render", "to": "key", "label": "列表身份" },
+    { "from": "render", "to": "split", "label": "拆分" }
+  ]
+}
+```
+
 ## 讲解
 
 ### 组件就是返回结构的函数
@@ -71,7 +97,7 @@ function TaskList({ tasks, status, error, onRetry, onRemove }) {
 }
 ```
 
-注意没有"先清空再插入"。你只写当前状态下应该有什么，React 对比前后两次结果，只改真正变化的 DOM——这就是虚拟 DOM 与 diff 的实际意义：**你按状态写，它按差异改**。
+注意没有"先清空再插入"。你只写当前状态下应该有什么，React 对比前后两次结果，只改真正变化的 DOM。这就是虚拟 DOM 与 diff 的实际意义：**你按状态写，它按差异改**。
 
 ### key：列表项的身份
 
@@ -92,7 +118,7 @@ function Search() {
 }
 ```
 
-这叫受控组件：输入框显示什么完全由 `text` 决定。好处是"值"只有一个来源，做校验、联动、清空都很直接；代价是每次输入都会触发一次渲染（通常没问题）。
+这叫受控组件：输入框显示什么完全由 `text` 决定。好处是"值"只有一个来源，做校验、联动、清空都很直接。代价是每次输入都会触发一次渲染（通常没问题）。
 
 ### 组件怎么切
 

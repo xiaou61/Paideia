@@ -17,6 +17,31 @@ CSS 里最常见的两种困惑：
 
 第一个是盒模型，第二个是层叠（优先级）。这两件事讲清楚，你就不会再靠 `!important` 猜。
 
+打个比方：盒模型像快递箱——箱子外还要留缓冲泡沫（padding）和胶带厚度（border），你量的只是内腔（content）。真实机制是 `width` 默认只算 content，加上 padding 和 border 才是实际占位。
+
+```sketch
+{
+  "title": "盒模型与层叠：一条排查路",
+  "rows": [
+    [
+      { "id": "box", "title": "盒模型", "sub": "content/padding/border", "tone": "blue" },
+      { "id": "margin", "title": "边距合并", "sub": "相邻·父子·空元素", "tone": "blue" }
+    ],
+    [
+      { "id": "cascade", "title": "层叠优先级", "sub": "五个来源按顺序比", "tone": "violet" },
+      { "id": "inherit", "title": "继承", "sub": "有些属性自动下传", "tone": "violet" }
+    ],
+    [
+      { "id": "debug", "title": "排查流程", "sub": "先看有没有、再看谁覆盖", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "box", "to": "debug", "label": "占位不对" },
+    { "from": "cascade", "to": "debug", "label": "没生效" }
+  ]
+}
+```
+
 ## 讲解
 
 ### 每个元素都是一个盒子
@@ -86,7 +111,7 @@ p { color: black; }                 /* (0,0,0,1) */
 #main .note { color: red; }         /* (0,1,1,0) 赢 */
 ```
 
-注意 `#main .note` 比 `.note` 高，但**不要靠堆 id 解决冲突**——那会让后面的样式越来越难覆盖。更稳的做法是把选择器写短、层级写浅。
+注意 `#main .note` 比 `.note` 高，但**不要靠堆 id 解决冲突**。那会让后面的样式越来越难覆盖。更稳的做法是把选择器写短、层级写浅。
 
 ### 继承：有些属性会自动往下传
 

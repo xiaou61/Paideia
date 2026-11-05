@@ -17,6 +17,35 @@ status: published
 
 以及三个最常用的能力：对齐、分配剩余空间、换行。
 
+打个比方：Flex 像把东西排成一队，Grid 像先画好格子再往里放。真实机制是 Flex 只管一条主轴上的排布，Grid 同时定义行和列，所以两者能用的属性也不同。
+
+```sketch
+{
+  "title": "Flex 与 Grid 怎么选",
+  "rows": [
+    [
+      { "id": "flex", "title": "Flex", "sub": "一维·沿主轴排", "tone": "blue" },
+      { "id": "grid", "title": "Grid", "sub": "二维·行和列一起", "tone": "violet" }
+    ],
+    [
+      { "id": "space", "title": "剩余空间", "sub": "flex-grow/shrink/basis", "tone": "blue" },
+      { "id": "wrap", "title": "flex-wrap", "sub": "换行 + gap", "tone": "blue" },
+      { "id": "areas", "title": "模板区域", "sub": "grid-template-areas", "tone": "violet" }
+    ],
+    [
+      { "id": "choose", "title": "一条判断", "sub": "一维 Flex·二维 Grid", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "flex", "to": "space" },
+    { "from": "flex", "to": "wrap" },
+    { "from": "grid", "to": "areas" },
+    { "from": "space", "to": "choose" },
+    { "from": "areas", "to": "choose" }
+  ]
+}
+```
+
 ## 讲解
 
 ### Flex：沿着一条主轴排
@@ -52,7 +81,7 @@ status: published
 .content { flex: 1; }         /* 吃掉剩下的全部 */
 ```
 
-如果写成 `flex: 1 1 auto`，基准是内容宽度，分配结果会受内容影响——"两个都设了 flex:1 为什么不一样宽"通常就是这个。
+如果写成 `flex: 1 1 auto`，基准是内容宽度，分配结果会受内容影响。"两个都设了 flex:1 为什么不一样宽"通常就是这个。
 
 还有一个隐藏默认值：**flex 子项的最小宽度是 `min-content`**，长单词或长链接会把卡片撑破。修法是 `min-width: 0`：
 
@@ -85,7 +114,7 @@ status: published
 }
 ```
 
-`repeat(3, minmax(0,1fr))` 是"三列等宽，且允许缩到 0"——`minmax(0, 1fr)` 里的 0 很关键，写成 `1fr` 时最小值仍是 `min-content`，长内容会撑破列。
+`repeat(3, minmax(0,1fr))` 是"三列等宽，且允许缩到 0"——`minmax(0, 1fr)` 里的 0 很关键。写成 `1fr` 时最小值仍是 `min-content`，长内容会撑破列。
 
 Grid 更适合：
 

@@ -18,6 +18,32 @@ status: published
 
 不依赖任何框架，手写一遍，后面看 React 才知道它替你做了什么。
 
+打个比方：DOM 像一棵家谱树，事件像家族里传话——从长辈往下传、再从当事人往上传。真实机制是事件先捕获、后冒泡，所以能在父容器上监听一次就接住所有子项的点击。
+
+```sketch
+{
+  "title": "DOM 与事件：手写三件事",
+  "rows": [
+    [
+      { "id": "query", "title": "查找节点", "sub": "querySelector", "tone": "blue" },
+      { "id": "update", "title": "改节点", "sub": "textContent 更安全", "tone": "blue" },
+      { "id": "event", "title": "事件", "sub": "监听·冒泡·委托", "tone": "violet" }
+    ],
+    [
+      { "id": "form", "title": "表单事件", "sub": "绑在 form 上", "tone": "green" },
+      { "id": "layout", "title": "读布局", "sub": "先读后写", "tone": "amber" },
+      { "id": "framework", "title": "何时上框架", "sub": "多处同步就上", "tone": "gray" }
+    ]
+  ],
+  "arrows": [
+    { "from": "query", "to": "update", "label": "选中" },
+    { "from": "update", "to": "event", "label": "响应" },
+    { "from": "event", "to": "form" },
+    { "from": "layout", "to": "framework", "label": "开始漏同步" }
+  ]
+}
+```
+
 ## 讲解
 
 ### 查找节点
@@ -41,7 +67,7 @@ el.style.color = 'red'           // 行内样式，优先级很高
 el.setAttribute('aria-expanded', 'true')
 ```
 
-**优先 `textContent`**。`innerHTML` 只在内容确实是你自己生成的 HTML 时用；拼接用户输入（评论、昵称、搜索词）等于把 XSS 开口留在页面上。
+**优先 `textContent`**。`innerHTML` 只在内容确实是你自己生成的 HTML 时用。拼接用户输入（评论、昵称、搜索词）等于把 XSS 开口留在页面上。
 
 创建与插入：
 

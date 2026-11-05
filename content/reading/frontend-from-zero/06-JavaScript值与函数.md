@@ -12,6 +12,34 @@ status: published
 
 JavaScript 的坑大多集中在三处：**类型会偷偷转换**、**对象是引用**、**函数里的 `this` 看调用方式**。这一关把这三件事讲清楚，后面的 DOM 与框架才不用靠猜。
 
+打个比方：原始类型像复印一份文件，改复印件不影响原件；对象像共享同一个云文档链接，谁改都一起变。真实机制是原始类型按值复制，对象赋值复制的是内存地址（引用）。
+
+```sketch
+{
+  "title": "JS 三条主线：值·引用·this",
+  "rows": [
+    [
+      { "id": "primitive", "title": "原始类型", "sub": "按值复制·不可变", "tone": "blue" },
+      { "id": "object", "title": "对象", "sub": "按引用共享", "tone": "violet" }
+    ],
+    [
+      { "id": "eq", "title": "== 与 ===", "sub": "默认用 ===", "tone": "amber" },
+      { "id": "truthy", "title": "真值与假值", "sub": "八个假值", "tone": "amber" },
+      { "id": "fn", "title": "函数与 this", "sub": "this 看调用方式", "tone": "green" }
+    ],
+    [
+      { "id": "spread", "title": "解构与展开", "sub": "做不可变更新", "tone": "green" },
+      { "id": "array", "title": "数组四方法", "sub": "map/filter/find/reduce", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "primitive", "to": "eq", "label": "先分清类型" },
+    { "from": "object", "to": "spread", "label": "复制才断引用" },
+    { "from": "fn", "to": "array", "label": "写回调" }
+  ]
+}
+```
+
 ## 讲解
 
 ### 原始类型与对象
@@ -92,7 +120,7 @@ const counter = {
 }
 ```
 
-所以回调里用箭头函数几乎总是更安全；需要动态 `this`（如事件处理器里想拿 `this` 指向元素）时才用普通函数。
+所以回调里用箭头函数几乎总是更安全。需要动态 `this`（如事件处理器里想拿 `this` 指向元素）时才用普通函数。
 
 ### 解构与展开
 
