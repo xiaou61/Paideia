@@ -10,9 +10,40 @@ status: published
 
 ## 这一关在解决什么
 
-XSS（跨站脚本）是：**攻击者的字符串最终被浏览器当成脚本执行**。一旦成立，攻击者可以在你的页面里做用户能做的一切——读页面内容、发请求、改界面、诱导输入。
+XSS（跨站脚本）是：**攻击者的字符串最终被浏览器当成脚本执行**。一旦成立，攻击者可以在你的页面里做用户能做的一切。他能读页面内容、发请求、改界面，也能诱导你输入。
 
 这一关先分清三种类型（它们的修法不同），再讲三道防线。
+
+打个比方：XSS 像有人在你的公告栏上贴了一张会自己动手的纸条。看的人一多，它就替他们做事。真实机制是：不可信字符串没经过转义或净化，被浏览器当成脚本执行了。
+
+```sketch
+{
+  "title": "XSS：三道防线各管一段",
+  "rows": [
+    [
+      { "id": "stored", "title": "存储型", "sub": "库里的评论", "tone": "amber" },
+      { "id": "reflected", "title": "反射型", "sub": "URL 回显", "tone": "amber" },
+      { "id": "dom", "title": "DOM 型", "sub": "写进 innerHTML", "tone": "amber" }
+    ],
+    [
+      { "id": "clean", "title": "白名单净化", "sub": "富文本", "tone": "green" },
+      { "id": "encode", "title": "上下文编码", "sub": "默认转义", "tone": "green" },
+      { "id": "csp", "title": "CSP", "sub": "脚本来源白名单", "tone": "green" }
+    ],
+    [
+      { "id": "safe", "title": "页面安全", "sub": "脚本不执行", "tone": "blue" }
+    ]
+  ],
+  "arrows": [
+    { "from": "stored", "to": "clean", "label": "富文本" },
+    { "from": "reflected", "to": "encode", "label": "回显编码" },
+    { "from": "dom", "to": "encode", "label": "危险 API" },
+    { "from": "clean", "to": "safe" },
+    { "from": "encode", "to": "safe" },
+    { "from": "csp", "to": "safe", "label": "兜底" }
+  ]
+}
+```
 
 ## 讲解
 
@@ -55,7 +86,7 @@ React 默认会把 `{comment}` 当文本转义，但这条路绕过了转义。�
 | JS 字符串 | 不用内联拼接；用 `JSON.stringify` 或数据属性 |
 | CSS | 不让用户控制 |
 
-**不要自己写转义函数**。用模板引擎的默认转义（Thymeleaf、React、Vue 都默认转义），只在必须输出 HTML 时才显式标记，并配净化。
+**不要自己写转义函数**。用模板引擎的默认转义（Thymeleaf、React、Vue 都默认转义）。只在必须输出 HTML 时才显式标记，并配上净化。
 
 ### 第二道防线：净化富文本
 

@@ -12,7 +12,40 @@ status: published
 
 CSRF（跨站请求伪造）利用的是一件浏览器默认会做的事：**向某个站点发请求时，自动带上该站点的 Cookie**。
 
-攻击者不需要读到你的响应，只需要让浏览器"替用户发一条请求"——转账、改密码、删数据。这一关讲清 Cookie 的携带规则，以及三种防护分别防住了什么。
+攻击者不需要读到你的响应，只需要让浏览器"替用户发一条请求"。能做的事包括转账、改密码、删数据。这一关讲清 Cookie 的携带规则，以及三种防护分别防住了什么。
+
+打个比方：CSRF 像别人用你的门禁卡刷开了你家的门。卡一直在你身上，是门自己认卡不认人。真实机制是：浏览器会自动带上目标站点的 Cookie，服务端只看 Cookie 就当成你本人。
+
+```sketch
+{
+  "title": "CSRF：借浏览器发请求",
+  "rows": [
+    [
+      { "id": "victim", "title": "你", "sub": "已登录 bank", "tone": "blue" },
+      { "id": "evil", "title": "恶意站点", "sub": "藏一张表单", "tone": "amber" }
+    ],
+    [
+      { "id": "browser", "title": "浏览器", "sub": "自动带 Cookie", "tone": "gray" }
+    ],
+    [
+      { "id": "bank", "title": "bank 服务端", "sub": "当成本人", "tone": "amber" }
+    ],
+    [
+      { "id": "samesite", "title": "SameSite", "sub": "浏览器层", "tone": "green" },
+      { "id": "token", "title": "CSRF Token", "sub": "应用层", "tone": "green" },
+      { "id": "origin", "title": "Origin 校验", "sub": "应用层", "tone": "green" }
+    ]
+  ],
+  "arrows": [
+    { "from": "victim", "to": "evil", "label": "点开链接" },
+    { "from": "evil", "to": "browser", "label": "自动提交" },
+    { "from": "browser", "to": "bank", "label": "带上 Cookie" },
+    { "from": "samesite", "to": "browser", "label": "跨站不带" },
+    { "from": "token", "to": "bank", "label": "写操作比对" },
+    { "from": "origin", "to": "bank", "label": "校验来源" }
+  ]
+}
+```
 
 ## 讲解
 
@@ -52,7 +85,7 @@ Set-Cookie: session=abc; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=3600
 | `Lax`（现代浏览器默认） | 顶层导航的 GET 带；跨站 POST、iframe、fetch 不带 |
 | `None` | 都带，但必须同时 `Secure` |
 
-`Lax` 挡住了大部分 CSRF（跨站 POST 不带 Cookie），但**不挡跨站的顶层 GET 导航**——所以"用 GET 做写操作"仍然危险。
+`Lax` 挡住了大部分 CSRF（跨站 POST 不带 Cookie），但它**不挡跨站的顶层 GET 导航**。所以"用 GET 做写操作"仍然危险。
 
 ### 三种防护，各防什么
 
@@ -69,7 +102,7 @@ GET  /form        → Set-Cookie: csrf=...（或放在页面 meta）
 POST /transfer    → 请求头 X-CSRF-Token: ...  服务端比对
 ```
 
-同步器模式（token 存在服务端会话）与双提交模式（token 同时放 Cookie 与请求头，服务端只比对两者）都常见。双提交不依赖会话存储，但要求攻击者无法设置自定义头。
+同步器模式（token 存在服务端会话）与双提交模式（token 同时放 Cookie 与请求头，服务端只比对两者）。这两种都常见。双提交不依赖会话存储，但要求攻击者无法设置自定义头。
 
 **三、Origin / Referer 校验（应用层）**
 
