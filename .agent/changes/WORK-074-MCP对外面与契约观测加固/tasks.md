@@ -35,11 +35,11 @@ approver_role: owner
 
 ## 任务
 
-### TASK-B1 | in_progress | 工具治理快照测试 + 生成对外能力清单
+### TASK-B1 | done | 工具治理快照测试 + 生成对外能力清单
 - 对应：REQ-001、AC-001
 - 依赖：无
 - 新建：`backend/paideia-app/src/test/java/io/github/xiaou61/ToolGovernanceTest.java`；生成 `docs/architecture/tool-inventory.md`
-- 验证：**代码已写并编译通过**（`mvn -B -o -pl paideia-app -am -DskipTests test-compile` exit 0）。**执行未跑**：本机无 `mysql` 客户端，`test-db.sh` 无法分配独占库（环境限制）；需在具备 MySQL 客户端 + `backend/config/remote-db.local.env` 的环境执行 `../scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=ToolGovernanceTest -Dsurefire.failIfNoSpecifiedTests=false test`
+- 验证：**已实跑**——本地 Maven 连服务器临时独占库执行 `ToolGovernanceTest`：`Tests run: 4, Failures: 0, Errors: 0, Skipped: 0`，BUILD SUCCESS；生成 `docs/architecture/tool-inventory.md`，**运行时注册 67 个工具**（22 个源文件）。临时库/账号已清理。
 
 ### TASK-B2 | pending | tool 契约测试（无副作用拒绝矩阵）
 - 对应：REQ-002、AC-002

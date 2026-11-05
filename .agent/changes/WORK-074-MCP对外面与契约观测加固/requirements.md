@@ -11,7 +11,7 @@ workflow: full
 depends_on: []
 related_to: [WORK-019, WORK-028]
 approved_by: xiaou61
-approved_at: 2026-11-05 16:29:54 +0800
+approved_at: 2026-11-05 16:41:50 +0800
 approver_role: owner
 ---
 
@@ -33,7 +33,7 @@ approver_role: owner
 
 ## 已确认事实
 
-1. 22 个 tool 文件、7 个模块；网关与 SDK 已就绪（见上）。
+1. 22 个 tool 源文件、7 个模块；**运行时 `ToolCatalog.snapshot()` 实测注册 67 个 tool**（一个源文件常含多个工具）。网关与 SDK 已就绪（见上）。
 2. `paideia-platform` 现有跨模块契约：`UserDeletedEvent`、`EntryAssessmentChangedEvent`、`RoleLookup`、`ScheduledTaskRecorder`、`ApiAccess` 等。
 3. 架构存档口径：190 个端点 / 48 个控制器；项目当前**没有 CI**，发布走 `scripts/release.ps1`（WORK-073 已给它加了 `-ValidateOnly` 内容校验）。
 4. `ModularityTest` 只校验 Spring Modulith 边界（循环依赖、跨模块访问 internal）；不校验事件发布/消费契约。
@@ -57,7 +57,7 @@ approver_role: owner
 
 **B 线**
 1. 一份"对外能力清单 + 纪律"：列全部 tool 的 toolset / scope / 读或写；规定新对外能力优先 MCP tool，REST 只服务自家前端。
-2. 给现有 22 个 tool 补 tool 级契约测试（参数校验 / scope / 结果形状 / 错误码）。
+2. 给现有注册工具（实测 67 个）补 tool 级契约测试（参数校验 / scope / 结果形状 / 错误码）。
 3. 一次收敛审计：找出"该做 tool 却做成 REST"或 tool 与 REST 重复的，出清单与处置。
 
 **C 线**
@@ -101,7 +101,7 @@ approver_role: owner
 
 ## 验收标准
 
-- AC-001：对外能力清单覆盖全部 22 个 tool，每项 toolset/scope/读写齐全。
+- AC-001：对外能力清单覆盖全部注册工具（实测 67 个），每项 toolset/scope/读写齐全。
 - AC-002：每个 tool 有契约测试；坏参数/越权/scope 不足均被拦（**无副作用**，不写库、不花积分），给出可运行命令。
 - AC-003：收敛审计清单产出，每项有处置结论。
 - AC-004：跨模块事件/端口守卫存在；构造一个非法发送/消费样例会让检查变红。
@@ -111,7 +111,7 @@ approver_role: owner
 
 ## 假设
 
-- 22 个 tool 的清单与模块归属以当前工作树实测为准；实施前再复核一次。
+- 注册工具清单与模块归属以 `ToolCatalog.snapshot()` 实测为准（当前 67 个）。
 - 指标落点可复用现有 Analytics/`McpMetrics`，不新建监控组件。
 
 ## 待确认问题
