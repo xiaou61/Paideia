@@ -28,6 +28,8 @@ status: published
 }
 ```
 
+打个比方：代理像你见一位明星时的"经纪人"，你以为谈的是本人，其实每句话都先经过经纪人转达。机制上，Spring 在 `BeanPostProcessor` 阶段把容器里的原对象换成一个同接口（或子类）的代理，调用先落到代理，代理再转给真对象。
+
 这个替身叫代理（proxy）。代理和你的类实现同一个接口（或继承你的类），外部拿到的其实是代理。代理在真正方法的前后插一段逻辑——这就是切面。
 
 由此可以推出本篇最重要的一条：
@@ -40,7 +42,7 @@ status: published
 
 织入（weaving）指"把切面逻辑插进目标方法的调用链"。时机有三种：编译期、类加载期、运行期。
 
-Spring AOP 用**运行期织入**，位置是 `BeanPostProcessor.postProcessAfterInitialization`——bean 初始化完之后，检查有没有需要增强的方法，有就把返回值替换成代理。所以容器里登记的是"代理"，不是原始对象。这也解释了第二篇那句话：`@PostConstruct` 执行时代理还不存在。
+Spring AOP 用**运行期织入**，位置是 `BeanPostProcessor.postProcessAfterInitialization`。bean 初始化完之后，检查有没有需要增强的方法，有就把返回值替换成代理。所以容器里登记的是"代理"，不是原始对象。这也解释了第二篇那句话：`@PostConstruct` 执行时代理还不存在。
 
 概念对应：
 
@@ -86,7 +88,7 @@ Spring 需要"造一个替身"，有两条路：
 | 依赖 | JDK 自带 | 需要额外库（Spring Boot 已内置） |
 
 Spring Boot 2.x 起**默认全部用 CGLIB**（`spring.aop.proxy-target-class=true`），即使有接口也走 CGLIB。
-原因是 JDK 代理只能注入接口类型。一个类实现了接口但你在别处按类类型注入，JDK 代理会报类型不匹配。统一用 CGLIB 省掉这类问题。代价是：**`final` 和 `private` 方法代理不了**——CGLIB 靠继承覆写，`final` 不能覆写，`private` 子类看不见。
+原因是 JDK 代理只能注入接口类型。一个类实现了接口，但你在别处按类类型注入，JDK 代理会报类型不匹配。统一用 CGLIB 省掉这类问题。代价是：**`final` 和 `private` 方法代理不了**。CGLIB 靠继承覆写，`final` 不能覆写，`private` 子类看不见。
 
 这就是 `@Transactional` 写在 `private` 方法上完全无效的原因：代理连覆写的机会都没有。
 
@@ -186,7 +188,7 @@ public class OrderService {
 
 ## 一个自检的方法
 
-怀疑某个方法没走切面时，在方法体第一行打 `TransactionSynchronizationManager.isActualTransactionActive()`。返回 `false` 就说明没有事务上下文，问题在代理，不在 SQL——比翻日志快得多。
+怀疑某个方法没走切面时，在方法体第一行打 `TransactionSynchronizationManager.isActualTransactionActive()`。返回 `false`，就说明没有事务上下文，问题在代理，不在 SQL——比翻日志快得多。
 
 ## 检查一下
 
@@ -203,19 +205,25 @@ public class OrderService {
 ### 误区：`@Transactional` 加在接口方法上就一定能生效
 
 **你以为**：写在接口上，实现类自然继承这个能力。
+
 **其实**：Spring 官方明确建议把 `@Transactional` 写在**实现类**上。接口上的注解在某些代理方式下不会被读取，行为依赖配置，属于"有时行有时不行"。
+
 **怎么验证**：把注解从实现类挪到接口，用 `isActualTransactionActive()` 检查，再换回来对比。
 
 ### 误区：切面是按"调用栈"生效的，所以嵌套调用也会被拦
 
 **你以为**：只要方法被调用，不管从哪调，切面都能拦到。
+
 **其实**：切面只认"调用是否经过代理对象"。同一对象内部的调用是普通方法调用，不经过代理；跨 bean 调用才经过。
+
 **怎么验证**：在 `createOrder` 里调 `saveOrder`，两处各打一行 `getClass()`。外层是代理类，内层是真类名。
 
 ### 误区：CGLIB 代理能增强所有方法
 
 **你以为**：既然生成了子类，那所有方法都被覆写了。
+
 **其实**：`final` 方法不能被覆写，`private` 方法子类看不见，`static` 方法属于类不属于实例——这三类都代理不了，加注解也白加。
+
 **怎么验证**：把 `@Transactional` 方法标成 `final`，启动不报错但事务不生效。这类"静默失效"最难查，所以别给业务方法加 `final`。
 
 ## 小结
