@@ -13,25 +13,76 @@ status: published
 
 这一关把前五关的机制串起来，你会看到它们不是五个独立概念，而是**同一条链上的五个动作**：插件（第 1 关）→ 拿到 tools 服务（第 2 关）→ 注册是 effect（第 3 关）→ 用事件观察结果（第 4 关）→ 靠配置装进应用（第 5 关）。
 
-```sketch
+```code-flow
 {
+  "id": "dsh-06-tool",
   "title": "一次工具调用经过谁",
-  "rows": [
-    [
-      { "id": "model", "title": "模型", "sub": "决定调哪个工具", "tone": "blue" },
-      { "id": "tools", "title": "ctx.tools", "sub": "执行流水线", "tone": "violet" },
-      { "id": "exec", "title": "tool.execute", "sub": "真正干活", "tone": "green" }
-    ],
-    [
-      { "id": "result", "title": "tools/result 事件", "sub": "旁观的插件看得到", "tone": "amber" },
-      { "id": "back", "title": "结果回到模型", "sub": "进入下一轮", "tone": "gray" }
-    ]
+  "nodes": [
+    { "id": "model", "label": "模型", "sub": "决定调哪个工具", "layer": 0, "order": 0 },
+    { "id": "tools", "label": "ctx.tools", "sub": "执行流水线", "layer": 1, "order": 0 },
+    { "id": "exec", "label": "tool.execute", "sub": "真正干活", "layer": 2, "order": 0 },
+    { "id": "result", "label": "tools/result 事件", "sub": "旁观的插件看得到", "layer": 3, "order": 0 },
+    { "id": "back", "label": "结果回到模型", "sub": "进入下一轮", "layer": 4, "order": 0 }
   ],
-  "arrows": [
+  "edges": [
     { "from": "model", "to": "tools", "label": "调用" },
     { "from": "tools", "to": "exec", "label": "派发" },
     { "from": "exec", "to": "result", "label": "发出" },
     { "from": "result", "to": "back", "label": "物化后" }
+  ],
+  "steps": [
+    {
+      "title": "模型决定调工具",
+      "desc": "模型只产出调用意图，不动手",
+      "file": "conversation/chunk.ts",
+      "code": "{ type: 'tool_call', name: 'greet', args: { name: 'Cordis' } }",
+      "focus": [1],
+      "nodes": ["model"],
+      "edges": [],
+      "log": [{ "k": "模型", "v": "调用 greet" }],
+      "explain": "模型负责决定调什么，真正执行是插件的事。"
+    },
+    {
+      "title": "工具注册在 ctx.tools",
+      "desc": "一个工具就是一个插件，注册即 effect",
+      "file": "plugins/greet-tool.ts",
+      "code": "export const inject = ['tools']\nexport function apply(ctx) {\n  ctx.tools.register(defineTool({ name: 'greet', … }))\n}",
+      "focus": [3],
+      "nodes": ["tools", "model"],
+      "edges": ["model>tools"],
+      "log": [{ "k": "服务", "v": "greet 已注册" }],
+      "explain": "插件卸载，工具自动注销，不用手写清理。"
+    },
+    {
+      "title": "执行 execute",
+      "desc": "流水线派发到工具实现",
+      "file": "plugins/greet-tool.ts",
+      "code": "async execute(args) {\n  return `Hello, ${args.name}!`\n}",
+      "focus": [2],
+      "nodes": ["exec", "tools"],
+      "edges": ["tools>exec"],
+      "log": [{ "k": "执行", "v": "Hello, Cordis!" }],
+      "explain": "defineTool 会在执行前校验模型给的参数。"
+    },
+    {
+      "title": "发出 tools/result 事件",
+      "desc": "旁观插件订阅这个事件就能看到结果",
+      "file": "plugins/tool-logger.ts",
+      "code": "ctx.on('tools/result', (exec, result) => {\n  console.log(`[tool-logger] ${exec.name}`)\n})",
+      "focus": [1],
+      "nodes": ["result", "exec"],
+      "edges": ["exec>result"],
+      "log": [{ "k": "事件", "v": "tools/result" }],
+      "explain": "logger 先看到结果，execute 的 promise 才兑现。"
+    },
+    {
+      "title": "结果回到模型",
+      "desc": "结果进入下一轮，模型据此继续",
+      "nodes": ["back", "result"],
+      "edges": ["result>back"],
+      "log": [{ "k": "状态", "v": "进入下一轮" }],
+      "explain": "两个插件谁也不需要认识谁，只共享 tools 服务与事件。"
+    }
   ]
 }
 ```
