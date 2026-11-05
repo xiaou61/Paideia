@@ -48,11 +48,11 @@ approver_role: owner
 - 修改：`ToolGovernanceTest` 增加 `everyToolHasCorrectReadVisibility`——对真实 67 个工具逐个断言"只读可见、写/管理/非只读不可见"，把契约覆盖到**每个注册工具**。
 - 验证：`ToolGovernanceTest` 全绿（含新用例）
 
-### TASK-B3 | pending | REST↔tool 收敛审计
+### TASK-B3 | done | REST↔tool 收敛审计
 - 对应：REQ-003、AC-003
 - 依赖：B1
-- 新建：`docs/architecture/rest-vs-tools.md`
-- 验证：人工核对 22 tool 与端点，处置结论齐全
+- 新建：`docs/architecture/rest-vs-tools.md`（toolset 级审计 + 处置纪律）
+- 验证：审计覆盖 19 个 toolset / 67 tool 与 190 端点前缀，每项给出"保持+同源"处置。本文档无 mermaid 图块；`check-diagrams.mjs` 在工作树因缺前端依赖（未 `pnpm install`）未能运行，属环境限制、与文档无关。
 
 ### TASK-C1 | pending | 跨模块事件/端口守卫
 - 对应：REQ-004、AC-004
