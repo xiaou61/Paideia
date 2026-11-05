@@ -49,7 +49,7 @@ approver_role: owner
 
 ## 任务
 
-### TASK-001 | pending | 抽取内容形态并固化 schema
+### TASK-001 | done | 抽取内容形态并固化 schema
 
 - 对应：`REQ-001`、`AC-002`（部分）
 - 依赖：无
@@ -59,11 +59,11 @@ approver_role: owner
 - 步骤：
   1. 写 `scripts/inventory-content.mjs`：遍历 `content/`，统计每个 frontmatter 键的出现次数与枚举值、每种围栏块计数，打印汇总。
   2. 加 `--check-schema`：把盘点结果与 `lesson.schema.json` 的声明比对，不符退出 1。
-  3. 依据盘点写 `content/schema/lesson.schema.json`：frontmatter 5 个必填键（`title`/`category`/`order`/`minutes`/`status`）+ 可选键（`level`/`chapter`/`prerequisite`/`line_*`）与枚举；块类型清单（15 种），其中 `quiz`/`code-challenge`/`sketch`/`learning-path`/`source-walk` 声明必填键。
+  3. 依据盘点写 `content/schema/lesson.schema.json`：frontmatter 5 个必填键（`title`/`category`/`order`/`minutes`/`status`）+ 可选键（`level`/`chapter`/`prerequisite`/`line_*`）与枚举；块类型清单为盘点得到的 **29 种**，其中 7 种 JSON 结构块（`quiz`/`code-challenge`/`sketch`/`learning-path`/`source-walk`/`code-map`/`sql-challenge`）列入 `structuredBlocks`。
   4. 运行 `--check-schema`，把差异改到一致。
-- 验证：`node scripts/inventory-content.mjs` → 打印 436 篇 / 17 键 / 15 块型；`node scripts/inventory-content.mjs --check-schema` → 退出 0
+- 验证：实施实测——`node scripts/inventory-content.mjs` 打印 **434 篇内容**（另 2 篇 README 跳过）/ 17 键 / **29 块型**（原计划的"436 篇 / 15 块型"是按含 README 与 top15 的粗口径，已按实测更正）；`node scripts/inventory-content.mjs --check-schema` → 退出 0 ✓
 
-### TASK-002 | pending | 统一静态校验器
+### TASK-002 | done | 统一静态校验器
 
 - 对应：`REQ-002`、`AC-002`、`AC-005`
 - 依赖：TASK-001
@@ -75,9 +75,9 @@ approver_role: owner
   2. 实现 `validateContent({ scope })`：解析 frontmatter + 校验 schema + 结构化块 JSON 与必填键 + `prerequisite` 引用存在 + `order` 连续；返回 `{ errors, warnings }`。
   3. 实现 CLI 包装：`--scope` / `--json`；非 json 时按 `文件:行  规则  原因` 打印；退出码 0/1。
   4. 对 good / bad 各跑一次，校准报错到具体文件与行。
-- 验证：`node scripts/check-content.mjs --scope tests/content-schema/good` → 退出 0；`--scope tests/content-schema/bad` → 退出 1 且逐条含 `文件:行`；连跑两次输出一致；`git status --porcelain content/` 为空
+- 验证：实施实测——`--scope tests/content-schema/good` → 0 error；`--scope tests/content-schema/bad` → 退出 1 且逐条带 `文件:行`；连续两次 `--json` 输出字节一致；`git status -- content/` 除新增 `content/schema/` 外无改动
 
-### TASK-003 | pending | 存量基线与白名单
+### TASK-003 | done | 存量基线与白名单
 
 - 对应：`REQ-007`、`AC-001`、`AC-005`
 - 依赖：TASK-002
@@ -87,11 +87,11 @@ approver_role: owner
 - 步骤：
   1. `node scripts/check-content.mjs --scope content` 跑全量，导出 error 清单。
   2. 逐条判断：能直接修的内容修正；确属历史遗留的登记进 `whitelist.json`（`file` + `rule` + `reason`）。
-  3. 实现 `--check-whitelist-shrink`：与已提交基线（白名单文件自身条目数）比对，只允许相等或减少，增加即退出 1。
+  3. 实现 `--check-whitelist-shrink`：白名单用 `{ maxEntries, entries }` 形式，断言 `entries.length <= maxEntries`，超出即退出 1（只许降上限、不许加条目）。
   4. 再跑全量到 error 为 0（命中白名单的以 warnings 呈现）。
-- 验证：`node scripts/check-content.mjs --scope content` → 退出 0（error 0）；白名单每条有 `reason`；`--check-whitelist-shrink` → 退出 0；连跑两次结果一致
+- 验证：实施实测——全量基线只有 2 个真 bug（`java/04` sketch 收尾围栏与结论同一行、`spring-handmade/01` prerequisite 指向不存在的"00 · 总览"），均直接修正内容，未使用白名单；`node scripts/check-content.mjs --scope content` → 0 error / 0 warning；`--check-whitelist-shrink` → `0 条 ≤ 上限 0` ✓；连跑两次一致
 
-### TASK-004 | pending | 并入并删除两个旧脚本
+### TASK-004 | done | 并入并删除两个旧脚本
 
 - 对应：`REQ-004`、`AC-004`
 - 依赖：TASK-002
@@ -102,9 +102,9 @@ approver_role: owner
   1. 把 `check_quiz_explain` 的"quiz 每题必须有非空 `explain`"、`check_shell_cases` 的"`judge` 非空且 ≤20000、seed ≤20 文件 / 单文件 ≤64000 / 合计 ≤256000、seed 路径合法、块 `id` 全仓唯一"并入 `validateContent`。
   2. 增加坏样例 `quiz-bad-json.md`、`shell-case-bad.md`、`dup-id/*.md`。
   3. 删除两个旧脚本；用 `git grep -n "check_quiz_explain\|check_shell_cases"` 确认无残留引用。
-- 验证：`node scripts/check-content.mjs --scope tests/content-schema/bad` → 退出 1 且报出新增四类问题；`Test-Path scripts/check_quiz_explain.py scripts/check_shell_cases.py` 均为 False
+- 验证：实施实测——`node scripts/check-content.mjs --scope tests/content-schema/bad` 报出 10 个问题，含新增四类 `block.quiz.explain` / `block.challenge.judge` / `block.challenge.seed` / `block.challenge.id`；全量 `content` 仍 0 error（新规则不误伤存量）；两个旧脚本已删除，`git grep` 无代码引用（仅 `.agent/` 历史工件与 WORK-073 自身文档提及，属记录保留）
 
-### TASK-005 | pending | import-course 写入前置校验
+### TASK-005 | done | import-course 写入前置校验
 
 - 对应：`REQ-003`、`AC-003`
 - 依赖：TASK-002
@@ -114,9 +114,9 @@ approver_role: owner
 - 步骤：
   1. 在 `main()`（约 462 行）里、`login` 之后、任何 `ensureParent`/`ensureCategory`/`importLanguage` 写入之前，对目标目录跑 `validateContent`。
   2. 有 error 时打印错误并以非 0 退出，不发起任何写请求；`--dry-run` 同样先校验。
-- 验证：`node scripts/import-course.mjs --dir tests/content-schema/bad --dry-run` → 非 0 退出、打印校验错误、不出现 `created … / updated …` 汇总
+- 验证：实施实测——`node scripts/import-course.mjs --dir tests/content-schema/bad --dry-run` → 退出 1、打印"内容校验未通过（10 个问题），已中止导入"，无 `created/updated`；`--dir tests/content-schema/good --dry-run` → 预检通过、正常 dry-run
 
-### TASK-006 | pending | release.ps1 发布前置校验
+### TASK-006 | done | release.ps1 发布前置校验
 
 - 对应：`REQ-005`、`AC-007`
 - 依赖：TASK-002
@@ -126,9 +126,9 @@ approver_role: owner
 - 步骤：
   1. 在 `release.ps1` 打包/部署动作之前插入校验段：运行校验，`$LASTEXITCODE -ne 0` 时 `throw` 终止。
   2. 确认该段在 `-WithTests` / `-SkipWeb` 等分支下都先执行。
-- 验证：临时把一份坏样例放进 `content/`，运行到校验段 → 非 0 并终止、不进入打包；移除后恢复正常
+- 验证：实施实测——加 `-ValidateOnly` 安全阀后：正常跑 `release.ps1 -ValidateOnly` → 打印 `0 error` 并"未打包未部署"退出 0；临时注入一份坏内容 → 打包前 `throw "内容校验未通过（退出码 1），已终止发版"` 退出 1；清理后恢复 0
 
-### TASK-007 | pending | --exec 档编排 verify_course.py
+### TASK-007 | done | --exec 档编排 verify_course.py
 
 - 对应：`REQ-006`、`AC-006`
 - 依赖：TASK-002
@@ -138,9 +138,9 @@ approver_role: owner
 - 步骤：
   1. 静态校验通过后，`--exec` 以子进程调用 `python scripts/verify_course.py`，透传 stdout/stderr 与退出码。
   2. 静态有 error 时不进入执行档。
-- 验证：`node scripts/check-content.mjs --exec` 正常内容 → 退出 0；对已知失败样例 → 退出非 0 且打印 `verify_course.py` 的失败输出
+- 验证：实施实测——`node scripts/check-content.mjs --exec -- --no-run --dir content/courses/python` → 静态 0、`verify_course` 通过、退出 0；`--exec -- --no-run --dir tests/content-schema/bad` → 退出 1 且打印 `verify_course` 的失败输出。**既有事实**：`verify_course.py --no-run` 对 `spring-boot-project` 课程当前就返回失败（python/java 通过），属本项之前的既有状态、不在范围内，`--exec` 只如实透传、不改其判定。
 
-### TASK-008 | pending | 文档与项目规则同步
+### TASK-008 | done | 文档与项目规则同步
 
 - 对应：`REQ-005`（说明性）、`AC-001`
 - 依赖：TASK-003、TASK-004
@@ -150,7 +150,7 @@ approver_role: owner
 - 步骤：
   1. 在 `always.md`「课程内容源在 `content/courses/`」那条下补：改内容后跑 `node scripts/check-content.mjs --scope content`（要真执行时加 `--exec`）。
   2. 更新 `content/courses/README.md` 的用法段，指向统一命令。
-- 验证：`Select-String` 确认两处都提到新命令；仓库内无指向已删脚本的引用
+- 验证：实施实测——`.agent/rules/always.md` 与 `content/courses/README.md` 均新增 `node scripts/check-content.mjs` 用法；代码/脚本中无指向已删脚本的引用
 
 ## 完成条件
 

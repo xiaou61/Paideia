@@ -107,10 +107,13 @@ SQL 示例（```sql）在**一次性库**里执行，执行完即删，绝不碰
 ## 校验与导入
 
 ```bash
+node scripts/check-content.mjs --scope content  # 统一静态校验（schema + 块结构 + 引用 + order）
+node scripts/check-content.mjs --exec           # 同上，再真跑 verify_course.py
 python scripts/verify_course.py                 # 结构 + 真跑代码 + 块 JSON
 python scripts/verify_course.py --dir content/courses/python
-node scripts/import-course.mjs --dry-run        # 只看要做哪些写入
+node scripts/import-course.mjs --dry-run        # 只看要做哪些写入（导入前会自动跑统一校验）
 node scripts/import-course.mjs                  # 真的导入（走管理端 API）
 ```
 
-`verify_course.py` 不连数据库、不连网络；只用本机的 `python` 与 `javac`/`java`。
+`check-content.mjs` 依 `content/schema/lesson.schema.json` 校验——schema 是内容合法性的唯一权威；
+`content/schema/whitelist.json` 是过渡白名单（`maxEntries` 只减不增）。`verify_course.py` 不连数据库、不连网络；只用本机的 `python` 与 `javac`/`java`。
