@@ -27,6 +27,27 @@ Map<String, List<Integer>> groups = new HashMap<String, List<Integer>>();
 
 右边已经把类型写全了，左边还要再抄一遍。`var` 让编译器从右边推断，少写一次重复信息。但它**不是** JavaScript 的 `let`——类型在编译期就定死了，写错一样编译不过。
 
+```sketch
+{
+  "title": "var：让编译器替你写左边类型",
+  "rows": [
+    [
+      { "id": "right", "title": "右边类型写全", "sub": "new HashMap 已够", "tone": "gray" },
+      { "id": "compiler", "title": "编译器推断", "sub": "编译期就定死", "tone": "blue" },
+      { "id": "left", "title": "左边写 var", "sub": "少抄一遍", "tone": "green" }
+    ],
+    [
+      { "id": "ok", "title": "可用于局部变量", "sub": "必须带初始化", "tone": "green" },
+      { "id": "no", "title": "不可字段与参数", "sub": "不是动态类型", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "right", "to": "compiler" },
+    { "from": "compiler", "to": "left" }
+  ]
+}
+```
+
 ## 讲解
 
 ### `var` 是"让编译器替你写类型"

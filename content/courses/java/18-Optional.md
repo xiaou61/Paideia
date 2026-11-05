@@ -26,6 +26,28 @@ status: published
 
 这一课讲清它真正的用途：**给返回值一个"可能没有结果"的显式类型**，并让调用方无法忘记处理"没有"的情况。
 
+```sketch
+{
+  "title": "Optional：把可能没有写进返回类型",
+  "rows": [
+    [
+      { "id": "ret", "title": "返回 Optional<T>", "sub": "可能没有值", "tone": "gray" },
+      { "id": "map", "title": "map / filter", "sub": "有值才继续处理", "tone": "blue" },
+      { "id": "end", "title": "orElse 系列", "sub": "给默认或抛异常", "tone": "green" }
+    ],
+    [
+      { "id": "field", "title": "别做字段", "sub": "不可序列化", "tone": "amber" },
+      { "id": "param", "title": "别做参数", "sub": "逼调用方包装", "tone": "amber" },
+      { "id": "coll", "title": "别进集合", "sub": "每格都要解包", "tone": "amber" }
+    ]
+  ],
+  "arrows": [
+    { "from": "ret", "to": "map" },
+    { "from": "map", "to": "end" }
+  ]
+}
+```
+
 ## 讲解
 
 ### 它解决什么
