@@ -10,6 +10,7 @@ import {
   visibleSteps,
   walkDefaults,
   walkPermalink,
+  type CodeMap,
   type SourceWalk,
   type WalkControlValues,
   type WalkStep,
@@ -185,6 +186,7 @@ function WalkBody({
         aria-label={`源码精读：${walk.title ?? walk.repo}`}
       >
         <div className="border-border flex min-w-0 flex-col border-b lg:border-r lg:border-b-0">
+          {walk.map === undefined ? null : <WalkMap map={walk.map} active={step.nodes} />}
           <div className="border-border flex gap-1 overflow-x-auto border-b px-2 py-1.5" role="tablist" aria-label="源码文件">
             {walk.files.map((file) => {
               const active = file.path === shownFile
@@ -433,6 +435,76 @@ function StatePanel({ step }: { step: WalkStep }) {
           </dl>
         </div>
       ))}
+    </div>
+  )
+}
+
+/** 架构地图（可选）：放在代码上方，按当前步的 `nodes` 高亮，实现「左图右码」同步。 */
+function WalkMap({ map, active }: { map: CodeMap; active?: string[] }) {
+  const NODE_W = 168
+  const NODE_H = 56
+  const COL = 186
+  const ROW = 80
+  const positions = new Map(
+    map.nodes.map((node) => [node.id, { x: 16 + node.layer * COL, y: 16 + node.order * ROW }]),
+  )
+  const width = Math.max(...map.nodes.map((node) => (positions.get(node.id)?.x ?? 0) + NODE_W)) + 24
+  const height = Math.max(...map.nodes.map((node) => (positions.get(node.id)?.y ?? 0) + NODE_H)) + 24
+  const act = new Set(active ?? [])
+  return (
+    <div className="border-border overflow-x-auto border-b bg-muted/10 p-2" data-testid="source-walk-map">
+      <div className="relative" style={{ width, height, minWidth: '100%' }}>
+        <svg className="pointer-events-none absolute inset-0" width={width} height={height} aria-hidden="true">
+          {map.edges.map((edge, index) => {
+            const from = positions.get(edge.from)
+            const to = positions.get(edge.to)
+            if (from === undefined || to === undefined) {
+              return null
+            }
+            const on = act.has(edge.from) && act.has(edge.to)
+            const forward = to.x >= from.x + NODE_W
+            const x1 = forward ? from.x + NODE_W : from.x
+            const y1 = from.y + NODE_H / 2
+            const x2 = forward ? to.x : to.x + NODE_W
+            const y2 = to.y + NODE_H / 2
+            const midX = (x1 + x2) / 2
+            return (
+              <path
+                key={index}
+                d={`M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={on ? 2.4 : 1.3}
+                className={on ? 'text-primary' : 'text-border'}
+                strokeDasharray={on ? '6 5' : undefined}
+              />
+            )
+          })}
+        </svg>
+        {map.nodes.map((node) => {
+          const position = positions.get(node.id)
+          if (position === undefined) {
+            return null
+          }
+          const on = act.has(node.id)
+          return (
+            <div
+              key={node.id}
+              data-testid={`source-walk-map-node-${node.id}`}
+              data-active={on ? 'true' : 'false'}
+              style={{ left: position.x, top: position.y, width: NODE_W, height: NODE_H }}
+              className={`absolute flex flex-col justify-center rounded-lg border px-2.5 text-left transition-colors ${
+                on ? 'border-primary bg-primary/10 text-primary ring-primary/30 ring-2' : 'border-border bg-card'
+              }`}
+            >
+              <span className="line-clamp-2 text-[12px] leading-snug font-medium break-words">{node.label}</span>
+              {node.file === undefined ? null : (
+                <span className="text-muted-foreground truncate font-mono text-[9.5px]">{node.file}</span>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

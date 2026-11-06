@@ -13,100 +13,45 @@ status: published
 
 这一关只看**对象是怎么被造出来的**：注册表存工厂，工厂造代理。
 
-```code-flow
+```source-walk
 {
   "id": "mapper-registry-proxy",
   "title": "从 getMapper 到动态代理",
   "repo": "mybatis/mybatis-3",
+  "ref": "mybatis-3.5.19",
   "commit": "ee0d4f4831ffdd311b0183c202f4ad6492a3f404",
   "license": "Apache-2.0",
-  "file": "org/apache/ibatis/binding/MapperRegistry.java",
-  "nodes": [
+  "base": "source/mybatis-3.5.19",
+  "files": [
     {
-      "id": "api",
-      "label": "Mapper 接口 / SqlSession",
-      "sub": "调用入口",
-      "layer": 0,
-      "order": 0
+      "path": "org/apache/ibatis/binding/MapperRegistry.java",
+      "label": "MapperRegistry"
     },
     {
-      "id": "config",
-      "label": "Configuration",
-      "sub": "配置与映射",
-      "layer": 1,
-      "order": 0
+      "path": "org/apache/ibatis/binding/MapperProxyFactory.java",
+      "label": "MapperProxyFactory"
     },
     {
-      "id": "proxy",
-      "label": "MapperProxy",
-      "sub": "动态代理",
-      "layer": 2,
-      "order": 0
-    },
-    {
-      "id": "executor",
-      "label": "Executor",
-      "sub": "执行器",
-      "layer": 3,
-      "order": 0
-    },
-    {
-      "id": "statement",
-      "label": "StatementHandler",
-      "sub": "JDBC 语句",
-      "layer": 4,
-      "order": 0
-    },
-    {
-      "id": "result",
-      "label": "ResultSetHandler",
-      "sub": "结果映射",
-      "layer": 5,
-      "order": 0
-    },
-    {
-      "id": "base",
-      "label": "基础模块",
-      "sub": "反射 / 类型 / 缓存 / 插件",
-      "layer": 6,
-      "order": 0
+      "path": "org/apache/ibatis/binding/MapperProxy.java",
+      "label": "MapperProxy"
     }
   ],
-  "edges": [
+  "controls": [
     {
-      "from": "api",
-      "to": "proxy",
-      "label": "调用接口方法"
-    },
-    {
-      "from": "config",
-      "to": "proxy",
-      "label": "注册 Mapper"
-    },
-    {
-      "from": "proxy",
-      "to": "executor",
-      "label": "MapperMethod"
-    },
-    {
-      "from": "config",
-      "to": "executor",
-      "label": "默认执行器"
-    },
-    {
-      "from": "executor",
-      "to": "statement",
-      "label": "prepare"
-    },
-    {
-      "from": "statement",
-      "to": "result",
-      "label": "ResultSet"
-    },
-    {
-      "from": "executor",
-      "to": "base",
-      "label": "用到时才取"
+      "id": "target",
+      "type": "select",
+      "label": "被调用的方法属于谁",
+      "default": "mapper",
+      "options": [
+        {
+          "value": "mapper",
+          "label": "你自己的 Mapper 方法"
+        },
+        {
+          "value": "object",
+          "label": "toString / equals / hashCode"
+        }
+      ]
     }
   ],
   "steps": [
@@ -114,36 +59,20 @@ status: published
       "title": "getMapper：查表，没有就报错",
       "file": "org/apache/ibatis/binding/MapperRegistry.java",
       "line": 44,
-      "code": "  public <T> T getMapper(Class<T> type, SqlSession sqlSession) {\n    final MapperProxyFactory<T> mapperProxyFactory = (MapperProxyFactory<T>) knownMappers.get(type);\n    if (mapperProxyFactory == null) {\n      throw new BindingException(\"Type \" + type + \" is not known to the MapperRegistry.\");\n    }\n    try {\n      return mapperProxyFactory.newInstance(sqlSession);\n    } catch (Exception e) {\n      throw new BindingException(\"Error getting mapper instance. Cause: \" + e, e);\n    }\n  }",
-      "language": "java",
-      "focus": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11
-      ],
-      "nodes": [
-        "proxy"
-      ],
-      "edges": [],
+      "lines": 11,
       "explain": "`knownMappers.get(type)` 拿到的是 `MapperProxyFactory`，不是对象本身。没注册过就抛 `BindingException`——「Type xxx is not known to the MapperRegistry」这句就是这儿来的。",
-      "log": [
-        {
-          "k": "knownMappers",
-          "v": "UserMapper → MapperProxyFactory"
-        },
-        {
-          "k": "返回",
-          "v": "代理对象"
-        }
-      ],
+      "state": {
+        "tables": [
+          [
+            "knownMappers",
+            "UserMapper → MapperProxyFactory"
+          ],
+          [
+            "返回",
+            "代理对象"
+          ]
+        ]
+      },
       "predict": {
         "question": "同一个接口两次 getMapper 得到？",
         "options": [
@@ -152,66 +81,39 @@ status: published
         ],
         "answer": 1,
         "reveal": "每次 newInstance 都新建 MapperProxy，并塞入当前 session。"
-      }
+      },
+      "nodes": [
+        "proxy"
+      ]
     },
     {
       "title": "Factory：每次 getMapper 造一个新的代理",
       "file": "org/apache/ibatis/binding/MapperProxyFactory.java",
       "line": 51,
-      "code": "  public T newInstance(SqlSession sqlSession) {\n    final MapperProxy<T> mapperProxy = new MapperProxy<>(sqlSession, mapperInterface, methodCache);\n    return newInstance(mapperProxy);\n  }",
-      "language": "java",
-      "focus": [
-        1,
-        2,
-        3,
-        4
-      ],
-      "nodes": [
-        "proxy"
-      ],
-      "edges": [],
+      "lines": 4,
       "explain": "`new MapperProxy<>(sqlSession, mapperInterface, methodCache)` 把**当前 SqlSession** 塞进 handler。所以同一个 Mapper 在不同 session 里是两个不同的代理对象——这也是为什么 Mapper 不能跨 session 复用。",
       "state": {
         "vars": [
-          {
-            "name": "sqlSession",
-            "value": "DefaultSqlSession@1"
-          },
-          {
-            "name": "mapperInterface",
-            "value": "UserMapper"
-          }
+          [
+            "sqlSession",
+            "DefaultSqlSession@1"
+          ],
+          [
+            "mapperInterface",
+            "UserMapper"
+          ]
         ]
-      }
+      },
+      "nodes": [
+        "proxy"
+      ]
     },
     {
       "title": "Proxy.newProxyInstance：真正的造对象",
       "file": "org/apache/ibatis/binding/MapperProxyFactory.java",
       "line": 46,
-      "code": "  @SuppressWarnings(\"unchecked\")\n  protected T newInstance(MapperProxy<T> mapperProxy) {\n    return (T) Proxy.newProxyInstance(mapperInterface.getClassLoader(), new Class[] { mapperInterface }, mapperProxy);",
-      "language": "java",
-      "focus": [
-        1,
-        2,
-        3
-      ],
-      "nodes": [
-        "proxy"
-      ],
-      "edges": [],
+      "lines": 3,
       "explain": "JDK 动态代理只要求一个接口 + 一个 `InvocationHandler`。`MapperProxy` 就是那个 handler。",
-      "state": {
-        "vars": [
-          {
-            "name": "interfaces",
-            "value": "[UserMapper]"
-          },
-          {
-            "name": "handler",
-            "value": "MapperProxy"
-          }
-        ]
-      },
       "predict": {
         "question": "为什么不用 CGLIB 生成子类？",
         "options": [
@@ -221,104 +123,92 @@ status: published
         ],
         "answer": 0,
         "reveal": "Mapper 本来就是接口，JDK 代理零依赖、无需字节码库。MyBatis 只在延迟加载那种**类**的场景才用 Javassist/CGLIB。"
-      }
+      },
+      "state": {
+        "vars": [
+          [
+            "interfaces",
+            "[UserMapper]"
+          ],
+          [
+            "handler",
+            "MapperProxy"
+          ]
+        ]
+      },
+      "nodes": [
+        "proxy"
+      ]
     },
     {
       "title": "invoke 的第一道判断：Object 的方法",
       "file": "org/apache/ibatis/binding/MapperProxy.java",
       "line": 81,
-      "code": "  public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {\n    try {\n      if (Object.class.equals(method.getDeclaringClass())) {\n        return method.invoke(this, args);\n      }\n      return cachedInvoker(method).invoke(proxy, method, args, sqlSession);\n    } catch (Throwable t) {\n      throw ExceptionUtil.unwrapThrowable(t);\n    }\n  }",
-      "language": "java",
-      "focus": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10
-      ],
-      "nodes": [
-        "proxy"
-      ],
-      "edges": [],
+      "lines": 10,
       "explain": "`toString` / `equals` / `hashCode` 的声明类是 `Object`，不能当成 SQL 去执行——直接 `method.invoke(this, args)`，作用在 handler 自己身上。**没有这段，打印一个 Mapper 代理就会去查库**。",
       "state": {
-        "vars": [
-          {
-            "name": "method",
-            "value": "toString()"
-          }
-        ],
         "stack": [
           "MapperProxy.invoke",
           "Object.equals"
+        ],
+        "vars": [
+          [
+            "method",
+            "toString()"
+          ]
         ]
-      }
+      },
+      "nodes": [
+        "proxy"
+      ]
     },
     {
       "title": "Mapper 方法走 cachedInvoker",
       "file": "org/apache/ibatis/binding/MapperProxy.java",
       "line": 86,
-      "code": "      return cachedInvoker(method).invoke(proxy, method, args, sqlSession);",
-      "language": "java",
-      "focus": [
-        1
-      ],
+      "lines": 1,
+      "explain": "其余方法先按 `Method` 查缓存，拿到一个 invoker 再执行。缓存的是「方法 → 怎么执行」，不是返回值。",
+      "when": {
+        "target": "mapper"
+      },
+      "state": {
+        "tables": [
+          [
+            "methodCache",
+            "selectById → PlainMethodInvoker"
+          ]
+        ]
+      },
       "nodes": [
         "proxy"
-      ],
-      "edges": [],
-      "explain": "其余方法先按 `Method` 查缓存，拿到一个 invoker 再执行。缓存的是「方法 → 怎么执行」，不是返回值。",
-      "log": [
-        {
-          "k": "methodCache",
-          "v": "selectById → PlainMethodInvoker"
-        }
       ]
     },
     {
       "title": "Object 方法不查表",
       "file": "org/apache/ibatis/binding/MapperProxy.java",
       "line": 83,
-      "code": "      if (Object.class.equals(method.getDeclaringClass())) {\n        return method.invoke(this, args);\n      }",
-      "language": "java",
-      "focus": [
-        1,
-        2,
-        3
-      ],
+      "lines": 3,
+      "explain": "这条分支在缓存之前就返回了，所以 `methodCache` 里永远不会有 `toString`。",
+      "when": {
+        "target": "object"
+      },
+      "state": {
+        "tables": [
+          [
+            "methodCache",
+            "不记录 Object 方法"
+          ]
+        ]
+      },
       "nodes": [
         "proxy"
-      ],
-      "edges": [],
-      "explain": "这条分支在缓存之前就返回了，所以 `methodCache` 里永远不会有 `toString`。",
-      "log": [
-        {
-          "k": "methodCache",
-          "v": "不记录 Object 方法"
-        }
       ]
     },
     {
       "title": "PlainMethodInvoker：最后还是 execute",
       "file": "org/apache/ibatis/binding/MapperProxy.java",
       "line": 140,
-      "code": "    public Object invoke(Object proxy, Method method, Object[] args, SqlSession sqlSession) throws Throwable {\n      return mapperMethod.execute(sqlSession, args);\n    }\n  }",
-      "language": "java",
-      "focus": [
-        1,
-        2,
-        3,
-        4
-      ],
-      "nodes": [
-        "proxy"
-      ],
-      "edges": [],
+      "lines": 4,
       "explain": "抽象方法的 invoker 只有一行：`mapperMethod.execute(sqlSession, args)`。到这儿，代理的活干完了，剩下的交给 `MapperMethod`。",
       "state": {
         "stack": [
@@ -326,9 +216,103 @@ status: published
           "PlainMethodInvoker.invoke",
           "MapperMethod.execute"
         ]
-      }
+      },
+      "nodes": [
+        "proxy"
+      ]
     }
-  ]
+  ],
+  "map": {
+    "title": "MyBatis 主干",
+    "nodes": [
+      {
+        "id": "api",
+        "label": "Mapper 接口 / SqlSession",
+        "sub": "调用入口",
+        "layer": 0,
+        "order": 0
+      },
+      {
+        "id": "config",
+        "label": "Configuration",
+        "sub": "配置与映射",
+        "layer": 1,
+        "order": 0
+      },
+      {
+        "id": "proxy",
+        "label": "MapperProxy",
+        "sub": "动态代理",
+        "layer": 2,
+        "order": 0
+      },
+      {
+        "id": "executor",
+        "label": "Executor",
+        "sub": "执行器",
+        "layer": 3,
+        "order": 0
+      },
+      {
+        "id": "statement",
+        "label": "StatementHandler",
+        "sub": "JDBC 语句",
+        "layer": 4,
+        "order": 0
+      },
+      {
+        "id": "result",
+        "label": "ResultSetHandler",
+        "sub": "结果映射",
+        "layer": 5,
+        "order": 0
+      },
+      {
+        "id": "base",
+        "label": "基础模块",
+        "sub": "反射/类型/缓存/插件",
+        "layer": 6,
+        "order": 0
+      }
+    ],
+    "edges": [
+      {
+        "from": "api",
+        "to": "proxy",
+        "label": "调用接口方法"
+      },
+      {
+        "from": "config",
+        "to": "proxy",
+        "label": "注册 Mapper"
+      },
+      {
+        "from": "proxy",
+        "to": "executor",
+        "label": "MapperMethod"
+      },
+      {
+        "from": "config",
+        "to": "executor",
+        "label": "默认执行器"
+      },
+      {
+        "from": "executor",
+        "to": "statement",
+        "label": "prepare"
+      },
+      {
+        "from": "statement",
+        "to": "result",
+        "label": "ResultSet"
+      },
+      {
+        "from": "executor",
+        "to": "base",
+        "label": "用到时才取"
+      }
+    ]
+  }
 }
 ```
 

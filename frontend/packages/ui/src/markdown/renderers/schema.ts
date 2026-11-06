@@ -599,6 +599,8 @@ export interface WalkStep {
   when?: WalkControlValues
   state?: WalkState
   refs?: WalkRef[]
+  /** 这一步高亮的架构图节点 id（仅在块声明了 `map` 时有意义）。 */
+  nodes?: string[]
   predict?: Predict
 }
 
@@ -616,6 +618,8 @@ export interface SourceWalk {
   files: WalkFile[]
   controls: WalkControl[]
   steps: WalkStep[]
+  /** 可选的架构地图：给了就在代码上方同屏展示，并按每步 `nodes` 高亮。 */
+  map?: CodeMap
 }
 
 function asRelativePath(value: unknown, where: string, max: number): string {
@@ -698,6 +702,14 @@ export function parseSourceWalk(code: string): ParseResult<SourceWalk> {
     )
     const controlTypes = new Map(controls.map((control) => [control.id, control.type]))
 
+    let map: CodeMap | undefined
+    if (raw['map'] !== undefined) {
+      const mapResult = parseCodeMap(JSON.stringify(raw['map']))
+      if (!mapResult.ok) throw new BadInput(`map 不合法：${mapResult.error}`)
+      map = mapResult.value
+    }
+    const mapIds = new Set((map?.nodes ?? []).map((node) => node.id))
+
     const steps = asArray(raw['steps'], 'steps', 1, LIMITS.walkSteps).map((item, index) => {
       const where = `steps[${index}]`
       const step = asObject(item, where)
@@ -734,6 +746,14 @@ export function parseSourceWalk(code: string): ParseResult<SourceWalk> {
             }
           })
 
+      const stepNodes = step['nodes'] === undefined
+        ? undefined
+        : asArray(step['nodes'], `${where}.nodes`, 0, LIMITS.mapNodes).map((value, position) => {
+            const id = asText(value, `${where}.nodes[${position}]`, LIMITS.id)
+            need(mapIds.has(id), `${where}.nodes[${position}] 指向不存在的节点：${id}`)
+            return id
+          })
+
       return {
         title: asText(step['title'], `${where}.title`, LIMITS.title),
         file,
@@ -743,6 +763,7 @@ export function parseSourceWalk(code: string): ParseResult<SourceWalk> {
         when,
         state: step['state'] === undefined ? undefined : parseWalkState(step['state'], `${where}.state`),
         refs,
+        nodes: stepNodes,
         predict: step['predict'] === undefined ? undefined : parsePredict(step['predict'], `${where}.predict`),
       }
     })
@@ -759,6 +780,7 @@ export function parseSourceWalk(code: string): ParseResult<SourceWalk> {
       files,
       controls,
       steps,
+      map,
     }
   })
 }

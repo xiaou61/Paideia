@@ -15,100 +15,37 @@ status: published
 - 接口里的 `default` 方法不能走 SQL，要用 `MethodHandle` 直接调；
 - 抛出来的异常会被解包，不然你看到的是 `UndeclaredThrowableException`。
 
-```code-flow
+```source-walk
 {
   "id": "mapper-proxy-cache",
   "title": "methodCache 与 default 方法",
   "repo": "mybatis/mybatis-3",
+  "ref": "mybatis-3.5.19",
   "commit": "ee0d4f4831ffdd311b0183c202f4ad6492a3f404",
   "license": "Apache-2.0",
-  "file": "org/apache/ibatis/binding/MapperProxy.java",
-  "nodes": [
+  "base": "source/mybatis-3.5.19",
+  "files": [
     {
-      "id": "api",
-      "label": "Mapper 接口 / SqlSession",
-      "sub": "调用入口",
-      "layer": 0,
-      "order": 0
-    },
-    {
-      "id": "config",
-      "label": "Configuration",
-      "sub": "配置与映射",
-      "layer": 1,
-      "order": 0
-    },
-    {
-      "id": "proxy",
-      "label": "MapperProxy",
-      "sub": "动态代理",
-      "layer": 2,
-      "order": 0
-    },
-    {
-      "id": "executor",
-      "label": "Executor",
-      "sub": "执行器",
-      "layer": 3,
-      "order": 0
-    },
-    {
-      "id": "statement",
-      "label": "StatementHandler",
-      "sub": "JDBC 语句",
-      "layer": 4,
-      "order": 0
-    },
-    {
-      "id": "result",
-      "label": "ResultSetHandler",
-      "sub": "结果映射",
-      "layer": 5,
-      "order": 0
-    },
-    {
-      "id": "base",
-      "label": "基础模块",
-      "sub": "反射 / 类型 / 缓存 / 插件",
-      "layer": 6,
-      "order": 0
+      "path": "org/apache/ibatis/binding/MapperProxy.java",
+      "label": "MapperProxy"
     }
   ],
-  "edges": [
+  "controls": [
     {
-      "from": "api",
-      "to": "proxy",
-      "label": "调用接口方法"
-    },
-    {
-      "from": "config",
-      "to": "proxy",
-      "label": "注册 Mapper"
-    },
-    {
-      "from": "proxy",
-      "to": "executor",
-      "label": "MapperMethod"
-    },
-    {
-      "from": "config",
-      "to": "executor",
-      "label": "默认执行器"
-    },
-    {
-      "from": "executor",
-      "to": "statement",
-      "label": "prepare"
-    },
-    {
-      "from": "statement",
-      "to": "result",
-      "label": "ResultSet"
-    },
-    {
-      "from": "executor",
-      "to": "base",
-      "label": "用到时才取"
+      "id": "methodKind",
+      "type": "select",
+      "label": "方法是什么类型",
+      "default": "abstract",
+      "options": [
+        {
+          "value": "abstract",
+          "label": "抽象方法（要执行 SQL）"
+        },
+        {
+          "value": "default",
+          "label": "default 方法（有实现）"
+        }
+      ]
     }
   ],
   "steps": [
@@ -116,72 +53,43 @@ status: published
       "title": "computeIfAbsent：一个方法只装配一次",
       "file": "org/apache/ibatis/binding/MapperProxy.java",
       "line": 92,
-      "code": "  private MapperMethodInvoker cachedInvoker(Method method) throws Throwable {\n    try {\n      return MapUtil.computeIfAbsent(methodCache, method, m -> {\n        if (!m.isDefault()) {\n          return new PlainMethodInvoker(new MapperMethod(mapperInterface, method, sqlSession.getConfiguration()));\n        }\n        try {\n          if (privateLookupInMethod == null) {\n            return new DefaultMethodInvoker(getMethodHandleJava8(method));\n          }\n          return new DefaultMethodInvoker(getMethodHandleJava9(method));\n        } catch (IllegalAccessException | InstantiationException | InvocationTargetException\n            | NoSuchMethodException e) {\n          throw new RuntimeException(e);\n        }\n      });\n    } catch (RuntimeException re) {\n      Throwable cause = re.getCause();\n      throw cause == null ? re : cause;\n    }\n  }",
-      "language": "java",
-      "focus": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        12,
-        13,
-        14,
-        15,
-        16,
-        17,
-        18,
-        19,
-        20
-      ],
+      "lines": 21,
+      "explain": "`methodCache` 是 `Map<Method, MapperMethodInvoker>`，用 `computeIfAbsent` 填。`MapperMethod` 的构造要做 SQL 命令解析与签名解析，**不该每次调用都做一遍**。",
+      "state": {
+        "tables": [
+          [
+            "methodCache",
+            "selectById → PlainMethodInvoker"
+          ],
+          [
+            "命中",
+            "第二次起不再构造"
+          ]
+        ]
+      },
       "nodes": [
         "proxy"
-      ],
-      "edges": [],
-      "explain": "`methodCache` 是 `Map<Method, MapperMethodInvoker>`，用 `computeIfAbsent` 填。`MapperMethod` 的构造要做 SQL 命令解析与签名解析，**不该每次调用都做一遍**。",
-      "log": [
-        {
-          "k": "methodCache",
-          "v": "selectById → PlainMethodInvoker"
-        },
-        {
-          "k": "命中",
-          "v": "第二次起不再构造"
-        }
       ]
     },
     {
       "title": "抽象方法：PlainMethodInvoker + MapperMethod",
       "file": "org/apache/ibatis/binding/MapperProxy.java",
       "line": 95,
-      "code": "        if (!m.isDefault()) {\n          return new PlainMethodInvoker(new MapperMethod(mapperInterface, method, sqlSession.getConfiguration()));\n        }",
-      "language": "java",
-      "focus": [
-        1,
-        2,
-        3
-      ],
-      "nodes": [
-        "proxy"
-      ],
-      "edges": [],
+      "lines": 3,
       "explain": "只要不是 default 方法，就 `new MapperMethod(mapperInterface, method, configuration)`，包成 `PlainMethodInvoker`。缓存里放的是这个 invoker。",
+      "when": {
+        "methodKind": "abstract"
+      },
       "state": {
         "vars": [
-          {
-            "name": "invoker",
-            "value": "PlainMethodInvoker"
-          },
-          {
-            "name": "MapperMethod",
-            "value": "每个方法一个"
-          }
+          [
+            "invoker",
+            "PlainMethodInvoker"
+          ],
+          [
+            "MapperMethod",
+            "每个方法一个"
+          ]
         ]
       },
       "predict": {
@@ -193,94 +101,60 @@ status: published
         ],
         "answer": 1,
         "reveal": "`cachedInvoker` 的 computeIfAbsent 在首次调用时 new。"
-      }
+      },
+      "nodes": [
+        "proxy"
+      ]
     },
     {
       "title": "default 方法：用 MethodHandle 直接调",
       "file": "org/apache/ibatis/binding/MapperProxy.java",
       "line": 98,
-      "code": "        try {\n          if (privateLookupInMethod == null) {\n            return new DefaultMethodInvoker(getMethodHandleJava8(method));\n          }\n          return new DefaultMethodInvoker(getMethodHandleJava9(method));\n        } catch (IllegalAccessException | InstantiationException | InvocationTargetException\n            | NoSuchMethodException e) {\n          throw new RuntimeException(e);\n        }",
-      "language": "java",
-      "focus": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9
-      ],
-      "nodes": [
-        "proxy"
-      ],
-      "edges": [],
+      "lines": 9,
       "explain": "接口的 default 方法不该被翻译成 SQL。Java 8 用 `Lookup` 反射构造 `MethodHandle`，Java 9+ 用 `privateLookupIn`；包成 `DefaultMethodInvoker` 后调用时不经过 SQL 层。",
+      "when": {
+        "methodKind": "default"
+      },
       "state": {
         "vars": [
-          {
-            "name": "invoker",
-            "value": "DefaultMethodInvoker"
-          },
-          {
-            "name": "底层",
-            "value": "MethodHandle.findSpecial"
-          }
+          [
+            "invoker",
+            "DefaultMethodInvoker"
+          ],
+          [
+            "底层",
+            "MethodHandle.findSpecial"
+          ]
         ]
-      }
+      },
+      "nodes": [
+        "proxy"
+      ]
     },
     {
       "title": "Java 9+ 的获取方式",
       "file": "org/apache/ibatis/binding/MapperProxy.java",
       "line": 114,
-      "code": "  private MethodHandle getMethodHandleJava9(Method method)\n      throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {\n    final Class<?> declaringClass = method.getDeclaringClass();\n    return ((Lookup) privateLookupInMethod.invoke(null, declaringClass, MethodHandles.lookup())).findSpecial(\n        declaringClass, method.getName(), MethodType.methodType(method.getReturnType(), method.getParameterTypes()),\n        declaringClass);\n  }",
-      "language": "java",
-      "focus": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7
-      ],
-      "nodes": [
-        "proxy"
-      ],
-      "edges": [],
+      "lines": 7,
       "explain": "`privateLookupIn(declaringClass, MethodHandles.lookup())` 拿到私有查找权限，再 `findSpecial` 找到 default 实现。这段是为了兼容 JDK 版本差异，读的时候知道它在干什么就够。",
       "state": {
         "vars": [
-          {
-            "name": "版本分支",
-            "value": "privateLookupInMethod != null → Java 9+"
-          }
+          [
+            "版本分支",
+            "privateLookupInMethod != null → Java 9+"
+          ]
         ]
-      }
+      },
+      "nodes": [
+        "proxy"
+      ]
     },
     {
       "title": "异常解包：别让 UndeclaredThrowable 盖住真因",
       "file": "org/apache/ibatis/binding/MapperProxy.java",
       "line": 87,
-      "code": "    } catch (Throwable t) {\n      throw ExceptionUtil.unwrapThrowable(t);\n    }",
-      "language": "java",
-      "focus": [
-        1,
-        2,
-        3
-      ],
-      "nodes": [
-        "proxy"
-      ],
-      "edges": [],
+      "lines": 3,
       "explain": "代理里抛的受检异常会被 JDK 包成 `UndeclaredThrowableException`。`ExceptionUtil.unwrapThrowable` 把它剥掉，你看到的才是 `PersistenceException` / `SQLException` 本身。",
-      "state": {
-        "stack": [
-          "MapperProxy.invoke",
-          "ExceptionUtil.unwrapThrowable"
-        ]
-      },
       "predict": {
         "question": "Mapper 方法里抛出的异常，为什么在业务层看到的是原始类型？",
         "options": [
@@ -290,9 +164,109 @@ status: published
         ],
         "answer": 1,
         "reveal": "invoke 的 catch 里调用 `ExceptionUtil.unwrapThrowable(t)`，把动态代理的包装层剥掉。"
-      }
+      },
+      "state": {
+        "stack": [
+          "MapperProxy.invoke",
+          "ExceptionUtil.unwrapThrowable"
+        ]
+      },
+      "nodes": [
+        "proxy"
+      ]
     }
-  ]
+  ],
+  "map": {
+    "title": "MyBatis 主干",
+    "nodes": [
+      {
+        "id": "api",
+        "label": "Mapper 接口 / SqlSession",
+        "sub": "调用入口",
+        "layer": 0,
+        "order": 0
+      },
+      {
+        "id": "config",
+        "label": "Configuration",
+        "sub": "配置与映射",
+        "layer": 1,
+        "order": 0
+      },
+      {
+        "id": "proxy",
+        "label": "MapperProxy",
+        "sub": "动态代理",
+        "layer": 2,
+        "order": 0
+      },
+      {
+        "id": "executor",
+        "label": "Executor",
+        "sub": "执行器",
+        "layer": 3,
+        "order": 0
+      },
+      {
+        "id": "statement",
+        "label": "StatementHandler",
+        "sub": "JDBC 语句",
+        "layer": 4,
+        "order": 0
+      },
+      {
+        "id": "result",
+        "label": "ResultSetHandler",
+        "sub": "结果映射",
+        "layer": 5,
+        "order": 0
+      },
+      {
+        "id": "base",
+        "label": "基础模块",
+        "sub": "反射/类型/缓存/插件",
+        "layer": 6,
+        "order": 0
+      }
+    ],
+    "edges": [
+      {
+        "from": "api",
+        "to": "proxy",
+        "label": "调用接口方法"
+      },
+      {
+        "from": "config",
+        "to": "proxy",
+        "label": "注册 Mapper"
+      },
+      {
+        "from": "proxy",
+        "to": "executor",
+        "label": "MapperMethod"
+      },
+      {
+        "from": "config",
+        "to": "executor",
+        "label": "默认执行器"
+      },
+      {
+        "from": "executor",
+        "to": "statement",
+        "label": "prepare"
+      },
+      {
+        "from": "statement",
+        "to": "result",
+        "label": "ResultSet"
+      },
+      {
+        "from": "executor",
+        "to": "base",
+        "label": "用到时才取"
+      }
+    ]
+  }
 }
 ```
 

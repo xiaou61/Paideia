@@ -14,100 +14,41 @@ status: published
 
 这一关看两件事：**注册表怎么找一个 handler**，以及**null 为什么会逼你写 jdbcType**。
 
-```code-flow
+```source-walk
 {
   "id": "type-handler",
   "title": "TypeHandlerRegistry 与 BaseTypeHandler",
   "repo": "mybatis/mybatis-3",
+  "ref": "mybatis-3.5.19",
   "commit": "ee0d4f4831ffdd311b0183c202f4ad6492a3f404",
   "license": "Apache-2.0",
-  "file": "org/apache/ibatis/type/TypeHandlerRegistry.java",
-  "nodes": [
+  "base": "source/mybatis-3.5.19",
+  "files": [
     {
-      "id": "api",
-      "label": "Mapper 接口 / SqlSession",
-      "sub": "调用入口",
-      "layer": 0,
-      "order": 0
+      "path": "org/apache/ibatis/type/TypeHandlerRegistry.java",
+      "label": "TypeHandlerRegistry"
     },
     {
-      "id": "config",
-      "label": "Configuration",
-      "sub": "配置与映射",
-      "layer": 1,
-      "order": 0
-    },
-    {
-      "id": "proxy",
-      "label": "MapperProxy",
-      "sub": "动态代理",
-      "layer": 2,
-      "order": 0
-    },
-    {
-      "id": "executor",
-      "label": "Executor",
-      "sub": "执行器",
-      "layer": 3,
-      "order": 0
-    },
-    {
-      "id": "statement",
-      "label": "StatementHandler",
-      "sub": "JDBC 语句",
-      "layer": 4,
-      "order": 0
-    },
-    {
-      "id": "result",
-      "label": "ResultSetHandler",
-      "sub": "结果映射",
-      "layer": 5,
-      "order": 0
-    },
-    {
-      "id": "base",
-      "label": "基础模块",
-      "sub": "反射 / 类型 / 缓存 / 插件",
-      "layer": 6,
-      "order": 0
+      "path": "org/apache/ibatis/type/BaseTypeHandler.java",
+      "label": "BaseTypeHandler"
     }
   ],
-  "edges": [
+  "controls": [
     {
-      "from": "api",
-      "to": "proxy",
-      "label": "调用接口方法"
-    },
-    {
-      "from": "config",
-      "to": "proxy",
-      "label": "注册 Mapper"
-    },
-    {
-      "from": "proxy",
-      "to": "executor",
-      "label": "MapperMethod"
-    },
-    {
-      "from": "config",
-      "to": "executor",
-      "label": "默认执行器"
-    },
-    {
-      "from": "executor",
-      "to": "statement",
-      "label": "prepare"
-    },
-    {
-      "from": "statement",
-      "to": "result",
-      "label": "ResultSet"
-    },
-    {
-      "from": "executor",
-      "to": "base",
-      "label": "用到时才取"
+      "id": "value",
+      "type": "select",
+      "label": "参数值",
+      "default": "normal",
+      "options": [
+        {
+          "value": "normal",
+          "label": "有值"
+        },
+        {
+          "value": "null",
+          "label": "null"
+        }
+      ]
     }
   ],
   "steps": [
@@ -115,55 +56,42 @@ status: published
       "title": "按 Java 类型找 handler",
       "file": "org/apache/ibatis/type/TypeHandlerRegistry.java",
       "line": 219,
-      "code": "  public <T> TypeHandler<T> getTypeHandler(Class<T> type) {\n    return getTypeHandler((Type) type, null);\n  }",
-      "language": "java",
-      "focus": [
-        1,
-        2,
-        3
-      ],
+      "lines": 4,
+      "explain": "`getTypeHandler(Class)` 查一张 `Map<Class, TypeHandler>`。内置的 `String`、`Long`、`LocalDateTime` 都在启动时注册好了；找不到就返回 null，调用方再决定用什么兜底。",
+      "state": {
+        "tables": [
+          [
+            "Long",
+            "LongTypeHandler"
+          ],
+          [
+            "String",
+            "StringTypeHandler"
+          ]
+        ]
+      },
       "nodes": [
         "base"
-      ],
-      "edges": [],
-      "explain": "`getTypeHandler(Class)` 查一张 `Map<Class, TypeHandler>`。内置的 `String`、`Long`、`LocalDateTime` 都在启动时注册好了；找不到就返回 null，调用方再决定用什么兜底。",
-      "log": [
-        {
-          "k": "Long",
-          "v": "LongTypeHandler"
-        },
-        {
-          "k": "String",
-          "v": "StringTypeHandler"
-        }
       ]
     },
     {
       "title": "带上 jdbcType 时走二维表",
       "file": "org/apache/ibatis/type/TypeHandlerRegistry.java",
       "line": 231,
-      "code": "  public <T> TypeHandler<T> getTypeHandler(Class<T> type, JdbcType jdbcType) {\n    return getTypeHandler((Type) type, jdbcType);\n  }",
-      "language": "java",
-      "focus": [
-        1,
-        2,
-        3
-      ],
-      "nodes": [
-        "base"
-      ],
-      "edges": [],
+      "lines": 4,
       "explain": "`getTypeHandler(type, jdbcType)` 先按精确的 (Java 类型, JDBC 类型) 找，找不到再退回只按 Java 类型。所以 `#{createdAt,jdbcType=TIMESTAMP}` 能选到更合适的 handler。",
-      "log": [
-        {
-          "k": "(LocalDateTime, TIMESTAM",
-          "v": "LocalDateTimeTypeHandler"
-        },
-        {
-          "k": "回退",
-          "v": "只按 Java 类型"
-        }
-      ],
+      "state": {
+        "tables": [
+          [
+            "(LocalDateTime, TIMESTAMP)",
+            "LocalDateTimeTypeHandler"
+          ],
+          [
+            "回退",
+            "只按 Java 类型"
+          ]
+        ]
+      },
       "predict": {
         "question": "精确匹配不到 (Java 类型, jdbcType) 时？",
         "options": [
@@ -173,118 +101,62 @@ status: published
         ],
         "answer": 1,
         "reveal": "先精确、后回退。"
-      }
+      },
+      "nodes": [
+        "base"
+      ]
     },
     {
       "title": "注册：内置的都是这么来的",
       "file": "org/apache/ibatis/type/TypeHandlerRegistry.java",
       "line": 417,
-      "code": "  public void register(Class<?> typeHandlerClass) {\n    boolean mappedTypeFound = false;\n    MappedTypes mappedTypes = typeHandlerClass.getAnnotation(MappedTypes.class);\n    if (mappedTypes != null) {\n      for (Class<?> javaTypeClass : mappedTypes.value()) {\n        register(javaTypeClass, typeHandlerClass);\n        mappedTypeFound = true;\n      }\n    }\n    if (!mappedTypeFound) {\n      register(getInstance(null, typeHandlerClass));\n    }\n  }\n\n  // java type + handler type\n\n  public void register(String javaTypeClassName, String typeHandlerClassName) throws ClassNotFoundException {\n    register(Resources.classForName(javaTypeClassName), Resources.classForName(typeHandlerClassName));\n  }",
-      "language": "java",
-      "focus": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        12,
-        13,
-        14,
-        15,
-        16,
-        17,
-        18,
-        19
-      ],
+      "lines": 20,
+      "explain": "`register(Class<T> javaType, TypeHandler<? extends T> handler)` 把 handler 放进两张表：按 Java 类型、按 (Java 类型, jdbcType)。自定义 handler 也是同一个入口。",
+      "state": {
+        "tables": [
+          [
+            "注册表",
+            "按 Java 类型 + 按 JDBC 类型"
+          ],
+          [
+            "自定义",
+            "同一入口"
+          ]
+        ]
+      },
       "nodes": [
         "base"
-      ],
-      "edges": [],
-      "explain": "`register(Class<T> javaType, TypeHandler<? extends T> handler)` 把 handler 放进两张表：按 Java 类型、按 (Java 类型, jdbcType)。自定义 handler 也是同一个入口。",
-      "log": [
-        {
-          "k": "注册表",
-          "v": "按 Java 类型 + 按 JDBC 类型"
-        },
-        {
-          "k": "自定义",
-          "v": "同一入口"
-        }
       ]
     },
     {
       "title": "有值：交给子类的 setNonNullParameter",
       "file": "org/apache/ibatis/type/BaseTypeHandler.java",
       "line": 70,
-      "code": "      }\n    } else {\n      try {\n        setNonNullParameter(ps, i, parameter, jdbcType);\n      } catch (Exception e) {\n        throw new TypeException(\"Error setting non null for parameter #\" + i + \" with JdbcType \" + jdbcType + \" . \"\n            + \"Try setting a different JdbcType for this parameter or a different configuration property. \" + \"Cause: \"\n            + e, e);\n      }\n    }\n  }",
-      "language": "java",
-      "focus": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11
-      ],
-      "nodes": [
-        "base"
-      ],
-      "edges": [],
+      "lines": 12,
       "explain": "`setParameter` 判断 null 之后，非 null 调抽象方法 `setNonNullParameter`——每个子类只实现这一句 JDBC 调用。",
+      "when": {
+        "value": "normal"
+      },
       "state": {
         "stack": [
           "BaseTypeHandler.setParameter",
           "LongTypeHandler.setNonNullParameter",
           "ps.setLong"
         ]
-      }
+      },
+      "nodes": [
+        "base"
+      ]
     },
     {
       "title": "null：没有 jdbcType 直接抛异常",
       "file": "org/apache/ibatis/type/BaseTypeHandler.java",
       "line": 59,
-      "code": "  public void setParameter(PreparedStatement ps, int i, T parameter, JdbcType jdbcType) throws SQLException {\n    if (parameter == null) {\n      if (jdbcType == null) {\n        throw new TypeException(\"JDBC requires that the JdbcType must be specified for all nullable parameters.\");\n      }\n      try {\n        ps.setNull(i, jdbcType.TYPE_CODE);\n      } catch (SQLException e) {\n        throw new TypeException(\"Error setting null for parameter #\" + i + \" with JdbcType \" + jdbcType + \" . \"\n            + \"Try setting a different JdbcType for this parameter or a different jdbcTypeForNull configuration property. \"\n            + \"Cause: \" + e, e);\n      }",
-      "language": "java",
-      "focus": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        12
-      ],
-      "nodes": [
-        "base"
-      ],
-      "edges": [],
+      "lines": 12,
       "explain": "`parameter == null && jdbcType == null` 时抛 `TypeException`：驱动不知道 null 该按哪种 JDBC 类型发。所以可空参数建议写成 `#{name,jdbcType=VARCHAR}`，或配全局 `jdbcTypeForNull`。",
-      "log": [
-        {
-          "k": "ps.setNull",
-          "v": "需要 TypeCode"
-        },
-        {
-          "k": "全局默认",
-          "v": "jdbcTypeForNull = OTHER"
-        }
-      ],
+      "when": {
+        "value": "null"
+      },
       "predict": {
         "question": "为什么 null 需要 jdbcType，而有值的时候不需要？",
         "options": [
@@ -294,28 +166,28 @@ status: published
         ],
         "answer": 0,
         "reveal": "有值时 Java 类型能推断 JDBC 类型；null 没有类型信息，只能显式指定或走全局默认（OTHER）。"
-      }
+      },
+      "state": {
+        "tables": [
+          [
+            "ps.setNull",
+            "需要 TypeCode"
+          ],
+          [
+            "全局默认",
+            "jdbcTypeForNull = OTHER"
+          ]
+        ]
+      },
+      "nodes": [
+        "base"
+      ]
     },
     {
       "title": "取值：getResult 只包一层异常",
       "file": "org/apache/ibatis/type/BaseTypeHandler.java",
       "line": 83,
-      "code": "  public T getResult(ResultSet rs, String columnName) throws SQLException {\n    try {\n      return getNullableResult(rs, columnName);\n    } catch (Exception e) {\n      throw new ResultMapException(\"Error attempting to get column '\" + columnName + \"' from result set.  Cause: \" + e,\n          e);\n    }\n  }",
-      "language": "java",
-      "focus": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8
-      ],
-      "nodes": [
-        "base"
-      ],
-      "edges": [],
+      "lines": 8,
       "explain": "`getResult(rs, columnName)` 调 `getNullableResult`，把 SQL 异常包成 `ResultMapException` 并带上列名——排查「哪一列转换失败」时这条信息很关键。",
       "state": {
         "stack": [
@@ -323,9 +195,103 @@ status: published
           "getNullableResult",
           "rs.getTimestamp"
         ]
-      }
+      },
+      "nodes": [
+        "base"
+      ]
     }
-  ]
+  ],
+  "map": {
+    "title": "MyBatis 主干",
+    "nodes": [
+      {
+        "id": "api",
+        "label": "Mapper 接口 / SqlSession",
+        "sub": "调用入口",
+        "layer": 0,
+        "order": 0
+      },
+      {
+        "id": "config",
+        "label": "Configuration",
+        "sub": "配置与映射",
+        "layer": 1,
+        "order": 0
+      },
+      {
+        "id": "proxy",
+        "label": "MapperProxy",
+        "sub": "动态代理",
+        "layer": 2,
+        "order": 0
+      },
+      {
+        "id": "executor",
+        "label": "Executor",
+        "sub": "执行器",
+        "layer": 3,
+        "order": 0
+      },
+      {
+        "id": "statement",
+        "label": "StatementHandler",
+        "sub": "JDBC 语句",
+        "layer": 4,
+        "order": 0
+      },
+      {
+        "id": "result",
+        "label": "ResultSetHandler",
+        "sub": "结果映射",
+        "layer": 5,
+        "order": 0
+      },
+      {
+        "id": "base",
+        "label": "基础模块",
+        "sub": "反射/类型/缓存/插件",
+        "layer": 6,
+        "order": 0
+      }
+    ],
+    "edges": [
+      {
+        "from": "api",
+        "to": "proxy",
+        "label": "调用接口方法"
+      },
+      {
+        "from": "config",
+        "to": "proxy",
+        "label": "注册 Mapper"
+      },
+      {
+        "from": "proxy",
+        "to": "executor",
+        "label": "MapperMethod"
+      },
+      {
+        "from": "config",
+        "to": "executor",
+        "label": "默认执行器"
+      },
+      {
+        "from": "executor",
+        "to": "statement",
+        "label": "prepare"
+      },
+      {
+        "from": "statement",
+        "to": "result",
+        "label": "ResultSet"
+      },
+      {
+        "from": "executor",
+        "to": "base",
+        "label": "用到时才取"
+      }
+    ]
+  }
 }
 ```
 
