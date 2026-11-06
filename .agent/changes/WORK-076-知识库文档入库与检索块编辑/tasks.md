@@ -303,3 +303,5 @@ approver_role: CTO
 - 2026-11-06 结构图：`gen-arch-diagram.mjs` 生成 65 表/15 外键、194 端点/48 控制器，`--check` 通过；README 计数已更新。
 - 2026-11-06 TASK-008：mapper SQL 已由集成测试在真实库上验证 → done。
 - 2026-11-06 TASK-015：验证报告 `testing/report.md` 已产出；Playwright e2e 已编写但未运行，真实模型蒸馏端到端（AC-101/102）待环境补验。
+- 2026-11-06 全链路集成：`-Dtest=KnowledgeImportFlowIntegrationTest` → Tests run 3, Failures 0（真实 PDF→抽取→桩蒸馏→draft+来源+指纹+目录树；重复导入指纹去重=1 条；发布后进入 publishedContents 语料）。覆盖 AC-101/103/104 与 AC-102 代理。
+- 2026-11-06 前端生产构建：`pnpm --filter @paideia/admin build`=0、`@paideia/app build`=0。

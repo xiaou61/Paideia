@@ -91,11 +91,36 @@
 - `pnpm --filter @paideia/knowledge exec vitest run src/admin-client.test.ts` → **4 passed**（导入/切片 client 路径、方法与载荷）。
 - `pnpm --filter @paideia/admin typecheck` → EXIT=0
 - `pnpm --filter @paideia/app typecheck` → EXIT=0
+- **生产构建**：`pnpm --filter @paideia/admin build` → ADMIN_BUILD=0；`pnpm --filter @paideia/app build` → APP_BUILD=0（新增页面可正常打包）
 - 说明：`pnpm --filter @paideia/knowledge test` 全量时 `recommend.test.ts` 有 2 条失败，与本工作项无关（未改 `recommend`），属既有问题。
 
-## 六、未执行与残留风险（诚实记录）
+## 六、文档入库全链路集成（模型打桩，真实上传/抽取/落库）
 
-- **未执行真实模型蒸馏的端到端**：AC-101/AC-102 的“上传 PDF → 模型蒸馏 → 草稿 → 发布 → RAG 命中”需要部署环境配置平台 AI 凭据（`paideia.ai.billing.platform-credential`）。本机测试 profile 关闭 embedding/RAG，且测试从不打真实上游，所以这条**未端到端验证**。导入编排的成功/失败分支由 `KnowledgeImportServiceTest`（桩 distiller）与集成测试的 plumbing 覆盖。
+命令：
+
+```
+../scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=KnowledgeImportFlowIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+结果：**Tests run: 3, Failures: 0, Errors: 0**。用真实 PDFBox 造带文字层的 PDF，经真实
+`/api/v1/knowledge/admin/files` 上传 → 登记导入 → 触发 relay 的 `processPending` → 真实
+`ResumeTextExtractor` 抽文本 → **仅把 `DocumentDistiller` 换成桩**（不打真实上游）→ 真实落库。断言：
+
+- **AC-101**：按 `source_url` 查到条目，`status=draft`、正文含原文、`fingerprint` 为 64 位、有来源记录；
+  导入任务 `status=succeeded`。
+- **AC-103**：同一 PDF 上传两次导入 → 两个来源 URL 合计只有 **1 条**条目，第二次导入仍 `succeeded`（命中指纹去重）。
+- **AC-104**：`relativePath=导入测试/子目录/a.pdf` → `knowledge_categories` 生成两层（父=导入测试、子=子目录）。
+- **AC-102（代理）**：把该草稿经管理端 PUT 发布为 published 后，`KnowledgeApi.publishedContents()`
+  包含该条目——这正是 RAG 索引的语料来源（RAG 抽取/向量化逻辑另由 `KnowledgeRagService` 单测覆盖）。
+
+> 期间另修一个测试自身缺陷（去重断言误用原始文本而非抽取文本），改按来源 URL 计数后为真实去重。
+
+## 七、未执行与残留风险（诚实记录）
+
+- **真实模型（非桩）蒸馏未验**：AC-101/102 的“抽文本→**真实模型**蒸馏出 Markdown 正文→草稿”这条，
+  本机把 `DocumentDistiller` 换成了桩（测试不打真实上游，与全仓 AI 测试同一纪律）。管线本身（抽取、落库、去重、
+  来源、目录、发布进语料）已由第六节真实集成覆盖；真实模型输出质量需部署环境配平台 AI 凭据（`paideia.ai.billing.platform-credential`）后人工试跑。
 - **未执行 Playwright e2e**：`knowledge-import.spec.ts` / `knowledge-chunks.spec.ts` / `knowledge-wiki.spec.ts` 已编写（页面级 smoke，不触发模型），但需要后端 jar + Redis + 前端服务 + Chrome 通道，本轮未起整套 e2e 服务，**未运行**。
 - **未跑 `mvn verify` 全量**：只跑了受影响的切片与守卫组合（符合项目「切片提交不跑全量」的约定）。
-- 判定：核心代码与全部自动化可覆盖的分支已绿；受“平台模型凭据/整套 e2e 服务”约束的端到端路径待环境就绪补验。
+- 判定：核心代码、单测、迁移、守卫、真实 DB 集成（含 AC-101/102代理/103/104）与前端类型/构建均已绿；
+  仅剩“真实模型输出质量”与“整套 UI e2e”这两项环境相关验证未做。
