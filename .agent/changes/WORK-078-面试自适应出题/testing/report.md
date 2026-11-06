@@ -12,7 +12,7 @@ updated: 2026-11-06
 
 ## 验证环境
 
-- 日期：2026-11-06；改动：后端 `ReviewPrompt`/`InterviewPrompt`（提示词与版本号）、前端 `@paideia/assistant/adaptive.ts` + 单测、`InterviewPage.tsx`。
+- 日期：2026-11-06；改动：后端 `ReviewPrompt`/`InterviewPrompt`（提示词与版本号）、`InterviewReviewService.EvaluationView`（加 `conversationId`）、前端 `@paideia/assistant/adaptive.ts` + 单测 + `types.ts`、`InterviewPage.tsx`（自适应 / 历史详情 / 弱项复习）。
 - Playwright 用系统 Chrome 打 `vite preview`，`/api/v1/**` 全 mock（含历史评估、简历、对话 SSE），不连后端、不花积分。
 
 ## 验证结果
@@ -26,6 +26,8 @@ updated: 2026-11-06
 | AC-005 生产构建 | `pnpm --filter @paideia/app build` | 0 | passed | 构建成功、懒加载守卫通过 |
 | AC-003 自适应注入 pageContext | 抓 messages POST body | 0 | passed | `{"ctxHasAdaptive":true,"ctxHasFocus":true,"ctxHasResume":true,"ctxHasAdvice":true}` |
 | AC-004 起始页显示重点/难度 | Playwright 截图 | 0 | passed | `focusVisible:true`；`.agent/prototypes/work078-shots/07-adaptive-start.png`（"本场重点：项目经验、技术深度 · 难度 中等 · 依据过往 2 场"） |
+| AC-006 历史详情 + 对话回放 | Playwright 点历史条目 | 0 | passed | `{"detailVisible":true,"transcriptVisible":true}`；`08-history-list.png` / `09-history-detail.png` |
+| AC-007 弱项 → 知识库复习 | Playwright mock 知识库条目 | 0 | passed | `{"suggestionVisible":true,"suggestionCount":2}`；截图中两行弱项 + 可点条目（Java 并发基础 / Spring Boot 项目实战） |
 
 ## 验收结果
 
@@ -36,6 +38,8 @@ updated: 2026-11-06
 | AC-003 | 满足 | 请求体 pageContext 含"本场自适应设置"、重点维度、简历、改进建议；气泡仍只"开始面试" |
 | AC-004 | 满足 | 截图 07 展示重点/难度/场次 |
 | AC-005 | 满足 | 编译 / 单测 / typecheck / 令牌 / 构建全绿 |
+| AC-006 | 满足 | `EvaluationView` 带 `conversationId`；点历史弹报告详情 + `messages` 回放（截图 09） |
+| AC-007 | 满足 | 评分卡"针对弱项去复习"列出弱项与知识库条目链接（截图 09） |
 
 ## 失败与未验证项
 

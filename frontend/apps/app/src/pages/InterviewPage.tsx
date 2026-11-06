@@ -25,7 +25,7 @@ import {
   Separator,
   Spinner,
 } from '@paideia/ui'
-import { useBlocker } from 'react-router'
+import { Link, useBlocker } from 'react-router'
 import {
   ArrowRight,
   Bot,
@@ -44,12 +44,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { api } from '../api'
 import { createAssistantApi } from '@paideia/assistant'
+import { createKnowledgeApi } from '@paideia/knowledge'
 import { LearnerHeader } from '../components/LearnerHeader'
 import { errorMessage } from '@paideia/core'
 
 const identity = createIdentityApi(api)
 const assistant: AssistantApi = createAssistantApi(api)
 const resumesApi = createResumeApi(api)
+const knowledgeApi = createKnowledgeApi(api)
 
 /** 半场对话里的一条。面试页自己维护，不复用助手的会话面板（那里面向"随手问一句"）。 */
 interface Line {
@@ -353,6 +355,9 @@ export function InterviewPage() {
                 <strong>你的笔记默认不参与</strong>——只有你自己选择带上时才会发出去。
               </AlertDescription>
             </Alert>
+            {history.data === undefined || history.data.length === 0 ? null : (
+              <HistoryCard items={history.data} />
+            )}
           </>
         ) : (
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
@@ -829,6 +834,7 @@ function TipCard() {
 /** 历次面试：默认收起，展开看分维度与改进点。 */
 function HistoryCard({ items }: { items: InterviewEvaluationView[] }) {
   const latest = items[0]
+  const [selected, setSelected] = useState<InterviewEvaluationView | null>(null)
   return (
     <Card data-testid="interview-history">
       <CardContent className="pt-6">
@@ -841,43 +847,96 @@ function HistoryCard({ items }: { items: InterviewEvaluationView[] }) {
         <ul className="divide-border divide-y">
           {items.map((item) => (
             <li key={item.id} data-testid="interview-history-item">
-              <details className="group py-2.5">
-                <summary className="flex cursor-pointer items-center justify-between gap-2 text-sm">
-                  <span className="text-muted-foreground text-xs">
-                    {new Date(item.createdAt).toLocaleString('zh-CN', {
-                      dateStyle: 'short',
-                      timeStyle: 'short',
-                    })}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="font-medium">{item.evaluation.overall} / 5</span>
-                    <ChevronDown className="text-muted-foreground size-4 transition-transform group-open:rotate-180" />
-                  </span>
-                </summary>
-                <div className="mt-3 space-y-2.5">
-                  {item.evaluation.dimensions.map((dimension) => (
-                    <div key={dimension.name}>
-                      <div className="flex items-baseline justify-between gap-2 text-xs">
-                        <span className="text-muted-foreground">{dimension.name}</span>
-                        <span className="text-muted-foreground">{dimension.score}/5</span>
-                      </div>
-                      <ScoreBar score={dimension.score} className="mt-1 h-1" />
-                    </div>
-                  ))}
-                  {item.evaluation.improvements.length === 0 ? null : (
-                    <ul className="text-muted-foreground mt-1 list-disc space-y-1 pl-4 text-xs leading-5">
-                      {item.evaluation.improvements.map((line) => (
-                        <li key={line}>{line}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </details>
+              <button
+                type="button"
+                onClick={() => { setSelected(item) }}
+                className="hover:text-foreground flex w-full items-center justify-between gap-2 py-2.5 text-left text-sm transition-colors"
+              >
+                <span className="text-muted-foreground text-xs">
+                  {new Date(item.createdAt).toLocaleString('zh-CN', {
+                    dateStyle: 'short',
+                    timeStyle: 'short',
+                  })}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="font-medium">{item.evaluation.overall} / 5</span>
+                  <ChevronDown className="text-muted-foreground size-4 -rotate-90" />
+                </span>
+              </button>
             </li>
           ))}
         </ul>
+        <p className="text-muted-foreground mt-2 text-xs">点任意一条看完整报告 + 对话回放</p>
       </CardContent>
+      <HistoryDetailDialog view={selected} onClose={() => { setSelected(null) }} />
     </Card>
+  )
+}
+
+/** 历史条目详情：完整报告 + 对话回放（WORK-078）。 */
+function HistoryDetailDialog({
+  view,
+  onClose,
+}: {
+  view: InterviewEvaluationView | null
+  onClose: () => void
+}) {
+  const transcript = useQuery({
+    queryKey: ['interview-transcript', view === null ? 0 : view.conversationId],
+    queryFn: () => (view === null ? Promise.resolve([]) : assistant.messages(view.conversationId)),
+    enabled: view !== null && (view.conversationId ?? 0) > 0,
+    retry: false,
+  })
+  return (
+    <Dialog open={view !== null} onOpenChange={(open) => { if (!open) { onClose() } }}>
+      <DialogContent data-testid="interview-history-detail" className="sm:max-w-2xl">
+        {view === null ? null : (
+          <>
+            <DialogHeader>
+              <DialogTitle>
+                面试报告 ·{' '}
+                {new Date(view.createdAt).toLocaleString('zh-CN', { dateStyle: 'medium', timeStyle: 'short' })}
+              </DialogTitle>
+              <DialogDescription>总分 {view.evaluation.overall} / 5</DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[68vh] space-y-5 overflow-y-auto pr-1">
+              <EvaluationCard view={view} />
+              <div className="border-border border-t pt-4">
+                <h3 className="text-sm font-medium">对话回放</h3>
+                {transcript.isPending ? (
+                  <p className="text-muted-foreground mt-2 flex items-center gap-2 text-xs"><Spinner className="size-3.5" />加载中…</p>
+                ) : transcript.isError ? (
+                  <p className="text-muted-foreground mt-2 text-xs">读不到对话记录（会话可能已过期）。</p>
+                ) : (transcript.data ?? []).length === 0 ? (
+                  <p className="text-muted-foreground mt-2 text-xs">没有对话记录。</p>
+                ) : (
+                  <ul className="mt-3 space-y-2">
+                    {(transcript.data ?? []).map((message, index) => (
+                      <li key={index} className={message.role === 'assistant' ? '' : 'text-right'}>
+                        <span className="text-muted-foreground mr-2 text-xs">
+                          {message.role === 'assistant' ? '面试官' : '我'}
+                        </span>
+                        <span
+                          className={
+                            'inline-block max-w-[85%] rounded-lg px-3 py-1.5 text-left text-xs leading-5 whitespace-pre-wrap ' +
+                            (message.role === 'assistant' ? 'bg-muted text-foreground' : 'bg-primary text-primary-foreground')
+                          }
+                        >
+                          {message.content}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={onClose}>关闭</Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -962,8 +1021,76 @@ function EvaluationCard({ view }: { view: InterviewEvaluationView }) {
             )}
           </div>
         </div>
+
+        <ReviewSuggestions view={view} />
       </CardContent>
     </Card>
+  )
+}
+
+/** 弱项维度 → 知识库检索词（WORK-078）。只映射有对应内容的方向。 */
+const REVIEW_KEYWORDS: Record<string, string> = {
+  技术深度: 'Java',
+  项目经验: '项目',
+  表达结构: '面试',
+  应变能力: '面试',
+}
+
+/** 针对弱项去知识库复习：取最弱的 1–2 个维度，实时检索并给可点条目。 */
+function ReviewSuggestions({ view }: { view: InterviewEvaluationView }) {
+  const weak = [...view.evaluation.dimensions]
+    .sort((left, right) => left.score - right.score)
+    .filter((dimension) => dimension.score < 4 && REVIEW_KEYWORDS[dimension.name] !== undefined)
+    .slice(0, 2)
+  if (weak.length === 0) {
+    return null
+  }
+  return (
+    <div className="border-border border-t pt-4">
+      <h3 className="flex items-center gap-1.5 text-sm font-medium">
+        <Lightbulb className="text-primary size-4" />
+        针对弱项去复习
+      </h3>
+      <div className="mt-2 space-y-2.5">
+        {weak.map((dimension) => (
+          <ReviewSuggestionRow
+            key={dimension.name}
+            name={dimension.name}
+            keyword={REVIEW_KEYWORDS[dimension.name] ?? ''}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ReviewSuggestionRow({ name, keyword }: { name: string; keyword: string }) {
+  const found = useQuery({
+    queryKey: ['review-suggest', keyword],
+    queryFn: () => knowledgeApi.entries({ q: keyword, size: 3 }),
+    retry: false,
+    enabled: keyword !== '',
+  })
+  const items = found.data?.items ?? []
+  return (
+    <div data-testid="interview-review-suggestion">
+      <p className="text-muted-foreground text-xs">
+        {name} 较弱 → 知识库搜「{keyword}」
+      </p>
+      {found.isPending ? null : items.length === 0 ? (
+        <p className="text-muted-foreground mt-1 text-xs">暂无匹配内容</p>
+      ) : (
+        <ul className="mt-1 space-y-0.5">
+          {items.map((entry) => (
+            <li key={entry.id}>
+              <Link to={`/knowledge/entries/${entry.id}`} className="text-primary text-xs hover:underline">
+                {entry.title}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 

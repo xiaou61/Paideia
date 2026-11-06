@@ -16,6 +16,7 @@ function view(
 ): InterviewEvaluationView {
   return {
     id,
+    conversationId: id * 10,
     createdAt: '2026-11-01T00:00:00Z',
     evaluation: {
       overall,

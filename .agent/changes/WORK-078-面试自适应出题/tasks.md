@@ -49,6 +49,16 @@ approver_role: owner
 - 改动：`InterviewPage.tsx` 用 `computeAbility(history.data)` 生成 brief；开场 `pageContext` 拼「自适应设置 + 简历」；起始卡显示"本场重点/难度/场次"。`InterviewPrompt.system()` 增规则并 `interview-v2`。
 - 验证：mock 抓 `pageContext` 含"本场自适应设置"；截图可见重点标签。
 
+### TASK-004 | done | 历次面试详情 + 对话回放
+- 对应：REQ-005、AC-006
+- 改动：后端 `EvaluationView` 增加 `conversationId`（含 `listMine`/`review` 与测试夹具）；前端类型加字段；`HistoryCard` 起始页与侧栏都显示，点条目弹 `HistoryDetailDialog`，含完整报告 + `assistant.messages(conversationId)` 回放。
+- 验证：mock 详情弹窗、回放文本可见；截图 08/09。
+
+### TASK-005 | done | 弱项联动知识库复习
+- 对应：REQ-006、AC-007
+- 改动：`ReviewSuggestions` 取最弱 1–2 维（score<4），按关键词（技术深度→Java、项目经验→项目、表达/应变→面试）调 `knowledgeApi.entries({q,size:3})`，列出可点条目（`/knowledge/entries/:id`）。
+- 验证：mock 知识库条目，详情内可见"针对弱项去复习"与条目链接。
+
 ## 完成条件
 
-- AC-001…AC-005 有证据。
+- AC-001…AC-007 有证据。
