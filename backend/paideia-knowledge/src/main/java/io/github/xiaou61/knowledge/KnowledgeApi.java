@@ -186,7 +186,8 @@ public interface KnowledgeApi {
     record CollectedEntry(
             String title,
             String body,
-            long categoryId,
+            /** 目标分类；{@code null} 表示未分类（文档导入可能没有分类）。 */
+            Long categoryId,
             /** draft | published */
             String status,
             /** 题目指纹：规范化后的题目文本，用于跨帖跨天去重 */

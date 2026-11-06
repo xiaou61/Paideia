@@ -82,7 +82,7 @@ approver_role: CTO
 - 测试：既有 `ResumeTextExtractorTest`（回归）
 - 验证：`-Dtest=ResumeTextExtractorTest` → Tests run: 10, Failures: 0（2026-11-06 已执行）
 
-### TASK-004 | pending | 蒸馏端口 DocumentDistiller + AgentScope 实现
+### TASK-004 | done | 蒸馏端口 DocumentDistiller + AgentScope 实现
 
 - 对应：`REQ-102`
 - 依赖：无
@@ -100,7 +100,7 @@ approver_role: CTO
   4. 测试转绿（用桩 provider，不真调上游）。
 - 验证：`-Dtest=DocumentDistillerValidationTest` → passed。
 
-### TASK-005 | pending | 导入任务表 + 编排服务
+### TASK-005 | done | 导入任务表 + 编排服务
 
 - 对应：`REQ-101`、`REQ-102`、`REQ-103`、`REQ-105`、`REQ-107`
 - 依赖：TASK-002、TASK-003、TASK-004
@@ -122,7 +122,7 @@ approver_role: CTO
   5. 测试转绿：成功生成草稿、同指纹只建一次、空文本 failed。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-ai -am test -Dtest=KnowledgeImportServiceTest` → passed。
 
-### TASK-006 | pending | 导入定时 relay + 重试
+### TASK-006 | done | 导入定时 relay + 重试
 
 - 对应：`REQ-106`
 - 依赖：TASK-005
@@ -135,7 +135,7 @@ approver_role: CTO
   3. 测试转绿。
 - 验证：`-Dtest=KnowledgeImportJobTest` → passed。
 
-### TASK-007 | pending | 导入管理端接口
+### TASK-007 | done | 导入管理端接口
 
 - 对应：`REQ-104`、`REQ-106`
 - 依赖：TASK-006
@@ -289,3 +289,7 @@ approver_role: CTO
 - 2026-11-06 TASK-002：`mvn -B -pl paideia-knowledge -am -Dtest=KnowledgeApiAttachmentPathTest -Dsurefire.failIfNoSpecifiedTests=false test` → Tests run 6, Failures 0, Errors 0。
 - 2026-11-06 TASK-003：`mvn -B -pl paideia-ai -am -Dtest=ResumeTextExtractorTest -Dsurefire.failIfNoSpecifiedTests=false test` → Tests run 10, Failures 0, Errors 0（回归通过）。
 - 2026-11-06 TASK-002/003 合并编译：`mvn -B -pl paideia-knowledge,paideia-ai -am -DskipTests compile` → EXIT=0。
+- 2026-11-06 TASK-004：`-Dtest=DistilledEntryValidatorTest` → Tests run 8, Failures 0。
+- 2026-11-06 TASK-005：`-Dtest=KnowledgeImportServiceTest` → Tests run 6, Failures 0。
+- 2026-11-06 TASK-006：`-Dtest=KnowledgeImportJobTest` → Tests run 3, Failures 0。
+- 2026-11-06 TASK-007：`-Dtest=KnowledgeImportControllerTest` → Tests run 1, Failures 0。

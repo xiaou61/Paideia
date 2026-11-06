@@ -65,6 +65,9 @@ public final class RunKind {
     /** 面经单篇抽题（WORK-069）。与整次抓取分开：一篇失败不该拖垮其余帖子。 */
     public static final String ESSAY_EXTRACT = "essay_extract";
 
+    /** 文档导入蒸馏（WORK-076）：管理员上传文档 → 蒸馏成条目草稿。 */
+    public static final String KNOWLEDGE_IMPORT = "knowledge_import";
+
     private RunKind() {
     }
 }
