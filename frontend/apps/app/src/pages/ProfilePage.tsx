@@ -35,6 +35,7 @@ import {
   MapPin,
 } from 'lucide-react'
 import { useEffect, useState, type ComponentType } from 'react'
+import { useLocation, useNavigate } from 'react-router'
 
 import { api } from '../api'
 import { AccountSecuritySection } from '../components/AccountSecuritySection'
@@ -73,6 +74,8 @@ const ALL_IDENTITIES = Object.keys(IDENTITY_LABELS) as Identity[]
  */
 export function ProfilePage() {
   const { data, isLoading, error } = useQuery({ queryKey: ['profile'], queryFn: () => identity.profile() })
+  const navigate = useNavigate()
+  const location = useLocation()
 
   const [form, setForm] = useState<LearnerProfileInput | null>(null)
   const [saving, setSaving] = useState(false)
@@ -129,6 +132,14 @@ export function ProfilePage() {
     try {
       await identity.saveProfile(form)
       setSaved(true)
+      // 保存完回到来的那一页（2026-11-06 用户要求）：首页「三步就能开始」的第 1 步点进来，
+      // 保存后停在这里就断了——用户不知道下一步在首页。`key === 'default'` 表示这是本次
+      // 会话的第一条历史（直接开 /profile 或书签进来），没有"上一页"可退，退回首页。
+      if (location.key === 'default') {
+        void navigate('/', { replace: true })
+      } else {
+        void navigate(-1)
+      }
     } catch (cause) {
       setSaveError(errorMessage(cause))
     } finally {

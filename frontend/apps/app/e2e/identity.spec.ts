@@ -28,10 +28,13 @@ test('身份与目标：能改画像并读回，且明写"不影响你能做什�
   const role = `后端开发-${String(Date.now())}`
   await page.getByTestId('profile-target-role').fill(role)
   await page.getByTestId('profile-save').click()
-  await expect(page.getByTestId('profile-saved')).toBeVisible()
+
+  // 保存成功后**自动回上一页**（2026-11-06 用户要求：从首页第 1 步点进来，保存完要能接着做第 2 步）。
+  // 这条用例是直接开 /profile 的，没有上一页，所以落回首页。
+  await expect(page).toHaveURL(/\/#\/?$/, { timeout: 15_000 })
 
   // 刷新后仍在：说明真的落库了，不是只存在表单状态里
-  await page.reload()
+  await page.goto('/#/profile')
   await expect(page.getByTestId('profile-target-role')).toHaveValue(role)
 })
 
@@ -42,7 +45,8 @@ test('导航按身份重排：求职者有面试入口、且排在第一', async
   await page.getByTestId('profile-identity').click()
   await page.getByTestId('identity-option-job_seeker').click()
   await page.getByTestId('profile-save').click()
-  await expect(page.getByTestId('profile-saved')).toBeVisible()
+  // 存完会自动离开这一页（保存成功才跳），等它跳完再往下走
+  await expect(page).not.toHaveURL(/\/profile/, { timeout: 15_000 })
 
   await page.goto('/#/knowledge')
   const nav = page.getByRole('navigation', { name: '主导航' })
