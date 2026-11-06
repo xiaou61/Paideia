@@ -1,5 +1,10 @@
 import { createIdentityApi, configFor, type LearnerProfile } from '@paideia/identity'
 import { type AssistantApi, type InterviewEvaluationView } from '@paideia/assistant'
+import {
+  createResumeApi,
+  type ResumeData,
+  type ResumeDocumentSummary,
+} from '@paideia/resume'
 import { useQuery } from '@tanstack/react-query'
 import {
   Alert,
@@ -17,6 +22,7 @@ import {
 import {
   ArrowRight,
   Bot,
+  Check,
   ChevronDown,
   Lightbulb,
   MessageSquareText,
@@ -24,6 +30,7 @@ import {
   Sparkles,
   Target,
   TrendingUp,
+  Upload,
   User,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -35,12 +42,16 @@ import { errorMessage } from '@paideia/core'
 
 const identity = createIdentityApi(api)
 const assistant: AssistantApi = createAssistantApi(api)
+const resumesApi = createResumeApi(api)
 
 /** 半场对话里的一条。面试页自己维护，不复用助手的会话面板（那里面向"随手问一句"）。 */
 interface Line {
   role: 'interviewer' | 'candidate'
   content: string
 }
+
+/** 开场用哪份简历：不使用 / 当场上传的 / 某份已有简历的 id（WORK-077）。 */
+type ResumeChoice = 'none' | 'upload' | number
 
 /**
  * 模拟面试（WORK-010 T-09 / T-11；WORK-075 视觉重做）。
@@ -86,6 +97,35 @@ export function InterviewPage() {
   /** 一次面试只要建过会话，就可能已经落库了消息——这里只用来控制按钮的可用性。 */
   const started = conversationId !== null
 
+  /** 我的简历列表（WORK-077）：开场可选一份来出题，也可以当场上传。 */
+  const resumeList = useQuery({
+    queryKey: ['resumes'],
+    queryFn: () => resumesApi.list(),
+    retry: false,
+  })
+  const [resumeChoice, setResumeChoice] = useState<ResumeChoice>('none')
+  const [uploadedName, setUploadedName] = useState<string | undefined>(undefined)
+  const [uploadedText, setUploadedText] = useState<string | undefined>(undefined)
+  const [uploading, setUploading] = useState(false)
+  const [preparing, setPreparing] = useState(false)
+  const [resumeError, setResumeError] = useState<string | null>(null)
+  const resumeInitialized = useRef(false)
+
+  /** 首次拿到列表时预选「默认简历」（没有默认就选第一份）；用户手动改过就不再覆盖。 */
+  useEffect(() => {
+    if (resumeInitialized.current) {
+      return
+    }
+    const list = resumeList.data
+    if (list !== undefined) {
+      resumeInitialized.current = true
+      const preferred = list.find((item) => item.isDefault) ?? list[0]
+      if (preferred !== undefined) {
+        setResumeChoice(preferred.id)
+      }
+    }
+  }, [resumeList.data])
+
   /** 当前这轮在飞的请求；离开页面时中断它（与助手那条同一纪律：不能让上游继续烧钱）。 */
   const abortRef = useRef<AbortController | null>(null)
   useEffect(() => () => {
@@ -101,7 +141,7 @@ export function InterviewPage() {
     }
   }, [lines, busy])
 
-  const send = useCallback(async (text: string, openingTurn = false) => {
+  const send = useCallback(async (text: string, openingTurn = false, pageContext?: string) => {
     if (text.trim() === '' || busy) {
       return
     }
@@ -142,6 +182,7 @@ export function InterviewPage() {
           // thinking 事件刻意忽略：推理过程不展示（WORK-075）。
         },
         controller.signal,
+        pageContext,
       )
     } catch (cause) {
       if (!isAbort(cause)) {
@@ -153,8 +194,47 @@ export function InterviewPage() {
     }
   }, [busy, conversationId, profile, config.interviewIntro])
 
-  const start = () => {
-    void send(`开始面试。目标岗位：${profile?.targetRole ?? '未填写'}。`, true)
+  /**
+   * 开始面试：先按所选简历拼出**只进提示词、不落库**的上下文，再发第一条消息（WORK-077）。
+   * 不选简历就不带上下文，回到"只按岗位问"的老行为。
+   */
+  const start = async () => {
+    if (busy || preparing) {
+      return
+    }
+    setPreparing(true)
+    setResumeError(null)
+    let pageContext: string | undefined
+    try {
+      if (resumeChoice === 'upload') {
+        pageContext = uploadedText
+      } else if (typeof resumeChoice === 'number') {
+        const document = await resumesApi.get(resumeChoice)
+        pageContext = formatResume(document.data, document.title)
+      }
+    } catch (cause) {
+      // 简历取不到不该拦住面试：给出可读提示，按"无简历"继续。
+      setResumeError(errorMessage(cause))
+    } finally {
+      setPreparing(false)
+    }
+    void send(`开始面试。目标岗位：${profile?.targetRole ?? '未填写'}。`, true, pageContext)
+  }
+
+  /** 本页上传 PDF/Word：解析成功用抽取出的原文作本次面试上下文（不强行入库）。 */
+  const uploadResume = async (file: File) => {
+    setUploading(true)
+    setResumeError(null)
+    try {
+      const draft = await resumesApi.parse(file)
+      setUploadedText(draft.plainText)
+      setUploadedName(file.name)
+      setResumeChoice('upload')
+    } catch (cause) {
+      setResumeError(errorMessage(cause))
+    } finally {
+      setUploading(false)
+    }
   }
 
   const review = async () => {
@@ -194,7 +274,20 @@ export function InterviewPage() {
 
         {lines.length === 0 ? (
           <>
-            <StartPanel intro={config.interviewIntro} role={role} busy={busy} onStart={start} />
+            <StartPanel
+              intro={config.interviewIntro}
+              role={role}
+              busy={busy}
+              preparing={preparing}
+              onStart={() => { void start() }}
+              resumes={resumeList.data}
+              choice={resumeChoice}
+              onChoose={setResumeChoice}
+              onUpload={(file) => { void uploadResume(file) }}
+              uploading={uploading}
+              uploadedName={uploadedName}
+              resumeError={resumeError}
+            />
             <Alert>
               <AlertTitle>关于隐私</AlertTitle>
               <AlertDescription>
@@ -369,18 +462,35 @@ function Bubble({ line, thinking }: { line: Line; thinking: boolean }) {
   )
 }
 
-/** 起始态：左边讲清楚要做什么，右边讲这场面试怎么进行。 */
+/** 起始态：左边讲清楚要做什么（含简历选择），右边讲这场面试怎么进行。 */
 function StartPanel({
   intro,
   role,
   busy,
+  preparing,
   onStart,
+  resumes,
+  choice,
+  onChoose,
+  onUpload,
+  uploading,
+  uploadedName,
+  resumeError,
 }: {
   intro: string
   role: string | undefined
   busy: boolean
+  preparing: boolean
   onStart: () => void
+  resumes: ResumeDocumentSummary[] | undefined
+  choice: ResumeChoice
+  onChoose: (choice: ResumeChoice) => void
+  onUpload: (file: File) => void
+  uploading: boolean
+  uploadedName: string | undefined
+  resumeError: string | null
 }) {
+  const starting = busy || preparing
   return (
     <Card className="overflow-hidden">
       <div className="grid md:grid-cols-[1.35fr_1fr]">
@@ -396,22 +506,131 @@ function StartPanel({
               {role === undefined || role === '' ? '未填写目标岗位' : role}
             </Badge>
           </div>
-          <Button data-testid="interview-start" size="lg" className="mt-6 gap-2" disabled={busy} onClick={onStart}>
-            {busy ? <Spinner /> : <Sparkles className="size-4" />}
-            {busy ? '开场中…' : '开始面试'}
-            {busy ? null : <ArrowRight className="size-4" />}
+
+          {/* 简历（可选，WORK-077）：选已有 / 当场上传 / 不使用 */}
+          <div className="border-border mt-5 space-y-2 border-t pt-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium">
+                用哪份简历来面？<span className="text-muted-foreground font-normal">（可选）</span>
+              </p>
+              <label
+                className={
+                  'border-border hover:bg-muted text-foreground inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium ' +
+                  (uploading ? 'pointer-events-none opacity-60' : '')
+                }
+              >
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  className="hidden"
+                  disabled={uploading}
+                  data-testid="interview-resume-upload"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    if (file !== undefined) {
+                      onUpload(file)
+                    }
+                    event.target.value = ''
+                  }}
+                />
+                {uploading ? <Spinner className="size-3.5" /> : <Upload className="size-3.5" />}
+                {uploading ? '解析中…' : '上传简历'}
+              </label>
+            </div>
+
+            <div className="space-y-1.5">
+              <ResumeOption
+                label="不使用简历（按岗位问）"
+                selected={choice === 'none'}
+                onClick={() => { onChoose('none') }}
+              />
+              {(resumes ?? []).map((resume) => (
+                <ResumeOption
+                  key={resume.id}
+                  label={resume.title}
+                  badge={resume.isDefault ? '默认' : undefined}
+                  selected={choice === resume.id}
+                  onClick={() => { onChoose(resume.id) }}
+                />
+              ))}
+              {uploadedName === undefined ? null : (
+                <ResumeOption
+                  label={uploadedName}
+                  badge="本次上传"
+                  selected={choice === 'upload'}
+                  onClick={() => { onChoose('upload') }}
+                />
+              )}
+            </div>
+
+            {resumes !== undefined && resumes.length === 0 && uploadedName === undefined ? (
+              <p className="text-muted-foreground text-xs">还没有简历，可上传一份，或去「简历」页新建。</p>
+            ) : null}
+            {resumeError === null ? null : <p className="text-destructive text-xs">{resumeError}</p>}
+            <p className="text-muted-foreground text-xs">简历只在你选择后用于本次面试，不会保存。</p>
+          </div>
+
+          <Button
+            data-testid="interview-start"
+            size="lg"
+            className="mt-6 gap-2"
+            disabled={starting}
+            onClick={onStart}
+          >
+            {starting ? <Spinner /> : <Sparkles className="size-4" />}
+            {preparing ? '准备中…' : busy ? '开场中…' : '开始面试'}
+            {starting ? null : <ArrowRight className="size-4" />}
           </Button>
         </div>
         <div className="border-border bg-muted/40 border-t p-6 sm:p-8 md:border-t-0 md:border-l">
           <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">这场面试怎么进行</p>
           <ol className="mt-4 space-y-4">
-            <Step n={1} title="面试官一次问一题" desc="围绕你的目标岗位，从基础到深入逐个追问。" />
+            <Step n={1} title="面试官一次问一题" desc="围绕你的目标岗位与简历，从基础到深入逐个追问。" />
             <Step n={2} title="像真面试一样作答" desc="答不上来就说不会，面试官会换个角度继续问。" />
             <Step n={3} title="结束拿结构化点评" desc="随时点「生成点评」，按维度给出分数与改进建议。" />
           </ol>
         </div>
       </div>
     </Card>
+  )
+}
+
+/** 简历选项：一个可选中的行，选中显示对勾。 */
+function ResumeOption({
+  label,
+  badge,
+  selected,
+  onClick,
+}: {
+  label: string
+  badge?: string
+  selected: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        'flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors ' +
+        (selected ? 'border-primary bg-accent text-accent-foreground' : 'border-border hover:bg-muted')
+      }
+    >
+      <span
+        className={
+          'flex size-4 shrink-0 items-center justify-center rounded-full border ' +
+          (selected ? 'border-primary bg-primary text-primary-foreground' : 'border-border')
+        }
+      >
+        {selected ? <Check className="size-3" /> : null}
+      </span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {badge === undefined ? null : (
+        <Badge variant="outline" className="shrink-0">
+          {badge}
+        </Badge>
+      )}
+    </button>
   )
 }
 
@@ -589,6 +808,47 @@ function EvaluationCard({ view }: { view: InterviewEvaluationView }) {
       </CardContent>
     </Card>
   )
+}
+
+/** 把一份结构化简历压成给面试官看的纯文本（截断到 pageContext 上限以内）。 */
+function formatResume(data: ResumeData, title: string): string {
+  const lines: string[] = [`简历：${title}`]
+  const basics = data.basics
+  if (basics.name !== '') {
+    lines.push(`姓名：${basics.name}`)
+  }
+  if (data.intent.role !== '') {
+    lines.push(`求职意向：${data.intent.role}`)
+  }
+  if (data.education.length > 0) {
+    lines.push(
+      '教育经历：' +
+        data.education
+          .map((item) => `${item.school} ${item.degree} ${item.major} ${item.start}-${item.end}`.trim())
+          .join('；'),
+    )
+  }
+  if (data.work.length > 0) {
+    lines.push('工作经历：')
+    data.work.forEach((item) => {
+      lines.push(`- ${item.company} ${item.title} ${item.start}-${item.end}${item.summary === '' ? '' : `：${item.summary}`}`)
+      item.bullets.forEach((bullet) => lines.push(`  · ${bullet}`))
+    })
+  }
+  if (data.projects.length > 0) {
+    lines.push('项目经历：')
+    data.projects.forEach((item) => {
+      lines.push(`- ${item.name} ${item.role} ${item.period}`)
+      item.bullets.forEach((bullet) => lines.push(`  · ${bullet}`))
+    })
+  }
+  if (data.skills.length > 0) {
+    lines.push('技能：' + data.skills.map((group) => `${group.group}：${group.items.join('、')}`).join('；'))
+  }
+  if (data.selfEvaluation !== '') {
+    lines.push(`自我评价：${data.selfEvaluation}`)
+  }
+  return lines.join('\n').slice(0, 3800)
 }
 
 /** 把"开始面试"变成一个模型看得懂的请求：目标岗位 + 本页约定的开场说明。 */
