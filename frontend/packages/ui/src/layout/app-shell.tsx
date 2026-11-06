@@ -61,13 +61,11 @@ export function AppShell({
       </header>
 
       {/*
-        底部留白是给 AI 助手浮标让位的：它是 `fixed right-6 bottom-6` 的 46px 高浮层，
-        main 不留空间的话最后一行内容永远可能被它盖住（实测 /learn 压住 3 个轨道卡、
-        /resume 压住改名与删除按钮）。pb-24 在两种宽度下都够，且不影响正常滚动。
+        原底部留白是给已下线的 AI 助手浮标让位的；浮标随 WORK-066 删除后这里不再需要额外 padding。
       */}
       <main
         className={cn(
-          'mx-auto w-full flex-1 px-4 py-8 pb-24 sm:px-6 sm:py-10 sm:pb-24',
+          'mx-auto w-full flex-1 px-4 py-8 sm:px-6 sm:py-10',
           wide ? 'max-w-[86rem]' : 'max-w-3xl',
         )}
       >

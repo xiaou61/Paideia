@@ -18,7 +18,7 @@ test('身份与目标：能改画像并读回，且明写"不影响你能做什�
 
   // 这句话是这一页最要紧的文案：身份不是第二套权限。
   // 用更长的前缀定位：登录方式那一段也有"不影响你能做什么"，短词会同时命中两处（strict mode）。
-  await expect(page.getByText('身份只影响推荐顺序与助手的形态')).toBeVisible()
+  await expect(page.getByText('身份只影响推荐顺序与首页入口')).toBeVisible()
 
   // 身份选择是弹窗式卡片：一期只有求职者可点，其余在弹窗里标「准备中」
   await page.getByTestId('profile-identity').click()

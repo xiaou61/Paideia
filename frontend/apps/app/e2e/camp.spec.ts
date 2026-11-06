@@ -289,8 +289,8 @@ test.describe('训练营', () => {
     await expect(page.getByText('第 1 天')).toBeVisible()
     await expect(page.getByText('第 2 天')).toBeVisible()
     await expect(page.getByText('第 3 天')).toBeVisible()
-    // 缺口项给出助手提示而不是死链接
-    await expect(page.getByText(/可以让助手先讲一讲/)).toBeVisible()
+    // 缺口项给出提示而不是死链接
+    await expect(page.getByText(/可以先去知识库看看/)).toBeVisible()
 
     // 勾一项
     await page.getByRole('checkbox').first().click()

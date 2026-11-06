@@ -57,9 +57,9 @@ describe('PlanDays', () => {
     expect(screen.getByText('今天没有安排。')).toBeTruthy()
   })
 
-  it('缺口项给出「让助手讲一讲」而不是一个死链接', () => {
+  it('缺口项给出「先去知识库看看」而不是一个死链接', () => {
     render(<PlanDays plan={plan} onToggle={vi.fn()} onOpenEntry={vi.fn()} />)
-    expect(screen.getByText(/可以让助手先讲一讲/)).toBeTruthy()
+    expect(screen.getByText(/可以先去知识库看看/)).toBeTruthy()
     // 只有第一项有 entryId，所以"打开这一篇"只出现一次
     expect(screen.getAllByText('打开这一篇')).toHaveLength(1)
   })

@@ -11,7 +11,7 @@ import { KIND_LABEL, type CampDay, type CampPlan, type CampTask } from './types'
  * <p>按天分组、每项可勾选。任务分三种去向：
  * <ul>
  *   <li>有 `entryId` 的读/做项 → 可以跳过去</li>
- *   <li>`gap` 缺口项 → 没有内容，给「让助手讲一讲」的提示（助手入口在页面层，组件只标注）</li>
+ *   <li>`gap` 缺口项 → 没有内容，给「先去知识库看看」的提示（组件只标注，不做跳转）</li>
  *   <li>排不下的项单独列在最后，写「时间不够，还有 N 项没排进来」</li>
  * </ul>
  *
@@ -120,7 +120,7 @@ function DayCard({
                   ) : null}
                   {task.entryId === null && task.kind === 'gap' ? (
                     <p className="text-muted-foreground mt-1 text-xs">
-                      平台还没有这一块的内容，可以让助手先讲一讲。
+                      平台还没有这一块的内容，可以先去知识库看看。
                     </p>
                   ) : null}
                 </div>
