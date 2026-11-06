@@ -13,18 +13,93 @@ Agent 出问题时，最没用的一句话是"模型不行"。有用的问题是
 
 就像看病不能只说"我不舒服"：得量体温、验血、拍片，把症状拆成一项项可查的指标，才知道毛病出在哪。机制上，可观测性把一次任务拆成 trace 和 span，每一段都记录耗时、token、成本、状态和错误类型，让失败可定位、可回放。
 
-```sketch
+```code-flow
 {
-  "title": "出问题时要能回答这四问",
-  "rows": [
-    [
-      { "id": "where", "title": "哪一步", "sub": "第几轮、哪个工具", "tone": "gray" },
-      { "id": "cost", "title": "花了多少", "sub": "token 与耗时", "tone": "blue" },
-      { "id": "stuck", "title": "卡了多久", "sub": "哪一次调用时间长", "tone": "blue" },
-      { "id": "why", "title": "为什么失败", "sub": "报错原文与入参", "tone": "green" }
-    ]
+  "id": "ag-14-trace-replay",
+  "title": "可观测性：一次任务拆成 trace 与 span",
+  "nodes": [
+    { "id": "trace", "label": "trace", "sub": "一次任务，一个 trace_id", "layer": 0, "order": 0 },
+    { "id": "span", "label": "span", "sub": "模型/工具/校验各一段", "layer": 1, "order": 0 },
+    { "id": "record", "label": "按 span 记账", "sub": "耗时/token/成本/错误", "layer": 2, "order": 0 },
+    { "id": "locate", "label": "找最大贡献的 span", "sub": "卡在哪、花在哪", "layer": 3, "order": 0 },
+    { "id": "replay", "label": "回放找分歧点", "sub": "固定输入与工具结果", "layer": 4, "order": 0 },
+    { "id": "evalset", "label": "进评测集回归", "sub": "失败变成用例", "layer": 5, "order": 0 }
   ],
-  "arrows": []
+  "edges": [
+    { "from": "trace", "to": "span", "label": "拆解" },
+    { "from": "span", "to": "record", "label": "记录" },
+    { "from": "record", "to": "locate", "label": "聚合" },
+    { "from": "locate", "to": "replay", "label": "查因" },
+    { "from": "replay", "to": "evalset", "label": "沉淀" }
+  ],
+  "steps": [
+    {
+      "title": "一次任务是一条 trace",
+      "desc": "一个 trace_id 贯穿日志",
+      "file": "trace.txt",
+      "code": "trace task-8f3a  (总 33.7s, $0.104)",
+      "focus": [1],
+      "nodes": ["trace"],
+      "edges": [],
+      "log": [{ "k": "标识", "v": "trace_id 贯穿日志" }],
+      "explain": "有了它才能按任务、按用户把零散日志串起来。"
+    },
+    {
+      "title": "拆成 span 树",
+      "desc": "模型/工具/校验各一段",
+      "file": "trace.txt",
+      "code": "├─ span plan          model  1.8s\n├─ span search_logs   tool  18.4s\n├─ span summarize     model  6.1s\n└─ span validate      guard  0.01s fail",
+      "focus": [1, 2, 3, 4],
+      "nodes": ["trace", "span"],
+      "edges": ["trace>span"],
+      "log": [{ "k": "作用", "v": "定位第几轮、哪个工具" }],
+      "explain": "没有这棵树，你只能看到「任务失败」，看不到卡在哪一步。"
+    },
+    {
+      "title": "按 span 记账",
+      "desc": "成本、延迟都拆到每一段",
+      "file": "trace.ts",
+      "code": "span.cost = (input - cached) * inPrice + cached * cachePrice + output * outPrice\n// 延迟按 ttft_ms / total_ms 拆",
+      "focus": [1, 2],
+      "nodes": ["span", "record"],
+      "edges": ["span>record"],
+      "log": [{ "k": "维度", "v": "任务/用户/功能/模型版本" }],
+      "explain": "只记总数不够，要能回答哪一轮、哪个工具之后最贵。"
+    },
+    {
+      "title": "找最大贡献的 span",
+      "desc": "先画瀑布图，再看 p95",
+      "file": "trace.txt",
+      "code": "// search_logs 18.4s，占总时长 54.6%\n// summarize $0.0486，占成本 46.7%",
+      "focus": [1, 2],
+      "nodes": ["record", "locate"],
+      "edges": ["record>locate"],
+      "log": [{ "k": "结论", "v": "卡在工具，不在模型" }],
+      "explain": "平均值会掩盖尾部，总数会掩盖结构。"
+    },
+    {
+      "title": "回放：固定现场",
+      "desc": "不是再跑一遍，而是重建现场",
+      "file": "trace.txt",
+      "code": "// 用记录下来的输入与工具结果重建\n// 写操作工具换成桩或沙箱，禁止真实副作用",
+      "focus": [1, 2],
+      "nodes": ["locate", "replay"],
+      "edges": ["locate>replay"],
+      "log": [{ "k": "红线", "v": "不在生产重放写操作" }],
+      "explain": "回放找第一个分歧点：从根往下对比输入、模型输出、工具结果。"
+    },
+    {
+      "title": "失败样本进评测集",
+      "desc": "每次问题变作下个用例",
+      "file": "trace.txt",
+      "code": "发现失败 trace → 脱敏最小化 → 写清期望行为 → 加入评测集\n每次改提示词/模型/工具都跑 → 通过率不降才放行",
+      "focus": [1, 2],
+      "nodes": ["replay", "evalset"],
+      "edges": ["replay>evalset"],
+      "log": [{ "k": "闭环", "v": "通过率/成本/延迟不倒退" }],
+      "explain": "线上 trace 是评测集最好的来源，形成闭环。"
+    }
+  ]
 }
 ```
 

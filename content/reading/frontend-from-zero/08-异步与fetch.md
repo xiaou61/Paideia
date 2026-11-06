@@ -18,27 +18,74 @@ status: published
 
 打个比方：`fetch` 像寄快递，只有快递根本没送出去（网络层失败）才算"寄失败"；对方签收了一张"查无此人"的单子（404/500），系统仍显示"已送达"。真实机制是 `fetch` 只在网络层失败时 reject，HTTP 错误要自己看 `res.ok`。
 
-```sketch
+```code-flow
 {
-  "title": "异步取数：从 Promise 到四态",
-  "rows": [
-    [
-      { "id": "nonblock", "title": "不阻塞", "sub": "1 2 3 的顺序", "tone": "blue" },
-      { "id": "promise", "title": "Promise 三态", "sub": "pending/fulfilled/rejected", "tone": "blue" },
-      { "id": "fetchpit", "title": "fetch 的坑", "sub": "HTTP 错误不 reject", "tone": "amber" }
-    ],
-    [
-      { "id": "abort", "title": "超时与取消", "sub": "AbortController", "tone": "violet" },
-      { "id": "concurrent", "title": "并发请求", "sub": "Promise.all", "tone": "violet" },
-      { "id": "fourstate", "title": "页面四态", "sub": "加载/成功/空/失败", "tone": "green" }
-    ]
+  "id": "fe-08-fetch",
+  "title": "异步取数：从 fetch 到页面四态",
+  "nodes": [
+    { "id": "req", "label": "发出 fetch", "sub": "主线程不阻塞", "layer": 0, "order": 0 },
+    { "id": "promise", "label": "Promise 三态", "sub": "pending/fulfilled/rejected", "layer": 1, "order": 0 },
+    { "id": "res", "label": "Response", "sub": "HTTP 已回来", "layer": 2, "order": 0 },
+    { "id": "ok", "label": "检查 res.ok", "sub": "HTTP 错误不 reject", "layer": 3, "order": 0 },
+    { "id": "state", "label": "页面四态", "sub": "加载/成功/空/失败", "layer": 4, "order": 0 }
   ],
-  "arrows": [
-    { "from": "nonblock", "to": "promise", "label": "等待" },
-    { "from": "promise", "to": "fetchpit", "label": "实际用" },
-    { "from": "fetchpit", "to": "abort", "label": "补超时" },
-    { "from": "abort", "to": "concurrent" },
-    { "from": "concurrent", "to": "fourstate", "label": "界面呈现" }
+  "edges": [
+    { "from": "req", "to": "promise", "label": "交给浏览器" },
+    { "from": "promise", "to": "res", "label": "resolve" },
+    { "from": "res", "to": "ok", "label": "自己检查" },
+    { "from": "ok", "to": "state", "label": "渲染" }
+  ],
+  "steps": [
+    {
+      "title": "发出 fetch，主线程不阻塞",
+      "desc": "then 回调等同步代码跑完才执行",
+      "nodes": ["req"],
+      "edges": [],
+      "code": "console.log('1')\nfetch('/api/data').then(() => console.log('3'))\nconsole.log('2')\n// 输出：1 2 3",
+      "focus": [1, 2, 3, 4],
+      "log": [{ "k": "输出顺序", "v": "1 2 3" }],
+      "explain": "fetch 把任务交给浏览器，'请求发出去了下面的代码先跑'不是 bug。"
+    },
+    {
+      "title": "Promise 三态与 await",
+      "desc": "await 只暂停这个函数，不暂停整页",
+      "nodes": ["req", "promise"],
+      "edges": ["req>promise"],
+      "code": "async function load() {\n  try {\n    const res = await fetch('/api/data')\n    const data = await res.json()\n    return data\n  } catch (error) {\n    console.error('请求失败', error)\n  }\n}",
+      "focus": [1, 2, 3, 4, 5, 6, 7, 8],
+      "log": [{ "k": "状态", "v": "pending → fulfilled / rejected" }],
+      "explain": "状态一旦确定不再变；async/await 只是把 .then 写成同步的样子。"
+    },
+    {
+      "title": "HTTP 错误不会 reject",
+      "desc": "404/500 是正常完成了一次 HTTP 交互",
+      "nodes": ["promise", "res"],
+      "edges": ["promise>res"],
+      "code": "const res = await fetch('/api/not-found')\nconsole.log(res.ok)     // false\nconsole.log(res.status) // 404",
+      "focus": [1, 2, 3],
+      "log": [{ "k": "res.ok", "v": "false，但不抛错" }],
+      "explain": "只有断网、DNS 失败、CORS 被拦这类网络层失败才 reject。"
+    },
+    {
+      "title": "自己检查 res.ok，否则把错误页当 JSON",
+      "desc": "每次都要在解析前判断状态码",
+      "nodes": ["res", "ok"],
+      "edges": ["res>ok"],
+      "code": "async function getJson(url) {\n  const res = await fetch(url, { headers: { Accept: 'application/json' } })\n  if (!res.ok) {\n    throw new Error(`HTTP ${res.status}`)\n  }\n  return res.json()\n}",
+      "focus": [1, 2, 3, 4, 5, 6],
+      "log": [{ "k": "否则", "v": "Unexpected token '<'" }],
+      "explain": "不检查会把 500 的 HTML 错误页当 JSON 解析，报错像前端 bug，其实是后端 500。"
+    },
+    {
+      "title": "页面必须处理的四种状态",
+      "desc": "加载中 / 成功 / 空 / 失败",
+      "nodes": ["ok", "state"],
+      "edges": ["ok>state"],
+      "code": "const [state, setState] = useState({ status: 'idle', data: null, error: null })\n// idle → loading → success | error",
+      "focus": [1, 2],
+      "log": [{ "k": "四态", "v": "加载 / 成功 / 空 / 失败" }],
+      "explain": "只写成功分支的页面，在弱网和空数据下看起来就是坏的。"
+    }
   ]
 }
 ```

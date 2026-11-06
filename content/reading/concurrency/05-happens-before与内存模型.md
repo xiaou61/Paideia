@@ -11,21 +11,69 @@ status: published
 
 **`volatile` 只建立一条很窄的可见性通道，不负责让一段代码变成原子操作。**
 
-```sketch
+```code-flow
 {
-  "title": "i++ 是三件事，volatile 挡不住中间被打断",
-  "rows": [
-    [
-      { "id": "read", "title": "读 i", "sub": "第一步", "tone": "gray" },
-      { "id": "add", "title": "加一", "sub": "第二步", "tone": "blue" },
-      { "id": "write", "title": "写回", "sub": "第三步", "tone": "blue" },
-      { "id": "lost", "title": "两个人交错就丢更新", "sub": "要么加锁要么用原子类", "tone": "amber" }
-    ]
+  "id": "concurrency-happens-before-iplusplus",
+  "title": "i++ 三步，volatile 挡不住交错",
+  "nodes": [
+    { "id": "r1", "label": "线程 A 读到 100", "sub": "第一步：读", "layer": 0, "order": 0 },
+    { "id": "r2", "label": "线程 B 读到 100", "sub": "也读到同一个旧值", "layer": 0, "order": 1 },
+    { "id": "w1", "label": "A 写回 101", "sub": "加一后写回", "layer": 1, "order": 0 },
+    { "id": "w2", "label": "B 写回 101", "sub": "覆盖 A 的结果", "layer": 1, "order": 1 },
+    { "id": "lost", "label": "丢失一次更新", "sub": "最终 101 而不是 102", "layer": 2, "order": 0 }
   ],
-  "arrows": [
-    { "from": "read", "to": "add" },
-    { "from": "add", "to": "write" },
-    { "from": "write", "to": "lost" }
+  "edges": [
+    { "from": "r1", "to": "w1", "label": "算出 101" },
+    { "from": "r2", "to": "w2", "label": "算出 101" },
+    { "from": "r1", "to": "r2", "label": "交错读" },
+    { "from": "w1", "to": "lost", "label": "写回 101" },
+    { "from": "w2", "to": "lost", "label": "写回 101（覆盖）" }
+  ],
+  "steps": [
+    {
+      "title": "count++ 是读-加-写三步",
+      "desc": "不是一步完成的原子操作",
+      "file": "Counter.java",
+      "code": "count++;   // 读 count → 加一 → 写回，三步",
+      "focus": [1],
+      "nodes": ["r1"],
+      "edges": [],
+      "log": [{ "k": "关键", "v": "volatile 只保证每步可见，不保证三步成一体" }],
+      "explain": "很多人以为 count++ 是一条指令，其实在字节码里是 get / add / put 一串操作。"
+    },
+    {
+      "title": "两个线程读到同一个旧值",
+      "desc": "交错从这里开始",
+      "file": "Counter.java",
+      "code": "private volatile int count;\n\nvoid inc() {\n    count++;   // A、B 可能同时读到 count == 100\n}",
+      "focus": [1, 2, 3, 4, 5],
+      "nodes": ["r1", "r2"],
+      "edges": ["r1>r2"],
+      "log": [{ "k": "可见性", "v": "volatile 让 A、B 都看到 100，但谁也没独占" }],
+      "explain": "volatile 保证读到的是最新值，可“看到最新”和“独占更新”是两件事。两个线程都可能读到 100。"
+    },
+    {
+      "title": "各自写回，后写覆盖先写",
+      "desc": "两次 101 只剩一次生效",
+      "file": "Counter.java",
+      "code": "// A: 读到 100 → 算出 101 → 写回 101\n// B: 读到 100 → 算出 101 → 写回 101\n// 两次写回都是 101，丢失一次更新",
+      "focus": [1, 2, 3],
+      "nodes": ["w1", "w2", "lost"],
+      "edges": ["w1>lost", "w2>lost"],
+      "log": [{ "k": "现象", "v": "十线程各加一万，结果通常小于十万" }],
+      "explain": "两个线程都基于旧值 100 算出 101，先后写回，第二次把第一次覆盖掉，于是丢了一次更新。"
+    },
+    {
+      "title": "要原子，用锁或原子类",
+      "desc": "volatile 救不了复合操作",
+      "file": "Counter.java",
+      "code": "private final AtomicInteger count = new AtomicInteger();\n\nvoid inc() {\n    count.incrementAndGet();   // 读-改-写合成一步，不丢更新\n}",
+      "focus": [1, 2, 3, 4, 5],
+      "nodes": ["lost"],
+      "edges": [],
+      "log": [{ "k": "结论", "v": "原子性靠锁 / 原子类，不靠 volatile" }],
+      "explain": "真正要检查的是 happens-before：跨线程的每次读写，要么被 HB 边连起来，要么就是数据竞争。"
+    }
   ]
 }
 ```

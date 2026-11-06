@@ -13,19 +13,81 @@ RAG（检索增强生成）做的事只有一件：**把模型不知道的内容
 
 好比开卷考试：先翻到相关那几页，再照着答题，而不是合上书凭记忆硬答。机制上，检索到的文档片段会作为上下文和问题一起发给模型，答案质量的上限，由那几页找得准不准决定。
 
-```sketch
+```code-flow
 {
-  "title": "RAG 只有一步：先查，再塞",
-  "rows": [
-    [
-      { "id": "q", "title": "用户问题", "sub": "模型不知道答案", "tone": "gray" },
-      { "id": "search", "title": "检索", "sub": "向量或关键词，拿回几段", "tone": "blue" },
-      { "id": "prompt", "title": "塞进提示词", "sub": "让模型基于它回答", "tone": "green" }
-    ]
+  "id": "ag-06-rag-pipeline",
+  "title": "RAG 四段链路：只有生成是模型做的",
+  "nodes": [
+    { "id": "q", "label": "用户问题", "sub": "模型不知道答案", "layer": 0, "order": 0 },
+    { "id": "split", "label": "切分", "sub": "按结构切、带上下文", "layer": 1, "order": 0 },
+    { "id": "index", "label": "索引", "sub": "算表示并存储", "layer": 2, "order": 0 },
+    { "id": "retrieve", "label": "检索", "sub": "关键词/向量/混合", "layer": 3, "order": 0 },
+    { "id": "rerank", "label": "重排", "sub": "取前 3–5 块", "layer": 4, "order": 0 },
+    { "id": "gen", "label": "生成", "sub": "资料+问题给模型", "layer": 5, "order": 0 }
   ],
-  "arrows": [
-    { "from": "q", "to": "search" },
-    { "from": "search", "to": "prompt" }
+  "edges": [
+    { "from": "split", "to": "index", "label": "建索引" },
+    { "from": "index", "to": "retrieve", "label": "可检索" },
+    { "from": "q", "to": "retrieve", "label": "查询" },
+    { "from": "retrieve", "to": "rerank", "label": "候选" },
+    { "from": "rerank", "to": "gen", "label": "精选" }
+  ],
+  "steps": [
+    {
+      "title": "切分：按结构切、带上下文",
+      "desc": "块是检索的基本单元",
+      "file": "rag.ts",
+      "code": "// Markdown 按标题切、代码按函数切\nconst chunks = split(doc, { by: \"heading\", overlap: 0.15 })",
+      "focus": [1, 2],
+      "nodes": ["split"],
+      "edges": [],
+      "log": [{ "k": "原则", "v": "按结构切，不按字数" }],
+      "explain": "块前面拼上标题路径，脱离上下文也仍能被理解与正确召回。"
+    },
+    {
+      "title": "索引：给每块算表示",
+      "desc": "存起来供检索",
+      "file": "rag.ts",
+      "code": "for (const c of chunks) index.add(c.id, embed(c.text))",
+      "focus": [1],
+      "nodes": ["split", "index"],
+      "edges": ["split>index"],
+      "log": [{ "k": "产物", "v": "可检索的块" }],
+      "explain": "索引建得好不好，直接决定后面检索的召回率。"
+    },
+    {
+      "title": "检索：先关键词，不够再向量",
+      "desc": "宁多勿漏",
+      "file": "rag.ts",
+      "code": "const hits = keywordSearch(q)      // 零依赖、可解释\n// const hits = vectorSearch(q)    // 语义召回\n// 混合：RRF 合并两路名次",
+      "focus": [1, 2, 3],
+      "nodes": ["q", "index", "retrieve"],
+      "edges": ["q>retrieve", "index>retrieve"],
+      "log": [{ "k": "召回", "v": "宁多勿漏" }],
+      "explain": "专有名词、错误码、函数名，关键词往往比向量更准。"
+    },
+    {
+      "title": "重排：从 20 块挑 3 块",
+      "desc": "宁准勿多",
+      "file": "rag.ts",
+      "code": "const top = rerank(q, hits).slice(0, 5)   // 宁准勿多",
+      "focus": [1],
+      "nodes": ["retrieve", "rerank"],
+      "edges": ["retrieve>rerank"],
+      "log": [{ "k": "取舍", "v": "检索召回、重排精选" }],
+      "explain": "两阶段精度要求不同，别让一个粗筛器做精选。"
+    },
+    {
+      "title": "生成：带编号、要求引用",
+      "desc": "让「资料里没有」显式暴露",
+      "file": "rag.ts",
+      "code": "const prompt = [\n  \"资料：\",\n  \"[1] \" + top[0].text,\n  \"[2] \" + top[1].text,\n  \"回答问题，每个结论后标注依据编号。\",\n].join(\"\\n\")",
+      "focus": [1, 2, 3, 4, 5, 6],
+      "nodes": ["rerank", "gen"],
+      "edges": ["rerank>gen"],
+      "log": [{ "k": "收益", "v": "降低幻觉、用户可核对" }],
+      "explain": "检索错了会制造更可信的幻觉，质量上限由检索决定。"
+    }
   ]
 }
 ```

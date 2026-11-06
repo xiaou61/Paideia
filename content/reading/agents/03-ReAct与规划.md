@@ -13,20 +13,78 @@ ReAct 的意思是 **Reason + Act**：让模型在同一个循环里交替"想"�
 
 好比走夜路打着手电：照一段、走一段，看到岔路再决定往哪拐，而不是站在起点把整条路都想好。机制上，每一轮的真实工具结果都会进入下一轮的上下文，模型据此修正下一步，而不是照着一份写死的计划往下走。
 
-```sketch
+```code-flow
 {
-  "title": "ReAct：想一想、做一次、看结果，再来一轮",
-  "rows": [
-    [
-      { "id": "think", "title": "思考", "sub": "下一步该做什么", "tone": "gray" },
-      { "id": "act", "title": "行动", "sub": "调一个工具", "tone": "blue" },
-      { "id": "obs", "title": "观察", "sub": "拿到真实结果", "tone": "green" }
-    ]
+  "id": "ag-03-react-loop",
+  "title": "ReAct：想一步、做一步、看结果再来一轮",
+  "nodes": [
+    { "id": "think", "label": "Thought", "sub": "下一步该做什么", "layer": 0, "order": 0 },
+    { "id": "act", "label": "Action", "sub": "调一个工具", "layer": 1, "order": 0 },
+    { "id": "obs", "label": "Observation", "sub": "代码生成的真实结果", "layer": 2, "order": 0 },
+    { "id": "answer", "label": "Answer", "sub": "信息够了就收尾", "layer": 3, "order": 0 }
   ],
-  "arrows": [
-    { "from": "think", "to": "act" },
-    { "from": "act", "to": "obs" },
-    { "from": "obs", "to": "think", "label": "结果不对再来一轮", "style": "back" }
+  "edges": [
+    { "from": "think", "to": "act", "label": "决定" },
+    { "from": "act", "to": "obs", "label": "执行工具" },
+    { "from": "obs", "to": "think", "label": "结果不对再来一轮" },
+    { "from": "think", "to": "answer", "label": "够了" }
+  ],
+  "steps": [
+    {
+      "title": "Thought：先想一步",
+      "desc": "只产出下一步意图，不写死整份计划",
+      "file": "react.txt",
+      "code": "Thought: 我需要先知道哪个方法慢",
+      "focus": [1],
+      "nodes": ["think"],
+      "edges": [],
+      "log": [{ "k": "产出", "v": "一个下一步意图" }],
+      "explain": "边做边看，事实在需要的那一刻才进入上下文。"
+    },
+    {
+      "title": "Action：调一个工具",
+      "desc": "模型给参数，代码去执行",
+      "file": "react.txt",
+      "code": "Action: 查慢查询日志",
+      "focus": [1],
+      "nodes": ["think", "act"],
+      "edges": ["think>act"],
+      "log": [{ "k": "形式", "v": "结构化工具调用" }],
+      "explain": "Action 由模型提出，执行由代码完成。"
+    },
+    {
+      "title": "Observation：必须是真实结果",
+      "desc": "生成权收归代码",
+      "file": "react.txt",
+      "code": "Observation: OrderMapper.selectByUser 平均 1.2s",
+      "focus": [1],
+      "nodes": ["act", "obs"],
+      "edges": ["act>obs"],
+      "log": [{ "k": "来源", "v": "工具真实返回" }],
+      "explain": "文本里出现的「Observation:」一律不认，模型只能通过调用工具获得观察。"
+    },
+    {
+      "title": "结果进上下文，再来一轮",
+      "desc": "下一轮 Thought 基于真实结果",
+      "file": "react.py",
+      "code": "messages.append({\"role\": \"tool\", \"content\": observation})\n# 下一轮 Thought 基于这条真实结果",
+      "focus": [1, 2],
+      "nodes": ["obs", "think"],
+      "edges": ["obs>think"],
+      "log": [{ "k": "循环", "v": "结果不对再来一轮" }],
+      "explain": "工具失败要如实说「连接超时」，谎报成「结果为空」会被固化进结论。"
+    },
+    {
+      "title": "够了就收尾",
+      "desc": "信息足够即停止检索",
+      "file": "react.txt",
+      "code": "Answer: 缺 (user_id, created_at) 联合索引",
+      "focus": [1],
+      "nodes": ["think", "answer"],
+      "edges": ["think>answer"],
+      "log": [{ "k": "停止", "v": "不要追求完美覆盖" }],
+      "explain": "没有停止条件会一直「再多查一点」，成本随之失控。"
+    }
   ]
 }
 ```

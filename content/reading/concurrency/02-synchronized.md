@@ -11,19 +11,71 @@ status: published
 
 `synchronized` 锁的是**一个对象**，不是一段代码：
 
-```sketch
+```code-flow
 {
-  "title": "锁的是对象，不是代码块",
-  "rows": [
-    [
-      { "id": "obj", "title": "同一把锁", "sub": "谁先拿到谁进", "tone": "blue" },
-      { "id": "other", "title": "锁不同对象", "sub": "等于没互斥，各走各的", "tone": "amber" },
-      { "id": "rule", "title": "先想清楚锁是谁", "sub": "this / 类 / 专用对象", "tone": "green" }
-    ]
+  "id": "concurrency-synchronized-scope",
+  "title": "synchronized 的互斥边界：同一把对象锁",
+  "nodes": [
+    { "id": "enter", "label": "线程进入 take()", "sub": "先抢对象锁", "layer": 0, "order": 0 },
+    { "id": "hold", "label": "持有 monitor", "sub": "同一对象才互斥", "layer": 1, "order": 0 },
+    { "id": "check", "label": "check: stock>0", "sub": "查", "layer": 2, "order": 0 },
+    { "id": "dec", "label": "act: stock--", "sub": "改", "layer": 3, "order": 0 },
+    { "id": "release", "label": "释放锁", "sub": "下一个线程才能进", "layer": 4, "order": 0 },
+    { "id": "split", "label": "拆成两个方法", "sub": "各锁一次，中间有空隙", "layer": 2, "order": 1 }
   ],
-  "arrows": [
-    { "from": "obj", "to": "other" },
-    { "from": "other", "to": "rule" }
+  "edges": [
+    { "from": "enter", "to": "hold", "label": "抢到" },
+    { "from": "hold", "to": "check", "label": "进入临界区" },
+    { "from": "check", "to": "dec", "label": "判断通过" },
+    { "from": "dec", "to": "release", "label": "改完" },
+    { "from": "check", "to": "split", "label": "若拆开" },
+    { "from": "split", "to": "dec", "label": "中间被插入" }
+  ],
+  "steps": [
+    {
+      "title": "抢到对象锁才能进",
+      "desc": "锁的是对象，不是代码块",
+      "file": "Counter.java",
+      "code": "synchronized boolean take() {   // 锁的是 this\n    // 临界区\n}\n// 两个不同实例各调 take()：锁各自的 this，完全并行",
+      "focus": [1, 2, 3, 4],
+      "nodes": ["enter", "hold"],
+      "edges": ["enter>hold"],
+      "log": [{ "k": "结论", "v": "只有锁同一对象的线程才互斥" }],
+      "explain": "实例方法锁 this，静态方法锁 Class，synchronized(obj) 锁 obj。两个实例各锁各的，等于没锁，这是线上最高频的并发 bug。"
+    },
+    {
+      "title": "check-then-act 要装进同一个锁",
+      "desc": "查和改之间不能有空隙",
+      "file": "Inventory.java",
+      "code": "class Inventory {\n    private int stock = 10;\n\n    synchronized boolean take() {\n        if (stock <= 0) return false;   // check\n        stock--;                        // act\n        return true;\n    }\n}",
+      "focus": [1, 2, 3, 4, 5, 6, 7, 8, 9],
+      "nodes": ["check", "dec", "hold"],
+      "edges": ["hold>check", "check>dec"],
+      "log": [{ "k": "安全", "v": "检查与扣减在同一把锁里" }],
+      "explain": "整段放进一个 synchronized，别的线程就进不来，不会在“查完还没扣”的瞬间插队。"
+    },
+    {
+      "title": "拆成两段各自加锁 = 不安全",
+      "desc": "看起来都加锁了，合起来却有窗口",
+      "file": "Inventory.java",
+      "code": "synchronized boolean has() { return stock > 0; }   // 锁 1\nsynchronized void dec() { stock--; }                // 锁 2\n// 两次调用之间有窗口，别的线程能插进来 → 超卖",
+      "focus": [1, 2, 3],
+      "nodes": ["split"],
+      "edges": ["check>split", "split>dec"],
+      "log": [{ "k": "陷阱", "v": "每个方法都线程安全 ≠ 组合起来安全" }],
+      "explain": "两把锁分别保护两段，合起来不构成原子操作。正确性优先于锁的细粒度。"
+    },
+    {
+      "title": "释放锁，下一个线程才进",
+      "desc": "互斥的边界就是持锁区间",
+      "file": "Inventory.java",
+      "code": "// 方法返回时释放 monitor，排队的线程被唤醒\n// 互斥的边界 = 同一把对象锁的持有区间\n// 无竞争时 JVM 用偏向锁/轻量级锁，几乎零开销",
+      "focus": [1, 2, 3],
+      "nodes": ["release"],
+      "edges": ["dec>release"],
+      "log": [{ "k": "补充", "v": "JDK6 起锁按竞争程度逐级升级" }],
+      "explain": "无竞争路径很便宜，不必为了性能把 synchronized 换成 CAS。偏向锁在 JDK 15 起默认关闭。"
+    }
   ]
 }
 ```

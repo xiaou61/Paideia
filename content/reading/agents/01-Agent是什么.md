@@ -13,19 +13,80 @@ status: published
 
 打个比方：普通程序像照着菜谱做菜，第几步放什么料都提前写死；Agent 更像厨师边尝边调，尝一口再决定下一步加盐还是加水。机制上，这个差别就是控制流归谁——调哪个工具、要不要继续、什么时候停，由模型在运行时决定，而不是提前写进代码。
 
-```sketch
+```code-flow
 {
-  "title": "和普通程序的分界线：下一步谁定",
-  "rows": [
-    [
-      { "id": "fixed", "title": "普通程序", "sub": "步骤写死在代码里", "tone": "gray" },
-      { "id": "model", "title": "模型自己选下一步", "sub": "看当前结果决定", "tone": "blue" },
-      { "id": "loop", "title": "循环到能回答为止", "sub": "中间可能查好几次", "tone": "green" }
-    ]
+  "id": "ag-01-agent-loop",
+  "title": "Agent 的核心就是一个循环",
+  "nodes": [
+    { "id": "model", "label": "调模型", "sub": "可能返回 tool_calls", "layer": 0, "order": 0 },
+    { "id": "tool", "label": "解析工具调用", "sub": "模型只说要调什么", "layer": 1, "order": 0 },
+    { "id": "exec", "label": "代码真正执行", "sub": "执行权在你手里", "layer": 2, "order": 0 },
+    { "id": "append", "label": "结果塞回消息", "sub": "messages.append", "layer": 3, "order": 0 },
+    { "id": "stop", "label": "无工具则收工", "sub": "返回 reply.content", "layer": 4, "order": 0 }
   ],
-  "arrows": [
-    { "from": "fixed", "to": "model" },
-    { "from": "model", "to": "loop" }
+  "edges": [
+    { "from": "model", "to": "tool", "label": "有 tool_calls" },
+    { "from": "tool", "to": "exec", "label": "逐个调用" },
+    { "from": "exec", "to": "append", "label": "拿到 result" },
+    { "from": "append", "to": "model", "label": "再来一轮" },
+    { "from": "model", "to": "stop", "label": "没有 tool_calls" }
+  ],
+  "steps": [
+    {
+      "title": "每一轮先调模型",
+      "desc": "带上完整历史与工具清单",
+      "file": "agent.py",
+      "code": "for step in range(MAX_STEPS):\n    reply = call_model(messages, tools=工具清单)",
+      "focus": [1, 2],
+      "nodes": ["model"],
+      "edges": [],
+      "log": [{ "k": "轮次", "v": "受 MAX_STEPS 约束" }],
+      "explain": "硬上限必须有，否则就是一个不封顶的账单。"
+    },
+    {
+      "title": "模型想动手",
+      "desc": "它只输出结构化意图，不碰系统",
+      "file": "agent.py",
+      "code": "if reply.tool_calls:\n    for call in reply.tool_calls:",
+      "focus": [1, 2],
+      "nodes": ["model", "tool"],
+      "edges": ["model>tool"],
+      "log": [{ "k": "意图", "v": "结构化 tool_calls" }],
+      "explain": "模型从头到尾没碰任何系统，只是「说要调什么」。"
+    },
+    {
+      "title": "代码真正执行",
+      "desc": "解析、校验、执行都在你的程序里",
+      "file": "agent.py",
+      "code": "result = execute(call)   # 你的代码真的执行",
+      "focus": [1],
+      "nodes": ["tool", "exec"],
+      "edges": ["tool>exec"],
+      "log": [{ "k": "执行方", "v": "你的宿主程序" }],
+      "explain": "执行权始终在你手里，模型不直接操作任何系统。"
+    },
+    {
+      "title": "结果塞回消息",
+      "desc": "这是「记忆」的本质",
+      "file": "agent.py",
+      "code": "messages.append({\n    \"role\": \"tool\",\n    \"tool_call_id\": call.id,\n    \"content\": result,\n})\ncontinue",
+      "focus": [1, 2, 3, 4, 5, 6],
+      "nodes": ["exec", "append"],
+      "edges": ["exec>append"],
+      "log": [{ "k": "提示", "v": "模型不记得上一轮" }],
+      "explain": "模型本身不记得调过什么，是你每轮把完整历史重新发给它。"
+    },
+    {
+      "title": "不想动手就收工",
+      "desc": "没有 tool_calls 时直接返回",
+      "file": "agent.py",
+      "code": "return reply.content   # 模型不想动手了，收工",
+      "focus": [1],
+      "nodes": ["model", "stop"],
+      "edges": ["model>stop"],
+      "log": [{ "k": "结束", "v": "正常返回" }],
+      "explain": "三十行不到的核心循环，全部魔法都在这里。"
+    }
   ]
 }
 ```

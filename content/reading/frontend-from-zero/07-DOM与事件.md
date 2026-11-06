@@ -20,26 +20,75 @@ status: published
 
 打个比方：DOM 像一棵家谱树，事件像家族里传话——从长辈往下传、再从当事人往上传。真实机制是事件先捕获、后冒泡，所以能在父容器上监听一次就接住所有子项的点击。
 
-```sketch
+```code-flow
 {
-  "title": "DOM 与事件：手写三件事",
-  "rows": [
-    [
-      { "id": "query", "title": "查找节点", "sub": "querySelector", "tone": "blue" },
-      { "id": "update", "title": "改节点", "sub": "textContent 更安全", "tone": "blue" },
-      { "id": "event", "title": "事件", "sub": "监听·冒泡·委托", "tone": "violet" }
-    ],
-    [
-      { "id": "form", "title": "表单事件", "sub": "绑在 form 上", "tone": "green" },
-      { "id": "layout", "title": "读布局", "sub": "先读后写", "tone": "amber" },
-      { "id": "framework", "title": "何时上框架", "sub": "多处同步就上", "tone": "gray" }
-    ]
+  "id": "fe-07-events",
+  "title": "DOM 与事件：查节点 → 改节点 → 事件委托",
+  "nodes": [
+    { "id": "query", "label": "查找节点", "sub": "querySelector", "layer": 0, "order": 0 },
+    { "id": "update", "label": "改节点", "sub": "textContent 更安全", "layer": 1, "order": 0 },
+    { "id": "event", "label": "绑定监听", "sub": "addEventListener", "layer": 2, "order": 0 },
+    { "id": "bubble", "label": "捕获 · 冒泡", "sub": "外层 ↔ 目标", "layer": 3, "order": 0 },
+    { "id": "delegate", "label": "事件委托", "sub": "父容器监听一次", "layer": 4, "order": 0 },
+    { "id": "thrash", "label": "强制布局", "sub": "读尺寸触发", "layer": 5, "order": 0 }
   ],
-  "arrows": [
+  "edges": [
     { "from": "query", "to": "update", "label": "选中" },
     { "from": "update", "to": "event", "label": "响应" },
-    { "from": "event", "to": "form" },
-    { "from": "layout", "to": "framework", "label": "开始漏同步" }
+    { "from": "event", "to": "bubble", "label": "捕获后冒泡" },
+    { "from": "bubble", "to": "delegate", "label": "利用冒泡" }
+  ],
+  "steps": [
+    {
+      "title": "查找节点",
+      "desc": "querySelectorAll 是静态快照",
+      "nodes": ["query"],
+      "edges": [],
+      "code": "document.querySelector('.card')      // 第一个匹配\ndocument.querySelectorAll('.card')   // 静态 NodeList\nelement.closest('.card')             // 从自己往上找",
+      "focus": [1, 2, 3],
+      "log": [{ "k": "注意", "v": "快照，不含后来插入的元素" }],
+      "explain": "需要动态结果时每次重新查，或者用事件委托。"
+    },
+    {
+      "title": "改节点：优先 textContent",
+      "desc": "innerHTML 会把内容当 HTML 解析",
+      "nodes": ["query", "update"],
+      "edges": ["query>update"],
+      "code": "el.textContent = '你好'       // 纯文本，安全\nel.innerHTML = '<b>你好</b>'  // 解析 HTML，有 XSS 风险",
+      "focus": [1, 2],
+      "log": [{ "k": "安全", "v": "textContent" }],
+      "explain": "拼接用户输入用 innerHTML，等于把 XSS 的入口留在页面上。"
+    },
+    {
+      "title": "绑定监听：先捕获，再冒泡",
+      "desc": "事件从最外层往下捕获，再从目标往上冒泡",
+      "nodes": ["update", "event", "bubble"],
+      "edges": ["update>event", "event>bubble"],
+      "code": "button.addEventListener('click', (event) => {\n  event.preventDefault()   // 阻止默认行为\n  event.stopPropagation()  // 阻止继续冒泡（少用）\n  console.log(event.target)\n})",
+      "focus": [1, 2, 3, 4, 5],
+      "log": [{ "k": "顺序", "v": "捕获 → 目标 → 冒泡" }],
+      "explain": "利用冒泡，可以只在父容器上绑一次，就接住所有子项的点击。"
+    },
+    {
+      "title": "事件委托：父容器上绑一次",
+      "desc": "动态插入的子项不用重新绑",
+      "nodes": ["event", "bubble", "delegate"],
+      "edges": ["event>bubble", "bubble>delegate"],
+      "code": "list.addEventListener('click', (event) => {\n  const item = event.target.closest('[data-id]')\n  if (!item) return\n  console.log('点了', item.dataset.id)\n})",
+      "focus": [1, 2, 3, 4, 5],
+      "log": [{ "k": "收益", "v": "动态子项不用重绑" }],
+      "explain": "只在父容器绑一次，用 closest 找到真实目标；列表、表格、菜单都该这么写。"
+    },
+    {
+      "title": "读布局会强制同步计算",
+      "desc": "写样式后立刻读尺寸，浏览器必须马上布局",
+      "nodes": ["thrash"],
+      "edges": [],
+      "code": "el.style.width = '200px'\nconsole.log(el.offsetHeight) // 浏览器必须立刻布局才能回答",
+      "focus": [1, 2],
+      "log": [{ "k": "修法", "v": "先批量读、再批量写" }],
+      "explain": "循环里反复'写样式 → 读尺寸'会触发多次强制布局（layout thrashing），页面明显卡顿。"
+    }
   ]
 }
 ```

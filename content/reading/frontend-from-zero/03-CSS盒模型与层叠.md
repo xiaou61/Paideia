@@ -19,25 +19,59 @@ CSS 里最常见的两种困惑：
 
 打个比方：盒模型像快递箱——箱子外还要留缓冲泡沫（padding）和胶带厚度（border），你量的只是内腔（content）。真实机制是 `width` 默认只算 content，加上 padding 和 border 才是实际占位。
 
-```sketch
+```code-flow
 {
-  "title": "盒模型与层叠：一条排查路",
-  "rows": [
-    [
-      { "id": "box", "title": "盒模型", "sub": "content/padding/border", "tone": "blue" },
-      { "id": "margin", "title": "边距合并", "sub": "相邻·父子·空元素", "tone": "blue" }
-    ],
-    [
-      { "id": "cascade", "title": "层叠优先级", "sub": "五个来源按顺序比", "tone": "violet" },
-      { "id": "inherit", "title": "继承", "sub": "有些属性自动下传", "tone": "violet" }
-    ],
-    [
-      { "id": "debug", "title": "排查流程", "sub": "先看有没有、再看谁覆盖", "tone": "green" }
-    ]
+  "id": "fe-03-css-debug",
+  "title": "样式没生效：三步排查路",
+  "nodes": [
+    { "id": "appear", "label": "规则在吗", "sub": "Styles 面板有没有", "layer": 0, "order": 0 },
+    { "id": "override", "label": "被谁覆盖", "sub": "优先级 / 顺序", "layer": 1, "order": 0 },
+    { "id": "invalid", "label": "值或约束", "sub": "非法值 · 属性冲突", "layer": 2, "order": 0 },
+    { "id": "located", "label": "定位原因", "sub": "不靠 !important", "layer": 3, "order": 0 }
   ],
-  "arrows": [
-    { "from": "box", "to": "debug", "label": "占位不对" },
-    { "from": "cascade", "to": "debug", "label": "没生效" }
+  "edges": [
+    { "from": "appear", "to": "override", "label": "出现了但被划掉" },
+    { "from": "override", "to": "invalid", "label": "没划掉仍不生效" },
+    { "from": "invalid", "to": "located", "label": "查到值/约束" },
+    { "from": "appear", "to": "located", "label": "没出现：选择器没选中" }
+  ],
+  "steps": [
+    {
+      "title": "先问：规则出现在 Styles 面板了吗？",
+      "desc": "没出现 = 选择器没匹配",
+      "nodes": ["appear"],
+      "edges": [],
+      "log": [{ "k": "没出现", "v": "选择器没选中" }],
+      "explain": "检查拼写、层级、元素是否真的存在——规则压根没进面板，就不是优先级的问题。"
+    },
+    {
+      "title": "出现了但被划掉：看谁覆盖",
+      "desc": "优先级更高，或后写的规则赢",
+      "nodes": ["appear", "override"],
+      "edges": ["appear>override"],
+      "code": "p { color: black; }         /* (0,0,0,1) */\n.note { color: blue; }      /* (0,0,1,0) 赢 */\n#main .note { color: red; } /* (0,1,1,0) 赢 */",
+      "focus": [1, 2, 3],
+      "log": [{ "k": "比较", "v": "(行内,id,class,元素)" }],
+      "explain": "#main .note 的 (0,1,1,0) 高过 .note 的 (0,0,1,0)；同优先级看谁后写。"
+    },
+    {
+      "title": "没划掉仍不生效：查值与约束",
+      "desc": "值非法、属性冲突、父元素限制",
+      "nodes": ["override", "invalid"],
+      "edges": ["override>invalid"],
+      "code": "display: flexx;   /* 非法值，被丢弃 */\nwidth: 200px;     /* 对 display: inline 无效 */",
+      "focus": [1, 2],
+      "log": [{ "k": "常见", "v": "非法值 / 父元素裁切" }],
+      "explain": "值非法会被丢弃；width 对 inline 元素无效；父元素 overflow:hidden 会把内容裁掉。"
+    },
+    {
+      "title": "定位到原因，而不是加 !important",
+      "desc": "按层叠顺序定位比试错快",
+      "nodes": ["invalid", "located", "appear"],
+      "edges": ["invalid>located", "appear>located"],
+      "log": [{ "k": "结论", "v": "按层叠顺序定位" }],
+      "explain": "这套流程比'加 !important 试试'快，而且不会留下技术债。"
+    }
   ]
 }
 ```

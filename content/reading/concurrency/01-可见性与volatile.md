@@ -11,19 +11,68 @@ status: published
 
 `volatile` 只做两件事：
 
-```sketch
+```code-flow
 {
-  "title": "volatile 只保证看得见，不保证不被打断",
-  "rows": [
-    [
-      { "id": "see", "title": "写立刻对其他线程可见", "sub": "不走缓存副本", "tone": "blue" },
-      { "id": "order", "title": "禁止指令重排", "sub": "写它前后不越界", "tone": "blue" },
-      { "id": "noatom", "title": "但不保证原子", "sub": "i++ 仍然会丢更新", "tone": "amber" }
-    ]
+  "id": "concurrency-volatile-dcl",
+  "title": "双重检查锁：volatile 挡住的是哪一步重排",
+  "nodes": [
+    { "id": "alloc", "label": "分配内存", "sub": "第 1 步", "layer": 0, "order": 0 },
+    { "id": "init", "label": "初始化对象", "sub": "第 2 步，写字段", "layer": 1, "order": 0 },
+    { "id": "assign", "label": "赋引用 instance", "sub": "第 3 步", "layer": 2, "order": 0 },
+    { "id": "reader", "label": "线程 B 读 instance", "sub": "第一次检查", "layer": 3, "order": 0 },
+    { "id": "half", "label": "拿到半成品", "sub": "字段仍是默认值", "layer": 4, "order": 0 }
   ],
-  "arrows": [
-    { "from": "see", "to": "order" },
-    { "from": "order", "to": "noatom" }
+  "edges": [
+    { "from": "alloc", "to": "init", "label": "构造" },
+    { "from": "init", "to": "assign", "label": "赋引用" },
+    { "from": "assign", "to": "reader", "label": "引用可见" },
+    { "from": "reader", "to": "half", "label": "误以为可用" }
+  ],
+  "steps": [
+    {
+      "title": "new 一个对象不是一步",
+      "desc": "分配内存、调用构造、赋引用，三步",
+      "file": "Config.java",
+      "code": "// instance = new Config(); 实际分三步：\n// 1. 分配内存\n// 2. 调用构造方法，写入字段\n// 3. 把引用赋给 instance",
+      "focus": [1, 2, 3, 4],
+      "nodes": ["alloc"],
+      "edges": [],
+      "log": [{ "k": "关键", "v": "重排只发生在这三步之间" }],
+      "explain": "单一语句在字节码层面是多条指令。理解这一点，才明白为什么一个赋值也能出并发 bug。"
+    },
+    {
+      "title": "构造与赋引用可能被重排",
+      "desc": "没有 volatile 时，先给引用、后写字段",
+      "file": "Config.java",
+      "code": "private static Config instance;   // 少了 volatile 就会出问题\n\n// 编译器/CPU 可能把第 3 步提前：\n// instance = <刚分配的内存>   ← 先赋引用\n// 构造方法写入字段            ← 后初始化",
+      "focus": [1, 2, 3, 4, 5],
+      "nodes": ["init", "assign"],
+      "edges": ["init>assign"],
+      "log": [{ "k": "原因", "v": "单线程看不出差别，就允许调换" }],
+      "explain": "单线程语义不变是被允许重排的前提。构造和赋引用之间没有数据依赖，于是可能被调换。"
+    },
+    {
+      "title": "线程 B 撞上未初始化的对象",
+      "desc": "看到非 null 就直接返回",
+      "file": "Config.java",
+      "code": "if (instance == null) {\n    synchronized (Config.class) {\n        if (instance == null) {\n            instance = new Config();   // 引用已可见，字段还没写完\n        }\n    }\n}\nreturn instance;   // 线程 B 在第一个 if 处返回了半成品",
+      "focus": [1, 2, 3, 4, 5, 6, 7, 8],
+      "nodes": ["reader", "half"],
+      "edges": ["assign>reader", "reader>half"],
+      "log": [{ "k": "后果", "v": "拿到一个字段全是默认值的对象" }],
+      "explain": "线程 B 的第一个 if 只是读 instance，读到的引用已经非空，于是跳过整个同步块，直接返回未初始化完的对象。"
+    },
+    {
+      "title": "volatile 写挡住这条重排",
+      "desc": "赋值不能越过构造",
+      "file": "Config.java",
+      "code": "private static volatile Config instance;   // 关键就是这一个 volatile\n\n// volatile 写（第 3 步）之前的构造写不能跑到它后面\n// 线程 B 的读也是 volatile 读，构造写由传递性对它可见",
+      "focus": [1, 2, 3, 4],
+      "nodes": ["assign"],
+      "edges": [],
+      "log": [{ "k": "结论", "v": "DCL 的 instance 必须加 volatile" }],
+      "explain": "volatile 挡的不是所有重排，只是“赋引用不能越过构造”这一条关键顺序。加对了，发布才安全。"
+    }
   ]
 }
 ```

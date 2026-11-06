@@ -11,19 +11,157 @@ status: published
 
 **JIT 不是"把 Java 编译成机器码"这么简单，它是一套基于运行时profile 的投机优化系统。它的假设成立时，代码会快得超出你的直觉；假设被推翻时，它会去优化、重新编译，表现为延迟尖刺。**
 
-```sketch
+```code-flow
 {
-  "title": "JIT 是赌你的代码一直走同一条路",
-  "rows": [
-    [
-      { "id": "prof", "title": "收集运行时画像", "sub": "哪个分支最常走", "tone": "gray" },
-      { "id": "opt", "title": "按画像优化", "sub": "内联、去虚拟调用", "tone": "blue" },
-      { "id": "deopt", "title": "假设被推翻", "sub": "去优化、重新编译", "tone": "amber" }
-    ]
+  "id": "jvm-jit-pipeline",
+  "title": "JIT 用运行时画像做投机优化",
+  "nodes": [
+    {
+      "id": "prof",
+      "label": "解释器 + profile",
+      "sub": "记分支与类型",
+      "layer": 0,
+      "order": 0
+    },
+    {
+      "id": "c1",
+      "label": "C1 编译",
+      "sub": "快、保守",
+      "layer": 1,
+      "order": 0
+    },
+    {
+      "id": "c2",
+      "label": "C2 优化",
+      "sub": "内联/逃逸/锁消除",
+      "layer": 2,
+      "order": 0
+    },
+    {
+      "id": "deopt",
+      "label": "去优化",
+      "sub": "假设推翻，重来",
+      "layer": 3,
+      "order": 0
+    }
   ],
-  "arrows": [
-    { "from": "prof", "to": "opt" },
-    { "from": "opt", "to": "deopt" }
+  "edges": [
+    {
+      "from": "prof",
+      "to": "c1",
+      "label": "热了编译"
+    },
+    {
+      "from": "c1",
+      "to": "c2",
+      "label": "热度够了"
+    },
+    {
+      "from": "c2",
+      "to": "deopt",
+      "label": "假设失效"
+    },
+    {
+      "from": "deopt",
+      "to": "prof",
+      "label": "重新收画像"
+    }
+  ],
+  "steps": [
+    {
+      "title": "解释器边跑边收画像",
+      "desc": "记录调用次数、分支、类型",
+      "file": "Calc.java",
+      "code": "int add(int a, int b) {\n    return a + b;\n}\n\nint calc() {\n    return add(1, 2) * 10;\n}",
+      "focus": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "nodes": [
+        "prof"
+      ],
+      "edges": [],
+      "log": [
+        {
+          "k": "阶段",
+          "v": "Level 0 解释器 + 收集 profile"
+        }
+      ],
+      "explain": "解释器不只是慢速执行器：它顺手记录方法被调了多少次、分支走哪边、调用点实际出现哪些类型。这些 profile 是后面所有投机优化的依据。"
+    },
+    {
+      "title": "C1 先把代码救出解释器",
+      "desc": "编译快、优化保守",
+      "nodes": [
+        "c1"
+      ],
+      "edges": [
+        "prof>c1"
+      ],
+      "log": [
+        {
+          "k": "路径",
+          "v": "常见 0 → 3 → 4"
+        }
+      ],
+      "explain": "C1 编译快、优化保守，作用是快速把热代码从解释器里救出来。分层编译把解释器、C1、C2 串起来：常见路径是 0 → 3 → 4，先解释执行并收集 profile，再用 C1 编译带 profile 的版本。"
+    },
+    {
+      "title": "C2 按假设做深度优化",
+      "desc": "内联、逃逸分析、锁消除",
+      "file": "Calc.java",
+      "code": "int add(int a, int b) {\n    return a + b;\n}\n\nint calc() {\n    return add(1, 2) * 10;   // 内联后折叠成 30\n}",
+      "focus": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "nodes": [
+        "c2"
+      ],
+      "edges": [
+        "c1>c2"
+      ],
+      "log": [
+        {
+          "k": "优化",
+          "v": "内联 → 常量折叠 → 30"
+        }
+      ],
+      "explain": "内联是最重要的一步：只有把 add 展开到 calc 的调用点，C2 才能做常量传播，把 (1+2)*10 折叠成 30。没内联，后面的逃逸分析、锁消除都做不了。小方法、单态调用点更容易被内联。"
+    },
+    {
+      "title": "假设被推翻就去优化",
+      "desc": "丢掉机器码，重新收画像",
+      "file": "PrintCompilation",
+      "code": "     456   78       4   com.example.Size::get (30 bytes)   made not entrant\n     457   79       4   com.example.Size::get (30 bytes)   made zombie",
+      "focus": [
+        1,
+        2
+      ],
+      "nodes": [
+        "deopt"
+      ],
+      "edges": [
+        "c2>deopt"
+      ],
+      "log": [
+        {
+          "k": "事件",
+          "v": "made not entrant / made zombie"
+        }
+      ],
+      "explain": "C2 的优化带假设，比如“这个调用点只会出现 ArrayList”。一旦来了 LinkedList 推翻假设，JVM 就去优化：这段编译代码不再被新调用进入（made not entrant），栈帧用完后回收（made zombie），回到解释器重新收集 profile。偶发去优化正常，反复风暴才是问题。"
+    }
   ]
 }
 ```

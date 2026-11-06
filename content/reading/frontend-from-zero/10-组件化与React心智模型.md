@@ -18,26 +18,74 @@ status: published
 
 打个比方：以前手写 DOM 像自己搬砖砌墙，React 像给装修队一张效果图——你说"这个状态该长什么样"，它去改墙。真实机制是 UI = f(state)：组件是返回结构的函数，React 对比前后两次结果只改变化的 DOM。
 
-```sketch
+```code-flow
 {
-  "title": "React 心智：组件·props·渲染",
-  "rows": [
-    [
-      { "id": "component", "title": "组件", "sub": "返回结构的函数", "tone": "blue" },
-      { "id": "props", "title": "props", "sub": "从外往里·只读", "tone": "blue" },
-      { "id": "render", "title": "渲染", "sub": "一次算出整棵结构", "tone": "violet" }
-    ],
-    [
-      { "id": "key", "title": "key", "sub": "列表项的身份", "tone": "green" },
-      { "id": "controlled", "title": "受控组件", "sub": "值由状态决定", "tone": "green" },
-      { "id": "split", "title": "组件怎么切", "sub": "一个变化原因", "tone": "amber" }
-    ]
+  "id": "fe-10-react-model",
+  "title": "React 心智：组件 · props · 渲染 · diff",
+  "nodes": [
+    { "id": "props", "label": "props", "sub": "父给·只读", "layer": 0, "order": 0 },
+    { "id": "comp", "label": "组件", "sub": "返回结构的函数", "layer": 1, "order": 0 },
+    { "id": "tree", "label": "元素树", "sub": "这次渲染的快照", "layer": 2, "order": 0 },
+    { "id": "diff", "label": "diff", "sub": "对比前后两棵树", "layer": 3, "order": 0 },
+    { "id": "dom", "label": "真实 DOM", "sub": "只改变化的部分", "layer": 4, "order": 0 }
   ],
-  "arrows": [
-    { "from": "props", "to": "render", "label": "喂输入" },
-    { "from": "component", "to": "render", "label": "调用" },
-    { "from": "render", "to": "key", "label": "列表身份" },
-    { "from": "render", "to": "split", "label": "拆分" }
+  "edges": [
+    { "from": "props", "to": "comp", "label": "喂输入" },
+    { "from": "comp", "to": "tree", "label": "调用返回" },
+    { "from": "tree", "to": "diff", "label": "新旧对比" },
+    { "from": "diff", "to": "dom", "label": "只改差异" }
+  ],
+  "steps": [
+    {
+      "title": "组件就是返回结构的函数",
+      "desc": "返回值是这一块界面长什么样",
+      "nodes": ["comp"],
+      "edges": [],
+      "code": "function TaskRow({ task, onRemove }) {\n  return (\n    <li className=\"row\">\n      <span>{task.title}</span>\n      <button type=\"button\" onClick={() => onRemove(task.id)}>删除</button>\n    </li>\n  )\n}",
+      "focus": [1, 2, 3, 4, 5, 6, 7],
+      "log": [{ "k": "不是模板", "v": "是函数，可以有逻辑" }],
+      "explain": "函数名大写才能当标签用；返回的不是 DOM 节点，是这一块界面的描述。"
+    },
+    {
+      "title": "props 从外往里传，只读",
+      "desc": "数据向下、事件向上",
+      "nodes": ["props", "comp"],
+      "edges": ["props>comp"],
+      "code": "<TaskRow task={task} onRemove={remove} />",
+      "focus": [1],
+      "log": [{ "k": "方向", "v": "数据向下·事件向上" }],
+      "explain": "子组件不能改 props；想改只能调用父组件传下来的回调。"
+    },
+    {
+      "title": "渲染一次算出整棵结构",
+      "desc": "只写当前状态应该有什么",
+      "nodes": ["comp", "tree"],
+      "edges": ["comp>tree"],
+      "code": "function TaskList({ tasks, status, error, onRetry, onRemove }) {\n  if (status === 'loading') return <p>加载中…</p>\n  if (status === 'error') return <div><p>加载失败：{error}</p><button onClick={onRetry}>重试</button></div>\n  if (tasks.length === 0) return <p>还没有任务。</p>\n  return <ul>{tasks.map((task) => <TaskRow key={task.id} task={task} onRemove={onRemove} />)}</ul>\n}",
+      "focus": [1, 2, 3, 4, 5, 6],
+      "log": [{ "k": "写法", "v": "没有先清空再插入" }],
+      "explain": "你按状态写整棵结构，React 对比前后两次结果，只改真正变化的 DOM。"
+    },
+    {
+      "title": "React 对比前后两棵树",
+      "desc": "diff 出最小变更",
+      "nodes": ["tree", "diff"],
+      "edges": ["tree>diff"],
+      "code": "// 上次：<li>A</li> <li>B</li>\n// 这次：<li>A</li> <li>C</li>\n// React 只改 B → C，不动 A",
+      "focus": [1, 2, 3],
+      "log": [{ "k": "虚拟 DOM", "v": "diff 出差异" }],
+      "explain": "这是虚拟 DOM 与 diff 的实际意义：你按状态写，它按差异改。"
+    },
+    {
+      "title": "key 决定复用，最终只改变化的 DOM",
+      "desc": "用稳定的业务 id",
+      "nodes": ["diff", "dom"],
+      "edges": ["diff>dom"],
+      "code": "// key 用稳定业务 id：删除中间项，其余身份不错位\n// key 用数组下标：后面各项身份错位，输入框内容跟着串",
+      "focus": [1, 2],
+      "log": [{ "k": "key", "v": "列表项的身份" }],
+      "explain": "用下标当 key，插入/删除会让身份错位，表现为输入框内容串了或动画错乱。"
+    }
   ]
 }
 ```

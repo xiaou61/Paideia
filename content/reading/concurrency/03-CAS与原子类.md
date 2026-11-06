@@ -11,19 +11,69 @@ status: published
 
 CAS 是"**比较并交换**"：只有当变量还是我读到的那个旧值时，才把它改成新值；否则失败重来。
 
-```sketch
+```code-flow
 {
-  "title": "CAS：旧值没变才敢写，变了就重来",
-  "rows": [
-    [
-      { "id": "read", "title": "读到 10", "sub": "记住这个旧值", "tone": "gray" },
-      { "id": "try", "title": "尝试写 11", "sub": "前提是还是 10", "tone": "blue" },
-      { "id": "retry", "title": "被人改过就失败", "sub": "重读再试，不阻塞", "tone": "amber" }
-    ]
+  "id": "concurrency-cas-retry",
+  "title": "CAS：失败就重试的无锁循环",
+  "nodes": [
+    { "id": "read", "label": "读到旧值 old", "sub": "value.get()", "layer": 0, "order": 0 },
+    { "id": "cas", "label": "CAS(old → next)", "sub": "比较并交换", "layer": 1, "order": 0 },
+    { "id": "ok", "label": "成功退出", "sub": "旧值仍是 old", "layer": 2, "order": 0 },
+    { "id": "fail", "label": "失败重试", "sub": "value 已被改", "layer": 2, "order": 1 },
+    { "id": "spin", "label": "自旋烧 CPU", "sub": "竞争激烈时都在重试", "layer": 3, "order": 0 }
   ],
-  "arrows": [
-    { "from": "read", "to": "try" },
-    { "from": "try", "to": "retry" }
+  "edges": [
+    { "from": "read", "to": "cas", "label": "拿旧值去换" },
+    { "from": "cas", "to": "ok", "label": "true" },
+    { "from": "cas", "to": "fail", "label": "false" },
+    { "from": "fail", "to": "read", "label": "重读再试" },
+    { "from": "fail", "to": "spin", "label": "竞争时" }
+  ],
+  "steps": [
+    {
+      "title": "先读一次旧值",
+      "desc": "记住当前值，算出新值",
+      "file": "AtomicCounter.java",
+      "code": "int old = value.get();     // 读到旧值\nint next = old + 1;        // 算出新值",
+      "focus": [1, 2],
+      "nodes": ["read"],
+      "edges": [],
+      "log": [{ "k": "前提", "v": "读和写之间不能有人插队" }],
+      "explain": "CAS 的写法永远是“读一次、算好、再尝试写”，而不是先写后判断。"
+    },
+    {
+      "title": "CAS 比较并交换",
+      "desc": "旧值没变才写，变了就失败",
+      "file": "AtomicCounter.java",
+      "code": "boolean ok = value.compareAndSet(old, next);\n// 旧值仍然是 old 才写成功，否则返回 false，不阻塞",
+      "focus": [1, 2],
+      "nodes": ["read", "cas", "ok", "fail"],
+      "edges": ["read>cas", "cas>ok", "cas>fail"],
+      "log": [{ "k": "机制", "v": "一条 CPU 原子指令完成判断 + 写入" }],
+      "explain": "“判断旧值 + 写入新值”合成一个硬件指令，中间没有窗口。失败不阻塞，只是返回 false。"
+    },
+    {
+      "title": "失败就循环重试",
+      "desc": "无锁的代价在这里",
+      "file": "AtomicCounter.java",
+      "code": "do {\n    int old = value.get();\n    int next = old + 1;\n} while (!value.compareAndSet(old, next));",
+      "focus": [1, 2, 3, 4],
+      "nodes": ["fail", "read"],
+      "edges": ["fail>read"],
+      "log": [{ "k": "模式", "v": "读 → CAS → 失败再读，直到成功" }],
+      "explain": "AtomicInteger.incrementAndGet() 内部就是这条循环。低竞争时比加锁快，因为没有线程挂起/唤醒。"
+    },
+    {
+      "title": "高竞争时全在自旋",
+      "desc": "CPU 白烧，吞吐反而下降",
+      "file": "AtomicCounter.java",
+      "code": "// 同一时刻只有一个线程 CAS 成功\n// 其余全部失败重试，重试次数随线程数上升 → CPU 白烧\n// 高并发纯计数改用 LongAdder，把写分散到多个格子",
+      "focus": [1, 2, 3],
+      "nodes": ["spin"],
+      "edges": ["fail>spin"],
+      "log": [{ "k": "结论", "v": "写密集计数用 LongAdder，别死磕 AtomicLong" }],
+      "explain": "无锁把“等待”换成了“重试”。竞争激烈时失败重试的线程全部在空转，吞吐可能比加锁还低。"
+    }
   ]
 }
 ```

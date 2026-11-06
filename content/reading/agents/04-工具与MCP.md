@@ -15,19 +15,80 @@ status: published
 
 所谓"调用工具"，全过程是这样的：
 
-```sketch
+```code-flow
 {
-  "title": "模型只出文本，干活的是宿主",
-  "rows": [
-    [
-      { "id": "model", "title": "模型输出", "sub": "一段「要调哪个工具」的 JSON", "tone": "gray" },
-      { "id": "host", "title": "宿主解析并执行", "sub": "真正调用函数或 HTTP", "tone": "blue" },
-      { "id": "back", "title": "结果塞回上下文", "sub": "模型再决定下一步", "tone": "green" }
-    ]
+  "id": "ag-04-tool-call",
+  "title": "一次工具调用：模型只出文本，宿主真正执行",
+  "nodes": [
+    { "id": "model", "label": "模型输出", "sub": "一段 tool_calls", "layer": 0, "order": 0 },
+    { "id": "parse", "label": "宿主解析参数", "sub": "不可信输入", "layer": 1, "order": 0 },
+    { "id": "validate", "label": "执行前校验", "sub": "类型/范围/权限", "layer": 2, "order": 0 },
+    { "id": "exec", "label": "真正执行", "sub": "函数或 HTTP", "layer": 3, "order": 0 },
+    { "id": "append", "label": "结果塞回上下文", "sub": "再发给模型", "layer": 4, "order": 0 }
   ],
-  "arrows": [
-    { "from": "model", "to": "host" },
-    { "from": "host", "to": "back" }
+  "edges": [
+    { "from": "model", "to": "parse", "label": "解析" },
+    { "from": "parse", "to": "validate", "label": "校验" },
+    { "from": "validate", "to": "exec", "label": "通过" },
+    { "from": "exec", "to": "append", "label": "拿到结果" },
+    { "from": "append", "to": "model", "label": "下一轮" }
+  ],
+  "steps": [
+    {
+      "title": "模型输出调用意图",
+      "desc": "它只产出结构化文本",
+      "file": "tool_call.json",
+      "code": "{ \"tool_calls\": [{ \"id\": \"call_1\", \"name\": \"search_code\", \"arguments\": \"{\\\"q\\\":\\\"OrderMapper\\\"}\" }] }",
+      "focus": [1],
+      "nodes": ["model"],
+      "edges": [],
+      "log": [{ "k": "产物", "v": "结构化调用意图" }],
+      "explain": "模型从头到尾没碰过任何系统，只是「说要调什么」。"
+    },
+    {
+      "title": "宿主解析参数",
+      "desc": "参数是生成出来的，不可信",
+      "file": "host.ts",
+      "code": "const args = JSON.parse(call.arguments)   // 可能给错类型、漏字段",
+      "focus": [1],
+      "nodes": ["model", "parse"],
+      "edges": ["model>parse"],
+      "log": [{ "k": "前提", "v": "模型参数=不可信输入" }],
+      "explain": "模型给的参数和用户提交的表单没有区别，都是不可信输入。"
+    },
+    {
+      "title": "执行前做三道校验",
+      "desc": "类型、范围、权限缺一不可",
+      "file": "host.ts",
+      "code": "checkType(args)            // 要整数给了字符串 → 拒绝\ncheckRange(args)           // limit 上限 100\ncheckOwnership(user, args) // 归属校验，不是模型说了算",
+      "focus": [1, 2, 3],
+      "nodes": ["parse", "validate"],
+      "edges": ["parse>validate"],
+      "log": [{ "k": "重点", "v": "权限校验最容易漏" }],
+      "explain": "传一个别人的 id 就能读到别人的数据——这是工具没做归属校验，不是模型的问题。"
+    },
+    {
+      "title": "真正执行",
+      "desc": "函数或 HTTP 调用",
+      "file": "host.ts",
+      "code": "const result = await execute(call.name, args)   // 函数或 HTTP",
+      "focus": [1],
+      "nodes": ["validate", "exec"],
+      "edges": ["validate>exec"],
+      "log": [{ "k": "执行方", "v": "你的宿主程序" }],
+      "explain": "执行只发生在你的代码里，模型没有直接动手的能力。"
+    },
+    {
+      "title": "结果塞回上下文",
+      "desc": "再发给模型决定下一步",
+      "file": "host.ts",
+      "code": "messages.push({ role: \"tool\", tool_call_id: call.id, content: result })\n// 再发给模型，决定下一步",
+      "focus": [1, 2],
+      "nodes": ["exec", "append", "model"],
+      "edges": ["exec>append", "append>model"],
+      "log": [{ "k": "成本", "v": "结果进历史后一直留着" }],
+      "explain": "工具清单每次重发、工具结果进历史不删，是成本的两个主要来源。"
+    }
   ]
 }
 ```
