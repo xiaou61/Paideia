@@ -52,13 +52,14 @@ updated: 2026-11-06
 
 | 检查项 | 命令 | 退出码 | 结果 | 证据 |
 | --- | --- | --- | --- | --- |
-| 从提交干净构建并部署 | 独立 worktree 跑 `scripts/release.ps1` | 0 | passed | 完成：299.3 秒；health 29s |
+| 从提交干净构建并部署（第一批：简历接入） | 独立 worktree 跑 `scripts/release.ps1` | 0 | passed | 完成：299.3 秒 → 版本 `bbfedbb` |
+| 从提交干净构建并部署（第二批：积分确认/退出确认） | 同上 | 0 | passed | 完成：131.0 秒 → 版本 `8e0179e` |
 | 线上健康 | `curl /actuator/health` | 0 | passed | HTTP 200 |
-| 线上版本 | `cat deploy.prom` | 0 | passed | `paideia_build_info{version="bbfedbb"} 1` |
-| 新版界面已上线 | 在 `/opt/paideia-app/web` 搜新文案 | 0 | passed | `assets/index-DF0NYg-G.js` 命中「用哪份简历来面」 |
+| 线上版本 | `cat deploy.prom` | 0 | passed | `paideia_build_info{version="8e0179e"} 1` |
+| 新版界面已上线 | 在 `/opt/paideia-app/web` 搜新文案 | 0 | passed | `assets/index-DYou0h-b.js` 命中「开始这场模拟面试」「结束并退出」 |
 | 简历接口存在且受保护 | `curl /api/v1/ai/resumes`（未登录） | 0 | passed | HTTP 401（端点存在、需鉴权） |
 
-> 说明：从 `bbfedbbc` 的独立 worktree 部署，主工作区当时仍有别的会话的未提交改动，未被带进本次发版。
+> 说明：两批都从各自提交的独立 worktree 部署，主工作区当时仍有别的会话的未提交改动，未被带进发版。
 
 ## 剩余风险
 
