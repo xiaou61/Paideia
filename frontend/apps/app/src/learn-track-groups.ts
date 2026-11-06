@@ -47,8 +47,8 @@ export const TRACK_GROUPS: TrackGroupDef[] = [
   {
     key: 'frontend',
     label: '前端',
-    hint: '从浏览器到组件化，自己写出有数据、能部署的页面。',
-    slugs: ['frontend-from-zero'],
+    hint: '从浏览器到组件化，再到构建、依赖、测试与发布：自己写出能维护、能上线的页面。',
+    slugs: ['frontend-from-zero', 'frontend-engineering'],
   },
   {
     key: 'cs',

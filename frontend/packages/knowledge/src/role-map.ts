@@ -73,9 +73,12 @@ const TIERS: Record<RoleKey, { core: readonly string[]; advanced: readonly strin
     core: ['sql-practice', 'mysql-from-zero', 'data-analysis'],
     advanced: ['redis', 'system-design', 'algorithms'],
   },
-  // 前端岗位的专属线（WORK-068）：先走完 12 关再碰其他。
-  // 进阶放三条跨岗位但前端天天用的：HTTP/网络、Git、系统设计（前端也要讲缓存与分层）。
-  frontend: { core: ['frontend-from-zero'], advanced: ['network-basics', 'git', 'system-design', 'web-security'] },
+  // 前端岗位的专属线：先能写出页面（12 关），再补工程化（构建/依赖/测试/发布 12 关）。
+  // 进阶放四条跨岗位但前端天天用的：HTTP/网络、Git、系统设计（缓存与分层）、Web 安全。
+  frontend: {
+    core: ['frontend-from-zero', 'frontend-engineering'],
+    advanced: ['network-basics', 'git', 'system-design', 'web-security'],
+  },
 }
 
 export function roleMeta(role: RoleKey): RoleMeta {
