@@ -41,7 +41,7 @@ approver_role: CTO
 
 ## 任务
 
-### TASK-001 | pending | PDFBox 抽取能力探针
+### TASK-001 | done | PDFBox 抽取能力探针
 
 - 对应：`REQ-101`
 - 依赖：无
@@ -54,7 +54,7 @@ approver_role: CTO
   3. 把版本、许可证、中文支持、扫描件行为写入 `.agent/notes/pdf-extraction.md` 并作为 TASK-003 依据。
 - 验证：`mvn -B -pl paideia-ai -am -DskipTests compile` 成功；笔记文件存在且给出结论。
 
-### TASK-002 | pending | KnowledgeApi 扩展：findAttachment + ensureCategoryPath
+### TASK-002 | done | KnowledgeApi 扩展：findAttachment + ensureCategoryPath
 
 - 对应：`REQ-101`、`REQ-104`
 - 依赖：无
@@ -73,18 +73,14 @@ approver_role: CTO
   4. 跑测试转绿。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-knowledge -am test -Dtest=KnowledgeApiAttachmentPathTest` → 期望全部 passed。
 
-### TASK-003 | pending | PDF 文本抽取组件 PdfTextExtractor
+### TASK-003 | done | 复用 ResumeTextExtractor（原计划新建 PdfTextExtractor）
 
 - 对应：`REQ-101`
 - 依赖：TASK-001
-- 新建：`backend/paideia-ai/src/main/java/io/github/xiaou61/ai/internal/importing/PdfTextExtractor.java`
-- 接口：`String extract(byte[] pdf)`；无文本/加密抛 `BizException("未能从 PDF 提取文本（可能是扫描件，暂不支持 OCR）")`
-- 测试：`backend/paideia-ai/src/test/java/io/github/xiaou61/ai/internal/importing/PdfTextExtractorTest.java`
-- 步骤：
-  1. 写失败测试：正常 PDF 返回非空文本；空白/扫描件返回/抛预期异常。
-  2. 用 PDFBox `PDFTextStripper` 实现，`extract` 结果 trim 后为空则抛 BizException；限制最大页数（常量）。
-  3. 测试转绿。
-- 验证：`-Dtest=PdfTextExtractorTest` → passed。
+- 说明（实施修订）：TASK-001 探针确认 `ResumeTextExtractor` 已实现 PDF/DOCX 文本抽取（PDFBox 3.0.7、20 页封顶、无文字层判定、XXE/zip 炸弹防线），无需新建。改为把 `extract(byte[],String)` 与 `ExtractedText` 提升为 public 并加注释，供 `internal.importing` 复用。属内部可见性调整，不改变范围与验收。
+- 修改：`backend/paideia-ai/src/main/java/io/github/xiaou61/ai/internal/resume/ResumeTextExtractor.java`（可见性 + 注释）
+- 测试：既有 `ResumeTextExtractorTest`（回归）
+- 验证：`-Dtest=ResumeTextExtractorTest` → Tests run: 10, Failures: 0（2026-11-06 已执行）
 
 ### TASK-004 | pending | 蒸馏端口 DocumentDistiller + AgentScope 实现
 
@@ -286,3 +282,10 @@ approver_role: CTO
 - 每个 `AC-*` 至少被一个任务覆盖且对应测试通过。
 - `testing/report.md` 记录本轮实际执行的命令与输出；未执行的验证写"未运行"，不得写成通过。
 - 结构图与数据库迁移一致（`--check` 通过）。
+
+## 执行记录
+
+- 2026-11-06 TASK-001：探针结论见 `.agent/notes/document-text-extraction.md`（不新增依赖，复用 `ResumeTextExtractor`）。
+- 2026-11-06 TASK-002：`mvn -B -pl paideia-knowledge -am -Dtest=KnowledgeApiAttachmentPathTest -Dsurefire.failIfNoSpecifiedTests=false test` → Tests run 6, Failures 0, Errors 0。
+- 2026-11-06 TASK-003：`mvn -B -pl paideia-ai -am -Dtest=ResumeTextExtractorTest -Dsurefire.failIfNoSpecifiedTests=false test` → Tests run 10, Failures 0, Errors 0（回归通过）。
+- 2026-11-06 TASK-002/003 合并编译：`mvn -B -pl paideia-knowledge,paideia-ai -am -DskipTests compile` → EXIT=0。

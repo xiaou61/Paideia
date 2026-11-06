@@ -63,11 +63,21 @@ public class ResumeTextExtractor {
     /** 小于这个字符数就当作"没有可读文字"——图片型 PDF 抽出来往往只有几个零散符号。 */
     static final int MIN_MEANINGFUL_CHARS = 50;
 
-    /** 抽取结果。{@code pages} 为 PDF 页数；DOCX 恒为 0（它没有稳定的页概念）。 */
-    record ExtractedText(String text, boolean truncated, int pages) {
+    /**
+     * 抽取结果。{@code pages} 为 PDF 页数；DOCX 恒为 0（它没有稳定的页概念）。
+     *
+     * <p>public 是因为 WORK-076 的「文档导入」也要用它——这里其实是**通用文档文本抽取器**，
+     * 名字带 resume 是历史来源（WORK-018 首次引入）。
+     */
+    public record ExtractedText(String text, boolean truncated, int pages) {
     }
 
-    ExtractedText extract(byte[] content, String filename) {
+    /**
+     * 把文件字节抽成纯文本。**WORK-076 的知识库文档导入复用此方法**（故为 public）。
+     *
+     * @throws io.github.xiaou61.platform.BizException 空文件、非 PDF/docx、无文字层、加密、损坏时
+     */
+    public ExtractedText extract(byte[] content, String filename) {
         if (content == null || content.length == 0) {
             throw invalid("简历文件是空的");
         }

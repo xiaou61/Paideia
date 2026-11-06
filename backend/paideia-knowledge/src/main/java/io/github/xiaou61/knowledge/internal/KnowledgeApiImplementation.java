@@ -5,6 +5,7 @@ import io.github.xiaou61.knowledge.KnowledgeApi;
 import io.github.xiaou61.knowledge.internal.assessment.SelfAssessmentService;
 import io.github.xiaou61.knowledge.internal.cache.KnowledgeRedisCache;
 import io.github.xiaou61.knowledge.internal.category.Category;
+import io.github.xiaou61.knowledge.internal.category.CategoryMapper;
 import io.github.xiaou61.knowledge.internal.category.CategoryService;
 import io.github.xiaou61.knowledge.internal.concept.ConceptLinkMapper;
 import io.github.xiaou61.knowledge.internal.concept.ConceptLinks;
@@ -12,19 +13,27 @@ import io.github.xiaou61.knowledge.internal.concept.ConceptMapper;
 import io.github.xiaou61.knowledge.internal.entry.Entry;
 import io.github.xiaou61.knowledge.internal.entry.EntryMapper;
 import io.github.xiaou61.knowledge.internal.entry.EntryService;
+import io.github.xiaou61.knowledge.internal.file.FileStorage;
+import io.github.xiaou61.knowledge.internal.file.StoredFile;
+import io.github.xiaou61.knowledge.internal.file.StoredFileMapper;
 import io.github.xiaou61.knowledge.internal.learning.LearningProgressService;
 import io.github.xiaou61.platform.PageQuery;
 import io.github.xiaou61.platform.PageResult;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
 
 /**
@@ -47,6 +56,9 @@ class KnowledgeApiImplementation implements KnowledgeApi {
     private final ConceptLinkMapper conceptLinkMapper;
     private final EntryService entryService;
     private final CategoryService categoryService;
+    private final CategoryMapper categoryMapper;
+    private final StoredFileMapper storedFiles;
+    private final FileStorage fileStorage;
     private final SelfAssessmentService selfAssessments;
     private final LearningProgressService learningProgress;
     private final KnowledgeRedisCache cache;
@@ -56,6 +68,9 @@ class KnowledgeApiImplementation implements KnowledgeApi {
                                ConceptLinkMapper conceptLinkMapper,
                                EntryService entryService,
                                CategoryService categoryService,
+                               CategoryMapper categoryMapper,
+                               StoredFileMapper storedFiles,
+                               FileStorage fileStorage,
                                SelfAssessmentService selfAssessments,
                                LearningProgressService learningProgress,
                                KnowledgeRedisCache cache) {
@@ -64,6 +79,9 @@ class KnowledgeApiImplementation implements KnowledgeApi {
         this.conceptLinkMapper = conceptLinkMapper;
         this.entryService = entryService;
         this.categoryService = categoryService;
+        this.categoryMapper = categoryMapper;
+        this.storedFiles = storedFiles;
+        this.fileStorage = fileStorage;
         this.selfAssessments = selfAssessments;
         this.learningProgress = learningProgress;
         this.cache = cache;
@@ -144,6 +162,102 @@ class KnowledgeApiImplementation implements KnowledgeApi {
         entryMapper.insert(entry);
         cache.evictEntryBriefs();
         return new CreateOutcome(entry.getId(), true);
+    }
+
+    // ── 文档入库（WORK-076） ───────────────────────────────────────────
+
+    @Override
+    public Optional<AttachmentContent> findAttachment(String fileId) {
+        if (fileId == null || fileId.isBlank()) {
+            return Optional.empty();
+        }
+        Optional<StoredFile> meta = storedFiles.findById(fileId);
+        if (meta.isEmpty()) {
+            return Optional.empty();
+        }
+        Optional<byte[]> bytes = fileStorage.read(fileId);
+        if (bytes.isEmpty()) {
+            return Optional.empty();
+        }
+        StoredFile file = meta.get();
+        return Optional.of(new AttachmentContent(
+                file.getId(), file.getOriginalName(), file.getContentType(), file.getSizeBytes(), bytes.get()));
+    }
+
+    @Override
+    @Transactional
+    public Long ensureCategoryPath(List<String> segments) {
+        if (segments == null || segments.isEmpty()) {
+            return null;
+        }
+        Long parent = null;
+        boolean created = false;
+        for (String raw : segments) {
+            String name = sanitizeSegment(raw);
+            if (name == null) {
+                continue;
+            }
+            Category existing = categoryMapper.findByParentAndName(parent, name);
+            if (existing != null) {
+                parent = existing.getId();
+                continue;
+            }
+            Category category = new Category();
+            category.setParentId(parent);
+            category.setName(name);
+            category.setSlug(uniqueImportSlug(parent, name));
+            category.setSortOrder(0);
+            categoryMapper.insert(category);
+            parent = category.getId();
+            created = true;
+        }
+        if (created) {
+            cache.evictCategories();
+        }
+        return parent;
+    }
+
+    /** 只保留路径末段并清洗控制字符与穿越片段；返回 null 表示该段应跳过。 */
+    private static String sanitizeSegment(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String value = raw.replace('\\', '/').trim();
+        int slash = value.lastIndexOf('/');
+        if (slash >= 0) {
+            value = value.substring(slash + 1);
+        }
+        value = value.replaceAll("[\\r\\n\\t]", " ").trim();
+        if (value.isEmpty() || ".".equals(value) || "..".equals(value)) {
+            return null;
+        }
+        return value.length() > 64 ? value.substring(0, 64) : value;
+    }
+
+    /**
+     * 导入路径专用 slug：从「父 id + 名称」确定性生成 {@code imp-<8hex>}。
+     *
+     * <p>目录名是中文，无法映射成 latin slug，所以 slug 不承载语义、只满足唯一约束与
+     * {@code [a-z0-9-]{1,64}} 的格式要求；同名同父命中时直接复用（不走这里），因此重复导入幂等。
+     */
+    private String uniqueImportSlug(Long parentId, String name) {
+        String base = "imp-" + shortHash((parentId == null ? "root" : parentId.toString()) + "/" + name);
+        String slug = base;
+        int attempt = 1;
+        while (categoryMapper.countBySlug(slug, null) > 0) {
+            slug = base + "-" + attempt;
+            attempt++;
+        }
+        return slug;
+    }
+
+    private static String shortHash(String value) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest).substring(0, 8);
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException(impossible);
+        }
     }
 
     @Override

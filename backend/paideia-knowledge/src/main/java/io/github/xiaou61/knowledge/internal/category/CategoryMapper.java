@@ -67,6 +67,27 @@ public interface CategoryMapper {
     @Select("SELECT COUNT(*) FROM knowledge_categories WHERE parent_id = #{id}")
     long countChildren(@Param("id") Long id);
 
+    /**
+     * 按「父 + 名称」查分类（WORK-076：上传保留目录树时按层复用）。
+     *
+     * <p>用名称而不是 slug 定位：导入的目录名是中文，无法稳定映射成 latin slug；
+     * 名称是用户可见的目录语义，同名同父即视为同一个分类。
+     */
+    @Select("""
+            <script>
+            SELECT id, parent_id, name, slug, sort_order, line_kind, created_at, updated_at
+            FROM knowledge_categories
+            WHERE name = #{name}
+            <choose>
+              <when test="parentId == null">AND parent_id IS NULL</when>
+              <otherwise>AND parent_id = #{parentId}</otherwise>
+            </choose>
+            ORDER BY id
+            LIMIT 1
+            </script>
+            """)
+    Category findByParentAndName(@Param("parentId") Long parentId, @Param("name") String name);
+
     @Insert("""
             INSERT INTO knowledge_categories (parent_id, name, slug, sort_order, line_kind)
             VALUES (#{parentId}, #{name}, #{slug}, #{sortOrder}, #{lineKind})

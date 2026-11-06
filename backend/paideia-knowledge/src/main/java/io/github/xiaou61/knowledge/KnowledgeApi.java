@@ -92,6 +92,29 @@ public interface KnowledgeApi {
         throw new UnsupportedOperationException("本实现不支持自动采集写入");
     }
 
+    // ── 文档入库（WORK-076） ───────────────────────────────────────────
+
+    /**
+     * 按 id 读取附件字节，供其它模块（文档解析）使用。
+     *
+     * <p>这是**模块内端口**，不是 HTTP 入口——对外的附件读取仍是既有的免鉴权
+     * {@code GET /files/{id}}（id 不可枚举的取舍不变）。返回空表示附件不存在或文件缺失。
+     */
+    default Optional<AttachmentContent> findAttachment(String fileId) {
+        return Optional.empty();
+    }
+
+    /**
+     * 按相对路径分段创建/复用分类，返回叶子分类 id。
+     *
+     * <p>用于“上传文件夹保留目录树”：逐段向下查找同名分类，不存在则创建（slug 由路径确定性生成）。
+     * {@code segments} 由调用方清洗（去空段、去 {@code .}/{@code ..}、去路径分隔符、限长）；
+     * 空列表返回 {@code null}（表示“未分类”）。
+     */
+    default Long ensureCategoryPath(List<String> segments) {
+        throw new UnsupportedOperationException("本实现不支持按路径建分类");
+    }
+
     // ── 训练营（WORK-029） ────────────────────────────────────────────
 
     /**
@@ -153,6 +176,10 @@ public interface KnowledgeApi {
 
     /** 到期复习的一条。`conceptId` 可能为空（条目没挂概念）。 */
     record DueEntry(Long conceptId, long entryId, String title) {
+    }
+
+    /** 附件字节（WORK-076）：供文档解析读取，不暴露给 HTTP 层。 */
+    record AttachmentContent(String id, String originalName, String contentType, long sizeBytes, byte[] bytes) {
     }
 
     /** 一条自动采集条目的写入输入。 */
