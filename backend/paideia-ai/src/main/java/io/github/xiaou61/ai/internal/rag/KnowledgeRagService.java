@@ -10,8 +10,10 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
@@ -37,16 +39,19 @@ public class KnowledgeRagService {
 
     private final KnowledgeApi knowledge;
     private final KnowledgeChunkMapper chunks;
+    private final KnowledgeChunkEditMapper edits;
     private final EmbeddingClient embedding;
     private final RagProperties properties;
     private final AtomicBoolean indexing = new AtomicBoolean(false);
 
     KnowledgeRagService(KnowledgeApi knowledge,
                         KnowledgeChunkMapper chunks,
+                        KnowledgeChunkEditMapper edits,
                         EmbeddingClient embedding,
                         RagProperties properties) {
         this.knowledge = knowledge;
         this.chunks = chunks;
+        this.edits = edits;
         this.embedding = embedding;
         this.properties = properties;
         log.info("rag.service.init enabled={} embedding={} topK={}",
@@ -133,8 +138,36 @@ public class KnowledgeRagService {
                 }
             }
             log.info("rag.index.completed entries={} chunks={}", pending.size(), texts.size());
+            reembedPendingEdits();
         } catch (RuntimeException failure) {
             log.warn("rag.index.failed cause={}", failure.toString());
+        }
+    }
+
+    /** WORK-076：把 embedding 服务不可用时遗留的“待补嵌”编辑补上向量。 */
+    private void reembedPendingEdits() {
+        if (!embedding.enabled()) {
+            return;
+        }
+        List<KnowledgeChunkEdit> pending;
+        try {
+            pending = edits.findPendingEmbedding();
+        } catch (RuntimeException failure) {
+            log.warn("rag.edit.pending_lookup_failed cause={}", failure.toString());
+            return;
+        }
+        if (pending == null || pending.isEmpty()) {
+            return;
+        }
+        for (KnowledgeChunkEdit edit : pending) {
+            try {
+                List<float[]> vectors = embedding.embed(List.of(edit.getContent()));
+                if (vectors != null && !vectors.isEmpty()) {
+                    edits.updateEmbedding(edit.getId(), encode(vectors.getFirst()), vectors.getFirst().length);
+                }
+            } catch (RuntimeException failure) {
+                log.warn("rag.edit.reembed_skipped id={} cause={}", edit.getId(), failure.toString());
+            }
         }
     }
 
@@ -150,14 +183,27 @@ public class KnowledgeRagService {
             }
             float[] q = query.getFirst();
             List<Hit> hits = new ArrayList<>();
+            // WORK-076：手工编辑的块以“当前版本”覆盖同位置自动块（仅当编辑已带向量）
+            Map<String, KnowledgeChunkEdit> overrides = new HashMap<>();
+            List<KnowledgeChunkEdit> currentEdits = edits.findAllCurrent();
+            if (currentEdits != null) {
+                for (KnowledgeChunkEdit edit : currentEdits) {
+                    if (edit.getEmbedding() != null) {
+                        overrides.put(edit.getEntryId() + ":" + edit.getChunkIndex(), edit);
+                    }
+                }
+            }
             for (KnowledgeChunk chunk : chunks.findAll()) {
-                float[] vector = decode(chunk.getEmbedding());
+                KnowledgeChunkEdit override = overrides.get(chunk.getEntryId() + ":" + chunk.getChunkIndex());
+                byte[] embeddingBytes = override != null ? override.getEmbedding() : chunk.getEmbedding();
+                String content = override != null ? override.getContent() : chunk.getContent();
+                float[] vector = decode(embeddingBytes);
                 if (vector.length != q.length) {
                     continue;
                 }
                 double score = cosine(q, vector);
                 if (score > 0) {
-                    hits.add(new Hit(chunk.getEntryId(), chunk.getTitle(), chunk.getContent(), score));
+                    hits.add(new Hit(chunk.getEntryId(), chunk.getTitle(), content, score));
                 }
             }
             hits.sort(Comparator.comparingDouble(Hit::score).reversed());

@@ -149,7 +149,7 @@ approver_role: CTO
   4. 测试转绿。
 - 验证：`-Dtest=KnowledgeImportControllerTest`、`-Dtest=AuthorizationIsolationTest` → passed。
 
-### TASK-008 | pending | 块编辑表 + mapper
+### TASK-008 | in_progress | 块编辑表 + mapper
 
 - 对应：`REQ-201`、`REQ-204`
 - 依赖：无
@@ -171,7 +171,7 @@ approver_role: CTO
   3. 测试转绿（插入多版本，当前取最新）。
 - 验证：`-Dtest=KnowledgeChunkEditMapperTest` → passed。
 
-### TASK-009 | pending | 块编辑服务 + RAG 合并 + 降级补嵌
+### TASK-009 | done | 块编辑服务 + RAG 合并 + 降级补嵌
 
 - 对应：`REQ-202`、`REQ-203`、`REQ-204`、`REQ-205`、`QR-002`
 - 依赖：TASK-008、现有 `KnowledgeRagService`/`EmbeddingClient`
@@ -195,7 +195,7 @@ approver_role: CTO
   6. 测试转绿。
 - 验证：`-Dtest=KnowledgeChunkEditingServiceTest` → passed。
 
-### TASK-010 | pending | 块编辑管理端接口
+### TASK-010 | done | 块编辑管理端接口
 
 - 对应：`REQ-201`
 - 依赖：TASK-009
@@ -293,3 +293,6 @@ approver_role: CTO
 - 2026-11-06 TASK-005：`-Dtest=KnowledgeImportServiceTest` → Tests run 6, Failures 0。
 - 2026-11-06 TASK-006：`-Dtest=KnowledgeImportJobTest` → Tests run 3, Failures 0。
 - 2026-11-06 TASK-007：`-Dtest=KnowledgeImportControllerTest` → Tests run 1, Failures 0。
+- 2026-11-06 TASK-008：迁移 `V20261106173000__create_ai_knowledge_chunk_edits.sql` + 实体 + mapper 已写，参与 `paideia-ai` 编译通过；mapper SQL 依赖 MySQL，待集成测试（环境就绪）验证后转 done。
+- 2026-11-06 TASK-009：`-Dtest=KnowledgeChunkEditingServiceTest,KnowledgeRagServiceTest` → Tests run 10, Failures 0（含合并覆盖用例）。
+- 2026-11-06 TASK-010：`-Dtest=KnowledgeChunkAdminControllerTest` → Tests run 1, Failures 0。
