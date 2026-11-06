@@ -1,14 +1,11 @@
 package io.github.xiaou61;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.xiaou61.ai.RunRecorder;
 import io.github.xiaou61.ai.RunSpec;
 import io.github.xiaou61.ai.SpanSpec;
-import io.github.xiaou61.ai.internal.feedback.AiFeedbackService;
 import io.github.xiaou61.ai.internal.telemetry.AiRunAdminService;
-import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.PageQuery;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -22,7 +19,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * WORK-036 的端到端验证：分桶序列、采集健康、对账、反馈、前缀搜索、子步骤。
+ * WORK-036 的端到端验证：分桶序列、采集健康、对账、前缀搜索、子步骤。
  *
  * <p>这一层测**只有真起 Spring + 真写库才看得见**的东西：SQL 里的分桶表达式对不对、
  * 空桶有没有补上、对账有没有把 RESERVE 算进去、反馈的 upsert 是不是真的覆盖。
@@ -43,9 +40,6 @@ class AiObservabilityIntegrationTest {
 
     @Autowired
     AiRunAdminService admin;
-
-    @Autowired
-    AiFeedbackService feedback;
 
     private void wipe() {
         jdbc.update("DELETE FROM ai_feedback WHERE user_id >= 9100");
@@ -237,60 +231,6 @@ class AiObservabilityIntegrationTest {
         assertThat(health.queueCapacity()).isPositive();
         assertThat(health.dropped()).isGreaterThanOrEqualTo(0);
         assertThat(health.sampling()).isBetween(0.0, 1.0);
-    }
-
-    @Test
-    @DisplayName("AC-010 同一用户对同一轮重复反馈是覆盖，不是追加")
-    void feedbackUpsertsInsteadOfAppending() {
-        wipe();
-        try {
-            feedback.submit(USER, null, null, "trace-abc", "chat", "down", "incorrect");
-            feedback.submit(USER, null, null, "trace-abc", "chat", "up", null);
-
-            Integer rows = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM ai_feedback WHERE user_id = ?", Integer.class, USER);
-            String rating = jdbc.queryForObject(
-                    "SELECT rating FROM ai_feedback WHERE user_id = ?", String.class, USER);
-
-            assertThat(rows).isEqualTo(1);
-            assertThat(rating).isEqualTo("up");
-        } finally {
-            wipe();
-        }
-    }
-
-    @Test
-    @DisplayName("AC-010 非法评价被拒，不入库")
-    void feedbackRejectsUnknownRating() {
-        wipe();
-        try {
-            assertThatThrownBy(() -> feedback.submit(USER, null, null, "t", "chat", "sideways", null))
-                    .isInstanceOf(BizException.class);
-            Integer rows = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM ai_feedback WHERE user_id = ?", Integer.class, USER);
-            assertThat(rows).isZero();
-        } finally {
-            wipe();
-        }
-    }
-
-    @Test
-    @DisplayName("AC-011 反馈列表可按评价筛选")
-    void feedbackPageFilters() {
-        wipe();
-        try {
-            feedback.submit(USER, null, null, "t1", "chat", "down", "off_topic");
-            feedback.submit(USER, null, null, "t2", "chat", "up", null);
-
-            Instant now = Instant.now();
-            var downs = feedback.page(now.minus(1, ChronoUnit.DAYS), now.plus(1, ChronoUnit.DAYS),
-                    "down", null, null, PageQuery.of(1, 10, null));
-
-            assertThat(downs.total()).isEqualTo(1);
-            assertThat(downs.items().get(0).rating()).isEqualTo("down");
-        } finally {
-            wipe();
-        }
     }
 
     @Test

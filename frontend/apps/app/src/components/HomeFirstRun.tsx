@@ -16,7 +16,7 @@ export function HomeFirstRun({
   onDismiss: () => void
 }) {
   const steps = [
-    { title: '先说一下你是谁', detail: '在个人资料里选身份和目标，首页与助手会按它调整。', to: '/profile' },
+    { title: '先说一下你是谁', detail: '在个人资料里选身份和目标，首页会按它调整。', to: '/profile' },
     { title: '挑一条线开始', detail: 'Python / Java / MySQL，一关二十分钟，边学边练。', to: '/learn' },
     { title: '直接进第一关', detail: '不用挑，从第一条线的第一课开始。', to: entryHref },
   ]

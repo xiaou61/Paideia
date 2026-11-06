@@ -4,7 +4,6 @@ import { AdminHomePage } from './pages/AdminHomePage'
 import { AnalyticsPage } from './pages/AnalyticsPage'
 import { AiCreditsAuditPage } from './pages/AiCreditsAuditPage'
 import { AiRunsListPage } from './pages/AiRunsListPage'
-import { AiFeedbackPage } from './pages/AiFeedbackPage'
 import { AiRunsOverviewPage } from './pages/AiRunsOverviewPage'
 import { AiRunsScreenPage } from './pages/AiRunsScreenPage'
 import { KnowledgeCategoriesPage } from './pages/KnowledgeCategoriesPage'
@@ -116,15 +115,6 @@ export const router = createHashRouter([
     element: (
       <RequireAdmin>
         <AiRunsListPage />
-      </RequireAdmin>
-    ),
-  },
-  // 回答反馈（WORK-036）：与本组其它页同属「AI 调用」。
-  {
-    path: '/ai-runs/feedback',
-    element: (
-      <RequireAdmin>
-        <AiFeedbackPage />
       </RequireAdmin>
     ),
   },

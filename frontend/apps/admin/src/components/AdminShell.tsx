@@ -20,7 +20,6 @@ import {
   Activity,
   Cpu,
   ListOrdered,
-  MessageSquareWarning,
   Monitor,
 } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
@@ -85,7 +84,6 @@ const MENU: MenuItem[] = [
     children: [
       { to: '/ai-runs/overview', label: '调用概览', icon: Activity },
       { to: '/ai-runs/list', label: '调用明细', icon: ListOrdered },
-      { to: '/ai-runs/feedback', label: '回答反馈', icon: MessageSquareWarning },
       { to: '/ai-runs/screen', label: '调用大屏', icon: Monitor },
     ],
   },
@@ -111,7 +109,6 @@ const CRUMBS: Record<string, string[]> = {
   '/ai-credits/audit': ['AI 积分', '用量审计'],
   '/ai-runs/overview': ['AI 调用', '调用概览'],
   '/ai-runs/list': ['AI 调用', '调用明细'],
-  '/ai-runs/feedback': ['AI 调用', '回答反馈'],
   '/ai-runs/screen': ['AI 调用', '调用大屏'],
   '/ops/panel': ['运维'],
   '/ops/incidents': ['事件'],

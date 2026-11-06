@@ -1,6 +1,5 @@
 package io.github.xiaou61.ai.internal.tools;
 
-import io.github.xiaou61.ai.internal.feedback.AiFeedbackService;
 import io.github.xiaou61.ai.internal.telemetry.AiRunAdminService;
 import io.github.xiaou61.platform.PageQuery;
 import io.github.xiaou61.platform.PageResult;
@@ -17,7 +16,7 @@ import java.util.Map;
 import org.springframework.stereotype.Component;
 
 /**
- * AI 观测的管理工具组（WORK-039 TASK-004，5 个）。
+ * AI 观测的管理工具组（WORK-039 TASK-004，4 个）。
  *
  * <p>全部只读：统计系统不该成为第二个能被写坏的地方（与 `AiRunAdminController` 同一条裁决）。
  *
@@ -303,57 +302,6 @@ public final class AiAdminTools {
                 return ToolResult.ok(join(lines));
             } catch (RuntimeException failure) {
                 return ToolResult.fail("读取调用详情失败：" + messageOf(failure));
-            }
-        }
-    }
-
-    /** 回答反馈列表。 */
-    @Component
-    public static class ListFeedback implements PaideiaTool {
-
-        private final AiFeedbackService feedback;
-
-        ListFeedback(AiFeedbackService feedback) {
-            this.feedback = feedback;
-        }
-
-        @Override
-        public ToolDescriptor descriptor() {
-            return new ToolDescriptor(
-                    "admin_ai_list_feedback", GROUP, "列出回答反馈",
-                    "分页列出学习者对助手回答的赞/踩反馈，可按时间、rating（up/down）、"
-                            + "reason、kind 筛选。踩的反馈带原因，是排查回答质量的第一入口。",
-                    schema(Map.of(
-                            "from", str("起始时间，ISO-8601"),
-                            "to", str("结束时间，ISO-8601"),
-                            "rating", str("up 或 down"),
-                            "reason", str("踩的原因代码"),
-                            "kind", str("场景过滤"),
-                            "page", num("页码，从 1 开始"),
-                            "size", num("每页条数，1-100，默认 20")),
-                            new String[0]),
-                    null, true, false, true, ToolScope.ADMIN, false);
-        }
-
-        @Override
-        public ToolResult call(ToolContext context, Map<String, Object> arguments) {
-            try {
-                PageResult<AiFeedbackService.FeedbackView> page = feedback.page(
-                        instantOf(arguments, "from"), instantOf(arguments, "to"),
-                        stringOf(arguments, "rating"), stringOf(arguments, "reason"),
-                        stringOf(arguments, "kind"), pageOf(arguments));
-                if (page.items().isEmpty()) {
-                    return ToolResult.ok("没有符合条件的反馈（共 " + page.total() + " 条）。");
-                }
-                List<String> lines = page.items().stream()
-                        .map(item -> item.createdAt() + " " + item.rating()
-                                + (item.reason() == null ? "" : "(" + item.reason() + ")")
-                                + " 用户=" + item.userId() + " 场景=" + item.kind()
-                                + (item.traceId() == null ? "" : " trace=" + item.traceId()))
-                        .toList();
-                return ToolResult.ok("共 " + page.total() + " 条，第 " + page.page() + " 页：\n" + join(lines));
-            } catch (RuntimeException failure) {
-                return ToolResult.fail("读取反馈失败：" + messageOf(failure));
             }
         }
     }

@@ -17,7 +17,7 @@ import { useNavigate } from 'react-router'
  * <p>预览页与打印页共用它——两页的差别只在数据从哪来（主简历 / 定稿版本），
  * 纸面与打印规则必须只有一份。
  *
- * <p><b>刻意不包 AppShell</b>：打印时页头、导航、助手面板都不该出现。工具栏用
+ * <p><b>刻意不包 AppShell</b>：打印时页头、导航都不该出现。工具栏用
  * `data-print-hide` 在 `@media print` 下隐藏。
  *
  * <p>版式选择存 localStorage（`@paideia/resume` 的 read/saveResumeTemplate），

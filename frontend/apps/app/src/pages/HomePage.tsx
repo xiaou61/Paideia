@@ -122,7 +122,7 @@ const QUICK_LINKS: {
     testId: 'home-entry-notes',
     icon: NotebookPen,
     title: '我的笔记',
-    description: '随手记点什么，或让助手把答案存进来。',
+    description: '随手记点什么，也能生成只读链接发给别人。',
   },
   {
     key: 'my-assessments' as const,
@@ -291,7 +291,7 @@ export function HomePage() {
         <div className="min-w-0">
           <h1 className="text-2xl sm:text-3xl">你好，{user?.username ?? ''}</h1>
           <p className="text-muted-foreground mt-3 max-w-xl text-base leading-7">
-            右下角的「助手」会读当前内容、记得你说过的话，也能把答案存成笔记。
+            需要 AI 的时候，正文页能生成摘要、按文章出题自测，复习页还能看错题讲解。
           </p>
 
           <form onSubmit={submitSearch} className="mt-7 flex max-w-lg flex-col items-stretch gap-2 sm:flex-row sm:items-center">

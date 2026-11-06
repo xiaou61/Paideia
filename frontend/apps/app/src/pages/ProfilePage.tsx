@@ -50,7 +50,7 @@ const IDENTITY_META: Record<
   { description: string; icon: ComponentType<{ className?: string }> }
 > = {
   job_seeker: {
-    description: '面试与岗位相关的知识优先，助手多一个模拟面试入口。',
+    description: '面试与岗位相关的知识优先，会多一个模拟面试入口。',
     icon: BriefcaseBusiness,
   },
   postgrad: { description: '基础理论与专业课相关的内容优先。', icon: GraduationCap },
@@ -63,7 +63,7 @@ const ALL_IDENTITIES = Object.keys(IDENTITY_LABELS) as Identity[]
 /**
  * 我的身份与画像（WORK-010 T-03）。
  *
- * <p><b>这里改什么都不影响权限</b>：身份只决定"首页推荐什么、导航谁排前面、助手以什么形态出现"。
+ * <p><b>这里改什么都不影响权限</b>：身份只决定"首页推荐什么、导航谁排前面"。
  * 页面顶部把这句话写出来，是因为它是最容易被误读的一处——"选了考研"不等于"失去了求职功能"。
  *
  * <p>四个画像字段全部可空：清空输入框等于"没有这个值"，不是存一个空字符串。
@@ -152,7 +152,7 @@ export function ProfilePage() {
       <div className="mx-auto max-w-2xl">
         <PageHeader
           title="身份与目标"
-          description="身份只影响推荐顺序与助手的形态（比如求职者会多一个面试入口），不影响你能做什么——每个身份都能读全部内容、记笔记、用助手。"
+          description="身份只影响推荐顺序与首页入口（比如求职者会多一个模拟面试入口），不影响你能做什么——每个身份都能读全部内容、记笔记、用 AI。"
         />
 
         <div className="border-border bg-card shadow-card overflow-hidden rounded-xl border">
@@ -248,7 +248,7 @@ export function ProfilePage() {
             <div>
               <h2 className="text-sm font-medium">进度</h2>
               <p className="text-muted-foreground mt-1 text-xs">
-                让助手知道你现在处在哪一步，回答会更贴近处境。
+                让首页更贴近你现在所处的阶段。
               </p>
             </div>
 
@@ -325,7 +325,7 @@ export function ProfilePage() {
           <DialogHeader className="gap-1.5 pr-8">
             <DialogTitle className="text-lg">选择你的身份</DialogTitle>
             <DialogDescription className="leading-6">
-              身份决定首页先推荐什么、导航怎么排、助手以什么形态出现。它不改变你能做什么。
+              身份决定首页先推荐什么、导航怎么排。它不改变你能做什么。
             </DialogDescription>
           </DialogHeader>
 

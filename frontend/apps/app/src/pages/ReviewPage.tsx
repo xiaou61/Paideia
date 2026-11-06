@@ -252,7 +252,7 @@ export function ReviewPage() {
                 <Card className="hover:border-primary/40 transition-colors">
                   <CardContent className="flex flex-wrap items-center gap-3 pt-5">
                     <RotateCcw className="text-primary size-4 shrink-0" />
-                    {/* 链接只包标题：卡片里还要放「问助手」按钮，按钮套在链接里是嵌套可交互内容 */}
+                    {/* 链接只包标题：卡片里还要放「问 AI」按钮，按钮套在链接里是嵌套可交互内容 */}
                     <Link
                       to={`/knowledge/entries/${item.entryId}`}
                       data-testid="review-item"

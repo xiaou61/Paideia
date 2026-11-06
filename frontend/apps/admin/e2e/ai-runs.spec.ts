@@ -94,17 +94,4 @@ test.describe('AI 调用统计', () => {
       }
     }
   })
-
-  test('反馈页：侧栏能进，空状态与筛选都在', async ({ page }) => {
-    await signIn(page)
-    await page.goto(`${ADMIN_ENTRY}#/ai-runs/feedback`)
-
-    await expect(page.getByRole('heading', { name: '回答反馈' })).toBeVisible()
-    await expect(page.getByTestId('feedback-filter-rating')).toBeVisible()
-    await expect(page.getByTestId('feedback-filter-reason')).toBeVisible()
-
-    const table = page.getByTestId('feedback-table')
-    const empty = page.getByTestId('feedback-empty')
-    await expect(table.or(empty)).toBeVisible()
-  })
 })

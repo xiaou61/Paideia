@@ -214,8 +214,8 @@ export function ProgressPage() {
 /**
  * 「今天要做的事」（WORK-053 阶段二）。
  *
- * <p>计划项**只由用户写入**：助手在对话里给候选，真正落库发生在这里的「添加」或
- * 助手卡片上的「加入计划」（REQ-007）。日期用浏览器本地的那一天——服务端不知道用户在哪个时区。
+ * <p>计划项**只由用户写入**：AI 在「让 AI 排一下」里只给建议，真正落库发生在这里的「添加」。
+ * 日期用浏览器本地的那一天——服务端不知道用户在哪个时区。
  */
 function PlanSection() {
   const queryClient = useQueryClient()
@@ -252,7 +252,7 @@ function PlanSection() {
         {items.isPending ? <Loading /> : null}
         {items.isError ? <Failed message="计划加载失败" /> : null}
         {items.isSuccess && list.length === 0 ? (
-          <EmptyHint title="今天还没有计划" description="让助手按你的学习记录给建议，或者自己写一条。" />
+          <EmptyHint title="今天还没有计划" description="让 AI 按你的学习记录给建议，或者自己写一条。" />
         ) : null}
         <ul className="mt-3 space-y-2 text-sm">
           {list.map((item: PlanItem) => (

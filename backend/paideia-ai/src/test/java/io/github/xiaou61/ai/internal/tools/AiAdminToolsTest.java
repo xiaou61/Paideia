@@ -39,7 +39,7 @@ class AiAdminToolsTest {
             descriptors.add(((PaideiaTool) constructor.newInstance(args)).descriptor());
         }
 
-        assertThat(descriptors).hasSize(5);
+        assertThat(descriptors).hasSize(4);
         Set<String> names = new HashSet<>();
         for (ToolDescriptor descriptor : descriptors) {
             assertThat(descriptor.name()).startsWith("admin_ai_");

@@ -182,10 +182,6 @@ public class SecurityConfiguration {
                         // 题目概念标注（WORK-033）。**必须排在 /api/v1/learning 的任何规则之前**：
                         // 顺序写反时这条永不生效、也不报错，表现为任何登录用户都能改题目标签。
                         .requestMatchers("/api/v1/learning/admin/**").hasRole("ADMIN")
-                        // 助手回答反馈的管理端列表（WORK-036）。**必须排在下面的
-                        // /api/v1/ai/** 之前**：顺序写反这条永不生效、也不报错，
-                        // 只会在某天表现为"任何已登录的学习者都能看到全平台的差评"。
-                        .requestMatchers("/api/v1/ai/feedback/admin/**").hasRole("ADMIN")
                         // 速递的读接口（WORK-027）：要登录。内容本身是公开新闻，但"哪天看过什么"
                         // 是隐私，且不做匿名访问可以避免它被当成公开抓取源。
                         .requestMatchers("/api/v1/digest/**").authenticated()

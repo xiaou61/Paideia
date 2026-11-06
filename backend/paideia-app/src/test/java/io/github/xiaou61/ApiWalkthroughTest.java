@@ -659,11 +659,6 @@ class ApiWalkthroughTest {
         if (traceId != null) {
             call("AI 调用详情", "GET", "/api/v1/ai/admin/runs/" + traceId, adminToken(), null);
         }
-        // 回答反馈（WORK-036 C 组）：写一条再读管理端列表。traceId 可能为 null（采集关闭），
-        // 那时唯一键退化成不生效，写入仍然合法。
-        bestEffort("POST", "/api/v1/ai/feedback", bearer);
-        call("管理端回答反馈", "GET", "/api/v1/ai/feedback/admin", adminToken(), null);
-
         // ---- SQL 数据集（WORK-035）----
         // 上传需要真文件与白名单校验，自查不打这条路；其余端点用一个不存在的 key
         // 走 404 分支——端点被走到、鉴权生效、错误语义正确，这就是覆盖要的东西。

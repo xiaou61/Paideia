@@ -112,7 +112,7 @@ class McpToolSnapshotTest {
                         + descriptor.destructive())
                 .toList();
 
-        assertThat(actual).hasSize(67);
+        assertThat(actual).hasSize(66);
         // 逐组核对数量：改动任何一组都会在这里显形
         assertThat(countByToolset()).containsExactlyInAnyOrderEntriesOf(expectedToolsetCounts());
     }
@@ -142,7 +142,7 @@ class McpToolSnapshotTest {
     private static java.util.Map<String, Integer> expectedToolsetCounts() {
         return java.util.Map.ofEntries(
                 java.util.Map.entry("account", 1),
-                java.util.Map.entry("admin_ai", 5),
+                java.util.Map.entry("admin_ai", 4),
                 java.util.Map.entry("admin_content", 15),
                 java.util.Map.entry("admin_digest", 2),
                 java.util.Map.entry("admin_learning", 4),
