@@ -44,6 +44,18 @@ updated: 2026-11-06
 - 上传的简历**不落库**（本期设计如此），只在本次面试用一次；要留存走「简历」页。
 - 同 WORK-075：真实 `identity.spec` 未跑（会花积分），其依赖的 testid 未改。
 
+## 部署结果（2026-11-06）
+
+| 检查项 | 命令 | 退出码 | 结果 | 证据 |
+| --- | --- | --- | --- | --- |
+| 从提交干净构建并部署 | 独立 worktree 跑 `scripts/release.ps1` | 0 | passed | 完成：299.3 秒；health 29s |
+| 线上健康 | `curl /actuator/health` | 0 | passed | HTTP 200 |
+| 线上版本 | `cat deploy.prom` | 0 | passed | `paideia_build_info{version="bbfedbb"} 1` |
+| 新版界面已上线 | 在 `/opt/paideia-app/web` 搜新文案 | 0 | passed | `assets/index-DF0NYg-G.js` 命中「用哪份简历来面」 |
+| 简历接口存在且受保护 | `curl /api/v1/ai/resumes`（未登录） | 0 | passed | HTTP 401（端点存在、需鉴权） |
+
+> 说明：从 `bbfedbbc` 的独立 worktree 部署，主工作区当时仍有别的会话的未提交改动，未被带进本次发版。
+
 ## 剩余风险
 
 - `pageContext` 后端截断 4000 字；前端 `formatResume` 已截到 3800，抽取原文按后端上限截断。
