@@ -391,26 +391,6 @@ class ApiWalkthroughTest {
         long mcpTokenId = idAt(mcpToken);
         call("MCP 凭据列表", "GET", "/api/v1/ai/mcp-tokens", bearer, null);
         call("吊销 MCP 凭据", "DELETE", "/api/v1/ai/mcp-tokens/" + mcpTokenId, bearer, null);
-        call("读设置", "GET", "/api/v1/ai/settings", bearer, null);
-        call("写设置", "PUT", "/api/v1/ai/settings", bearer,
-                json(Map.of("memoryEnabled", true, "referenceSavedMemories", true, "referenceChatHistory", true)));
-
-        MvcResult memory = call("写记忆", "POST", "/api/v1/ai/memories", bearer,
-                json(Map.of("type", "text", "text", "自查用的一条记忆")));
-        long memoryId = idAt(memory);
-        call("读记忆", "GET", "/api/v1/ai/memories", bearer, null);
-        call("删单条记忆", "DELETE", "/api/v1/ai/memories/text/" + memoryId, bearer, null);
-        call("写第二条记忆", "POST", "/api/v1/ai/memories", bearer,
-                json(Map.of("type", "text", "text", "自查用的第二条记忆")));
-        call("清空并关闭记忆", "DELETE", "/api/v1/ai/memories", bearer, null);
-        call("重新打开记忆", "PUT", "/api/v1/ai/settings", bearer,
-                json(Map.of("memoryEnabled", true, "referenceSavedMemories", true, "referenceChatHistory", true)));
-        // 候选记忆（WORK-050）：后台提取的产物，空列表是正常结果；采纳/拒绝不存在的 id 是 400。
-        call("记忆候选", "GET", "/api/v1/ai/memories/candidates", bearer, null);
-        call("采纳不存在的候选 → 400", "POST",
-                "/api/v1/ai/memories/candidates/999999999/accept", bearer, null, 400);
-        call("拒绝不存在的候选 → 400", "POST",
-                "/api/v1/ai/memories/candidates/999999999/reject", bearer, null, 400);
 
         call("读精简（可能为空）", "GET", "/api/v1/ai/summaries/" + entryId, bearer, null);
         call("生成精简（桩）", "POST", "/api/v1/ai/summaries", bearer,

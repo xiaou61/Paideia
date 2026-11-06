@@ -55,7 +55,7 @@ updated: 2026-11-05
 | 端口与 API 客户端 `@paideia/core` | `frontend/packages/core/` | 平台端口、API 客户端、通用格式化；`session.ts` 是角色判断的唯一入口 | `src/api.test.ts`、`src/workspace-boundaries.test.ts`、`src/session.test.ts` | WORK-001、WORK-002 |
 | 共享认证 `@paideia/auth` | `frontend/packages/auth/` | 令牌存储、401 刷新重放、登录/注册表单、OAuth 按钮、登录门 | `src/auth.test.ts`、`src/auth-context.test.tsx` | WORK-003、WORK-037 |
 | 身份化配置 `@paideia/identity` | `frontend/packages/identity/` | 按身份决定首页推荐分类、`preferredNav` 导航顺序、助手开场白；**不决定任何权限** | `src/config.test.ts` | WORK-010 |
-| AI 能力共享包 `@paideia/assistant` | `frontend/packages/assistant/` | 条目摘要卡、记忆面板、积分面板、数据集引导卡（`GuideCard`）、SSE 客户端；**通用对话面板已于 WORK-066 下线** | `src/memory-panel.test.tsx`、`src/summary-card.test.tsx`、`src/sse.test.ts` | WORK-005、WORK-006、WORK-011、WORK-013、WORK-058、WORK-066 |
+| AI 能力共享包 `@paideia/assistant` | `frontend/packages/assistant/` | 条目摘要卡、积分面板、数据集引导卡（`GuideCard`）、SSE 客户端；**通用对话面板与记忆面板已下线** | `src/summary-card.test.tsx`、`src/sse.test.ts` | WORK-005、WORK-006、WORK-011、WORK-013、WORK-058、WORK-066 |
 | 知识库共享包 `@paideia/knowledge` | `frontend/packages/knowledge/` | 类型、学习者侧 `client.ts` 与管理侧 `admin-client.ts`、`markdown-body.tsx` 薄封装（渲染器在 `@paideia/ui`）、正文目录、关系邻域、图谱布局、学习进度、习题种子与推荐 | `src/*.test.ts`（13 个，含 `category-tree`、`concept-graph-layout`、`learning-progress`、`source-reading-progress`） | WORK-004、WORK-021、WORK-024、WORK-033、WORK-034、WORK-053、WORK-057 |
 | 训练营包 `@paideia/camp` | `frontend/packages/camp/` | 类型与客户端 `client.ts`、薄弱点/主题表/并排对比 `weakness.tsx`、每日计划 `plan.tsx` | `src/components.test.tsx`；e2e `apps/app/e2e/camp.spec.ts` | WORK-029 |
 | 简历包 `@paideia/resume` | `frontend/packages/resume/` | 简历 DTO/API、自动保存状态机、模板与差异渲染 | `src/autosave.test.ts`、`src/diff.test.tsx`、`src/templates.test.tsx` | WORK-018 |

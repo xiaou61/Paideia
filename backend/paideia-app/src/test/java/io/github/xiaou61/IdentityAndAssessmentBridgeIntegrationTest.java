@@ -3,7 +3,6 @@ package io.github.xiaou61;
 
 import io.github.xiaou61.account.AccountApi;
 import io.github.xiaou61.account.Identity;
-import io.github.xiaou61.ai.internal.memory.MemoryStore;
 import io.github.xiaou61.security.AuthPort;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,12 +29,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * <p>三条主线：
  * <ul>
  *   <li><b>身份与角色正交</b>（AC-001）：改身份不动 `role`、不动任何权限判定；</li>
- *   <li><b>自评桥是覆盖语义</b>（AC-008）：同一条目反复改，记忆始终只有一条且是最后一次；</li>
  *   <li><b>会话记 harness</b>（AC-005 的数据层）：建面试会话后，恢复时读到的就是面试行为。</li>
  * </ul>
  *
- * <p>用完整上下文 + 真实 MySQL + MockMvc。自评走真实端点（它会发事件），所以这条用例同时验了
- * "事件在事务内被监听器消费"这件事——那正是桥最容易被写错的地方。
+ * <p>用完整上下文 + 真实 MySQL + MockMvc。
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -51,9 +48,6 @@ class IdentityAndAssessmentBridgeIntegrationTest {
 
     @Autowired
     AccountApi accountApi;
-
-    @Autowired
-    MemoryStore memories;
 
     @Autowired
     JdbcTemplate jdbcTemplate;
@@ -136,32 +130,6 @@ class IdentityAndAssessmentBridgeIntegrationTest {
         assertThat(putProfile("{\"identity\":\"postgrad\"}").getResponse().getStatus()).isEqualTo(400);
         // 不认识的字符串直接拒，不静默退回默认（否则用户以为选上了）
         assertThat(putProfile("{\"identity\":\"nonsense\"}").getResponse().getStatus()).isEqualTo(400);
-    }
-
-    @Test
-    @DisplayName("AC-008：自评桥写一条记忆；反复改仍只有一条且是最后一次；取消后消失")
-    void assessmentBridgeIsOverwriteSemantics() throws Exception {
-        assertThat(mark(entryId, "unsure").getResponse().getStatus()).isEqualTo(200);
-        assertThat(memories.list(user, 0, 0)).hasSize(1);
-        assertThat(memories.list(user, 0, 0).getFirst().text()).contains("还不懂");
-
-        // 改成"已掌握"：仍然一条，内容是最后一次（覆盖，不堆积）
-        assertThat(mark(entryId, "understood").getResponse().getStatus()).isEqualTo(200);
-        assertThat(memories.list(user, 0, 0)).hasSize(1);
-        assertThat(memories.list(user, 0, 0).getFirst().text()).contains("已掌握");
-
-        // 再来回改几次，条数不变
-        mark(entryId, "unsure");
-        mark(entryId, "understood");
-        assertThat(memories.list(user, 0, 0)).hasSize(1);
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM ai_memories_structured WHERE user_id = ?", Long.class, user)).isEqualTo(1L);
-
-        // 取消自评 → 那条记忆消失（否则标记没了助手还记着，是假记忆）
-        assertThat(mockMvc.perform(delete("/api/v1/knowledge/entries/" + entryId + "/self-assessment")
-                        .header("Authorization", token(user)))
-                .andReturn().getResponse().getStatus()).isEqualTo(200);
-        assertThat(memories.list(user, 0, 0)).isEmpty();
     }
 
     @Test

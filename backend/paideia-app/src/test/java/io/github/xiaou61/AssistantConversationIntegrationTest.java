@@ -13,7 +13,6 @@ import io.github.xiaou61.ai.AssistantConversation;
 import io.github.xiaou61.ai.Harness;
 import io.github.xiaou61.ai.TokenUsage;
 import io.github.xiaou61.ai.internal.conversation.HarnessPrompts;
-import io.github.xiaou61.ai.internal.memory.MemoryStore;
 import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
 import io.github.xiaou61.security.AuthPort;
@@ -65,9 +64,6 @@ class AssistantConversationIntegrationTest {
 
     @Autowired
     JdbcTemplate jdbcTemplate;
-
-    @Autowired
-    MemoryStore memories;
 
     @MockitoBean
     AssistantConversation assistant;
@@ -381,36 +377,6 @@ class AssistantConversationIntegrationTest {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ai_messages WHERE conversation_id = ? AND content = '垫底 1'",
                 Long.class, conversationId)).isEqualTo(1);
-    }
-
-    @Test
-    @DisplayName("召回的记忆会随这一轮进到模型上下文，并在提示词里标出来源")
-    void recalledMemoryReachesTheModel() throws Exception {
-        configureCredential(userA);
-        long conversationId = createConversation(userA, null);
-        // 写入端点属 TASK-009（助手写本人私有数据那条确认路径），这里直接落一条
-        memories.rememberStructured(Long.parseLong(userA), "entry_understanding", null, "第 9 条：还不懂");
-        memories.rememberText(Long.parseLong(userA), "他说过想先学并发");
-
-        List<AssistantConversation.Request> seen = new ArrayList<>();
-        doAnswer(invocation -> {
-            seen.add(invocation.getArgument(0));
-            AssistantConversation.Listener listener = invocation.getArgument(3);
-            listener.onContent("好的");
-            listener.onUsage(null);
-            listener.onCompleted();
-            return null;
-        }).when(assistant).stream(any(), any(), any(), any());
-
-        // 消息里带上关键词：全文那一路是**按当前这轮的话**检索的（第 2 条裁决取舍——
-        // 用全文检索而不是语义检索，代价就是字面对不上就召不回）
-        sendMessage(userA, conversationId, "并发我该先看什么");
-
-        assertThat(seen).hasSize(1);
-        // 两路都在，且各自带了来源标注——不标的话模型会把"随口一句"当成事实
-        assertThat(seen.getFirst().memorySnippets()).containsExactly(
-                "[学习者事实] 第 9 条：还不懂",
-                "[他说过] 他说过想先学并发");
     }
 
     @Test

@@ -130,18 +130,6 @@ public class CreditService {
     }
 
     /**
-     * 自动整理记忆的结算（WORK-013）。
-     *
-     * <p>种类单独记（{@code MEMORY_EXTRACT}），因为它是"我没聊几次怎么花了这么多"的唯一解释处：
-     * 与对话的消耗混成一类，用户对着账目算不明白，面板也没法单独显示"最近一次整理花了多少"。
-     */
-    @Transactional
-    public int settleMemoryExtraction(long userId, long reserved, String model,
-                                      Integer inputTokens, Integer outputTokens, Long refMessageId) {
-        return settleAs(userId, reserved, CreditLedger.KIND_MEMORY_EXTRACT, model, inputTokens, outputTokens, refMessageId);
-    }
-
-    /**
      * 面试点评的结算（WORK-010）。
      *
      * <p>种类单独记：一场面试里点评是单次最贵的一笔（要读整场对话），与逐轮对话混成一类之后，

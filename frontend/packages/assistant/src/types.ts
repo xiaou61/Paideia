@@ -75,64 +75,7 @@ export interface ConversationView {
   updatedAt: string | null
 }
 
-/**
- * 一条记忆（设置页用，用户裁决 13）。
- *
- * <p>`source` 必须回给删除动作：结构化与全文两路的 id **各自独立**，只说 id 会删错一路。
- * 它与 {@link MemoryView.origin} 是**两件事**：`source` 是存哪一路，`origin` 是谁写的。
- */
-export interface MemoryView {
-  source: 'structured' | 'text'
-  id: number
-  text: string
-  createdAt: string | null
-  /** 谁写的：`manual` = 用户点「记住这条」；`auto` = 回答后台自动整理写入（WORK-013）。 */
-  origin: 'manual' | 'auto'
-  /** `auto` 时模型给的判定理由（为什么记/为什么改）；`manual` 时为 `null`。 */
-  reason: string | null
-  /** `auto` 时的出处会话，用来回答"它为什么在这里"；`manual` 时为 `null`。 */
-  conversationId: number | null
-}
 
-/**
- * 记忆的控制面设置（`GET/PUT /api/v1/ai/settings`，WORK-013）。
- *
- * <p>**三个布尔一次给全**（PUT 不做部分更新的花活）：只传一个字段的话，客户端就得知道
- * 其余两个在服务端当前是什么值，那正是"本地状态与服务端不一致"的起点。
- */
-export interface MemorySettings {
-  /** 总开关：关掉后不召回、不自动提取，手动写入也会被后端拒绝。 */
-  memoryEnabled: boolean
-  /** 轴一：把已有记忆召回进提示词。**不影响自动提取**（提取是"写"不是"用"）。 */
-  referenceSavedMemories: boolean
-  /** 轴二：把当前对话的历史消息拼进提示词。关掉 = 只看本轮这一句。 */
-  referenceChatHistory: boolean
-}
-
-/**
- * 待确认的候选记忆（WORK-050 半自动提案）。
- *
- * <p>`status='filtered'` 的行 `content` 恒为 `null`：它是因为"疑似含敏感信息"被拦下的，
- * 正文根本不该出现在浏览器里——面板只显示"有一条没记"和原因。
- */
-export interface MemoryCandidate {
-  id: number
-  store: 'structured' | 'text'
-  kind: string | null
-  content: string | null
-  reason: string | null
-  conversationId: number | null
-  status: 'pending' | 'accepted' | 'rejected' | 'filtered' | 'expired'
-  decisionReason: string | null
-  createdAt: string | null
-  expiresAt: string | null
-}
-
-/** 「清空并关闭」的响应：清掉了几条 + 清空之后的设置（总开关已被后端关掉）。 */
-export interface MemoryClearResult {
-  cleared: number
-  settings: MemorySettings
-}
 
 /** 界面上的一条对话消息。与后端 `role` 一致。 */
 export interface ChatMessage {

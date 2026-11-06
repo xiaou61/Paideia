@@ -68,33 +68,20 @@ class McpToolSnapshotTest {
         assertThat(actual).as("实际默认视图清单：%s", actual).containsExactlyElementsOf(DEFAULT_VIEW);
     }
 
-    /** 新增的四个域都必须只出现在各自的组里，且不进默认视图。 */
+    /** 新增的三个域都必须只出现在各自的组里，且不进默认视图。 */
     @Test
-    @DisplayName("WORK-044 的四个域各自成组且不进默认视图")
+    @DisplayName("WORK-044 的三个域各自成组且不进默认视图")
     void newDomainsAreGroupedAndNotDefault() {
-        // 用可写查询：memory_remember 是写工具，只读查询会把它过滤掉
         assertThat(namesIn("resume")).containsExactly("resume_get", "resume_list");
         assertThat(namesIn("interview")).containsExactly("interview_get", "interview_list");
         assertThat(namesIn("review")).containsExactly("review_due", "review_plan");
-        assertThat(namesInAll("memory")).containsExactly("memory_list", "memory_remember");
 
         catalog.snapshot().stream()
-                .filter(descriptor -> Set.of("resume", "interview", "review", "memory")
+                .filter(descriptor -> Set.of("resume", "interview", "review")
                         .contains(descriptor.toolset()))
                 .forEach(descriptor -> assertThat(descriptor.defaultGroup())
                         .as(descriptor.name() + " 不该进默认视图")
                         .isFalse());
-    }
-
-    /** 记忆写入是四个域里唯一的写工具，必须标 WRITE 且非只读。 */
-    @Test
-    @DisplayName("memory_remember 是写工具")
-    void memoryRememberIsWrite() {
-        ToolDescriptor remember = catalog.find("memory_remember").orElseThrow().descriptor();
-
-        assertThat(remember.scope()).isEqualTo(ToolScope.WRITE);
-        assertThat(remember.readOnly()).isFalse();
-        assertThat(remember.destructive()).as("写记忆不是破坏性操作").isFalse();
     }
 
     /**
@@ -112,7 +99,7 @@ class McpToolSnapshotTest {
                         + descriptor.destructive())
                 .toList();
 
-        assertThat(actual).hasSize(66);
+        assertThat(actual).hasSize(64);
         // 逐组核对数量：改动任何一组都会在这里显形
         assertThat(countByToolset()).containsExactlyInAnyOrderEntriesOf(expectedToolsetCounts());
     }
@@ -154,7 +141,6 @@ class McpToolSnapshotTest {
                 java.util.Map.entry("interview", 2),
                 java.util.Map.entry("knowledge", 5),
                 java.util.Map.entry("learning", 1),
-                java.util.Map.entry("memory", 2),
                 java.util.Map.entry("note", 4),
                 java.util.Map.entry("planner", 1),
                 java.util.Map.entry("resume", 2),

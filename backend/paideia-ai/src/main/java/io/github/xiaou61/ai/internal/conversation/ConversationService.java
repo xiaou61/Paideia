@@ -8,8 +8,6 @@ import io.github.xiaou61.ai.ModelAccess;
 import io.github.xiaou61.ai.TokenUsage;
 import io.github.xiaou61.ai.internal.billing.CreditService;
 import io.github.xiaou61.ai.internal.credential.CredentialService;
-import io.github.xiaou61.ai.internal.memory.MemoryStore;
-import io.github.xiaou61.ai.internal.settings.AiSettingsStore;
 import io.github.xiaou61.ai.internal.support.UserRateLimiter;
 import io.github.xiaou61.knowledge.KnowledgeApi;
 import io.github.xiaou61.platform.BizException;
@@ -44,36 +42,29 @@ public class ConversationService {
     private final ConversationProperties properties;
     private final CredentialService credentials;
     private final KnowledgeApi knowledge;
-    private final MemoryStore memories;
     private final io.github.xiaou61.ai.internal.rag.KnowledgeRagService rag;
     /** 解析落库的用量 JSON 用。自带一份即可，不必依赖容器里的 ObjectMapper。 */
     private static final ObjectMapper USAGE_JSON = new ObjectMapper();
 
     private final UserRateLimiter limiter;
     private final CreditService credits;
-    /** 两个开关与总闸（WORK-013）：装配上下文时按它短路。 */
-    private final AiSettingsStore settingsStore;
 
     ConversationService(ConversationMapper conversations,
                         ConversationMessageMapper messages,
                         ConversationProperties properties,
                         CredentialService credentials,
                         KnowledgeApi knowledge,
-                        MemoryStore memories,
                         io.github.xiaou61.ai.internal.rag.KnowledgeRagService rag,
                         UserRateLimiter limiter,
-                        CreditService credits,
-                        AiSettingsStore settingsStore) {
+                        CreditService credits) {
         this.conversations = conversations;
         this.messages = messages;
         this.properties = properties;
         this.credentials = credentials;
         this.knowledge = knowledge;
-        this.memories = memories;
         this.rag = rag;
         this.limiter = limiter;
         this.credits = credits;
-        this.settingsStore = settingsStore;
     }
 
     /** 会话列表项。**不含消息内容**：列表只用来选，拉开某一条才取内容。 */
@@ -286,15 +277,11 @@ public class ConversationService {
         // 先取历史、再写本轮消息：history() 取的是"最近 N 条"，写在前面的话这条用户消息
         // 会同时出现在 history 里和 toMessages() 末尾追加的 userMessage 里，模型会看到两遍。
         //
-        // 两个开关在这里生效（WORK-013）：
-        // - 「参考当前对话的历史消息」关掉 → history 为空，助手只回答本轮这一句；
-        // - 「使用已保存的记忆」或总开关关掉 → 召回为空（不读记忆）。
-        // 都只影响"拼给模型什么"，不改任何存储行为——**关掉记忆不会删除记忆**。
-        AiSettingsStore.Settings settings = settingsStore.get(userId);
-        List<ConversationTurn> history = settings.referenceChatHistory() ? history(conversationId) : List.of();
+        // 历史消息一律拼进上下文；记忆面板已随助手下线删除，不再召回记忆。
+        List<ConversationTurn> history = history(conversationId);
         // 同样排在写库之前：它只读，且能抛（DB 异常），不能留到预留之后
         EntryContext entry = entryContext(conversation.getEntryId());
-        List<String> snippets = memory(settings, userId, trimmed);
+        List<String> snippets = List.of();
         // RAG 只读且失败自降级；放在写库与预扣之前，与历史/记忆/学情同一顺序
         String knowledgeContext = rag.retrieveContext(trimmed);
         Harness harness = Harness.ofOrDefault(conversation.getHarness());
@@ -320,35 +307,6 @@ public class ConversationService {
                         : pageContext;
         return new TurnPreparation(conversationId, history, trimmed, entry.title(), entry.body(),
                 learning, snippets, access.get(), reserved, harness, context, knowledgeContext);
-    }
-
-    /**
-     * 按两个开关决定要不要召回（WORK-013）。
-     *
-     * <p>总开关与「使用已保存的记忆」是**且**的关系：总开关是闸，那一轴是"要不要用它"。
-     * 分开是为了让用户能"留着记忆但这次别用"——把两者合成一个，这种用法就没有表达了。
-     */
-    private List<String> memory(AiSettingsStore.Settings settings, long userId, String keyword) {
-        if (!settings.memoryEnabled() || !settings.referenceSavedMemories()) {
-            return List.of();
-        }
-        return memorySnippets(userId, keyword);
-    }
-
-    /**
-     * 召回本人记忆并拼成给模型看的几行。
-     *
-     * <p>用**本轮用户输入**当检索关键词：这一步是"这轮的话可能和过去说过什么有关"，
-     * 关键词为空（理论上不会，消息已校验非空）时退回"取最近的记忆"。
-     *
-     * <p>两路在提示词里**标注来源**：结构化的是"关于学习者的事实"，全文的是"他说过的话"。
-     * 不标的话，模型会把"用户曾经随口说的一句"当成确定的事实。
-     */
-    private List<String> memorySnippets(long userId, String keyword) {
-        return memories.recall(userId, keyword).stream()
-                .map(item -> (item.source() == MemoryStore.MemoryItem.Source.STRUCTURED
-                        ? "[学习者事实] " : "[他说过] ") + item.text())
-                .toList();
     }
 
     /**

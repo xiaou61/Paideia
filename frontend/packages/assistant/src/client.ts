@@ -13,10 +13,6 @@ import type {
   CreditsView,
   HistoryMessage,
   InterviewEvaluationView,
-  MemoryCandidate,
-  MemoryClearResult,
-  MemorySettings,
-  MemoryView,
   ReviewExplainInput,
   SummaryView,
   SummaryVisibility,
@@ -47,41 +43,6 @@ export interface AssistantApi {
   interviewEvaluations(): Promise<InterviewEvaluationView[]>
   /** 读回某会话的消息（**旧 → 新**），供界面恢复历史。 */
   messages(conversationId: number): Promise<HistoryMessage[]>
-  /** 本人的记忆控制面设置（本人范围：请求体里没有 `userId`，传不了别人的）。 */
-  settings(): Promise<MemorySettings>
-  /** 写设置。**三个布尔一次给全**：后端不接受部分更新，缺字段会被当成"关"。 */
-  saveSettings(settings: MemorySettings): Promise<MemorySettings>
-  /**
-   * 本人的记忆（严格私有，没有"看别人的"这种调用）。
-   *
-   * <p>`limit`/`offset` 由调用方显式给：翻页要靠 offset，而后端的默认值将来可能变，
-   * 前端跟着它走等于把"一页多少条"这个决定放在看不见的地方。
-   */
-  memories(limit?: number, offset?: number): Promise<MemoryView[]>
-  /**
-   * 待确认的候选记忆（WORK-050）。
-   *
-   * <p>它不是"记忆"——它是助手拿不准、排队等用户点一下的东西。被敏感信息拦下的那些
-   * `content` 为 null，前端只能显示一句"有一条没记"。
-   */
-  pendingCandidates(limit?: number, offset?: number): Promise<MemoryCandidate[]>
-  /** 接受一条候选：它成为一条正式记忆。 */
-  acceptCandidate(id: number): Promise<void>
-  /** 拒绝一条候选：它永远不会成为记忆。 */
-  rejectCandidate(id: number): Promise<void>
-  /** 逐条删除。返回是否真的删掉了一行（不是本人的会返回 false）。 */
-  deleteMemory(source: MemoryView['source'], id: number): Promise<boolean>
-  /**
-   * 清空两路记忆**并把总开关置为 false**，返回更新后的设置。
-   *
-   * <p>清空与关闭是**一个**端点、一次请求：分成两个调用会出现"清空了但没关上"的半状态。
-   */
-  clearMemories(): Promise<MemoryClearResult>
-  /**
-   * 记住一句话（写一条全文记忆）。**这是记忆唯一的写入口**，只有用户点击才会走到这里——
-   * 助手自己无法调用它（端口里没有写工具）。
-   */
-  remember(text: string): Promise<number>
   /** 五个一次性 AI 入口（WORK-067）：只回一小段、不落库，每次点击都花积分。 */
   explainReviewItem(input: ReviewExplainInput): Promise<AiText>
   nextStep(input: { lines: string; failing?: string; dueReviews?: string; weakConcepts?: string }): Promise<AiSteps>
@@ -102,18 +63,6 @@ export interface AssistantApi {
     /** 页面场景（WORK-035）：已截断的一段文本，只进提示词不落库。 */
     pageContext?: string,
   ): Promise<void>
-  /**
-   * 对一条助手回答提交反馈（WORK-036）。
-   *
-   * <p>**重复提交是覆盖**：同一用户对同一轮再点一次会改写那一条，不会堆出两条。
-   * `traceId` 为 null 时（采集关闭）仍可提交，只是挂不到轮次上。
-   */
-  submitFeedback(input: {
-    conversationId: number | null
-    traceId: string | null
-    rating: 'up' | 'down'
-    reason?: 'off_topic' | 'too_verbose' | 'incorrect' | 'other'
-  }): Promise<void>
 }
 
 /**
@@ -166,51 +115,6 @@ export function createAssistantApi(client: ApiClient): AssistantApi {
 
     messages: (conversationId) =>
       client.requestEnvelope<HistoryMessage[]>(`${base}/conversations/${conversationId}/messages`),
-
-    settings: () => client.requestEnvelope<MemorySettings>(`${base}/settings`),
-
-    saveSettings: (settings) =>
-      client.requestEnvelope<MemorySettings>(`${base}/settings`, {
-        method: 'PUT',
-        headers: JSON_HEADERS,
-        body: JSON.stringify(settings),
-      }),
-
-    pendingCandidates: (limit = 20, offset = 0) =>
-      client.requestEnvelope<MemoryCandidate[]>(
-        `${base}/memories/candidates?limit=${limit}&offset=${offset}`),
-    acceptCandidate: (id: number) =>
-      client.requestEnvelope<void>(`${base}/memories/candidates/${id}/accept`, { method: 'POST' }),
-    rejectCandidate: (id: number) =>
-      client.requestEnvelope<void>(`${base}/memories/candidates/${id}/reject`, { method: 'POST' }),
-    memories: (limit = 200, offset = 0) =>
-      client.requestEnvelope<MemoryView[]>(`${base}/memories?limit=${limit}&offset=${offset}`),
-
-    deleteMemory: (source, id) =>
-      client.requestEnvelope<boolean>(`${base}/memories/${source}/${id}`, { method: 'DELETE' }),
-
-    clearMemories: () =>
-      client.requestEnvelope<MemoryClearResult>(`${base}/memories`, { method: 'DELETE' }),
-
-    remember: (text) =>
-      client.requestEnvelope<number>(`${base}/memories`, {
-        method: 'POST',
-        headers: JSON_HEADERS,
-        body: JSON.stringify({ type: 'text', text }),
-      }),
-
-    submitFeedback: async (input) => {
-      await client.requestEnvelope(`${base}/feedback`, {
-        method: 'POST',
-        headers: JSON_HEADERS,
-        body: JSON.stringify({
-          conversationId: input.conversationId,
-          traceId: input.traceId,
-          rating: input.rating,
-          reason: input.reason ?? null,
-        }),
-      })
-    },
 
     // pageContext 来自 WORK-035（工作台把当前 SQL/数据集带进对话）；两边各加一个参数与方法，都要留
     sendMessage: async (conversationId, message, onEvent, signal, pageContext) => {

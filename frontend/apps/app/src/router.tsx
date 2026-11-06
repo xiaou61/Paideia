@@ -91,7 +91,7 @@ export const router = createHashRouter([
       </RequireAuth>
     ),
   },
-  // 记忆与积分（WORK-066）：助手面板下线后，这两块的自有入口。
+  // 积分（WORK-066）：助手面板下线后，AI 用量的余额与流水在这里看。
   {
     path: '/settings',
     element: (
