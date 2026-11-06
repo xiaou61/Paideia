@@ -11,19 +11,77 @@ status: published
 
 **Spring 的 AOP 不修改你的字节码，它在运行时给你造一个"替身"，让调用先经过替身。**
 
-```sketch
+```code-flow
 {
+  "id": "spring-aop-flow",
   "title": "不改字节码，只造替身",
-  "rows": [
-    [
-      { "id": "caller", "title": "调用方", "sub": "以为自己调的是原对象", "tone": "gray" },
-      { "id": "proxy", "title": "运行时代理", "sub": "子类或接口实现", "tone": "blue" },
-      { "id": "target", "title": "原对象", "sub": "字节码一个字节没改", "tone": "green" }
-    ]
+  "nodes": [
+    { "id": "caller", "label": "调用方", "sub": "以为调的是原对象", "layer": 0, "order": 0 },
+    { "id": "proxy", "label": "运行时代理", "sub": "子类或接口实现", "layer": 1, "order": 0 },
+    { "id": "target", "label": "原对象", "sub": "字节码没改", "layer": 2, "order": 0 },
+    { "id": "miss", "label": "this 调用绕过代理", "sub": "切面失效", "layer": 3, "order": 0 }
   ],
-  "arrows": [
-    { "from": "caller", "to": "proxy" },
-    { "from": "proxy", "to": "target" }
+  "edges": [
+    { "from": "caller", "to": "proxy", "label": "经过代理" },
+    { "from": "proxy", "to": "target", "label": "proceed / invoke" },
+    { "from": "target", "to": "miss", "label": "this.xxx()" }
+  ],
+  "steps": [
+    {
+      "title": "调用方以为调的是原对象",
+      "desc": "实际拿到的是代理",
+      "file": "OrderController.java",
+      "code": "orderService.createOrder(order);",
+      "focus": [1],
+      "nodes": ["caller"],
+      "edges": [],
+      "log": [{ "k": "调用", "v": "createOrder" }],
+      "explain": "容器里登记的是代理，不是原始对象。"
+    },
+    {
+      "title": "代理先过切面",
+      "desc": "BeanPostProcessor 阶段替换成代理",
+      "file": "TimingAspect.java",
+      "code": "@Around(\"execution(* com.example.service..*.*(..))\")\npublic Object time(ProceedingJoinPoint pjp) throws Throwable {\n  return pjp.proceed();   // 放行到目标\n}",
+      "focus": [3],
+      "nodes": ["proxy", "caller"],
+      "edges": ["caller>proxy"],
+      "log": [{ "k": "切面", "v": "@Around" }],
+      "explain": "@Around 不调 proceed，目标方法根本不会执行。"
+    },
+    {
+      "title": "代理转发给真对象",
+      "desc": "真对象的方法体开始执行",
+      "file": "OrderService.java",
+      "code": "method.invoke(target, args);",
+      "focus": [1],
+      "nodes": ["target", "proxy"],
+      "edges": ["proxy>target"],
+      "log": [{ "k": "转发", "v": "target" }],
+      "explain": "Spring Boot 2.x 起默认用 CGLIB 生成子类。"
+    },
+    {
+      "title": "真对象里 this.saveOrder() 绕过代理",
+      "desc": "this 指向真对象自己",
+      "file": "OrderService.java",
+      "code": "public void createOrder(Order o) {\n  validate(o);\n  saveOrder(o);   // this = 真对象，不经过代理\n}",
+      "focus": [3],
+      "nodes": ["miss", "target"],
+      "edges": ["target>miss"],
+      "log": [{ "k": "事务", "v": "未生效" }],
+      "explain": "切面挂在代理上，this 绕过了代理——这是代理机制的必然。"
+    },
+    {
+      "title": "解法：拆到另一个 bean",
+      "desc": "跨 bean 调用才会经过对方的代理",
+      "file": "OrderService.java",
+      "code": "writer.saveOrder(order);   // 另一个 bean 的代理",
+      "focus": [1],
+      "nodes": ["proxy"],
+      "edges": [],
+      "log": [{ "k": "解法", "v": "拆 bean" }],
+      "explain": "首选把「写订单」拆成独立职责，同时改善设计。"
+    }
   ]
 }
 ```

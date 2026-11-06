@@ -11,19 +11,79 @@ status: published
 
 **IoC（控制反转）反转的是"谁来 new 这个对象"的决定权，从你的代码转移到容器。**
 
-```sketch
+```code-flow
 {
-  "title": "反转的是「谁决定 new」",
-  "rows": [
-    [
-      { "id": "before", "title": "以前：自己 new", "sub": "依赖变了就得改调用方", "tone": "amber" },
-      { "id": "after", "title": "现在：容器造好送进来", "sub": "调用方只说我要什么", "tone": "blue" },
-      { "id": "why", "title": "代价是启动变慢", "sub": "换来的是换实现不动调用方", "tone": "green" }
-    ]
+  "id": "spring-ioc-flow",
+  "title": "启动时：扫描 → 实例化 → 后处理 → 注入",
+  "nodes": [
+    { "id": "scan", "label": "扫描注解", "sub": "生成 bean 定义", "layer": 0, "order": 0 },
+    { "id": "order", "label": "算依赖顺序", "sub": "拓扑排序", "layer": 1, "order": 0 },
+    { "id": "instantiate", "label": "实例化", "sub": "按序造对象", "layer": 2, "order": 0 },
+    { "id": "proxy", "label": "BeanPostProcessor", "sub": "套代理", "layer": 3, "order": 0 },
+    { "id": "use", "label": "注入给调用方", "sub": "拿到的可能是代理", "layer": 4, "order": 0 }
   ],
-  "arrows": [
-    { "from": "before", "to": "after" },
-    { "from": "after", "to": "why" }
+  "edges": [
+    { "from": "scan", "to": "order", "label": "bean 定义" },
+    { "from": "order", "to": "instantiate", "label": "创建顺序" },
+    { "from": "instantiate", "to": "proxy", "label": "需要增强" },
+    { "from": "proxy", "to": "use", "label": "送进构造器" }
+  ],
+  "steps": [
+    {
+      "title": "扫描：@Component → bean 定义",
+      "desc": "BeanDefinition 是「怎么造」的说明书，不是对象",
+      "file": "spring/AnnotationConfigApplicationContext.java",
+      "code": "// 扫描 @Component / @Service / @Configuration\n// 生成 BeanDefinition：类名、构造器参数、作用域、是否懒加载",
+      "focus": [1, 2],
+      "nodes": ["scan"],
+      "edges": [],
+      "log": [{ "k": "bean 定义", "v": "N 个" }],
+      "explain": "容器核心是一张表：bean 名字 → bean 定义 → bean 实例。"
+    },
+    {
+      "title": "按依赖关系算创建顺序",
+      "desc": "被依赖的先造",
+      "file": "spring/DefaultListableBeanFactory.java",
+      "code": "// 依赖图拓扑排序：没有未满足依赖的先实例化",
+      "focus": [1],
+      "nodes": ["order", "scan"],
+      "edges": ["scan>order"],
+      "log": [{ "k": "顺序", "v": "拓扑序" }],
+      "explain": "构造器注入要求对方先完整存在，造不出环。"
+    },
+    {
+      "title": "实例化：造对象",
+      "desc": "反射调用构造器，参数是已造好的依赖",
+      "file": "spring/DefaultListableBeanFactory.java",
+      "code": "Object bean = constructor.newInstance(args);",
+      "focus": [1],
+      "nodes": ["instantiate", "order"],
+      "edges": ["order>instantiate"],
+      "log": [{ "k": "实例", "v": "已创建" }],
+      "explain": "这就是 DI：依赖被送进来，而不是你去 new。"
+    },
+    {
+      "title": "BeanPostProcessor 套代理",
+      "desc": "需要增强的 bean，返回值被替换成代理",
+      "file": "spring/AbstractAutoProxyCreator.java",
+      "code": "// 初始化后检查有没有需要增强的方法\nreturn proxyFactory.wrap(bean);",
+      "focus": [2],
+      "nodes": ["proxy", "instantiate"],
+      "edges": ["instantiate>proxy"],
+      "log": [{ "k": "代理", "v": "@Transactional" }],
+      "explain": "所以容器返回给你的不一定是「你的对象」。"
+    },
+    {
+      "title": "注入给调用方",
+      "desc": "构造器/字段拿到的可能已经是代理",
+      "file": "OrderService.java",
+      "code": "@Autowired private UserService userService;   // 可能是代理",
+      "focus": [1],
+      "nodes": ["use", "proxy"],
+      "edges": ["proxy>use"],
+      "log": [{ "k": "注入", "v": "完成" }],
+      "explain": "IoC 是目标，DI 是手段：你不要去拿依赖，依赖被送到你手上。"
+    }
   ]
 }
 ```
