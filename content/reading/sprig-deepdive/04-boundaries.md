@@ -13,19 +13,75 @@ status: published
 
 打个比方：模板像一个只负责排版的编辑——把稿子按格式摆好看是本职，让他替你做「这条该不该发」的业务判断就越界了。机制上，模板语言没有类型检查、单元测试和像样的错误信息，业务逻辑一旦写进去，就成了藏在字符串里、最难测也最难查的程序。
 
-```sketch
+```code-flow
 {
+  "id": "sprig-boundaries",
   "title": "模板只负责排版，别往里塞业务",
-  "rows": [
-    [
-      { "id": "layout", "title": "排版", "sub": "字段摆在哪、怎么格式化", "tone": "green" },
-      { "id": "business", "title": "业务判断", "sub": "该不该显示、算不算通过", "tone": "amber" },
-      { "id": "risk", "title": "写进模板就没人测得动", "sub": "逻辑藏在字符串里", "tone": "amber" }
-    ]
+  "nodes": [
+    { "id": "layout", "label": "排版", "sub": "字段摆在哪、怎么格式化", "layer": 0, "order": 0 },
+    { "id": "business", "label": "业务判断", "sub": "该不该显示、算不算通过", "layer": 1, "order": 0 },
+    { "id": "risk", "label": "写进模板就没人测得动", "sub": "逻辑藏在字符串里", "layer": 2, "order": 0 }
   ],
-  "arrows": [
-    { "from": "layout", "to": "business" },
-    { "from": "business", "to": "risk" }
+  "edges": [
+    { "from": "layout", "to": "business", "label": "越界" },
+    { "from": "business", "to": "risk", "label": "失控" }
+  ],
+  "steps": [
+    {
+      "title": "排版：模板的本职",
+      "desc": "字段怎么摆、怎么转义",
+      "file": "chart/values.yaml",
+      "code": "name: {{ .Name }}\ndata: {{ .Config | b64enc }}",
+      "focus": [1, 2],
+      "nodes": ["layout"],
+      "edges": [],
+      "log": [{ "k": "职责", "v": "排版" }],
+      "explain": "转义、缩进这类纯排版，错了也能一眼看出来，适合留在模板。"
+    },
+    {
+      "title": "越界：在模板里算业务数值",
+      "desc": "按负载算副本数",
+      "file": "chart/deployment.yaml",
+      "code": "replicas: {{ if gt (int .Load) 80 }}{{ mul (div (int .Load) 20) 2 }}{{ else }}2{{ end }}",
+      "focus": [1],
+      "nodes": ["business", "layout"],
+      "edges": ["layout>business"],
+      "log": [{ "k": "越界", "v": "业务算法" }],
+      "explain": "无法单测、无法复用，错误还是 wrong type for value 这种。"
+    },
+    {
+      "title": "越界：用模板做校验",
+      "desc": "fail + 正则校验名字",
+      "file": "chart/_helpers.tpl",
+      "code": "{{ if not (regexMatch \"^[a-z][a-z0-9-]{2,30}$\" .Name) }}{{ fail \"name 不合法\" }}{{ end }}",
+      "focus": [1],
+      "nodes": ["business"],
+      "edges": [],
+      "log": [{ "k": "越界", "v": "校验规则重复" }],
+      "explain": "校验会在模板和应用各有一份，迟早不一致，而模板那份最后被发现。"
+    },
+    {
+      "title": "越界：模板当编程语言",
+      "desc": "用 dict/set/range 做分组聚合",
+      "file": "chart/_helpers.tpl",
+      "code": "{{- $r := dict -}}\n{{- range .Items }}{{ $_ := set $r .Group . }}{{ end }}",
+      "focus": [1, 2],
+      "nodes": ["business"],
+      "edges": [],
+      "log": [{ "k": "越界", "v": "重写业务逻辑" }],
+      "explain": "等于用一门没有类型检查、没有测试的语言写业务。"
+    },
+    {
+      "title": "结果：逻辑藏进字符串，测不动",
+      "desc": "业务出错时，渲染结果看起来合理但是错的",
+      "file": "notes.md",
+      "code": "# 没有类型检查、没有单测、错误信息极差",
+      "focus": [1],
+      "nodes": ["risk", "business"],
+      "edges": ["business>risk"],
+      "log": [{ "k": "后果", "v": "最难发现的一类 bug" }],
+      "explain": "模板只负责排版，判断力比会用 100 个函数更重要。"
+    }
   ]
 }
 ```

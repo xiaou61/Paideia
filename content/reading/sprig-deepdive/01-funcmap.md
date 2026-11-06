@@ -13,19 +13,53 @@ status: published
 
 打个比方：模板引擎像一个只会照单念名字的服务员——它不认菜，只认菜单上有没有登记；想让它端出 `upper` 这道菜，先得把名字和做法写进菜单。机制上，Sprig 就是一张巨大的 `FuncMap`（名字 → 函数的 map），在 `Parse` 之前通过 `template.Funcs()` 交给引擎，解析时按名字查得到就算数。
 
-```sketch
+```code-flow
 {
+  "id": "sprig-funcmap",
   "title": "模板里的函数，全靠一张表",
-  "rows": [
-    [
-      { "id": "map", "title": "FuncMap", "sub": "名字 → 函数", "tone": "blue" },
-      { "id": "inject", "title": "解析模板前交进去", "sub": "交晚了就认不出", "tone": "blue" },
-      { "id": "use", "title": "模板里按名字调", "sub": "引擎自己不认任何函数", "tone": "green" }
-    ]
+  "nodes": [
+    { "id": "map", "label": "FuncMap", "sub": "名字 → 函数", "layer": 0, "order": 0 },
+    { "id": "inject", "label": "解析前交进去", "sub": "交晚了就认不出", "layer": 1, "order": 0 },
+    { "id": "use", "label": "模板里按名字调", "sub": "引擎自己不认函数", "layer": 2, "order": 0 }
   ],
-  "arrows": [
-    { "from": "map", "to": "inject" },
-    { "from": "inject", "to": "use" }
+  "edges": [
+    { "from": "map", "to": "inject", "label": "Funcs()" },
+    { "from": "inject", "to": "use", "label": "解析时绑定" }
+  ],
+  "steps": [
+    {
+      "title": "定义一张 FuncMap",
+      "desc": "名字 → 函数的映射表，Sprig 就是一张很大的表",
+      "file": "sprig/functions.go",
+      "code": "var funcMap = template.FuncMap{\n    \"upper\":  strings.ToUpper,\n    \"repeat\": strings.Repeat,\n}",
+      "focus": [1, 2, 3],
+      "nodes": ["map"],
+      "edges": [],
+      "log": [{ "k": "注册表", "v": "名字 → 函数" }],
+      "explain": "引擎不认任何函数，只认这张表里登记过的名字。"
+    },
+    {
+      "title": "解析模板前交给引擎",
+      "desc": "Funcs 必须在 Parse 之前调用",
+      "file": "main.go",
+      "code": "tmpl, err := template.New(\"demo\").Funcs(funcMap).Parse(src)",
+      "focus": [1],
+      "nodes": ["inject", "map"],
+      "edges": ["map>inject"],
+      "log": [{ "k": "顺序", "v": "Funcs → Parse" }],
+      "explain": "先 Parse 再 Funcs 不行——解析阶段就要把名字绑定成函数引用。"
+    },
+    {
+      "title": "模板里按名字调用",
+      "desc": "解析时查得到就算数",
+      "file": "demo.tmpl",
+      "code": "{{ upper .Name }}",
+      "focus": [1],
+      "nodes": ["use", "inject"],
+      "edges": ["inject>use"],
+      "log": [{ "k": "渲染", "v": "upper 已找到" }],
+      "explain": "名字没登记就报 function \"xyz\" not defined，且发生在 Parse 期。"
+    }
   ]
 }
 ```

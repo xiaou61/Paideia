@@ -13,19 +13,75 @@ status: published
 
 打个比方：带 `now` 的模板像一台会自己翻日历的打印机，同一份文件送进去两次，出来的日期却不同；带 `randAlpha` 的模板像每次都换一把新配的钥匙。机制上，这些函数在渲染时去读时钟、环境变量或随机源，所以同样的模板、同样的输入，产物不再一样。
 
-```sketch
+```code-flow
 {
+  "id": "sprig-side-effects",
   "title": "有一批函数会让渲染结果不可复现",
-  "rows": [
-    [
-      { "id": "pure", "title": "纯函数", "sub": "同样输入，同样输出", "tone": "green" },
-      { "id": "impure", "title": "有副作用的函数", "sub": "now / rand / uuid / env", "tone": "amber" },
-      { "id": "cost", "title": "渲染不可复现", "sub": "排障与对比都变难", "tone": "amber" }
-    ]
+  "nodes": [
+    { "id": "pure", "label": "纯函数", "sub": "同样输入同样输出", "layer": 0, "order": 0 },
+    { "id": "impure", "label": "有副作用的函数", "sub": "now / rand / env", "layer": 1, "order": 0 },
+    { "id": "cost", "label": "渲染不可复现", "sub": "排障与对比都变难", "layer": 2, "order": 0 }
   ],
-  "arrows": [
-    { "from": "pure", "to": "impure" },
-    { "from": "impure", "to": "cost" }
+  "edges": [
+    { "from": "pure", "to": "impure", "label": "混入" },
+    { "from": "impure", "to": "cost", "label": "产物漂移" }
+  ],
+  "steps": [
+    {
+      "title": "纯函数：同输入同输出",
+      "desc": "排版类函数可以安全地反复渲染",
+      "file": "demo.tmpl",
+      "code": "{{ .Name | upper }}",
+      "focus": [1],
+      "nodes": ["pure"],
+      "edges": [],
+      "log": [{ "k": "类型", "v": "纯函数" }],
+      "explain": "这是模板该有的样子：同样的输入永远同样的产物。"
+    },
+    {
+      "title": "读时钟：now / date / ago",
+      "desc": "产物变成时间相关",
+      "file": "demo.tmpl",
+      "code": "{{ now | date \"2006-01-02\" }}",
+      "focus": [1],
+      "nodes": ["impure", "pure"],
+      "edges": ["pure>impure"],
+      "log": [{ "k": "副作用", "v": "读时钟" }],
+      "explain": "今天渲染和明天渲染产出不同文件，git diff 永远有变化。"
+    },
+    {
+      "title": "读环境：env / expandenv",
+      "desc": "同一份模板在不同机器产出不同结果",
+      "file": "demo.tmpl",
+      "code": "{{ env \"HOME\" }}",
+      "focus": [1],
+      "nodes": ["impure"],
+      "edges": [],
+      "log": [{ "k": "副作用", "v": "读环境变量" }],
+      "explain": "模板看不出它依赖哪些环境变量，本地成功、CI 失败很难查。"
+    },
+    {
+      "title": "随机：randAlphaNum / uuidv4",
+      "desc": "每次渲染都换一套值",
+      "file": "demo.tmpl",
+      "code": "{{ randAlphaNum 32 }}",
+      "focus": [1],
+      "nodes": ["impure"],
+      "edges": [],
+      "log": [{ "k": "副作用", "v": "随机源" }],
+      "explain": "而且是 math/rand，不是密码学安全，不能拿来生成真实口令。"
+    },
+    {
+      "title": "结果：渲染不可复现",
+      "desc": "带副作用的模板不能随便重渲染",
+      "file": "notes.md",
+      "code": "# 同一模板两次渲染 → 不同产物",
+      "focus": [1],
+      "nodes": ["cost", "impure"],
+      "edges": ["impure>cost"],
+      "log": [{ "k": "后果", "v": "diff 疲劳 / 无意义滚动更新" }],
+      "explain": "想让渲染可复现，就把时间/随机/环境值在调用方取值再注入。"
+    }
   ]
 }
 ```

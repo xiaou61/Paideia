@@ -13,19 +13,66 @@ status: published
 
 打个比方：`|` 像工厂流水线的传送带，每个工位只接上道工序送来的半成品，还默认把它放在自己参数表的最后一位。机制上，`x | f` 就是 `f x`；管道的值被塞进右边函数的最后一个参数位，所以像 `default` 这种「默认值在前、被检查值在后」的签名，顺序才显得反直觉。
 
-```sketch
+```code-flow
 {
+  "id": "sprig-pipeline",
   "title": "管道不是 shell 管道，是「塞到最后一个参数」",
-  "rows": [
-    [
-      { "id": "left", "title": "左边的值", "sub": "不是第一个参数", "tone": "gray" },
-      { "id": "pipe", "title": "|", "sub": "作为最后一个实参传过去", "tone": "blue" },
-      { "id": "why", "title": "所以 default 顺序反直觉", "sub": "默认值在前、值在后", "tone": "green" }
-    ]
+  "nodes": [
+    { "id": "left", "label": "左边的值", "sub": "不是第一个参数", "layer": 0, "order": 0 },
+    { "id": "pipe", "label": "|", "sub": "作为最后一个实参", "layer": 1, "order": 0 },
+    { "id": "fn", "label": "右边函数", "sub": "收到管道值", "layer": 2, "order": 0 },
+    { "id": "result", "label": "结果", "sub": "所以 default 反直觉", "layer": 3, "order": 0 }
   ],
-  "arrows": [
+  "edges": [
     { "from": "left", "to": "pipe" },
-    { "from": "pipe", "to": "why" }
+    { "from": "pipe", "to": "fn" },
+    { "from": "fn", "to": "result" }
+  ],
+  "steps": [
+    {
+      "title": "管道把左边塞进最后一个参数",
+      "desc": "{{ .Name | upper }} 就是 {{ upper .Name }}",
+      "file": "demo.tmpl",
+      "code": "{{ upper .Name }}",
+      "focus": [1],
+      "nodes": ["left", "pipe"],
+      "edges": ["left>pipe"],
+      "log": [{ "k": "等价", "v": "{{ .Name | upper }}" }],
+      "explain": "管道不是 shell 的 stdin，是把左边作为最后一个实参传过去。"
+    },
+    {
+      "title": "default 的签名：默认值在前",
+      "desc": "第一个参数是默认值，第二个才是被检查的值",
+      "file": "sprig/defaults.go",
+      "code": "func default(d interface{}, given ...interface{}) interface{}",
+      "focus": [1],
+      "nodes": ["fn", "pipe"],
+      "edges": ["pipe>fn"],
+      "log": [{ "k": "签名", "v": "default(默认值, 值)" }],
+      "explain": "管道把左边放到最后一位，所以 default 的用法看着反直觉。"
+    },
+    {
+      "title": "所以 default 要写在最后",
+      "desc": ".Name | default \"匿名\" 才是对的",
+      "file": "demo.tmpl",
+      "code": "{{ .Name | default \"匿名\" }}   // = default \"匿名\" .Name",
+      "focus": [1],
+      "nodes": ["result", "fn"],
+      "edges": ["fn>result"],
+      "log": [{ "k": "结果", "v": "空则取默认值" }],
+      "explain": "写成 \"匿名\" | default .Name 会得到相反的结果。"
+    },
+    {
+      "title": "零值也会被替换",
+      "desc": "0 / false / 空字符串都算零值",
+      "file": "demo.tmpl",
+      "code": "{{ default 1 .Replicas }}   // Replicas=0 -> 1",
+      "focus": [1],
+      "nodes": ["result"],
+      "edges": [],
+      "log": [{ "k": "坑", "v": "replicas: 0 被改成 1" }],
+      "explain": "「设置了 0」和「没设置」在模板里看起来一样，这是 Helm 最常见的坑。"
+    }
   ]
 }
 ```
