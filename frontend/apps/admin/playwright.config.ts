@@ -35,6 +35,8 @@ export default defineConfig({
     // 管理端没有 globalSetup 先热身，这条只能靠超时兜住。
     navigationTimeout: 60_000,
     trace: 'retain-on-failure',
+    // 与学习者端一致：本机没装配套浏览器时用系统 Chrome（E2E_CHANNEL=chrome）。
+    ...(process.env.E2E_CHANNEL === undefined ? {} : { channel: process.env.E2E_CHANNEL as 'chrome' }),
   },
   /** 同学习者端：桌面跑全部既有用例，移动 project 只跑 `*.mobile.spec.ts`（WORK-016）。 */
   projects: [

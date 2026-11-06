@@ -266,7 +266,7 @@ approver_role: CTO
   3. e2e：进入页面 → 展开分类 → 正文渲染。
 - 验证：`e2e/knowledge-wiki.spec.ts` → passed。
 
-### TASK-015 | in_progress | 收尾：结构图 + 迁移守卫 + 验收报告
+### TASK-015 | done | 收尾：结构图 + 迁移守卫 + 验收报告
 
 - 对应：全部 `AC-*`
 - 依赖：TASK-001…TASK-014
@@ -305,3 +305,4 @@ approver_role: CTO
 - 2026-11-06 TASK-015：验证报告 `testing/report.md` 已产出；Playwright e2e 已编写但未运行，真实模型蒸馏端到端（AC-101/102）待环境补验。
 - 2026-11-06 全链路集成：`-Dtest=KnowledgeImportFlowIntegrationTest` → Tests run 3, Failures 0（真实 PDF→抽取→桩蒸馏→draft+来源+指纹+目录树；重复导入指纹去重=1 条；发布后进入 publishedContents 语料）。覆盖 AC-101/103/104 与 AC-102 代理。
 - 2026-11-06 前端生产构建：`pnpm --filter @paideia/admin build`=0、`@paideia/app build`=0。
+- 2026-11-06 e2e 实跑（Chrome）：admin `knowledge-import`+`knowledge-chunks` → 2 passed；app `knowledge-wiki` → 1 passed。期间修复 admin playwright 配置不识别 E2E_CHANNEL 的问题（与 app 对齐）。
