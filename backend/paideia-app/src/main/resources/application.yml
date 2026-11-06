@@ -94,7 +94,8 @@ paideia:
     essay:
       # 八股文专区（WORK-025）。**默认关闭**：它要访问外部站点并消耗 AI 额度。
       enabled: false
-      # 抓哪个面经合集：639 = Java 工程师（实测每天 3~7 条新帖）。
+      # 单源模式下的合集 id：639 = Java 工程师（实测每天 3~7 条新帖）。
+      # **只在 sources 为空时生效**，保留它是为了没配新键的部署配置照旧能跑。
       job-id: 639
       # 回溯几天。默认 2 天 = 覆盖"昨天"并留一天容错，定时任务漏跑一次不会丢内容。
       lookback-days: 2
@@ -102,15 +103,31 @@ paideia:
       max-pages: 3
       # 抓来的内容进哪个分类。**不自动建分类**：不存在时任务跳过并记录。
       category-slug: essay-java
-      # 按判定主题分流（WORK-070）：topic → 分类 slug；没配到的 topic 回退上面的 category-slug。
+      # 多方向源清单（2026-11-06）：一个源 = 一个牛客合集 → 一个分类。
+      # **方向由源决定**，不经模型判主题——决策模型的主题标签只有 java/database/career/other，
+      # 判不出前端/测试/数据。合集 id 是 2026-11-06 实测的：
+      #   639 Java 后端（现用） / 644 前端 / 680 测试测开 / 684 数据大数据
+      # ⚠️ 无效的 jobId **不报错**，上游会退回一个默认列表并照样返回 200——配错的表现是
+      #    "抓到了但与 Java 源重复"，不是"抓不到"。去重按 contentId 跨分类判，兜得住重复。
+      # 三个新分类由迁移 V20261106153000 建好（essay-frontend / essay-testing / essay-data）。
+      sources:
+        - job-id: 639
+          category-slug: essay-java
+        - job-id: 644
+          category-slug: essay-frontend
+        - job-id: 680
+          category-slug: essay-testing
+        - job-id: 684
+          category-slug: essay-data
+      # 按判定主题分流（WORK-070）：topic → 分类 slug；没配到的 topic 回退源自己的分类。
       # **默认空**：为空时不额外问主题，行为与改动前逐条一致。
-      # 要启用先建好对应分类——这里不建，空分类会直接出现在学习者导航里（CategoryTree 不过滤空节点）。
+      # 注意它和上面的 sources 是两件事：sources 决定"抓哪个方向"，这里只决定"模型判出某主题时改投哪个分类"。
       category-slugs: {}
       # 抓来直接发布还是先进草稿。默认草稿——无人值守的自动入库，先让人过一眼更稳。
       publish-directly: false
-      # 成本闸：单次最多解析多少题、最多处理多少帖。
+      # 成本闸：单次最多解析多少题（**全局**，跨源合计）、每源最多处理多少帖。
       max-questions-per-run: 40
-      max-posts-per-run: 10
+      max-posts-per-run: 6
     decision:
       # 决策模型（Laya，WORK-026）。**默认关闭**：它要连一个外部 Python 进程，
       # 那个进程不在就每次判定都要等超时。关掉时分类器直接返回"没判断出来"，

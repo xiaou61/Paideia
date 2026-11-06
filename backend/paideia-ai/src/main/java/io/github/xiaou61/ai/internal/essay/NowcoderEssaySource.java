@@ -32,6 +32,11 @@ import org.springframework.stereotype.Component;
  *
  * <p>**这是内部接口**，没有文档、没有版本承诺。它一变，这里就抛异常并由定时任务记日志——
  * 端口化的意义就是那时只换这一个类。
+ *
+ * <p><b>合集 id 由调用方传入</b>（2026-11-06）：牛客按岗位分合集，Java=639、前端=644、
+ * 测试=680、数据=684（2026-11-06 实测）。**无效的 id 不会报错**，上游会退回一个默认列表并照样
+ * 返回 200/total=2000——所以配错的表现是"抓到了、但和别的源重复"，不是"抓不到"。
+ * 见 {@code docs} 里的实测记录；要防它只能靠多源去重（指纹按 contentId 算，跨源也拦得住）。
  */
 @Component
 class NowcoderEssaySource implements EssaySource {
@@ -60,10 +65,10 @@ class NowcoderEssaySource implements EssaySource {
     }
 
     @Override
-    public List<FetchedPost> fetchSince(long sinceMillis, int maxPages) {
+    public List<FetchedPost> fetchSince(long jobId, long sinceMillis, int maxPages) {
         List<FetchedPost> collected = new ArrayList<>();
         for (int page = 1; page <= maxPages; page++) {
-            JsonNode records = fetchPage(page);
+            JsonNode records = fetchPage(jobId, page);
             if (records == null || records.isEmpty()) {
                 break;
             }
@@ -87,11 +92,11 @@ class NowcoderEssaySource implements EssaySource {
         return collected;
     }
 
-    private JsonNode fetchPage(int page) {
+    private JsonNode fetchPage(long jobId, int page) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("page", page);
         payload.put("pageSize", PAGE_SIZE);
-        payload.put("jobId", properties.getJobId());
+        payload.put("jobId", jobId);
 
         HttpRequest request;
         try {

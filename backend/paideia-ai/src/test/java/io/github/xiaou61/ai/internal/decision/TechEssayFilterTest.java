@@ -95,4 +95,42 @@ class TechEssayFilterTest {
         assertThat(filter.judge(null, false).technical()).isFalse();
         assertThat(filter.judge("   ", false).technical()).isFalse();
     }
+
+    @Test
+    void chineseTermsMatchInsideChineseSentences() {
+        TechEssayFilter filter = new TechEssayFilter(UNAVAILABLE);
+        // 2026-11-06 之前中文分支带 \b，而中文不是 \w —— 这条文本只会命中 mysql 一种，
+        // 「索引/事务/隔离级别/死锁」全部漏掉。这条用例就是那个缺陷的守卫。
+        assertThat(filter.countDistinctTerms("MySQL索引失效，事务隔离级别怎么讲，死锁怎么排查"))
+                .isEqualTo(5);
+    }
+
+    @Test
+    void frontendAndTestingPostsAreRecognisedByRuleAlone() {
+        TechEssayFilter filter = new TechEssayFilter(UNAVAILABLE);
+
+        // 纯中文、没有一个英文技术词：只靠词表的中文分支也要能判出技术帖。
+        assertThat(filter.judge("前端一面：浏览器的跨域怎么处理，事件循环里微任务和宏任务的顺序，"
+                + "闭包为什么会造成内存泄漏，防抖节流写过吗", false).technical()).isTrue();
+        assertThat(filter.judge("测试一面：测试用例怎么设计，等价类和边界值各举一个，"
+                + "接口自动化的断言怎么写，压测用什么工具，缺陷的生命周期是什么", false).technical()).isTrue();
+    }
+
+    @Test
+    void dataEngineeringPostsAreRecognisedByRuleAlone() {
+        TechEssayFilter filter = new TechEssayFilter(UNAVAILABLE);
+        assertThat(filter.judge("数据开发一面：数仓分层怎么设计，出现数据倾斜怎么调，"
+                + "维度建模里的事实表和维度表怎么分，实时计算用 flink 还是 spark", false).technical())
+                .isTrue();
+    }
+
+    @Test
+    void jobHuntingComplaintStillNotTechnicalAfterWideningTerms() {
+        TechEssayFilter filter = new TechEssayFilter(UNAVAILABLE);
+        // 扩词表最容易出的事故：把求职吐槽判成技术帖。这条守的是"扩词不等于放宽阈值"。
+        assertThat(filter.judge("今天面了两家，第一家的面试官很热情，聊了一个小时，第二家直接挂我",
+                false).technical()).isFalse();
+        assertThat(filter.judge("收到 offer 了，纠结去大厂还是留在家乡，薪资差不多", false).technical())
+                .isFalse();
+    }
 }

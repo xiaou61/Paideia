@@ -94,6 +94,47 @@ class EssayCollectionIntegrationTest {
     }
 
     @Test
+    @DisplayName("多方向的三个分类由迁移建好（前端 / 测试 / 数据）")
+    void directionCategoriesAreCreatedByMigration() {
+        List<String> slugs = knowledge.listCategories().stream()
+                .map(KnowledgeApi.CategoryNode::slug)
+                .toList();
+
+        assertThat(slugs).contains("essay-frontend", "essay-testing", "essay-data");
+    }
+
+    @Test
+    @DisplayName("同一指纹跨分类也只产生一条（多方向抓取防重复）")
+    void sameFingerprintInAnotherCategoryDoesNotCreateTwice() {
+        String otherSlug = "essay-it-category-2";
+        jdbc.update("DELETE FROM knowledge_categories WHERE slug = ?", otherSlug);
+        jdbc.update("INSERT INTO knowledge_categories (name, slug, sort_order) VALUES (?, ?, 998)",
+                "测试八股分类二", otherSlug);
+        Long otherId = jdbc.queryForObject(
+                "SELECT id FROM knowledge_categories WHERE slug = ?", Long.class, otherSlug);
+        try {
+            KnowledgeApi.CreateOutcome first = knowledge.createCollected(new KnowledgeApi.CollectedEntry(
+                    "HashMap 为什么线程不安全", "第一次", categoryId, "draft", FINGERPRINT, null));
+            // 同一篇帖子被另一个方向的源再次抓到：指纹一样，只是目标分类不同。
+            KnowledgeApi.CreateOutcome second = knowledge.createCollected(new KnowledgeApi.CollectedEntry(
+                    "HashMap 为什么线程不安全", "第二次", otherId, "draft", FINGERPRINT, null));
+
+            assertThat(first.created()).isTrue();
+            assertThat(second.created()).isFalse();
+            assertThat(jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM knowledge_entries WHERE fingerprint = ?", Integer.class, FINGERPRINT))
+                    .isEqualTo(1);
+            // 留在先落地的分类里，不会被后一次悄悄搬家
+            assertThat(jdbc.queryForObject(
+                    "SELECT category_id FROM knowledge_entries WHERE fingerprint = ?", Long.class, FINGERPRINT))
+                    .isEqualTo(categoryId);
+        } finally {
+            jdbc.update("DELETE FROM knowledge_entries WHERE fingerprint = ?", FINGERPRINT);
+            jdbc.update("DELETE FROM knowledge_categories WHERE slug = ?", otherSlug);
+        }
+    }
+
+    @Test
     @DisplayName("分类按 slug 可定位，且节点带 slug 供抓取任务查找")
     void categoryNodeCarriesSlug() {
         List<KnowledgeApi.CategoryNode> nodes = knowledge.listCategories();

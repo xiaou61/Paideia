@@ -34,9 +34,9 @@ class EssayCollectionRoutingTest {
     /**
      * 命中 6 种**英文**技术词，规则自己就判成技术帖。
      *
-     * <p>不能用中文词构造：`TECH_TERMS` 的中文分支带 `\b`，而中文不是 `\w`，所以
-     * 「MySQL索引失效」这类文本的命中数只有 1（mysql），会落进边界地带去问模型。
-     * 这是 WORK-026 的既有缺陷，记在 testing/report.md，不在本项修。
+     * <p>这里仍用英文词构造：本类验的是分流与计数，不验词表。中文词的匹配口径见
+     * {@code TechEssayFilterTest}——2026-11-06 之前中文分支带 `\b` 而中文不是 `\w`，
+     * 词表里的中文词实际全部失效；那次一并修了。
      */
     private static final String CLEARLY_TECHNICAL = "面经：HashMap JVM MySQL Spring Redis Kafka 都在问";
 
@@ -120,7 +120,7 @@ class EssayCollectionRoutingTest {
         properties.setCategorySlug(DEFAULT_SLUG);
         properties.setCategorySlugs(categorySlugs);
 
-        EssaySource source = (sinceMillis, maxPages) -> List.of(
+        EssaySource source = (jobId, sinceMillis, maxPages) -> List.of(
                 new FetchedPost("post-1", "面经", body, "https://example.invalid/1", 0L));
 
         EssayExtractor extractor = mock(EssayExtractor.class);

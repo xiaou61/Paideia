@@ -24,19 +24,21 @@ import org.springframework.stereotype.Service;
  *
  * <p>四个阶段，每一步都有明确的"跳过"语义：
  * <ol>
- *   <li><b>抓</b>：从 {@link EssaySource} 拿最近的帖子。失败 → 整次任务放弃并记日志。</li>
+ *   <li><b>抓</b>：按 {@link EssayProperties#effectiveSources()} 逐个源抓最近的帖子。单源失败只跳过
+ *       该源，其它源照跑；全部失败才算整次抓取失败。</li>
  *   <li><b>过滤</b>：{@link TechEssayFilter} 判断是不是技术帖。**非技术帖不消耗任何 AI 额度**——
  *       实测同一天 14 条里只有 5 条真在讲题，不过滤就是为每条都花一次解析。</li>
  *   <li><b>抽题</b>：{@link EssayExtractor} 让模型从正文里挑出技术题并写解析。空结果是合法的。</li>
- *   <li><b>入库</b>：按题目指纹去重后写进知识库。重复的跳过，不报错。</li>
+ *   <li><b>入库</b>：按帖子指纹去重后写进知识库。重复的跳过，不报错。</li>
  * </ol>
+ *
+ * <p><b>多方向（2026-11-06）</b>：一个源对应一个方向（Java / 前端 / 测试 / 数据），落到各自的分类。
+ * 方向来自**源**而不是模型——决策模型的主题标签只有四个，判不出这三个方向。
+ * 每源各有 {@code maxPostsPerRun} 篇的配额，总量由 {@code maxQuestionsPerRun} 兜住。
  *
  * <p><b>不扣用户积分</b>：抓取解析是平台行为，没有用户归属。{@code CreditService} 按 userId 记账，
  * 这里没有可用的 userId——强行塞一个系统账号会让积分账目出现"凭空扣费"。代价是这部分成本
  * 只能从部署侧的用量统计看，不在产品内的积分面板里。这是已知取舍。
- *
- * <p>三个上限防止一次跑飞：帖子数（{@code maxPostsPerRun}）、题数（{@code maxQuestionsPerRun}）、
- * 翻页数（{@code maxPages}）。
  */
 @Service
 public class EssayCollectionService {
@@ -93,113 +95,145 @@ public class EssayCollectionService {
         if (!properties.isEnabled()) {
             return RunResult.skipped("未启用");
         }
-        Long defaultCategoryId = categoryIdOf(properties.getCategorySlug());
-        if (defaultCategoryId == null) {
-            return RunResult.skipped("分类不存在：" + properties.getCategorySlug());
-        }
         Optional<ModelAccess> access = credentials.access(0);
         if (access.isEmpty()) {
             return RunResult.skipped("平台未配置 AI 凭据");
         }
 
         long since = Instant.now().minus(Duration.ofDays(properties.getLookbackDays())).toEpochMilli();
-        List<FetchedPost> posts;
-        var fetchRun = recorder.begin(RunSpec.of(RunKind.ESSAY_COLLECT, 0L));
-        try {
-            posts = source.fetchSince(since, properties.getMaxPages());
-            fetchRun.finish(RunOutcome.OK, null);
-        } catch (RuntimeException exception) {
-            fetchRun.finish(RunOutcome.FAILED, "essay_fetch_failed", FailureKind.RETRYABLE);
-            log.warn("面经抓取失败，本次跳过：{}", exception.getMessage());
-            return RunResult.skipped("抓取失败");
-        } finally {
-            fetchRun.close();
-        }
-        if (posts.isEmpty()) {
-            return new RunResult(0, 0, new FilterStats(0, 0, 0, 0), 0, 0, 0, 0, "本次没有新帖");
-        }
 
         // 配了分流才问主题：默认空 map 时行为与改动前逐条一致。
         boolean needTopic = !properties.getCategorySlugs().isEmpty();
+        int fetched = 0;
         int skipped = 0;
         int extracted = 0;
         int created = 0;
         int duplicated = 0;
         int failed = 0;
-        int handled = 0;
         int borderline = 0;
         int askedModel = 0;
         int changedByModel = 0;
         int routed = 0;
+        int sourcesRun = 0;
+        int sourcesFailed = 0;
+        int sourcesMissingCategory = 0;
 
-        for (FetchedPost post : posts) {
-            if (handled >= properties.getMaxPostsPerRun() || created >= properties.getMaxQuestionsPerRun()) {
-                break;
-            }
-            handled++;
-
-            TechEssayFilter.Verdict verdict = filter.judge(post.body(), needTopic);
-            if (verdict.borderline()) {
-                borderline++;
-            }
-            if (verdict.askedModel()) {
-                askedModel++;
-            }
-            if (verdict.changedByModel()) {
-                changedByModel++;
-            }
-            if (!verdict.technical()) {
-                skipped++;
+        for (EssayProperties.SourceSpec spec : properties.effectiveSources()) {
+            Long defaultCategoryId = categoryIdOf(spec.getCategorySlug());
+            if (defaultCategoryId == null) {
+                // 不自动建分类：建分类是人的决定，空分类会直接出现在学习者导航里。
+                log.warn("面经源跳过：分类不存在 slug={}（jobId={}）", spec.getCategorySlug(), spec.getJobId());
+                sourcesMissingCategory++;
                 continue;
             }
-            Long categoryId = categoryIdFor(verdict.topic(), defaultCategoryId);
-            if (!categoryId.equals(defaultCategoryId)) {
-                routed++;
-            }
-            var extractRun = recorder.begin(RunSpec.of(RunKind.ESSAY_EXTRACT, 0L)
-                    .withModel(access.get().model())
-                    .withPromptVersion(EssayExtractionPrompt.VERSION));
+
+            List<FetchedPost> posts;
+            var fetchRun = recorder.begin(RunSpec.of(RunKind.ESSAY_COLLECT, 0L));
             try {
-                EssayExtractionPrompt.Extraction result =
-                        extractor.extract(post, access.get(), properties.getTimeoutSeconds());
-                for (EssayExtractionPrompt.ExtractedQuestion question : result.questions()) {
-                    if (created >= properties.getMaxQuestionsPerRun()) {
-                        break;
-                    }
-                    extracted++;
-                    KnowledgeApi.CreateOutcome outcome = knowledge.createCollected(
-                            new KnowledgeApi.CollectedEntry(
-                                    question.title(),
-                                    render(question, post),
-                                    categoryId,
-                                    properties.isPublishDirectly() ? "published" : "draft",
-                                    fingerprintOfPost(post),
-                                    post.url()));
-                    if (outcome.created()) {
-                        created++;
-                    } else {
-                        duplicated++;
-                    }
-                }
-                extractRun.finish(RunOutcome.OK, null);
+                posts = source.fetchSince(spec.getJobId(), since, properties.getMaxPages());
+                fetchRun.finish(RunOutcome.OK, null);
             } catch (RuntimeException exception) {
-                // 单篇失败不影响其它帖子：一天十篇里坏一篇，其余照收。
-                // WORK-069：抽题失败按 bad_output 记录；这不改变“不重试”的现有行为。
-                extractRun.finish(RunOutcome.FAILED, "essay_extract_failed", FailureKind.BAD_OUTPUT);
-                failed++;
-                log.warn("面经抽题失败（{}）：{}", post.externalId(), exception.getMessage());
+                // 一个源挂了不该让其它方向一起停：记一条，继续下一个源。
+                fetchRun.finish(RunOutcome.FAILED, "essay_fetch_failed", FailureKind.RETRYABLE);
+                log.warn("面经抓取失败，跳过该源（jobId={}）：{}", spec.getJobId(), exception.getMessage());
+                sourcesFailed++;
+                continue;
             } finally {
-                extractRun.close();
+                fetchRun.close();
+            }
+            sourcesRun++;
+            fetched += posts.size();
+
+            int handled = 0;
+            for (FetchedPost post : posts) {
+                if (handled >= properties.getMaxPostsPerRun() || created >= properties.getMaxQuestionsPerRun()) {
+                    break;
+                }
+                handled++;
+
+                TechEssayFilter.Verdict verdict = filter.judge(post.body(), needTopic);
+                if (verdict.borderline()) {
+                    borderline++;
+                }
+                if (verdict.askedModel()) {
+                    askedModel++;
+                }
+                if (verdict.changedByModel()) {
+                    changedByModel++;
+                }
+                if (!verdict.technical()) {
+                    skipped++;
+                    continue;
+                }
+                Long categoryId = categoryIdFor(verdict.topic(), defaultCategoryId);
+                if (!categoryId.equals(defaultCategoryId)) {
+                    routed++;
+                }
+                var extractRun = recorder.begin(RunSpec.of(RunKind.ESSAY_EXTRACT, 0L)
+                        .withModel(access.get().model())
+                        .withPromptVersion(EssayExtractionPrompt.VERSION));
+                try {
+                    EssayExtractionPrompt.Extraction result =
+                            extractor.extract(post, access.get(), properties.getTimeoutSeconds());
+                    for (EssayExtractionPrompt.ExtractedQuestion question : result.questions()) {
+                        if (created >= properties.getMaxQuestionsPerRun()) {
+                            break;
+                        }
+                        extracted++;
+                        KnowledgeApi.CreateOutcome outcome = knowledge.createCollected(
+                                new KnowledgeApi.CollectedEntry(
+                                        question.title(),
+                                        render(question, post),
+                                        categoryId,
+                                        properties.isPublishDirectly() ? "published" : "draft",
+                                        fingerprintOfPost(post),
+                                        post.url()));
+                        if (outcome.created()) {
+                            created++;
+                        } else {
+                            duplicated++;
+                        }
+                    }
+                    extractRun.finish(RunOutcome.OK, null);
+                } catch (RuntimeException exception) {
+                    // 单篇失败不影响其它帖子：一天十篇里坏一篇，其余照收。
+                    // WORK-069：抽题失败按 bad_output 记录；这不改变“不重试”的现有行为。
+                    extractRun.finish(RunOutcome.FAILED, "essay_extract_failed", FailureKind.BAD_OUTPUT);
+                    failed++;
+                    log.warn("面经抽题失败（{}）：{}", post.externalId(), exception.getMessage());
+                } finally {
+                    extractRun.close();
+                }
             }
         }
 
-        log.info("八股文抓取完成：抓 {} 篇，跳过非技术 {} 篇（边界 {} / 问模型 {} / 改判 {} / 分流 {}），"
-                        + "抽出 {} 题，新建 {} 条，重复 {} 条，失败 {} 篇",
-                posts.size(), skipped, borderline, askedModel, changedByModel, routed,
+        if (sourcesRun == 0) {
+            if (sourcesFailed > 0) {
+                return RunResult.skipped("抓取失败");
+            }
+            return RunResult.skipped("分类不存在：" + categorySlugs());
+        }
+        if (fetched == 0) {
+            return new RunResult(0, 0, new FilterStats(0, 0, 0, 0), 0, 0, 0, 0, "本次没有新帖");
+        }
+
+        log.info("八股文抓取完成：源 {} 个（失败 {} / 缺分类 {}），抓 {} 篇，跳过非技术 {} 篇"
+                        + "（边界 {} / 问模型 {} / 改判 {} / 分流 {}），抽出 {} 题，新建 {} 条，"
+                        + "重复 {} 条，失败 {} 篇",
+                sourcesRun, sourcesFailed, sourcesMissingCategory, fetched, skipped,
+                borderline, askedModel, changedByModel, routed,
                 extracted, created, duplicated, failed);
-        return new RunResult(posts.size(), skipped,
+        return new RunResult(fetched, skipped,
                 new FilterStats(borderline, askedModel, changedByModel, routed),
                 extracted, created, duplicated, failed, null);
+    }
+
+    private String categorySlugs() {
+        return properties.effectiveSources().stream()
+                .map(EssayProperties.SourceSpec::getCategorySlug)
+                .distinct()
+                .reduce((left, right) -> left + "," + right)
+                .orElse("");
     }
 
     /**

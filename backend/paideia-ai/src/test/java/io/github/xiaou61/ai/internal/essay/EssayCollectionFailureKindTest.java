@@ -61,7 +61,7 @@ class EssayCollectionFailureKindTest {
     @Test
     @DisplayName("抓取失败是 retryable，整次跳过")
     void fetchFailureIsRetryable() {
-        when(source.fetchSince(anyLong(), anyInt())).thenThrow(new IllegalStateException("网络断了"));
+        when(source.fetchSince(anyLong(), anyLong(), anyInt())).thenThrow(new IllegalStateException("网络断了"));
 
         EssayCollectionService.RunResult result = service.runOnce();
 
@@ -72,7 +72,7 @@ class EssayCollectionFailureKindTest {
     @Test
     @DisplayName("单篇抽题失败是 bad_output，且不影响其它帖子")
     void perPostFailureIsBadOutputAndDoesNotAbortRun() {
-        when(source.fetchSince(anyLong(), anyInt())).thenReturn(List.of(
+        when(source.fetchSince(anyLong(), anyLong(), anyInt())).thenReturn(List.of(
                 new FetchedPost("post-1", "面经", "HashMap JVM MySQL Spring Redis Kafka", "https://example.invalid/1", 0L),
                 new FetchedPost("post-2", "面经", "HashMap JVM MySQL Spring Redis Kafka", "https://example.invalid/2", 0L)));
         when(extractor.extract(any(), any(), anyInt()))
@@ -91,7 +91,7 @@ class EssayCollectionFailureKindTest {
     @Test
     @DisplayName("成功抽取写 OK，且不写 failure_kind")
     void successfulExtractionWritesOkRun() {
-        when(source.fetchSince(anyLong(), anyInt())).thenReturn(List.of(
+        when(source.fetchSince(anyLong(), anyLong(), anyInt())).thenReturn(List.of(
                 new FetchedPost("post-1", "面经", "HashMap JVM MySQL Spring Redis Kafka", "https://example.invalid/1", 0L)));
         when(extractor.extract(any(), any(), anyInt())).thenReturn(new EssayExtractionPrompt.Extraction(
                 List.of(new EssayExtractionPrompt.ExtractedQuestion("HashMap 线程安全吗", "不安全"))));

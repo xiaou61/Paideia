@@ -125,10 +125,11 @@ class KnowledgeApiImplementation implements KnowledgeApi {
 
     @Override
     public CreateOutcome createCollected(CollectedEntry input) {
-        // 先查后插：同一道题会在不同面经里反复出现，重复插入等于每天制造重复内容。
-        // 并发下理论上仍可能双写（两个任务同时抓到同一题），但抓取是单实例定时任务，
-        // 不为此加唯一约束——那会让"指纹为空"的存量条目行为变得微妙。
-        Long existing = entryMapper.findIdByFingerprint(input.categoryId(), input.fingerprint());
+        // 先查后插：指纹是「来源站点 + 上游内容 id」，一篇帖子一个。
+        // **跨分类查**（2026-11-06）：同一篇帖子会出现在多个牛客合集里，多方向抓取时
+        // 限定分类判重会让它在库里存两份。并发下理论上仍可能双写（两个任务同时抓到同一帖），
+        // 但抓取是单实例定时任务，不为此加唯一约束——那会让"指纹为空"的存量条目行为变得微妙。
+        Long existing = entryMapper.findIdByFingerprint(input.fingerprint());
         if (existing != null) {
             return new CreateOutcome(existing, false);
         }

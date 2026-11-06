@@ -282,17 +282,20 @@ public interface EntryMapper {
     int insert(Entry entry);
 
     /**
-     * 按指纹查同一分类下是否已有（WORK-025）。
+     * 按指纹查是否已存在（WORK-025，2026-11-06 改为**跨分类**）。
      *
-     * <p>**限定分类**：同一道题出现在不同分类里是有意义的，跨分类判重会把它们合并掉。
-     * 返回 id 而不是计数，是为了让调用方能把"已存在"的 id 回报出去。
+     * <p><b>为什么不再限定分类</b>：指纹是「来源站点 + 上游内容 id」的哈希，**一篇帖子一个指纹**，
+     * 不是题目文本的哈希。同一篇帖子会同时出现在多个牛客合集里（实测 Java 合集与「软件开发」合集
+     * 撞帖），而多方向抓取会把它分别写进不同分类——限定分类判重的话，同一篇帖子会在库里有两份。
+     * 原注释担心的"同一道题出现在不同分类里"在指纹改成帖子 id 之后已不成立：两道不同的帖子
+     * 本来就是两个指纹。
      */
     @Select("""
             SELECT id FROM knowledge_entries
-            WHERE category_id = #{categoryId} AND fingerprint = #{fingerprint}
+            WHERE fingerprint = #{fingerprint}
             LIMIT 1
             """)
-    Long findIdByFingerprint(@Param("categoryId") Long categoryId, @Param("fingerprint") String fingerprint);
+    Long findIdByFingerprint(@Param("fingerprint") String fingerprint);
 
     @Update("""
             UPDATE knowledge_entries
