@@ -12,7 +12,7 @@ updated: 2026-11-06
 
 ## 验证环境
 
-- 日期：2026-11-06；工作区主树 `F:\Paideia`（分支 `master`，改动未提交）。
+- 日期：2026-11-06；代码提交 **`07dc01fb`**（只含本页 + 工件）。因主工作区当时有其它会话的未提交改动，**从该提交的独立 worktree 干净构建并部署**，未触碰主树他人改动。
 - 前端 `pnpm`（React 19 / Vite 8 / Tailwind 4）；Playwright 用系统 Chrome（`channel: chrome`），对 `vite preview` 的产物做页面演练，`/api/v1/**` 全部 mock，**不连后端、不花积分**。
 - 页面修改：`frontend/apps/app/src/pages/InterviewPage.tsx`（单文件）。
 
@@ -43,8 +43,18 @@ updated: 2026-11-06
 ## 失败与未验证项
 
 - **未跑真实 `identity.spec.ts` 面试用例**：该用例会真调上游并消耗线上账号积分（`test.skip(REMOTE)` 只挡线上域名，本地会真花钱），故本轮用同构 mock 覆盖其断言语义，未执行真上游调用。
-- **未提交、未部署**：本报告基于工作树内新鲜执行；代码未 commit、未 push、未部署，线上 `36.212.5.130:8081` 仍是旧版。
 - 截图来自 mock 数据，仅用于验证布局；真实内容长度/折行以部署后为准。
+
+## 部署结果（2026-11-06）
+
+| 检查项 | 命令 | 退出码 | 结果 | 证据 |
+| --- | --- | --- | --- | --- |
+| 从提交干净构建并部署 | 独立 worktree 跑 `scripts/release.ps1` | 0 | passed | 完成：304.5 秒；unpack 0s / repack 4s / swap 1s / start 0s / health 30s / marker 0s |
+| 线上健康 | `curl /actuator/health`（服务器本机 8081） | 0 | passed | HTTP 200 |
+| 线上版本 | `cat /var/lib/node_exporter/textfile/deploy.prom` | 0 | passed | `paideia_build_info{version="07dc01f"} 1` |
+| 新版界面已上线 | 在 `/opt/paideia-app/web` 搜新文案 | 0 | passed | `assets/index-CF6fhFFt.js` 命中「面试官正在思考」；「思考过程」零命中（旧折叠框已移除） |
+
+> 说明：部署从 `07dc01fb` 的**独立 worktree** 发起，主工作区当时有别的会话的未提交改动（删 AI 记忆模块等），未被带进本次发版；因该提交的 backend 即已提交基线，后端 48 个文件按清单差异同步、前端 web 变化 162 / 删 159。
 
 ## 剩余风险
 
