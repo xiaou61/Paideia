@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, CornerDownRight, RotateCcw } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { CustomRendererProps } from 'streamdown'
 
 import { Button } from '../../components/button'
@@ -451,9 +451,29 @@ function WalkMap({ map, active }: { map: CodeMap; active?: string[] }) {
   const width = Math.max(...map.nodes.map((node) => (positions.get(node.id)?.x ?? 0) + NODE_W)) + 24
   const height = Math.max(...map.nodes.map((node) => (positions.get(node.id)?.y ?? 0) + NODE_H)) + 24
   const act = new Set(active ?? [])
+  // 按容器宽度自动缩放：图始终完整可见，不出现横向滚动。
+  const wrapRef = useRef<HTMLDivElement | null>(null)
+  const [scale, setScale] = useState(1)
+  useLayoutEffect(() => {
+    const el = wrapRef.current
+    if (el === null) {
+      return
+    }
+    const update = () => {
+      const available = el.clientWidth
+      if (available > 0) {
+        setScale(Math.min(1, available / width))
+      }
+    }
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [width])
   return (
-    <div className="border-border overflow-x-auto border-b bg-muted/10 p-2" data-testid="source-walk-map">
-      <div className="relative" style={{ width, height, minWidth: '100%' }}>
+    <div className="border-border border-b bg-muted/10 p-2" data-testid="source-walk-map">
+      <div ref={wrapRef} className="w-full" style={{ height: height * scale }}>
+        <div className="relative" style={{ width, height, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
         <svg className="pointer-events-none absolute inset-0" width={width} height={height} aria-hidden="true">
           {map.edges.map((edge, index) => {
             const from = positions.get(edge.from)
@@ -504,6 +524,7 @@ function WalkMap({ map, active }: { map: CodeMap; active?: string[] }) {
             </div>
           )
         })}
+        </div>
       </div>
     </div>
   )

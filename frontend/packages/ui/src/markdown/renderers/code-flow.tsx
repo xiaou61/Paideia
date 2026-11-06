@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { CustomRendererProps } from 'streamdown'
 
 import { Button } from '../../components/button'
@@ -77,16 +77,36 @@ function FlowBody({ flow }: { flow: CodeFlow }) {
     progress.update({ tours: { [flow.id]: { step: current, total, done: current >= total - 1 } } })
   }, [flow.id, current, total, progress])
 
-  const step = flow.steps[Math.min(current, total - 1)]
-  if (step === undefined) {
-    return null
-  }
-
   const positions = new Map(
     flow.nodes.map((node) => [node.id, { x: 16 + node.layer * COLUMN_GAP, y: 16 + node.order * ROW_GAP }]),
   )
   const width = Math.max(...flow.nodes.map((node) => (positions.get(node.id)?.x ?? 0) + NODE_WIDTH)) + 24
   const height = Math.max(...flow.nodes.map((node) => (positions.get(node.id)?.y ?? 0) + NODE_HEIGHT)) + 24
+
+  // 架构图按容器宽度自动缩放：始终完整可见，不出现横向滚动。
+  const mapWrapRef = useRef<HTMLDivElement | null>(null)
+  const [mapScale, setMapScale] = useState(1)
+  useLayoutEffect(() => {
+    const el = mapWrapRef.current
+    if (el === null) {
+      return
+    }
+    const update = () => {
+      const available = el.clientWidth
+      if (available > 0) {
+        setMapScale(Math.min(1, available / width))
+      }
+    }
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [width])
+
+  const step = flow.steps[Math.min(current, total - 1)]
+  if (step === undefined) {
+    return null
+  }
 
   const activeNodes = new Set(step.nodes ?? [])
   const activeEdges = new Set(step.edges ?? [])
@@ -170,10 +190,11 @@ function FlowBody({ flow }: { flow: CodeFlow }) {
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-          {/* 左：架构图 */}
-          <div className="border-border min-w-0 overflow-x-auto border-b p-3 lg:border-r lg:border-b-0">
-            <div className="relative" style={{ width, height, minWidth: '100%' }}>
+        <div className="grid lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+          {/* 左：架构图（按容器宽度自动缩放，始终完整可见、无横向滚动） */}
+          <div className="border-border flex min-w-0 items-start justify-center border-b p-3 lg:border-r lg:border-b-0">
+            <div ref={mapWrapRef} className="w-full" style={{ height: height * mapScale }}>
+              <div className="relative" style={{ width, height, transform: `scale(${mapScale})`, transformOrigin: 'top left' }}>
               <svg className="pointer-events-none absolute inset-0" width={width} height={height} aria-hidden="true">
                 <defs>
                   <marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
@@ -241,6 +262,7 @@ function FlowBody({ flow }: { flow: CodeFlow }) {
                   </button>
                 )
               })}
+              </div>
             </div>
           </div>
 

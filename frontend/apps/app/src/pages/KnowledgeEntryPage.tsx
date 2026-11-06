@@ -276,7 +276,12 @@ export function KnowledgeEntryPage() {
 
       {entry.isSuccess && !serverProgress.isPending ? (
         <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_15rem]">
-          <article className="min-w-0 lg:max-w-[46rem]">
+          <article
+            className={`min-w-0 ${
+              // 含「左图右码」交互块的文章放宽正文列，让内容铺满、不挤在 46rem 里
+              /```(code-flow|source-walk)/.test(practice.body) ? 'lg:max-w-none' : 'lg:max-w-[46rem]'
+            }`}
+          >
             {/*
               "我在哪个分类里"是真信息，但它该是可点的面包屑而不是标题上方的小标签：
               标签只能看，面包屑能回去。
