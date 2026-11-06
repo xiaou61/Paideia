@@ -3,9 +3,7 @@ import { Navigate, createHashRouter } from 'react-router'
 import { AdminHomePage } from './pages/AdminHomePage'
 import { AnalyticsPage } from './pages/AnalyticsPage'
 import { AiCreditsAuditPage } from './pages/AiCreditsAuditPage'
-import { AiRunsListPage } from './pages/AiRunsListPage'
-import { AiRunsOverviewPage } from './pages/AiRunsOverviewPage'
-import { AiRunsScreenPage } from './pages/AiRunsScreenPage'
+import { AiRunsPage } from './pages/AiRunsPage'
 import { KnowledgeCategoriesPage } from './pages/KnowledgeCategoriesPage'
 import { KnowledgeConceptsPage } from './pages/KnowledgeConceptsPage'
 import { KnowledgeEntriesPage } from './pages/KnowledgeEntriesPage'
@@ -100,34 +98,19 @@ export const router = createHashRouter([
   // 但没有它时手敲这个地址就是一片空白。**「积分调整」那一页已按用户裁决删除**
   // （U-04）——调整积分并入用户管理，这里不再有独立入口。
   { path: '/ai-credits', element: <Navigate to="/ai-credits/audit" replace /> },
-  // AI 调用统计（WORK-022）。父项只分组，子项才是页面。
-  { path: '/ai-runs', element: <Navigate to="/ai-runs/overview" replace /> },
+  // AI 调用统计（WORK-022；2026-11-06 合并为一页，大屏已删）。旧的三个子地址保留转向，
+  // 免得好不容易收藏的链接打开是空白。
   {
-    path: '/ai-runs/overview',
+    path: '/ai-runs',
     element: (
       <RequireAdmin>
-        <AiRunsOverviewPage />
+        <AiRunsPage />
       </RequireAdmin>
     ),
   },
-  {
-    path: '/ai-runs/list',
-    element: (
-      <RequireAdmin>
-        <AiRunsListPage />
-      </RequireAdmin>
-    ),
-  },
-  // 调用大屏：回放最近 24 小时 / 7 天的调用与步骤瀑布。
-  // **走 bare**：大屏不该带着侧栏，但那道门一个条件都没少（见 RequireAdmin 的说明）。
-  {
-    path: '/ai-runs/screen',
-    element: (
-      <RequireAdmin bare>
-        <AiRunsScreenPage />
-      </RequireAdmin>
-    ),
-  },
+  { path: '/ai-runs/overview', element: <Navigate to="/ai-runs" replace /> },
+  { path: '/ai-runs/list', element: <Navigate to="/ai-runs?tab=list" replace /> },
+  { path: '/ai-runs/screen', element: <Navigate to="/ai-runs" replace /> },
   // 运维面板（WORK-028）。单页，不需要父项分组；`/ops` 一条转向只是为了
   // 手敲地址时不落到空白。
   { path: '/ops', element: <Navigate to="/ops/panel" replace /> },

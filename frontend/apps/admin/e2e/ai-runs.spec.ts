@@ -13,17 +13,20 @@ async function signIn(page: Page) {
 }
 
 /**
- * AI 调用统计两个页面（WORK-022 AC-017）。
+ * AI 调用统计（WORK-022；2026-11-06 三页合并为一页）。
  *
- * <p>断言的是**用户能看到的东西**：卡片出得来、筛选可用、点行能展开步骤表、
- * 没数据时是空状态而不是白屏。数字对不对由后端集成测试负责，这里不重复验证统计口径。
+ * <p>概览与明细用页签切换，大屏已删除。断言的是**用户能看到的东西**：卡片出得来、
+ * 页签能切、筛选可用、点行能展开步骤表、没数据时是空状态而不是白屏。
+ * 数字对不对由后端集成测试负责，这里不重复验证统计口径。
  */
 test.describe('AI 调用统计', () => {
-  test('概览页：侧栏能进，卡片与状态分布出得来', async ({ page }) => {
+  test('概览：侧栏能进，卡片与状态分布出得来', async ({ page }) => {
     await signIn(page)
-    await page.goto(`${ADMIN_ENTRY}#/ai-runs/overview`)
+    await page.goto(`${ADMIN_ENTRY}#/ai-runs`)
 
     await expect(page.getByRole('heading', { name: 'AI 调用' })).toBeVisible()
+    await expect(page.getByTestId('ai-runs-tab-overview')).toBeVisible()
+    await expect(page.getByTestId('ai-runs-tab-list')).toBeVisible()
     // 六张卡：调用次数 / 成功率 / 耗时 / 首字 / 扣分
     await expect(page.getByTestId('runs-total')).toBeVisible()
     await expect(page.getByTestId('runs-success-rate')).toBeVisible()
@@ -35,9 +38,10 @@ test.describe('AI 调用统计', () => {
     await expect(empty.or(byKind)).toBeVisible()
   })
 
-  test('明细页：筛选控件可用，点一行能展开步骤表', async ({ page }) => {
+  test('明细：切页签后筛选可用，点一行能展开步骤表', async ({ page }) => {
     await signIn(page)
-    await page.goto(`${ADMIN_ENTRY}#/ai-runs/list`)
+    await page.goto(`${ADMIN_ENTRY}#/ai-runs`)
+    await page.getByTestId('ai-runs-tab-list').click()
 
     await expect(page.getByTestId('runs-filter-kind')).toBeVisible()
     await expect(page.getByTestId('runs-filter-status')).toBeVisible()
@@ -55,9 +59,9 @@ test.describe('AI 调用统计', () => {
     }
   })
 
-  test('概览页：有数据时出趋势图，采集健康那一行也在', async ({ page }) => {
+  test('概览：采集健康那行无条件可见，趋势图有数据时渲染', async ({ page }) => {
     await signIn(page)
-    await page.goto(`${ADMIN_ENTRY}#/ai-runs/overview`)
+    await page.goto(`${ADMIN_ENTRY}#/ai-runs`)
 
     // 采集健康是**无条件**要出的：它回答"这份统计可不可信"，没数据时更该能看到
     await expect(page.getByTestId('runs-health-inline')).toBeVisible()
@@ -68,30 +72,11 @@ test.describe('AI 调用统计', () => {
     await expect(trend.or(empty)).toBeVisible()
   })
 
-  test('调用大屏：侧栏能进，时间轴与调用流出得来，点一轮能看瀑布', async ({ page }) => {
+  test('旧地址 /ai-runs/list 会落到明细页签', async ({ page }) => {
     await signIn(page)
-    // 入口必须在侧栏里（只在首页快捷卡里出现不算）
-    await page.goto(`${ADMIN_ENTRY}#/ai-runs/overview`)
-    const entry = page.getByRole('link', { name: '调用大屏' })
-    await expect(entry).toBeVisible()
-    await entry.click()
+    await page.goto(`${ADMIN_ENTRY}#/ai-runs/list`)
 
-    await expect(page.getByRole('heading', { name: 'AI 调用大屏' })).toBeVisible()
-    await expect(page.getByTestId('screen-timeline-track')).toBeVisible()
-    // 大屏不带侧栏：进来之后那一列不该还在
-    await expect(page.getByRole('link', { name: '调用大屏' })).toHaveCount(0)
-
-    const feed = page.getByTestId('screen-feed')
-    const empty = page.getByTestId('screen-empty')
-    await expect(feed.or(empty)).toBeVisible()
-
-    if (await feed.isVisible()) {
-      const first = feed.locator('button').first()
-      if (await first.count() > 0) {
-        await first.click()
-        await expect(page.getByTestId('screen-spans').or(page.getByTestId('screen-spans-empty')))
-          .toBeVisible()
-      }
-    }
+    // 旧书签重定向到合并页的明细页签，不落空白
+    await expect(page.getByTestId('runs-filter-kind')).toBeVisible()
   })
 })

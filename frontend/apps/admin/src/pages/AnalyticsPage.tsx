@@ -121,7 +121,7 @@ const STATE_LABEL: Record<NodeState, string> = {
 /** 链可下钻到这里；没有对应页面的就不给链接（不要造假入口）。 */
 const FLOW_LINK: Record<string, string> = {
   knowledge: '/knowledge/entries',
-  ai: '/ai-runs/list',
+  ai: '/ai-runs?tab=list',
 }
 
 const SERIES_LABEL: Record<string, string> = {
@@ -438,7 +438,7 @@ function AiSection({ ai }: { ai: Overview['ai'] }) {
           AI 与成本
         </CardTitle>
         <CardDescription>
-          <Link to="/ai-runs/overview" className="hover:text-primary underline-offset-2 hover:underline">
+          <Link to="/ai-runs" className="hover:text-primary underline-offset-2 hover:underline">
             更细的趋势与成本看 AI 调用概览
           </Link>
           。这里的口径与它一致。

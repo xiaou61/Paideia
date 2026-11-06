@@ -19,8 +19,6 @@ import {
   Users,
   Activity,
   Cpu,
-  ListOrdered,
-  Monitor,
 } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
@@ -76,17 +74,8 @@ const MENU: MenuItem[] = [
       { to: '/ai-credits/audit', label: '用量审计', icon: Receipt },
     ],
   },
-  // AI 调用统计（WORK-022）：概览看趋势，明细下钻到步骤。
-  {
-    to: '/ai-runs',
-    label: 'AI 调用',
-    icon: Activity,
-    children: [
-      { to: '/ai-runs/overview', label: '调用概览', icon: Activity },
-      { to: '/ai-runs/list', label: '调用明细', icon: ListOrdered },
-      { to: '/ai-runs/screen', label: '调用大屏', icon: Monitor },
-    ],
-  },
+  // AI 调用统计（WORK-022；2026-11-06 合并为一页，概览与明细用页签切换，大屏已删）。
+  { to: '/ai-runs', label: 'AI 调用', icon: Activity },
   // 运维（WORK-028）：只有一页（摘要卡片 + 完整面板），所以是叶子菜单项而不是父项分组。
   { to: '/ops/panel', label: '运维', icon: Cpu },
   // 事件（WORK-043）：告警的生命周期与时间线，与运维诊断分开一页。
@@ -107,9 +96,7 @@ const CRUMBS: Record<string, string[]> = {
   '/sql-datasets/reports': ['SQL 数据集', '举报处理'],
   '/users': ['用户管理'],
   '/ai-credits/audit': ['AI 积分', '用量审计'],
-  '/ai-runs/overview': ['AI 调用', '调用概览'],
-  '/ai-runs/list': ['AI 调用', '调用明细'],
-  '/ai-runs/screen': ['AI 调用', '调用大屏'],
+  '/ai-runs': ['AI 调用'],
   '/ops/panel': ['运维'],
   '/ops/incidents': ['事件'],
   '/analytics': ['数据大屏'],
