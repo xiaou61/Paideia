@@ -1,5 +1,7 @@
 package io.github.xiaou61.ai.internal.conversation;
 
+import java.util.List;
+
 /**
  * 点评官的提示词（WORK-010）。
  *
@@ -15,7 +17,15 @@ package io.github.xiaou61.ai.internal.conversation;
 public final class ReviewPrompt {
 
     /** 独立版本号：改字段或改约束都必须改它。 */
-    public static final String VERSION = "review-v1";
+    public static final String VERSION = "review-v2";
+
+    /**
+     * 固定的四个评估维度（WORK-078）。
+     *
+     * <p>**为什么固定**：跨场做自适应要能按维度比较，模型每次自造维度名（"技术准确性"/"深度"/
+     * "表达清晰度"…）就没法聚合。四者覆盖"知识 / 表达 / 经历 / 临场"，够用且不啰嗦。
+     */
+    public static final List<String> DIMENSIONS = List.of("技术深度", "表达结构", "项目经验", "应变能力");
 
     /** 各维度最多几个字、整体上限。与解析器保持一致。 */
     static final int MAX_DIMENSION_COMMENT = 200;
@@ -31,15 +41,16 @@ public final class ReviewPrompt {
                 只输出一个 JSON 对象，不要解释、不要用 markdown 代码块包裹。
 
                 JSON 结构：
-                {"overall": 3, "dimensions": [{"name": "技术准确性", "score": 3, "comment": "一句话"}],\
+                {"overall": 3, "dimensions": [{"name": "技术深度", "score": 3, "comment": "一句话"}],\
                 "strengths": ["具体优点"], "improvements": ["具体可执行的改进建议"]}
 
                 要求：
                 1. `overall` 与每个 `score` 都是 **1 到 5 的整数**，5 最好。
-                2. `dimensions` 给 2 到 4 个维度，名字用中文（如 技术准确性 / 表达清晰度 / 深度 / 应变）。
+                2. `dimensions` **必须且只能**是这四项、名字逐字照抄：技术深度、表达结构、项目经验、应变能力。
+                   每项给一个 score 与一句话 comment。不要改名、不要增删、不要换顺序。
                 3. `strengths` 与 `improvements` 各 1 到 4 条，每条一句话，**必须基于对话里的具体表现**，
                    不要写"继续努力""多练习"这种放之四海皆准的空话。
-                4. **只依据这场对话**。没聊到的方向不要打分、不要编造他说过的话。
+                4. **只依据这场对话**。没聊到的方向给该维度一个合理低分或中性分，不要编造他说过的话。
                 5. 打分要诚实：答不上来就是低分，不要为了照顾情绪给虚高的分。
                 """;
     }

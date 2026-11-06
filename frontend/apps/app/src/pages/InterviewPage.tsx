@@ -1,5 +1,5 @@
 import { createIdentityApi, configFor, type LearnerProfile } from '@paideia/identity'
-import { type AssistantApi, type InterviewEvaluationView } from '@paideia/assistant'
+import { adaptiveContextText, computeAbility, difficultyLabel, type AssistantApi, type AdaptiveBrief, type InterviewEvaluationView } from '@paideia/assistant'
 import {
   createResumeApi,
   type ResumeData,
@@ -40,7 +40,7 @@ import {
   Upload,
   User,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { api } from '../api'
 import { createAssistantApi } from '@paideia/assistant'
@@ -93,6 +93,9 @@ export function InterviewPage() {
     queryFn: () => assistant.interviewEvaluations(),
     retry: false,
   })
+
+  /** 历史评估 → 能力画像（WORK-078）：据此决定本场重点与起始难度。 */
+  const adaptive = useMemo(() => computeAbility(history.data ?? []), [history.data])
 
   const [conversationId, setConversationId] = useState<number | null>(null)
   const [lines, setLines] = useState<Line[]>([])
@@ -245,13 +248,13 @@ export function InterviewPage() {
     }
     setPreparing(true)
     setResumeError(null)
-    let pageContext: string | undefined
+    let resumeText: string | undefined
     try {
       if (resumeChoice === 'upload') {
-        pageContext = uploadedText
+        resumeText = uploadedText
       } else if (typeof resumeChoice === 'number') {
         const document = await resumesApi.get(resumeChoice)
-        pageContext = formatResume(document.data, document.title)
+        resumeText = formatResume(document.data, document.title)
       }
     } catch (cause) {
       // 简历取不到不该拦住面试：给出可读提示，按"无简历"继续。
@@ -259,7 +262,20 @@ export function InterviewPage() {
     } finally {
       setPreparing(false)
     }
-    void send(`开始面试。目标岗位：${profile?.targetRole ?? '未填写'}。`, true, pageContext)
+
+    // 自适应设置（WORK-078）+ 简历（WORK-077）一起作为 pageContext：只进提示词、不落库。
+    const parts: string[] = []
+    if (adaptive !== null) {
+      parts.push(adaptiveContextText(adaptive, history.data?.[0]?.evaluation.improvements ?? []))
+    }
+    if (resumeText !== undefined && resumeText.trim() !== '') {
+      parts.push(`【候选人简历】\n${resumeText}`)
+    }
+    void send(
+      `开始面试。目标岗位：${profile?.targetRole ?? '未填写'}。`,
+      true,
+      parts.length === 0 ? undefined : parts.join('\n\n'),
+    )
   }
 
   /** 本页上传 PDF/Word：解析成功用抽取出的原文作本次面试上下文（不强行入库）。 */
@@ -320,6 +336,7 @@ export function InterviewPage() {
               role={role}
               busy={busy}
               preparing={preparing}
+              adaptive={adaptive}
               onStart={() => { setConfirmStartOpen(true) }}
               resumes={resumeList.data}
               choice={resumeChoice}
@@ -594,6 +611,7 @@ function StartPanel({
   role,
   busy,
   preparing,
+  adaptive,
   onStart,
   resumes,
   choice,
@@ -607,6 +625,7 @@ function StartPanel({
   role: string | undefined
   busy: boolean
   preparing: boolean
+  adaptive: AdaptiveBrief | null
   onStart: () => void
   resumes: ResumeDocumentSummary[] | undefined
   choice: ResumeChoice
@@ -632,6 +651,15 @@ function StartPanel({
               {role === undefined || role === '' ? '未填写目标岗位' : role}
             </Badge>
           </div>
+
+          {adaptive === null ? null : (
+            <div className="border-border bg-muted/40 mt-3 rounded-lg border px-3 py-2 text-xs leading-5">
+              <span className="text-foreground font-medium">本场重点</span>：{adaptive.focus.join('、')}
+              <span className="text-muted-foreground">
+                {' '}· 难度 {difficultyLabel(adaptive.difficulty)} · 依据过往 {adaptive.sessions} 场
+              </span>
+            </div>
+          )}
 
           {/* 简历（可选，WORK-077）：选已有 / 当场上传 / 不使用 */}
           <div className="border-border mt-5 space-y-2 border-t pt-4">

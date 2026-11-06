@@ -9,6 +9,17 @@
 
 export { createAssistantApi } from './client'
 export type { AssistantApi } from './client'
+export {
+  adaptiveContextText,
+  computeAbility,
+  difficultyLabel,
+  INTERVIEW_DIMENSIONS,
+  normalizeDimension,
+  type AdaptiveBrief,
+  type DimensionAbility,
+  type InterviewDifficulty,
+  type InterviewDimensionName,
+} from './adaptive'
 export { GuideCard, composeGuideMessage, type AssistantGuide } from './guide-card'
 export { CreditsPanel } from './credits-panel'
 export { SummaryCardView } from './summary-card'
