@@ -39,15 +39,15 @@ interface KnowledgeChunkEditMapper {
             + "WHERE entry_id = #{entryId} AND chunk_index = #{chunkIndex}")
     int findMaxVersion(@Param("entryId") long entryId, @Param("chunkIndex") int chunkIndex);
 
-    @Select("SELECT c." + COLUMNS + " FROM ai_knowledge_chunk_edits c " + CURRENT_JOIN
+    @Select("SELECT c.* FROM ai_knowledge_chunk_edits c " + CURRENT_JOIN
             + " WHERE c.entry_id = #{entryId} ORDER BY c.chunk_index")
     List<KnowledgeChunkEdit> findCurrentByEntry(@Param("entryId") long entryId);
 
-    @Select("SELECT c." + COLUMNS + " FROM ai_knowledge_chunk_edits c " + CURRENT_JOIN
+    @Select("SELECT c.* FROM ai_knowledge_chunk_edits c " + CURRENT_JOIN
             + " ORDER BY c.entry_id, c.chunk_index")
     List<KnowledgeChunkEdit> findAllCurrent();
 
-    @Select("SELECT c." + COLUMNS + " FROM ai_knowledge_chunk_edits c " + CURRENT_JOIN
+    @Select("SELECT c.* FROM ai_knowledge_chunk_edits c " + CURRENT_JOIN
             + " WHERE c.embedding IS NULL")
     List<KnowledgeChunkEdit> findPendingEmbedding();
 

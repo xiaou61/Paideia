@@ -46,6 +46,8 @@ src/main/resources/db/migration/V20261102200000__create_memory_extraction_jobs.s
 src/main/resources/db/migration/V20261104142000__add_ai_runs_failure_kind.sql 1025408658
 src/main/resources/db/migration/V20261104160000__create_ai_knowledge_chunks.sql -1879670554
 src/main/resources/db/migration/V20261106153000__add_essay_direction_categories.sql 902909467
+src/main/resources/db/migration/V20261106172000__create_ai_knowledge_imports.sql 278575980
+src/main/resources/db/migration/V20261106173000__create_ai_knowledge_chunk_edits.sql -2023697050
 src/main/resources/db/migration/V20__add_entry_read_indexes.sql -1148086735
 src/main/resources/db/migration/V21__create_ai_telemetry_tables.sql -891669932
 src/main/resources/db/migration/V22__create_learning_tracks.sql -976007377

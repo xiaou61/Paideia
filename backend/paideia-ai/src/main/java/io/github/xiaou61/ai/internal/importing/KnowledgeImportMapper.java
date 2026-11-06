@@ -31,7 +31,8 @@ interface KnowledgeImportMapper {
 
     @Select("""
             <script>
-            SELECT """ + COLUMNS + """
+            SELECT id, file_id, relative_path, target_category_id, status, entry_id, error,
+                   operator_id, created_at, updated_at
             FROM ai_knowledge_imports
             <if test="status != null">WHERE status = #{status}</if>
             ORDER BY id DESC

@@ -6,7 +6,7 @@
 
 # API 端点清单
 
-由后端 48 个 Controller 生成：**190 个端点**，分布在 9 个模块。
+由后端 48 个 Controller 生成：**194 个端点**，分布在 9 个模块。
 
 这是**结构性的清单**，不是手写文档——端点加一个这里就多一行，
 所以它不会像手写的接口文档那样过期。真正的授权规则在 `SecurityConfiguration`，
@@ -19,19 +19,18 @@
 | `paideia-account` | `/api/v1/auth` | `AuthController` | 免鉴权 | 6 |
 | `paideia-account` | `/api/v1/auth/oauth` | `OAuthController` | 免鉴权 | 4 |
 | `paideia-account` | `/api/v1/me` | `AccountDeletionController` | 登录即可 | 1 |
+| `paideia-ai` | `/api/v1/ai` | `QuickInsightController` | 登录即可 | 5 |
 | `paideia-ai` | `/api/v1/ai` | `ResumeOptimizationController` | 登录即可 | 9 |
 | `paideia-ai` | `/api/v1/ai/admin/credits` | `AiCreditAdminController` | 仅管理员 | 4 |
+| `paideia-ai` | `/api/v1/ai/admin/knowledge-entries/{entryId}/chunks` | `KnowledgeChunkAdminController` | 仅管理员 | 4 |
+| `paideia-ai` | `/api/v1/ai/admin/knowledge-imports` | `KnowledgeImportController` | 仅管理员 | 3 |
 | `paideia-ai` | `/api/v1/ai/admin/runs` | `AiRunAdminController` | 仅管理员 | 7 |
 | `paideia-ai` | `/api/v1/ai/camps` | `CampController` | 登录即可 | 11 |
 | `paideia-ai` | `/api/v1/ai/conversations` | `AssistantConversationController` | 登录即可 | 4 |
 | `paideia-ai` | `/api/v1/ai/credentials` | `AiCredentialController` | 登录即可 | 1 |
 | `paideia-ai` | `/api/v1/ai/credits` | `AiCreditController` | 登录即可 | 1 |
-| `paideia-ai` | `/api/v1/ai/feedback` | `AiFeedbackAdminController` | 登录即可 | 1 |
-| `paideia-ai` | `/api/v1/ai/feedback` | `AiFeedbackController` | 登录即可 | 1 |
 | `paideia-ai` | `/api/v1/ai/interviews` | `InterviewController` | 登录即可 | 2 |
-| `paideia-ai` | `/api/v1/ai/memories` | `AiMemoryController` | 登录即可 | 7 |
 | `paideia-ai` | `/api/v1/ai/resumes` | `ResumeController` | 登录即可 | 12 |
-| `paideia-ai` | `/api/v1/ai/settings` | `AiSettingsController` | 登录即可 | 2 |
 | `paideia-ai` | `/api/v1/ai/summaries` | `AiSummaryController` | 登录即可 | 2 |
 | `paideia-ai` | `/api/v1/digest` | `DigestController` | 登录即可 | 4 |
 | `paideia-ai` | `/api/v1/digest/admin` | `DigestAdminController` | 仅管理员 | 2 |
@@ -55,12 +54,13 @@
 | `paideia-ops` | `(根)` | `OpsGrafanaProxyController` | 登录即可 | 2 |
 | `paideia-ops` | `/api/v1/ops/admin` | `OpsSummaryController` | 仅管理员 | 1 |
 | `paideia-ops` | `/api/v1/ops/admin/analytics` | `AnalyticsController` | 仅管理员 | 1 |
+| `paideia-ops` | `/api/v1/ops/admin/content-import` | `ContentImportController` | 仅管理员 | 2 |
 | `paideia-ops` | `/api/v1/ops/admin/diagnoses` | `OpsDiagnosisController` | 仅管理员 | 5 |
 | `paideia-ops` | `/api/v1/ops/admin/incidents` | `OpsIncidentController` | 仅管理员 | 4 |
 | `paideia-ops` | `/api/v1/ops/hooks` | `OpsHookController` | 登录即可 | 1 |
 | `paideia-sandbox` | `/api/v1/sandbox` | `SandboxController` | 登录即可 | 5 |
 | `paideia-sandbox` | `/api/v1/sandbox/admin/sql-datasets` | `SqlDatasetAdminController` | 仅管理员 | 4 |
-| `paideia-sandbox` | `/api/v1/sql-datasets` | `SqlDatasetController` | 登录即可 | 9 |
+| `paideia-sandbox` | `/api/v1/sql-datasets` | `SqlDatasetController` | 登录即可 | 10 |
 | `paideia-security` | `(根)` | `MeController` | 登录即可 | 1 |
 
 ## 按 HTTP 方法统计
@@ -68,7 +68,7 @@
 | 方法 | 数量 |
 | --- | --- |
 | `GET` | 88 |
-| `POST` | 66 |
-| `DELETE` | 21 |
+| `POST` | 72 |
+| `DELETE` | 19 |
 | `PUT` | 12 |
 | `PATCH` | 3 |

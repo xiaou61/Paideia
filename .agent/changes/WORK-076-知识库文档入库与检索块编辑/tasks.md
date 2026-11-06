@@ -149,7 +149,7 @@ approver_role: CTO
   4. 测试转绿。
 - 验证：`-Dtest=KnowledgeImportControllerTest`、`-Dtest=AuthorizationIsolationTest` → passed。
 
-### TASK-008 | in_progress | 块编辑表 + mapper
+### TASK-008 | done | 块编辑表 + mapper
 
 - 对应：`REQ-201`、`REQ-204`
 - 依赖：无
@@ -266,7 +266,7 @@ approver_role: CTO
   3. e2e：进入页面 → 展开分类 → 正文渲染。
 - 验证：`e2e/knowledge-wiki.spec.ts` → passed。
 
-### TASK-015 | pending | 收尾：结构图 + 迁移守卫 + 验收报告
+### TASK-015 | in_progress | 收尾：结构图 + 迁移守卫 + 验收报告
 
 - 对应：全部 `AC-*`
 - 依赖：TASK-001…TASK-014
@@ -298,3 +298,8 @@ approver_role: CTO
 - 2026-11-06 TASK-010：`-Dtest=KnowledgeChunkAdminControllerTest` → Tests run 1, Failures 0。
 - 2026-11-06 TASK-011：`pnpm --filter @paideia/knowledge exec vitest run src/admin-client.test.ts` → 4 passed；`pnpm --filter @paideia/knowledge typecheck` EXIT=0。
 - 2026-11-06 TASK-012/013/014：页面+路由+入口实现；`pnpm --filter @paideia/admin typecheck` EXIT=0、`pnpm --filter @paideia/app typecheck` EXIT=0。e2e 规格待补并在 TASK-015 运行。
+- 2026-11-06 守卫：test-db.sh + `-Dtest=ModularityTest,MigrationVersionFormatTest,MigrationChecksumTest,MigrationSeedOverlapTest,ApiSurfaceTest,ApiContractTest,AuthorizationIsolationTest` → BUILD SUCCESS，Tests run 35，Failures 0。Flyway 成功应用 62 迁移（含两条新迁移，now at v20261106173000）。
+- 2026-11-06 集成：`-Dtest=KnowledgeChunkImportIntegrationTest` → Tests run 3, Failures 0（真实 MySQL；期间修复 2 个 SQL 缺陷：IMPORT findRecent 丢空格、CHUNK_EDIT 列前缀歧义）。
+- 2026-11-06 结构图：`gen-arch-diagram.mjs` 生成 65 表/15 外键、194 端点/48 控制器，`--check` 通过；README 计数已更新。
+- 2026-11-06 TASK-008：mapper SQL 已由集成测试在真实库上验证 → done。
+- 2026-11-06 TASK-015：验证报告 `testing/report.md` 已产出；Playwright e2e 已编写但未运行，真实模型蒸馏端到端（AC-101/102）待环境补验。

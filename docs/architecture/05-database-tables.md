@@ -6,8 +6,8 @@
 
 # 数据库表
 
-由 `backend/paideia-app/src/main/resources/db/migration/` 的 45 个迁移生成：
-共 **62 张表**，其中只有 **14 条外键**。
+由 `backend/paideia-app/src/main/resources/db/migration/` 的 50 个迁移生成：
+共 **65 张表**，其中只有 **15 条外键**。
 
 外键少是**刻意的**，不是遗漏：跨模块的关联（比如 `ai_memories_structured.user_id` → `users.id`）
 由应用层保证，不交给数据库。所以下面这张图只画**有真实外键约束**的关系，
@@ -15,6 +15,7 @@
 
 ```mermaid
 flowchart LR
+  ai_knowledge_chunk_edits["ai_knowledge_chunk_edits"]
   knowledge_categories["knowledge_categories"]
   knowledge_concept_edges["knowledge_concept_edges"]
   knowledge_entries["knowledge_entries"]
@@ -34,6 +35,7 @@ flowchart LR
   knowledge_entry_views -->|entry_id| knowledge_entries
   refresh_tokens -->|user_id| users
   user_identities -->|user_id| users
+  ai_knowledge_chunk_edits -->|entry_id| knowledge_entries
   learning_track_stages -->|entry_id| knowledge_entries
   knowledge_categories -->|parent_id| knowledge_categories
   knowledge_entries -->|category_id| knowledge_categories
@@ -52,6 +54,9 @@ flowchart LR
 | `ai_entry_summaries` | `V4__create_ai_tables` | （无） |
 | `ai_feedback` | `V20261023140000__create_ai_feedback` | （无） |
 | `ai_interview_evaluations` | `V14__create_learner_profiles` | （无） |
+| `ai_knowledge_chunk_edits` | `V20261106173000__create_ai_knowledge_chunk_edits` | `entry_id` → `knowledge_entries` |
+| `ai_knowledge_chunks` | `V20261104160000__create_ai_knowledge_chunks` | （无） |
+| `ai_knowledge_imports` | `V20261106172000__create_ai_knowledge_imports` | （无） |
 | `ai_memories_structured` | `V6__create_memory_tables` | （无） |
 | `ai_memories_text` | `V6__create_memory_tables` | （无） |
 | `ai_memory_candidates` | `V20261028150000__memory_relevance_candidates_and_ttl` | （无） |
