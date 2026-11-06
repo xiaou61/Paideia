@@ -42,6 +42,17 @@ updated: 2026-11-06
 - **真实长跑自适应效果未验**：需多场真实面试产生历史才能观察"是否真的变难/变准"，属线上观测项，不做假数据断言。
 - 旧评估（review-v1 时代）维度名不规范，靠关键词归一到四维；归一不上的旧维度不会进入"重点"判断（仍参与总分为主）。
 
+## 部署结果（2026-11-06）
+
+| 检查项 | 命令 | 退出码 | 结果 | 证据 |
+| --- | --- | --- | --- | --- |
+| 从提交干净构建并部署 | 独立 worktree 跑 `scripts/release.ps1` | 0 | passed | 完成：174.7 秒（health 29s） |
+| 线上健康 | `curl /actuator/health` | 0 | passed | HTTP 200 |
+| 线上版本 | `cat deploy.prom` | 0 | passed | `paideia_build_info{version="60da934"} 1` |
+| 自适应界面已上线 | grep `/opt/paideia-app/web` | 0 | passed | `index-DUiqDYzt.js` 命中「本场重点」「本场自适应设置」 |
+
+> 说明：从 `60da9340` 的独立 worktree 部署；主工作区当时有别的会话未提交改动，未被带上线。
+
 ## 剩余风险
 
 - 能力模型是 EWMA 近似，不是真正 IRT；维度样本少时（1 场）权重退化合理但波动大。
