@@ -87,7 +87,12 @@ const MENU: MenuItem[] = [
   { to: '/analytics', label: '数据大屏', icon: BarChart3 },
 ]
 
-/** 面包屑：按菜单层级写死的路径（首页固定在最前，不再逐级可点）。 */
+/**
+ * 面包屑：按菜单层级写死的路径（首页固定在最前，不再逐级可点）。
+ *
+ * <p>静态映射只覆盖固定路径；带参数的页面（如 `/knowledge/entries/:id/chunks`，WORK-076）
+ * 用 {@link crumbsFor} 里的模式兜住——否则会退化成只有「管理端」一段，看不出自己在哪。
+ */
 const CRUMBS: Record<string, string[]> = {
   '/': ['总览'],
   '/knowledge/categories': ['知识库', '分类管理'],
@@ -103,6 +108,18 @@ const CRUMBS: Record<string, string[]> = {
   '/ops/panel': ['运维'],
   '/ops/incidents': ['事件'],
   '/analytics': ['数据大屏'],
+}
+
+/** 动态路由的面包屑（静态表放不下的带参数页面）。 */
+function crumbsFor(pathname: string): string[] {
+  const exact = CRUMBS[pathname]
+  if (exact !== undefined) {
+    return exact
+  }
+  if (/^\/knowledge\/entries\/\d+\/chunks$/.test(pathname)) {
+    return ['知识库', '检索切片']
+  }
+  return ['管理端']
 }
 
 /**
@@ -122,7 +139,7 @@ export function AdminShell({ actions, children }: { actions?: ReactNode; childre
   const [drawerOpen, setDrawerOpen] = useState(false)
   // 只记录"用户手动点过"的父菜单；没点过的跟着当前路由走
   const [toggled, setToggled] = useState<Record<string, boolean>>({})
-  const crumbs = CRUMBS[pathname] ?? ['管理端']
+  const crumbs = crumbsFor(pathname)
 
   // 选中菜单后自动收起：手机上抽屉盖住内容，不关的话还要再点一次遮罩
   useEffect(() => {
