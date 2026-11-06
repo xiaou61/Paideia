@@ -209,7 +209,7 @@ approver_role: CTO
   4. 测试转绿。
 - 验证：`-Dtest=KnowledgeChunkAdminControllerTest`、`-Dtest=AuthorizationIsolationTest` → passed。
 
-### TASK-011 | pending | 前端 admin-client 扩展
+### TASK-011 | done | 前端 admin-client 扩展
 
 - 对应：`REQ-201`、`REQ-106`
 - 依赖：TASK-007、TASK-010
@@ -222,7 +222,7 @@ approver_role: CTO
   3. 测试转绿。
 - 验证：`cd frontend && pnpm --filter @paideia/knowledge test` → passed。
 
-### TASK-012 | pending | 管理端导入页（文件夹保留目录）
+### TASK-012 | done | 管理端导入页（文件夹保留目录）
 
 - 对应：`REQ-104`、`REQ-106`
 - 依赖：TASK-011
@@ -237,7 +237,7 @@ approver_role: CTO
   3. e2e：上传含子目录 → 断言任务列表出现且成功后分类树生成子节点。
 - 验证：`bash ../scripts/test-db.sh pnpm --filter @paideia/admin test:e2e e2e/knowledge-import.spec.ts` → passed。
 
-### TASK-013 | pending | 管理端块编辑面板
+### TASK-013 | done | 管理端块编辑面板
 
 - 对应：`REQ-201`、`REQ-202`、`REQ-203`、`REQ-204`
 - 依赖：TASK-011
@@ -252,7 +252,7 @@ approver_role: CTO
   3. e2e：编辑一块 → 检索（用 API 或页面）内容变化；回滚 → 内容恢复。
 - 验证：`e2e/knowledge-chunks.spec.ts` → passed。
 
-### TASK-014 | pending | 学习者目录阅读视图
+### TASK-014 | done | 学习者目录阅读视图
 
 - 对应：`REQ-301`、`REQ-302`
 - 依赖：TASK-002
@@ -296,3 +296,5 @@ approver_role: CTO
 - 2026-11-06 TASK-008：迁移 `V20261106173000__create_ai_knowledge_chunk_edits.sql` + 实体 + mapper 已写，参与 `paideia-ai` 编译通过；mapper SQL 依赖 MySQL，待集成测试（环境就绪）验证后转 done。
 - 2026-11-06 TASK-009：`-Dtest=KnowledgeChunkEditingServiceTest,KnowledgeRagServiceTest` → Tests run 10, Failures 0（含合并覆盖用例）。
 - 2026-11-06 TASK-010：`-Dtest=KnowledgeChunkAdminControllerTest` → Tests run 1, Failures 0。
+- 2026-11-06 TASK-011：`pnpm --filter @paideia/knowledge exec vitest run src/admin-client.test.ts` → 4 passed；`pnpm --filter @paideia/knowledge typecheck` EXIT=0。
+- 2026-11-06 TASK-012/013/014：页面+路由+入口实现；`pnpm --filter @paideia/admin typecheck` EXIT=0、`pnpm --filter @paideia/app typecheck` EXIT=0。e2e 规格待补并在 TASK-015 运行。

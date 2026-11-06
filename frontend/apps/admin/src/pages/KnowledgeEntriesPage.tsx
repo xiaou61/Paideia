@@ -40,6 +40,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, RotateCcw, Upload } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
+import { Link } from 'react-router'
 
 import { API_BASE_URL } from '../env'
 import { ConfirmDeleteDialog, Loading, admin, categoryGroups, flatten, type FlatCategory } from '../knowledge-shared'
@@ -352,6 +353,14 @@ export function KnowledgeEntriesPage() {
                       onClick={() => setEditingId(entry.id)}
                     >
                       编辑
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      render={<Link to={`/knowledge/entries/${entry.id}/chunks`} />}
+                      data-testid={`admin-entry-chunks-${entry.id}`}
+                    >
+                      切片
                     </Button>
                     <Button
                       variant="ghost"

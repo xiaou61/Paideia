@@ -7,6 +7,8 @@ import { AiRunsPage } from './pages/AiRunsPage'
 import { KnowledgeCategoriesPage } from './pages/KnowledgeCategoriesPage'
 import { KnowledgeConceptsPage } from './pages/KnowledgeConceptsPage'
 import { KnowledgeEntriesPage } from './pages/KnowledgeEntriesPage'
+import { KnowledgeImportPage } from './pages/KnowledgeImportPage'
+import { KnowledgeEntryChunksPage } from './pages/KnowledgeEntryChunksPage'
 import { AdminUsersPage } from './pages/AdminUsersPage'
 import { NoteReportsPage } from './pages/NoteReportsPage'
 import { SqlDatasetReportsPage } from './pages/SqlDatasetReportsPage'
@@ -91,6 +93,24 @@ export const router = createHashRouter([
     element: (
       <RequireAdmin>
         <KnowledgeEntriesPage />
+      </RequireAdmin>
+    ),
+  },
+  {
+    // 文档导入（WORK-076）：选文件夹 → 解析蒸馏成草稿。
+    path: '/knowledge/imports',
+    element: (
+      <RequireAdmin>
+        <KnowledgeImportPage />
+      </RequireAdmin>
+    ),
+  },
+  {
+    // 检索切片编辑（WORK-076）：查看/编辑/回滚某条目的 RAG 切片。
+    path: '/knowledge/entries/:entryId/chunks',
+    element: (
+      <RequireAdmin>
+        <KnowledgeEntryChunksPage />
       </RequireAdmin>
     ),
   },

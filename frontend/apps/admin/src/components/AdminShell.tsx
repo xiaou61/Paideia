@@ -19,6 +19,7 @@ import {
   Users,
   Activity,
   Cpu,
+  Upload,
 } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
@@ -46,6 +47,7 @@ const MENU: MenuItem[] = [
     children: [
       { to: '/knowledge/categories', label: '分类管理', icon: FolderTree },
       { to: '/knowledge/entries', label: '条目管理', icon: FileText },
+      { to: '/knowledge/imports', label: '文档导入', icon: Upload },
       { to: '/knowledge/concepts', label: '概念', icon: Boxes },
     ],
   },
@@ -90,6 +92,7 @@ const CRUMBS: Record<string, string[]> = {
   '/': ['总览'],
   '/knowledge/categories': ['知识库', '分类管理'],
   '/knowledge/entries': ['知识库', '条目管理'],
+  '/knowledge/imports': ['知识库', '文档导入'],
   '/knowledge/concepts': ['知识库', '概念'],
   '/reports': ['举报处理'],
   '/sql-datasets/list': ['SQL 数据集', '数据集管理'],

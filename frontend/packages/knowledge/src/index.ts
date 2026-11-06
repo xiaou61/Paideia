@@ -14,10 +14,16 @@ export type {
   AdminEntrySummary,
   AdminRelation,
   CategoryInput,
+  ChunkEditResult,
+  ChunkRevision,
+  ChunkView,
   ConceptInput,
   ConceptSummary,
+  CreateImportResult,
   EntryInput,
+  ImportItem,
   KnowledgeAdminApi,
+  KnowledgeImportRow,
 } from './admin-client'
 export { createKnowledgeApi } from './client'
 export type {

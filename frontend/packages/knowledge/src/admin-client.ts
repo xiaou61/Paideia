@@ -62,6 +62,52 @@ export interface UploadedFile {
   originalName: string
 }
 
+// ── 文档导入（WORK-076） ─────────────────────────────────────────
+
+/** 单个导入项：附件 id + 文件夹内相对路径（保留目录树，可空）。 */
+export interface ImportItem {
+  fileId: string
+  relativePath: string | null
+}
+
+export interface CreateImportResult {
+  importIds: number[]
+}
+
+export interface KnowledgeImportRow {
+  id: number
+  fileId: string
+  relativePath: string | null
+  status: string
+  entryId: number | null
+  error: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+// ── 检索切片编辑（WORK-076） ─────────────────────────────────────
+
+export interface ChunkView {
+  chunkIndex: number
+  content: string
+  origin: 'auto' | 'manual'
+  version: number | null
+  conflict: boolean
+  orphaned: boolean
+}
+
+export interface ChunkEditResult {
+  version: number
+  embeddingPending: boolean
+}
+
+export interface ChunkRevision {
+  version: number
+  content: string
+  editorId: number
+  createdAt: string
+}
+
 export interface KnowledgeAdminApi {
   categories(): Promise<CategoryNode[]>
   createCategory(input: CategoryInput): Promise<number>
@@ -88,6 +134,21 @@ export interface KnowledgeAdminApi {
   unlinkConceptEntry(conceptId: number, entryId: number): Promise<null>
   createConceptEdge(fromConceptId: number, toConceptId: number, relationType: string): Promise<number>
   deleteConceptEdge(id: number): Promise<null>
+
+  /** 文档导入：登记任务、查状态、重试（WORK-076）。 */
+  knowledgeImports: {
+    create(categoryId: number | null, items: ImportItem[]): Promise<CreateImportResult>
+    list(status?: string): Promise<KnowledgeImportRow[]>
+    retry(id: number): Promise<null>
+  }
+
+  /** 检索切片：查看、编辑、历史、回滚（WORK-076）。 */
+  chunkEdits: {
+    list(entryId: number): Promise<ChunkView[]>
+    edit(entryId: number, chunkIndex: number, content: string): Promise<ChunkEditResult>
+    revisions(entryId: number, chunkIndex: number): Promise<ChunkRevision[]>
+    rollback(entryId: number, chunkIndex: number, version: number): Promise<{ version: number }>
+  }
 }
 
 export interface ConceptSummary {
@@ -193,5 +254,39 @@ export function createKnowledgeAdminApi(client: ApiClient): KnowledgeAdminApi {
       }),
     deleteConceptEdge: (id) =>
       client.requestEnvelope<null>(`${base}/concept-edges/${id}`, { method: 'DELETE' }),
+
+    knowledgeImports: {
+      create: (categoryId, items) =>
+        client.requestEnvelope<CreateImportResult>('/api/v1/ai/admin/knowledge-imports', {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ categoryId, items }),
+        }),
+      list: (status) =>
+        client.requestEnvelope<KnowledgeImportRow[]>(
+          `/api/v1/ai/admin/knowledge-imports${status === undefined ? '' : `?status=${status}`}`,
+        ),
+      retry: (id) =>
+        client.requestEnvelope<null>(`/api/v1/ai/admin/knowledge-imports/${id}/retry`, { method: 'POST' }),
+    },
+
+    chunkEdits: {
+      list: (entryId) =>
+        client.requestEnvelope<ChunkView[]>(`/api/v1/ai/admin/knowledge-entries/${entryId}/chunks`),
+      edit: (entryId, chunkIndex, content) =>
+        client.requestEnvelope<ChunkEditResult>(
+          `/api/v1/ai/admin/knowledge-entries/${entryId}/chunks/${chunkIndex}`,
+          { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ content }) },
+        ),
+      revisions: (entryId, chunkIndex) =>
+        client.requestEnvelope<ChunkRevision[]>(
+          `/api/v1/ai/admin/knowledge-entries/${entryId}/chunks/${chunkIndex}/revisions`,
+        ),
+      rollback: (entryId, chunkIndex, version) =>
+        client.requestEnvelope<{ version: number }>(
+          `/api/v1/ai/admin/knowledge-entries/${entryId}/chunks/${chunkIndex}/rollback`,
+          { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ version }) },
+        ),
+    },
   }
 }

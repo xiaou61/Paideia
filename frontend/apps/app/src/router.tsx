@@ -8,6 +8,7 @@ import { GraphPage } from './pages/GraphPage'
 import { ProgressPage } from './pages/ProgressPage'
 import { ReviewPage } from './pages/ReviewPage'
 import { KnowledgeEntryPage } from './pages/KnowledgeEntryPage'
+import { KnowledgeWikiPage } from './pages/KnowledgeWikiPage'
 import { CampDetailPage } from './pages/CampDetailPage'
 import { CampListPage } from './pages/CampListPage'
 import { CategoryEntriesPage } from './pages/CategoryEntriesPage'
@@ -213,6 +214,15 @@ export const router = createHashRouter([
     element: (
       <RequireAuth>
         <KnowledgeEntryPage />
+      </RequireAuth>
+    ),
+  },
+  {
+    // 按目录阅读（WORK-076）：左目录 + 中条目 + 右正文的文档站式浏览。
+    path: '/knowledge/wiki',
+    element: (
+      <RequireAuth>
+        <KnowledgeWikiPage />
       </RequireAuth>
     ),
   },

@@ -69,6 +69,23 @@ export function KnowledgeCategoriesPage() {
         <ArrowRight className="text-muted-foreground group-hover:text-primary size-5 transition-colors" />
       </Link>
 
+      <Link
+        to="/knowledge/wiki"
+        data-testid="wiki-reader-card"
+        className="border-border bg-card hover:border-primary/40 hover:shadow-card group mb-8 flex items-center justify-between rounded-xl border p-5 transition-all hover:-translate-y-0.5"
+      >
+        <span className="flex items-center gap-4">
+          <span className="bg-muted text-foreground flex size-11 items-center justify-center rounded-xl">
+            <FolderOpen className="size-5" />
+          </span>
+          <span>
+            <span className="block font-medium">按目录阅读</span>
+            <span className="text-muted-foreground block text-sm">像读手册一样：左目录、右正文</span>
+          </span>
+        </span>
+        <ArrowRight className="text-muted-foreground group-hover:text-primary size-5 transition-colors" />
+      </Link>
+
       {categories.isPending ? (
         <LoadingRow label="加载分类…" testId="category-state" />
       ) : null}
