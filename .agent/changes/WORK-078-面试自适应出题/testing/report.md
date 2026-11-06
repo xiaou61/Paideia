@@ -50,12 +50,13 @@ updated: 2026-11-06
 
 | 检查项 | 命令 | 退出码 | 结果 | 证据 |
 | --- | --- | --- | --- | --- |
-| 从提交干净构建并部署 | 独立 worktree 跑 `scripts/release.ps1` | 0 | passed | 完成：174.7 秒（health 29s） |
+| 部署（第一批：自适应出题） | 独立 worktree 跑 `scripts/release.ps1` | 0 | passed | 完成：174.7 秒 → 版本 `60da934` |
+| 部署（第二批：历史详情+回放+弱项复习） | 同上 | 0 | passed | 完成：333.7 秒（health 27s）→ 版本 `53260b5` |
 | 线上健康 | `curl /actuator/health` | 0 | passed | HTTP 200 |
-| 线上版本 | `cat deploy.prom` | 0 | passed | `paideia_build_info{version="60da934"} 1` |
-| 自适应界面已上线 | grep `/opt/paideia-app/web` | 0 | passed | `index-DUiqDYzt.js` 命中「本场重点」「本场自适应设置」 |
+| 线上版本 | `cat deploy.prom` | 0 | passed | `paideia_build_info{version="53260b5"} 1` |
+| 界面已上线 | grep `/opt/paideia-app/web` | 0 | passed | `index-IzAsjm2p.js` 命中「本场重点」「本场自适应设置」「针对弱项去复习」「对话回放」 |
 
-> 说明：从 `60da9340` 的独立 worktree 部署；主工作区当时有别的会话未提交改动，未被带上线。
+> 说明：两批都从各自提交的独立 worktree 部署；主工作区当时有别的会话未提交改动，未被带上线。
 
 ## 剩余风险
 
