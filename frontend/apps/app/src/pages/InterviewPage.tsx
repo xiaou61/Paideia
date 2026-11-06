@@ -15,10 +15,17 @@ import {
   Button,
   Card,
   CardContent,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   PageHeader,
   Separator,
   Spinner,
 } from '@paideia/ui'
+import { useBlocker } from 'react-router'
 import {
   ArrowRight,
   Bot,
@@ -125,6 +132,40 @@ export function InterviewPage() {
       }
     }
   }, [resumeList.data])
+
+  /** 开面二次确认：明确告知会消耗积分（每轮对话与生成点评都计费）。 */
+  const [confirmStartOpen, setConfirmStartOpen] = useState(false)
+  /** 「结束面试」二次确认：结束后这场不能继续、也不能重进。 */
+  const [endConfirmOpen, setEndConfirmOpen] = useState(false)
+
+  /** 结束本场：退回到未开始状态（对话不再恢复）。 */
+  const endInterview = () => {
+    abortRef.current?.abort()
+    setEndConfirmOpen(false)
+    setConversationId(null)
+    setLines([])
+    setEvaluation(null)
+    setInput('')
+    setError(null)
+  }
+
+  /**
+   * 未出报告就离开 = 这场白聊：站内跳转要拦一下确认，关页/刷新也要提示。
+   * 出了报告（evaluation 非空）就不再拦——报告已落库，历史里能看。
+   */
+  const blockLeave = started && evaluation === null
+  const blocker = useBlocker(blockLeave)
+  useEffect(() => {
+    if (!blockLeave) {
+      return
+    }
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => { window.removeEventListener('beforeunload', handler) }
+  }, [blockLeave])
 
   /** 当前这轮在飞的请求；离开页面时中断它（与助手那条同一纪律：不能让上游继续烧钱）。 */
   const abortRef = useRef<AbortController | null>(null)
@@ -279,7 +320,7 @@ export function InterviewPage() {
               role={role}
               busy={busy}
               preparing={preparing}
-              onStart={() => { void start() }}
+              onStart={() => { setConfirmStartOpen(true) }}
               resumes={resumeList.data}
               choice={resumeChoice}
               onChoose={setResumeChoice}
@@ -318,6 +359,16 @@ export function InterviewPage() {
                     )}
                   </p>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  data-testid="interview-end"
+                  disabled={busy}
+                  onClick={() => { setEndConfirmOpen(true) }}
+                  className="gap-1.5"
+                >
+                  结束面试
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -396,6 +447,81 @@ export function InterviewPage() {
           </Alert>
         )}
       </div>
+
+      {/* 开面二次确认：把"会扣积分 / 结束能出报告"讲清楚再开始 */}
+      <Dialog open={confirmStartOpen} onOpenChange={setConfirmStartOpen}>
+        <DialogContent data-testid="interview-start-confirm-dialog">
+          <DialogHeader>
+            <DialogTitle>开始这场模拟面试？</DialogTitle>
+            <DialogDescription>开始前先确认几件事：</DialogDescription>
+          </DialogHeader>
+          <ul className="text-muted-foreground space-y-2 text-sm">
+            <li>· <span className="text-foreground">会消耗积分</span>：每轮提问/回答按模型用量计费，点「生成点评」出报告也会计费。</li>
+            <li>· <span className="text-foreground">结束有报告</span>：随时点「生成点评」，拿到总分 + 各维度评分 + 优点/改进。</li>
+            <li>· <span className="text-foreground">开始后请别中途离开</span>：这场对话不会在页面留存，退出后无法继续、也不能重新进入。</li>
+          </ul>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setConfirmStartOpen(false) }}>
+              再想想
+            </Button>
+            <Button
+              data-testid="interview-start-confirm"
+              disabled={busy || preparing}
+              onClick={() => {
+                setConfirmStartOpen(false)
+                void start()
+              }}
+            >
+              {preparing ? '准备中…' : '开始面试'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 未出报告就离开的二次确认（站内跳转被 useBlocker 拦下时弹） */}
+      <Dialog
+        open={blocker.state === 'blocked'}
+        onOpenChange={(open) => { if (!open) { blocker.reset?.() } }}
+      >
+        <DialogContent data-testid="interview-leave-confirm-dialog">
+          <DialogHeader>
+            <DialogTitle>要离开这场面试吗？</DialogTitle>
+            <DialogDescription>
+              离开后这场对话<strong className="text-foreground">无法继续，也不能重新进入</strong>。
+              想留下结果的话，先点右上角「生成点评」拿一份报告，报告会存进「历次面试」。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { blocker.reset?.() }}>
+              继续面试
+            </Button>
+            <Button variant="destructive" onClick={() => { blocker.proceed?.() }}>
+              离开
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 「结束面试」二次确认 */}
+      <Dialog open={endConfirmOpen} onOpenChange={setEndConfirmOpen}>
+        <DialogContent data-testid="interview-end-confirm-dialog">
+          <DialogHeader>
+            <DialogTitle>结束这场面试？</DialogTitle>
+            <DialogDescription>
+              结束后这场对话<strong className="text-foreground">无法继续，也不能重新进入</strong>。
+              想留下结果的话，先点「生成点评」拿一份报告，报告会存进「历次面试」。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setEndConfirmOpen(false) }}>
+              继续面试
+            </Button>
+            <Button variant="destructive" onClick={endInterview}>
+              结束并退出
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   )
 }
@@ -581,6 +707,9 @@ function StartPanel({
             {preparing ? '准备中…' : busy ? '开场中…' : '开始面试'}
             {starting ? null : <ArrowRight className="size-4" />}
           </Button>
+          <p className="text-muted-foreground mt-2 text-xs">
+            本场会消耗积分：每轮提问/回答与「生成点评」都按模型用量计费。
+          </p>
         </div>
         <div className="border-border bg-muted/40 border-t p-6 sm:p-8 md:border-t-0 md:border-l">
           <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">这场面试怎么进行</p>

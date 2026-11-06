@@ -48,6 +48,16 @@ approver_role: owner
 - 改动：隐藏 `input[type=file]` + 上传按钮；`resumeApi.parse(file)`，成功存 `plainText`+文件名并选中，失败显示错误。
 - 验证：mock parse 成功/失败两条路径。
 
+### TASK-004 | done | 积分提示 + 开面二次确认
+- 对应：REQ-005、AC-006
+- 改动：起始卡标注积分计费；点「开始面试」弹 `Dialog` 列明"扣积分 / 结束有报告 / 中途别离开"，确认按钮 `interview-start-confirm` 才 `start()`。
+- 验证：mock 截图 + `identity.spec` 同步点确认。
+
+### TASK-005 | done | 结束面试二次确认
+- 对应：REQ-006、AC-007
+- 改动：对话头加「结束面试」按钮 → 确认弹窗 → 确认后复位到未开始；`useBlocker` 拦站内跳转 + `beforeunload` 提示关闭/刷新。
+- 验证：mock 点击结束 → 弹窗 → 回到起始态。
+
 ## 完成条件
 
-- AC-001…AC-005 有证据；typecheck / ui 测试通过。
+- AC-001…AC-007 有证据；typecheck / ui 测试通过。

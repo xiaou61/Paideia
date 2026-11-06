@@ -75,6 +75,8 @@ test('面试页：能发起会话，且无论余额够不够都给出确定状�
   await expect(page.getByText('你的笔记默认不参与')).toBeVisible()
 
   await page.getByTestId('interview-start').click()
+  // WORK-077：开始前多了一层"会扣积分"的二次确认
+  await page.getByTestId('interview-start-confirm').click()
 
   /**
    * **不断言余额为 0**：种子账号的余额是可变的——WORK-010 T-14 明确要求管理员给验收账号发积分，

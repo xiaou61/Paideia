@@ -27,6 +27,8 @@ updated: 2026-11-06
 | AC-003 上传解析显示文件名 | 同上 | 0 | passed | 选项出现"我的简历.pdf" |
 | AC-004 上下文进 pageContext、不进气泡 | 抓 messages POST body | 0 | passed | `{"scene":"existing-default","hasPageContext":true,"ctxHasProject":true,"candidateBubble":"开始面试"}` |
 | AC-004 上传原文进上下文 | 抓 messages POST body | 0 | passed | `{"scene":"uploaded","ctxHasUploadText":true}` |
+| AC-006 开场积分提示 + 二次确认 | Playwright 点击开始 | 0 | passed | `confirmVisible:true`；`.agent/prototypes/work077-shots/04-start-confirm.png` |
+| AC-007 结束面试二次确认 + 回到起始态 | Playwright 点击「结束面试」→「结束并退出」 | 0 | passed | `{"endDialogVisible":true,"backToStart":true}`；`06-end-confirm.png` |
 
 ## 验收结果
 
@@ -37,6 +39,8 @@ updated: 2026-11-06
 | AC-003 | 满足 | 上传后选项显示文件名；后端 parse 复解析失败会给 `resumeError` 提示（错误分支代码路径） |
 | AC-004 | 满足 | 请求体 `pageContext` 含简历文本；候选人气泡严格为"开始面试" |
 | AC-005 | 满足 | typecheck / tokens+contrast / build 全绿；既有 testid 与 `interview-line-interviewer` 口径未改 |
+| AC-006 | 满足 | 截图 04：开面确认框（扣积分/有报告/别中途离开）；`identity.spec` 已同步点 `interview-start-confirm` |
+| AC-007 | 满足 | 截图 06：结束确认；确认后回到开始页；站内跳转 `useBlocker` + 关闭/刷新 `beforeunload` 提示 |
 
 ## 失败与未验证项
 
