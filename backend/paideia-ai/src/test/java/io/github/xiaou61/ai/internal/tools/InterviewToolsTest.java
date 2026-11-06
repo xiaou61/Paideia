@@ -25,7 +25,7 @@ class InterviewToolsTest {
     private final InterviewReviewService reviews = mock(InterviewReviewService.class);
 
     private static InterviewReviewService.EvaluationView evaluation(long id, int overall) {
-        return new InterviewReviewService.EvaluationView(id,
+        return new InterviewReviewService.EvaluationView(id, id * 10,
                 new InterviewEvaluation(overall,
                         List.of(new InterviewEvaluation.Dimension("技术准确性", 4, "基本答对")),
                         List.of("表达清楚"),

@@ -1,5 +1,10 @@
 import { createIdentityApi, configFor, type LearnerProfile } from '@paideia/identity'
-import { type AssistantApi, type InterviewEvaluationView } from '@paideia/assistant'
+import { adaptiveContextText, computeAbility, difficultyLabel, type AssistantApi, type AdaptiveBrief, type InterviewEvaluationView } from '@paideia/assistant'
+import {
+  createResumeApi,
+  type ResumeData,
+  type ResumeDocumentSummary,
+} from '@paideia/resume'
 import { useQuery } from '@tanstack/react-query'
 import {
   Alert,
@@ -10,13 +15,21 @@ import {
   Button,
   Card,
   CardContent,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   PageHeader,
   Separator,
   Spinner,
 } from '@paideia/ui'
+import { Link, useBlocker } from 'react-router'
 import {
   ArrowRight,
   Bot,
+  Check,
   ChevronDown,
   Lightbulb,
   MessageSquareText,
@@ -24,23 +37,30 @@ import {
   Sparkles,
   Target,
   TrendingUp,
+  Upload,
   User,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { api } from '../api'
 import { createAssistantApi } from '@paideia/assistant'
+import { createKnowledgeApi } from '@paideia/knowledge'
 import { LearnerHeader } from '../components/LearnerHeader'
 import { errorMessage } from '@paideia/core'
 
 const identity = createIdentityApi(api)
 const assistant: AssistantApi = createAssistantApi(api)
+const resumesApi = createResumeApi(api)
+const knowledgeApi = createKnowledgeApi(api)
 
 /** 半场对话里的一条。面试页自己维护，不复用助手的会话面板（那里面向"随手问一句"）。 */
 interface Line {
   role: 'interviewer' | 'candidate'
   content: string
 }
+
+/** 开场用哪份简历：不使用 / 当场上传的 / 某份已有简历的 id（WORK-077）。 */
+type ResumeChoice = 'none' | 'upload' | number
 
 /**
  * 模拟面试（WORK-010 T-09 / T-11；WORK-075 视觉重做）。
@@ -76,6 +96,9 @@ export function InterviewPage() {
     retry: false,
   })
 
+  /** 历史评估 → 能力画像（WORK-078）：据此决定本场重点与起始难度。 */
+  const adaptive = useMemo(() => computeAbility(history.data ?? []), [history.data])
+
   const [conversationId, setConversationId] = useState<number | null>(null)
   const [lines, setLines] = useState<Line[]>([])
   const [input, setInput] = useState('')
@@ -85,6 +108,69 @@ export function InterviewPage() {
   const [reviewing, setReviewing] = useState(false)
   /** 一次面试只要建过会话，就可能已经落库了消息——这里只用来控制按钮的可用性。 */
   const started = conversationId !== null
+
+  /** 我的简历列表（WORK-077）：开场可选一份来出题，也可以当场上传。 */
+  const resumeList = useQuery({
+    queryKey: ['resumes'],
+    queryFn: () => resumesApi.list(),
+    retry: false,
+  })
+  const [resumeChoice, setResumeChoice] = useState<ResumeChoice>('none')
+  const [uploadedName, setUploadedName] = useState<string | undefined>(undefined)
+  const [uploadedText, setUploadedText] = useState<string | undefined>(undefined)
+  const [uploading, setUploading] = useState(false)
+  const [preparing, setPreparing] = useState(false)
+  const [resumeError, setResumeError] = useState<string | null>(null)
+  const resumeInitialized = useRef(false)
+
+  /** 首次拿到列表时预选「默认简历」（没有默认就选第一份）；用户手动改过就不再覆盖。 */
+  useEffect(() => {
+    if (resumeInitialized.current) {
+      return
+    }
+    const list = resumeList.data
+    if (list !== undefined) {
+      resumeInitialized.current = true
+      const preferred = list.find((item) => item.isDefault) ?? list[0]
+      if (preferred !== undefined) {
+        setResumeChoice(preferred.id)
+      }
+    }
+  }, [resumeList.data])
+
+  /** 开面二次确认：明确告知会消耗积分（每轮对话与生成点评都计费）。 */
+  const [confirmStartOpen, setConfirmStartOpen] = useState(false)
+  /** 「结束面试」二次确认：结束后这场不能继续、也不能重进。 */
+  const [endConfirmOpen, setEndConfirmOpen] = useState(false)
+
+  /** 结束本场：退回到未开始状态（对话不再恢复）。 */
+  const endInterview = () => {
+    abortRef.current?.abort()
+    setEndConfirmOpen(false)
+    setConversationId(null)
+    setLines([])
+    setEvaluation(null)
+    setInput('')
+    setError(null)
+  }
+
+  /**
+   * 未出报告就离开 = 这场白聊：站内跳转要拦一下确认，关页/刷新也要提示。
+   * 出了报告（evaluation 非空）就不再拦——报告已落库，历史里能看。
+   */
+  const blockLeave = started && evaluation === null
+  const blocker = useBlocker(blockLeave)
+  useEffect(() => {
+    if (!blockLeave) {
+      return
+    }
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => { window.removeEventListener('beforeunload', handler) }
+  }, [blockLeave])
 
   /** 当前这轮在飞的请求；离开页面时中断它（与助手那条同一纪律：不能让上游继续烧钱）。 */
   const abortRef = useRef<AbortController | null>(null)
@@ -101,7 +187,7 @@ export function InterviewPage() {
     }
   }, [lines, busy])
 
-  const send = useCallback(async (text: string, openingTurn = false) => {
+  const send = useCallback(async (text: string, openingTurn = false, pageContext?: string) => {
     if (text.trim() === '' || busy) {
       return
     }
@@ -142,6 +228,7 @@ export function InterviewPage() {
           // thinking 事件刻意忽略：推理过程不展示（WORK-075）。
         },
         controller.signal,
+        pageContext,
       )
     } catch (cause) {
       if (!isAbort(cause)) {
@@ -153,8 +240,60 @@ export function InterviewPage() {
     }
   }, [busy, conversationId, profile, config.interviewIntro])
 
-  const start = () => {
-    void send(`开始面试。目标岗位：${profile?.targetRole ?? '未填写'}。`, true)
+  /**
+   * 开始面试：先按所选简历拼出**只进提示词、不落库**的上下文，再发第一条消息（WORK-077）。
+   * 不选简历就不带上下文，回到"只按岗位问"的老行为。
+   */
+  const start = async () => {
+    if (busy || preparing) {
+      return
+    }
+    setPreparing(true)
+    setResumeError(null)
+    let resumeText: string | undefined
+    try {
+      if (resumeChoice === 'upload') {
+        resumeText = uploadedText
+      } else if (typeof resumeChoice === 'number') {
+        const document = await resumesApi.get(resumeChoice)
+        resumeText = formatResume(document.data, document.title)
+      }
+    } catch (cause) {
+      // 简历取不到不该拦住面试：给出可读提示，按"无简历"继续。
+      setResumeError(errorMessage(cause))
+    } finally {
+      setPreparing(false)
+    }
+
+    // 自适应设置（WORK-078）+ 简历（WORK-077）一起作为 pageContext：只进提示词、不落库。
+    const parts: string[] = []
+    if (adaptive !== null) {
+      parts.push(adaptiveContextText(adaptive, history.data?.[0]?.evaluation.improvements ?? []))
+    }
+    if (resumeText !== undefined && resumeText.trim() !== '') {
+      parts.push(`【候选人简历】\n${resumeText}`)
+    }
+    void send(
+      `开始面试。目标岗位：${profile?.targetRole ?? '未填写'}。`,
+      true,
+      parts.length === 0 ? undefined : parts.join('\n\n'),
+    )
+  }
+
+  /** 本页上传 PDF/Word：解析成功用抽取出的原文作本次面试上下文（不强行入库）。 */
+  const uploadResume = async (file: File) => {
+    setUploading(true)
+    setResumeError(null)
+    try {
+      const draft = await resumesApi.parse(file)
+      setUploadedText(draft.plainText)
+      setUploadedName(file.name)
+      setResumeChoice('upload')
+    } catch (cause) {
+      setResumeError(errorMessage(cause))
+    } finally {
+      setUploading(false)
+    }
   }
 
   const review = async () => {
@@ -194,7 +333,21 @@ export function InterviewPage() {
 
         {lines.length === 0 ? (
           <>
-            <StartPanel intro={config.interviewIntro} role={role} busy={busy} onStart={start} />
+            <StartPanel
+              intro={config.interviewIntro}
+              role={role}
+              busy={busy}
+              preparing={preparing}
+              adaptive={adaptive}
+              onStart={() => { setConfirmStartOpen(true) }}
+              resumes={resumeList.data}
+              choice={resumeChoice}
+              onChoose={setResumeChoice}
+              onUpload={(file) => { void uploadResume(file) }}
+              uploading={uploading}
+              uploadedName={uploadedName}
+              resumeError={resumeError}
+            />
             <Alert>
               <AlertTitle>关于隐私</AlertTitle>
               <AlertDescription>
@@ -202,6 +355,9 @@ export function InterviewPage() {
                 <strong>你的笔记默认不参与</strong>——只有你自己选择带上时才会发出去。
               </AlertDescription>
             </Alert>
+            {history.data === undefined || history.data.length === 0 ? null : (
+              <HistoryCard items={history.data} />
+            )}
           </>
         ) : (
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
@@ -225,6 +381,16 @@ export function InterviewPage() {
                     )}
                   </p>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  data-testid="interview-end"
+                  disabled={busy}
+                  onClick={() => { setEndConfirmOpen(true) }}
+                  className="gap-1.5"
+                >
+                  结束面试
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -303,6 +469,81 @@ export function InterviewPage() {
           </Alert>
         )}
       </div>
+
+      {/* 开面二次确认：把"会扣积分 / 结束能出报告"讲清楚再开始 */}
+      <Dialog open={confirmStartOpen} onOpenChange={setConfirmStartOpen}>
+        <DialogContent data-testid="interview-start-confirm-dialog">
+          <DialogHeader>
+            <DialogTitle>开始这场模拟面试？</DialogTitle>
+            <DialogDescription>开始前先确认几件事：</DialogDescription>
+          </DialogHeader>
+          <ul className="text-muted-foreground space-y-2 text-sm">
+            <li>· <span className="text-foreground">会消耗积分</span>：每轮提问/回答按模型用量计费，点「生成点评」出报告也会计费。</li>
+            <li>· <span className="text-foreground">结束有报告</span>：随时点「生成点评」，拿到总分 + 各维度评分 + 优点/改进。</li>
+            <li>· <span className="text-foreground">开始后请别中途离开</span>：这场对话不会在页面留存，退出后无法继续、也不能重新进入。</li>
+          </ul>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setConfirmStartOpen(false) }}>
+              再想想
+            </Button>
+            <Button
+              data-testid="interview-start-confirm"
+              disabled={busy || preparing}
+              onClick={() => {
+                setConfirmStartOpen(false)
+                void start()
+              }}
+            >
+              {preparing ? '准备中…' : '开始面试'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 未出报告就离开的二次确认（站内跳转被 useBlocker 拦下时弹） */}
+      <Dialog
+        open={blocker.state === 'blocked'}
+        onOpenChange={(open) => { if (!open) { blocker.reset?.() } }}
+      >
+        <DialogContent data-testid="interview-leave-confirm-dialog">
+          <DialogHeader>
+            <DialogTitle>要离开这场面试吗？</DialogTitle>
+            <DialogDescription>
+              离开后这场对话<strong className="text-foreground">无法继续，也不能重新进入</strong>。
+              想留下结果的话，先点右上角「生成点评」拿一份报告，报告会存进「历次面试」。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { blocker.reset?.() }}>
+              继续面试
+            </Button>
+            <Button variant="destructive" onClick={() => { blocker.proceed?.() }}>
+              离开
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 「结束面试」二次确认 */}
+      <Dialog open={endConfirmOpen} onOpenChange={setEndConfirmOpen}>
+        <DialogContent data-testid="interview-end-confirm-dialog">
+          <DialogHeader>
+            <DialogTitle>结束这场面试？</DialogTitle>
+            <DialogDescription>
+              结束后这场对话<strong className="text-foreground">无法继续，也不能重新进入</strong>。
+              想留下结果的话，先点「生成点评」拿一份报告，报告会存进「历次面试」。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setEndConfirmOpen(false) }}>
+              继续面试
+            </Button>
+            <Button variant="destructive" onClick={endInterview}>
+              结束并退出
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   )
 }
@@ -369,18 +610,37 @@ function Bubble({ line, thinking }: { line: Line; thinking: boolean }) {
   )
 }
 
-/** 起始态：左边讲清楚要做什么，右边讲这场面试怎么进行。 */
+/** 起始态：左边讲清楚要做什么（含简历选择），右边讲这场面试怎么进行。 */
 function StartPanel({
   intro,
   role,
   busy,
+  preparing,
+  adaptive,
   onStart,
+  resumes,
+  choice,
+  onChoose,
+  onUpload,
+  uploading,
+  uploadedName,
+  resumeError,
 }: {
   intro: string
   role: string | undefined
   busy: boolean
+  preparing: boolean
+  adaptive: AdaptiveBrief | null
   onStart: () => void
+  resumes: ResumeDocumentSummary[] | undefined
+  choice: ResumeChoice
+  onChoose: (choice: ResumeChoice) => void
+  onUpload: (file: File) => void
+  uploading: boolean
+  uploadedName: string | undefined
+  resumeError: string | null
 }) {
+  const starting = busy || preparing
   return (
     <Card className="overflow-hidden">
       <div className="grid md:grid-cols-[1.35fr_1fr]">
@@ -396,22 +656,143 @@ function StartPanel({
               {role === undefined || role === '' ? '未填写目标岗位' : role}
             </Badge>
           </div>
-          <Button data-testid="interview-start" size="lg" className="mt-6 gap-2" disabled={busy} onClick={onStart}>
-            {busy ? <Spinner /> : <Sparkles className="size-4" />}
-            {busy ? '开场中…' : '开始面试'}
-            {busy ? null : <ArrowRight className="size-4" />}
+
+          {adaptive === null ? null : (
+            <div className="border-border bg-muted/40 mt-3 rounded-lg border px-3 py-2 text-xs leading-5">
+              <span className="text-foreground font-medium">本场重点</span>：{adaptive.focus.join('、')}
+              <span className="text-muted-foreground">
+                {' '}· 难度 {difficultyLabel(adaptive.difficulty)} · 依据过往 {adaptive.sessions} 场
+              </span>
+            </div>
+          )}
+
+          {/* 简历（可选，WORK-077）：选已有 / 当场上传 / 不使用 */}
+          <div className="border-border mt-5 space-y-2 border-t pt-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium">
+                用哪份简历来面？<span className="text-muted-foreground font-normal">（可选）</span>
+              </p>
+              <label
+                className={
+                  'border-border hover:bg-muted text-foreground inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium ' +
+                  (uploading ? 'pointer-events-none opacity-60' : '')
+                }
+              >
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  className="hidden"
+                  disabled={uploading}
+                  data-testid="interview-resume-upload"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    if (file !== undefined) {
+                      onUpload(file)
+                    }
+                    event.target.value = ''
+                  }}
+                />
+                {uploading ? <Spinner className="size-3.5" /> : <Upload className="size-3.5" />}
+                {uploading ? '解析中…' : '上传简历'}
+              </label>
+            </div>
+
+            <div className="space-y-1.5">
+              <ResumeOption
+                label="不使用简历（按岗位问）"
+                selected={choice === 'none'}
+                onClick={() => { onChoose('none') }}
+              />
+              {(resumes ?? []).map((resume) => (
+                <ResumeOption
+                  key={resume.id}
+                  label={resume.title}
+                  badge={resume.isDefault ? '默认' : undefined}
+                  selected={choice === resume.id}
+                  onClick={() => { onChoose(resume.id) }}
+                />
+              ))}
+              {uploadedName === undefined ? null : (
+                <ResumeOption
+                  label={uploadedName}
+                  badge="本次上传"
+                  selected={choice === 'upload'}
+                  onClick={() => { onChoose('upload') }}
+                />
+              )}
+            </div>
+
+            {resumes !== undefined && resumes.length === 0 && uploadedName === undefined ? (
+              <p className="text-muted-foreground text-xs">还没有简历，可上传一份，或去「简历」页新建。</p>
+            ) : null}
+            {resumeError === null ? null : <p className="text-destructive text-xs">{resumeError}</p>}
+            <p className="text-muted-foreground text-xs">简历只在你选择后用于本次面试，不会保存。</p>
+          </div>
+
+          <Button
+            data-testid="interview-start"
+            size="lg"
+            className="mt-6 gap-2"
+            disabled={starting}
+            onClick={onStart}
+          >
+            {starting ? <Spinner /> : <Sparkles className="size-4" />}
+            {preparing ? '准备中…' : busy ? '开场中…' : '开始面试'}
+            {starting ? null : <ArrowRight className="size-4" />}
           </Button>
+          <p className="text-muted-foreground mt-2 text-xs">
+            本场会消耗积分：每轮提问/回答与「生成点评」都按模型用量计费。
+          </p>
         </div>
         <div className="border-border bg-muted/40 border-t p-6 sm:p-8 md:border-t-0 md:border-l">
           <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">这场面试怎么进行</p>
           <ol className="mt-4 space-y-4">
-            <Step n={1} title="面试官一次问一题" desc="围绕你的目标岗位，从基础到深入逐个追问。" />
+            <Step n={1} title="面试官一次问一题" desc="围绕你的目标岗位与简历，从基础到深入逐个追问。" />
             <Step n={2} title="像真面试一样作答" desc="答不上来就说不会，面试官会换个角度继续问。" />
             <Step n={3} title="结束拿结构化点评" desc="随时点「生成点评」，按维度给出分数与改进建议。" />
           </ol>
         </div>
       </div>
     </Card>
+  )
+}
+
+/** 简历选项：一个可选中的行，选中显示对勾。 */
+function ResumeOption({
+  label,
+  badge,
+  selected,
+  onClick,
+}: {
+  label: string
+  badge?: string
+  selected: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        'flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors ' +
+        (selected ? 'border-primary bg-accent text-accent-foreground' : 'border-border hover:bg-muted')
+      }
+    >
+      <span
+        className={
+          'flex size-4 shrink-0 items-center justify-center rounded-full border ' +
+          (selected ? 'border-primary bg-primary text-primary-foreground' : 'border-border')
+        }
+      >
+        {selected ? <Check className="size-3" /> : null}
+      </span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {badge === undefined ? null : (
+        <Badge variant="outline" className="shrink-0">
+          {badge}
+        </Badge>
+      )}
+    </button>
   )
 }
 
@@ -453,6 +834,7 @@ function TipCard() {
 /** 历次面试：默认收起，展开看分维度与改进点。 */
 function HistoryCard({ items }: { items: InterviewEvaluationView[] }) {
   const latest = items[0]
+  const [selected, setSelected] = useState<InterviewEvaluationView | null>(null)
   return (
     <Card data-testid="interview-history">
       <CardContent className="pt-6">
@@ -465,43 +847,96 @@ function HistoryCard({ items }: { items: InterviewEvaluationView[] }) {
         <ul className="divide-border divide-y">
           {items.map((item) => (
             <li key={item.id} data-testid="interview-history-item">
-              <details className="group py-2.5">
-                <summary className="flex cursor-pointer items-center justify-between gap-2 text-sm">
-                  <span className="text-muted-foreground text-xs">
-                    {new Date(item.createdAt).toLocaleString('zh-CN', {
-                      dateStyle: 'short',
-                      timeStyle: 'short',
-                    })}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="font-medium">{item.evaluation.overall} / 5</span>
-                    <ChevronDown className="text-muted-foreground size-4 transition-transform group-open:rotate-180" />
-                  </span>
-                </summary>
-                <div className="mt-3 space-y-2.5">
-                  {item.evaluation.dimensions.map((dimension) => (
-                    <div key={dimension.name}>
-                      <div className="flex items-baseline justify-between gap-2 text-xs">
-                        <span className="text-muted-foreground">{dimension.name}</span>
-                        <span className="text-muted-foreground">{dimension.score}/5</span>
-                      </div>
-                      <ScoreBar score={dimension.score} className="mt-1 h-1" />
-                    </div>
-                  ))}
-                  {item.evaluation.improvements.length === 0 ? null : (
-                    <ul className="text-muted-foreground mt-1 list-disc space-y-1 pl-4 text-xs leading-5">
-                      {item.evaluation.improvements.map((line) => (
-                        <li key={line}>{line}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </details>
+              <button
+                type="button"
+                onClick={() => { setSelected(item) }}
+                className="hover:text-foreground flex w-full items-center justify-between gap-2 py-2.5 text-left text-sm transition-colors"
+              >
+                <span className="text-muted-foreground text-xs">
+                  {new Date(item.createdAt).toLocaleString('zh-CN', {
+                    dateStyle: 'short',
+                    timeStyle: 'short',
+                  })}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="font-medium">{item.evaluation.overall} / 5</span>
+                  <ChevronDown className="text-muted-foreground size-4 -rotate-90" />
+                </span>
+              </button>
             </li>
           ))}
         </ul>
+        <p className="text-muted-foreground mt-2 text-xs">点任意一条看完整报告 + 对话回放</p>
       </CardContent>
+      <HistoryDetailDialog view={selected} onClose={() => { setSelected(null) }} />
     </Card>
+  )
+}
+
+/** 历史条目详情：完整报告 + 对话回放（WORK-078）。 */
+function HistoryDetailDialog({
+  view,
+  onClose,
+}: {
+  view: InterviewEvaluationView | null
+  onClose: () => void
+}) {
+  const transcript = useQuery({
+    queryKey: ['interview-transcript', view === null ? 0 : view.conversationId],
+    queryFn: () => (view === null ? Promise.resolve([]) : assistant.messages(view.conversationId)),
+    enabled: view !== null && (view.conversationId ?? 0) > 0,
+    retry: false,
+  })
+  return (
+    <Dialog open={view !== null} onOpenChange={(open) => { if (!open) { onClose() } }}>
+      <DialogContent data-testid="interview-history-detail" className="sm:max-w-2xl">
+        {view === null ? null : (
+          <>
+            <DialogHeader>
+              <DialogTitle>
+                面试报告 ·{' '}
+                {new Date(view.createdAt).toLocaleString('zh-CN', { dateStyle: 'medium', timeStyle: 'short' })}
+              </DialogTitle>
+              <DialogDescription>总分 {view.evaluation.overall} / 5</DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[68vh] space-y-5 overflow-y-auto pr-1">
+              <EvaluationCard view={view} />
+              <div className="border-border border-t pt-4">
+                <h3 className="text-sm font-medium">对话回放</h3>
+                {transcript.isPending ? (
+                  <p className="text-muted-foreground mt-2 flex items-center gap-2 text-xs"><Spinner className="size-3.5" />加载中…</p>
+                ) : transcript.isError ? (
+                  <p className="text-muted-foreground mt-2 text-xs">读不到对话记录（会话可能已过期）。</p>
+                ) : (transcript.data ?? []).length === 0 ? (
+                  <p className="text-muted-foreground mt-2 text-xs">没有对话记录。</p>
+                ) : (
+                  <ul className="mt-3 space-y-2">
+                    {(transcript.data ?? []).map((message, index) => (
+                      <li key={index} className={message.role === 'assistant' ? '' : 'text-right'}>
+                        <span className="text-muted-foreground mr-2 text-xs">
+                          {message.role === 'assistant' ? '面试官' : '我'}
+                        </span>
+                        <span
+                          className={
+                            'inline-block max-w-[85%] rounded-lg px-3 py-1.5 text-left text-xs leading-5 whitespace-pre-wrap ' +
+                            (message.role === 'assistant' ? 'bg-muted text-foreground' : 'bg-primary text-primary-foreground')
+                          }
+                        >
+                          {message.content}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={onClose}>关闭</Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -586,9 +1021,118 @@ function EvaluationCard({ view }: { view: InterviewEvaluationView }) {
             )}
           </div>
         </div>
+
+        <ReviewSuggestions view={view} />
       </CardContent>
     </Card>
   )
+}
+
+/** 弱项维度 → 知识库检索词（WORK-078）。只映射有对应内容的方向。 */
+const REVIEW_KEYWORDS: Record<string, string> = {
+  技术深度: 'Java',
+  项目经验: '项目',
+  表达结构: '面试',
+  应变能力: '面试',
+}
+
+/** 针对弱项去知识库复习：取最弱的 1–2 个维度，实时检索并给可点条目。 */
+function ReviewSuggestions({ view }: { view: InterviewEvaluationView }) {
+  const weak = [...view.evaluation.dimensions]
+    .sort((left, right) => left.score - right.score)
+    .filter((dimension) => dimension.score < 4 && REVIEW_KEYWORDS[dimension.name] !== undefined)
+    .slice(0, 2)
+  if (weak.length === 0) {
+    return null
+  }
+  return (
+    <div className="border-border border-t pt-4">
+      <h3 className="flex items-center gap-1.5 text-sm font-medium">
+        <Lightbulb className="text-primary size-4" />
+        针对弱项去复习
+      </h3>
+      <div className="mt-2 space-y-2.5">
+        {weak.map((dimension) => (
+          <ReviewSuggestionRow
+            key={dimension.name}
+            name={dimension.name}
+            keyword={REVIEW_KEYWORDS[dimension.name] ?? ''}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ReviewSuggestionRow({ name, keyword }: { name: string; keyword: string }) {
+  const found = useQuery({
+    queryKey: ['review-suggest', keyword],
+    queryFn: () => knowledgeApi.entries({ q: keyword, size: 3 }),
+    retry: false,
+    enabled: keyword !== '',
+  })
+  const items = found.data?.items ?? []
+  return (
+    <div data-testid="interview-review-suggestion">
+      <p className="text-muted-foreground text-xs">
+        {name} 较弱 → 知识库搜「{keyword}」
+      </p>
+      {found.isPending ? null : items.length === 0 ? (
+        <p className="text-muted-foreground mt-1 text-xs">暂无匹配内容</p>
+      ) : (
+        <ul className="mt-1 space-y-0.5">
+          {items.map((entry) => (
+            <li key={entry.id}>
+              <Link to={`/knowledge/entries/${entry.id}`} className="text-primary text-xs hover:underline">
+                {entry.title}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+/** 把一份结构化简历压成给面试官看的纯文本（截断到 pageContext 上限以内）。 */
+function formatResume(data: ResumeData, title: string): string {
+  const lines: string[] = [`简历：${title}`]
+  const basics = data.basics
+  if (basics.name !== '') {
+    lines.push(`姓名：${basics.name}`)
+  }
+  if (data.intent.role !== '') {
+    lines.push(`求职意向：${data.intent.role}`)
+  }
+  if (data.education.length > 0) {
+    lines.push(
+      '教育经历：' +
+        data.education
+          .map((item) => `${item.school} ${item.degree} ${item.major} ${item.start}-${item.end}`.trim())
+          .join('；'),
+    )
+  }
+  if (data.work.length > 0) {
+    lines.push('工作经历：')
+    data.work.forEach((item) => {
+      lines.push(`- ${item.company} ${item.title} ${item.start}-${item.end}${item.summary === '' ? '' : `：${item.summary}`}`)
+      item.bullets.forEach((bullet) => lines.push(`  · ${bullet}`))
+    })
+  }
+  if (data.projects.length > 0) {
+    lines.push('项目经历：')
+    data.projects.forEach((item) => {
+      lines.push(`- ${item.name} ${item.role} ${item.period}`)
+      item.bullets.forEach((bullet) => lines.push(`  · ${bullet}`))
+    })
+  }
+  if (data.skills.length > 0) {
+    lines.push('技能：' + data.skills.map((group) => `${group.group}：${group.items.join('、')}`).join('；'))
+  }
+  if (data.selfEvaluation !== '') {
+    lines.push(`自我评价：${data.selfEvaluation}`)
+  }
+  return lines.join('\n').slice(0, 3800)
 }
 
 /** 把"开始面试"变成一个模型看得懂的请求：目标岗位 + 本页约定的开场说明。 */

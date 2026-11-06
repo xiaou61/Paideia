@@ -67,7 +67,8 @@ public class InterviewReviewService {
     }
 
     /** 界面用的评估视图。 */
-    public record EvaluationView(long id, InterviewEvaluation evaluation, java.time.Instant createdAt) {
+    public record EvaluationView(long id, long conversationId, InterviewEvaluation evaluation,
+                                 java.time.Instant createdAt) {
     }
 
     /**
@@ -115,7 +116,7 @@ public class InterviewReviewService {
             run.finish(io.github.xiaou61.ai.RunOutcome.OK, null);
             log.info("ai.interview.reviewed userId={} conversationId={} overall={}",
                     userId, conversationId, result.evaluation().overall());
-            return new EvaluationView(id, result.evaluation(), java.time.Instant.now());
+            return new EvaluationView(id, conversationId, result.evaluation(), java.time.Instant.now());
         } catch (RuntimeException failure) {
             // 失败也要过账：拿到了用量就按用量扣，没拿到就全额退回（与对话/记忆那两条同一纪律）
             if (usage == null) {
@@ -136,7 +137,7 @@ public class InterviewReviewService {
     /** 本人的历次评估（新 → 旧）。"进度与弱项"要能查，所以有这个列表。 */
     public List<EvaluationView> listMine(long userId) {
         return evaluations.listRowsByUser(userId, 50).stream()
-                .map(row -> new EvaluationView(row.getId(), evaluations.toEvaluation(row), row.getCreatedAt()))
+                .map(row -> new EvaluationView(row.getId(), row.getConversationId(), evaluations.toEvaluation(row), row.getCreatedAt()))
                 .toList();
     }
 

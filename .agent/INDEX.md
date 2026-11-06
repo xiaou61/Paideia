@@ -16,7 +16,7 @@ updated: 2026-11-05
 | --- | --- |
 | 项目常驻规范 | `.agent/rules/always.md` |
 | 当前稳定规格 | `.agent/specs/`（目前为 `platform-contracts.md`） |
-| 需求与变更依据 | `.agent/changes/WORK-编号-中文名/`（当前 WORK-001…WORK-075，共 74 项；无 WORK-008） |
+| 需求与变更依据 | `.agent/changes/WORK-编号-中文名/`（当前 WORK-001…WORK-078，共 77 项；无 WORK-008） |
 | 决策说明与共享资料 | `.agent/notes/`、`.agent/references/` |
 | 长期记忆 | `.agent/memory.md` |
 | 代码审查报告 | `.agent/reviews/`（按 ref 区间归档） |

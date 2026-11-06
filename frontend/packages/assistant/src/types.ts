@@ -151,6 +151,8 @@ export interface InterviewEvaluation {
 /** 评估 + 它的落库标识与时间。 */
 export interface InterviewEvaluationView {
   id: number
+  /** 这场面试对应的会话 id（WORK-078 回放用）；老数据可能为 0。 */
+  conversationId: number
   evaluation: InterviewEvaluation
   createdAt: string
 }

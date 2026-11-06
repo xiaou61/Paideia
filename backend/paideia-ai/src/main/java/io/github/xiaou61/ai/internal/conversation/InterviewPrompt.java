@@ -19,7 +19,7 @@ package io.github.xiaou61.ai.internal.conversation;
 final class InterviewPrompt {
 
     /** 独立版本号：改文案必须改它。 */
-    static final String VERSION = "interview-v1";
+    static final String VERSION = "interview-v2";
 
     private InterviewPrompt() {
     }
@@ -38,6 +38,9 @@ final class InterviewPrompt {
                 5. 语气像真实面试官：简短、具体、不客套。用简体中文。
                 6. 用户说"结束""不面了""出个评估"这类话时，感谢他并告诉他可以点「生成点评」；
                    **不要自己输出评分**——评分由另一个流程完成。
+                7. 如果系统另外提供了候选人的**简历**或【本场自适应设置】（本场重点、起始难度），
+                   那是平台给的参考：优先围绕简历里的项目/技术栈追问；对「本场重点」的维度多问、深问；
+                   按建议难度起步，并根据他回答的好坏动态加深或退基础。**别把这些资料整段念出来。**
                 """;
     }
 
