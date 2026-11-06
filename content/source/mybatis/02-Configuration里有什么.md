@@ -17,41 +17,100 @@ status: published
 
 读完你会知道：为什么 MyBatis 的「默认行为」几乎全在一个对象上改。
 
-```source-walk
+```code-flow
 {
   "id": "configuration-fields",
   "title": "Configuration 里真正重要的三类字段",
   "repo": "mybatis/mybatis-3",
-  "ref": "mybatis-3.5.19",
   "commit": "ee0d4f4831ffdd311b0183c202f4ad6492a3f404",
   "license": "Apache-2.0",
-  "base": "source/mybatis-3.5.19",
-  "files": [
+  "file": "org/apache/ibatis/session/Configuration.java",
+  "nodes": [
     {
-      "path": "org/apache/ibatis/session/Configuration.java",
-      "label": "Configuration"
-    }
-  ],
-  "controls": [
+      "id": "api",
+      "label": "Mapper 接口 / SqlSession",
+      "sub": "调用入口",
+      "layer": 0,
+      "order": 0
+    },
+    {
+      "id": "config",
+      "label": "Configuration",
+      "sub": "配置与映射",
+      "layer": 1,
+      "order": 0
+    },
+    {
+      "id": "proxy",
+      "label": "MapperProxy",
+      "sub": "动态代理",
+      "layer": 2,
+      "order": 0
+    },
     {
       "id": "executor",
-      "type": "select",
-      "label": "默认执行器",
-      "default": "SIMPLE",
-      "options": [
-        {
-          "value": "SIMPLE",
-          "label": "SIMPLE"
-        },
-        {
-          "value": "REUSE",
-          "label": "REUSE"
-        },
-        {
-          "value": "BATCH",
-          "label": "BATCH"
-        }
-      ]
+      "label": "Executor",
+      "sub": "执行器",
+      "layer": 3,
+      "order": 0
+    },
+    {
+      "id": "statement",
+      "label": "StatementHandler",
+      "sub": "JDBC 语句",
+      "layer": 4,
+      "order": 0
+    },
+    {
+      "id": "result",
+      "label": "ResultSetHandler",
+      "sub": "结果映射",
+      "layer": 5,
+      "order": 0
+    },
+    {
+      "id": "base",
+      "label": "基础模块",
+      "sub": "反射 / 类型 / 缓存 / 插件",
+      "layer": 6,
+      "order": 0
+    }
+  ],
+  "edges": [
+    {
+      "from": "api",
+      "to": "proxy",
+      "label": "调用接口方法"
+    },
+    {
+      "from": "config",
+      "to": "proxy",
+      "label": "注册 Mapper"
+    },
+    {
+      "from": "proxy",
+      "to": "executor",
+      "label": "MapperMethod"
+    },
+    {
+      "from": "config",
+      "to": "executor",
+      "label": "默认执行器"
+    },
+    {
+      "from": "executor",
+      "to": "statement",
+      "label": "prepare"
+    },
+    {
+      "from": "statement",
+      "to": "result",
+      "label": "ResultSet"
+    },
+    {
+      "from": "executor",
+      "to": "base",
+      "label": "用到时才取"
     }
   ],
   "steps": [
@@ -59,22 +118,36 @@ status: published
       "title": "第一组：开关",
       "file": "org/apache/ibatis/session/Configuration.java",
       "line": 105,
-      "lines": 7,
+      "code": "  protected Environment environment;\n\n  protected boolean safeRowBoundsEnabled;\n  protected boolean safeResultHandlerEnabled = true;\n  protected boolean mapUnderscoreToCamelCase;\n  protected boolean aggressiveLazyLoading;\n  protected boolean useGeneratedKeys;",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "nodes": [
+        "config"
+      ],
+      "edges": [],
       "explain": "`environment` 之外是一排布尔开关。它们不是「全局配置文档」里的摆设——每一个都会被某个执行路径读到，比如 `mapUnderscoreToCamelCase` 直接决定结果集映射时列名 `user_name` 能不能对上属性 `userName`。",
       "state": {
         "vars": [
-          [
-            "mapUnderscoreToCamelCase",
-            "false（默认）"
-          ],
-          [
-            "cacheEnabled",
-            "true"
-          ],
-          [
-            "useActualParamName",
-            "true"
-          ]
+          {
+            "name": "mapUnderscoreToCamelCase",
+            "value": "false（默认）"
+          },
+          {
+            "name": "cacheEnabled",
+            "value": "true"
+          },
+          {
+            "name": "useActualParamName",
+            "value": "true"
+          }
         ]
       }
     },
@@ -82,22 +155,38 @@ status: published
       "title": "第二组：默认值决定「不写会怎样」",
       "file": "org/apache/ibatis/session/Configuration.java",
       "line": 125,
-      "lines": 9,
+      "code": "  protected LocalCacheScope localCacheScope = LocalCacheScope.SESSION;\n  protected JdbcType jdbcTypeForNull = JdbcType.OTHER;\n  protected Set<String> lazyLoadTriggerMethods = new HashSet<>(\n      Arrays.asList(\"equals\", \"clone\", \"hashCode\", \"toString\"));\n  protected Integer defaultStatementTimeout;\n  protected Integer defaultFetchSize;\n  protected ResultSetType defaultResultSetType;\n  protected ExecutorType defaultExecutorType = ExecutorType.SIMPLE;\n  protected AutoMappingBehavior autoMappingBehavior = AutoMappingBehavior.PARTIAL;",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "nodes": [
+        "config"
+      ],
+      "edges": [],
       "explain": "`localCacheScope=SESSION`、`defaultExecutorType=SIMPLE`、`autoMappingBehavior=PARTIAL`——这三个默认值几乎解释了初学者遇到的一半「为什么和我以为的不一样」。",
       "state": {
         "vars": [
-          [
-            "localCacheScope",
-            "SESSION"
-          ],
-          [
-            "defaultExecutorType",
-            "SIMPLE"
-          ],
-          [
-            "autoMappingBehavior",
-            "PARTIAL"
-          ]
+          {
+            "name": "localCacheScope",
+            "value": "SESSION"
+          },
+          {
+            "name": "defaultExecutorType",
+            "value": "SIMPLE"
+          },
+          {
+            "name": "autoMappingBehavior",
+            "value": "PARTIAL"
+          }
         ]
       },
       "predict": {
@@ -115,93 +204,131 @@ status: published
       "title": "执行器换一种，openSession 之后的对象就不同",
       "file": "org/apache/ibatis/session/Configuration.java",
       "line": 132,
-      "lines": 1,
+      "code": "  protected ExecutorType defaultExecutorType = ExecutorType.SIMPLE;",
+      "language": "java",
+      "focus": [
+        1
+      ],
+      "nodes": [
+        "config"
+      ],
+      "edges": [],
       "explain": "`defaultExecutorType` 只是被 `DefaultSqlSessionFactory.openSession` 读一次。选 SIMPLE 就是每次新建一个 `SimpleExecutor`，没有花活。",
-      "when": {
-        "executor": "SIMPLE"
-      },
-      "state": {
-        "tables": [
-          [
-            "openSession → executor",
-            "SimpleExecutor"
-          ]
-        ]
-      }
+      "log": [
+        {
+          "k": "openSession → executor",
+          "v": "SimpleExecutor"
+        }
+      ]
     },
     {
       "title": "REUSE：复用 Statement",
       "file": "org/apache/ibatis/session/Configuration.java",
       "line": 132,
-      "lines": 1,
+      "code": "  protected ExecutorType defaultExecutorType = ExecutorType.SIMPLE;",
+      "language": "java",
+      "focus": [
+        1
+      ],
+      "nodes": [
+        "config"
+      ],
+      "edges": [],
       "explain": "同一个 SqlSession 里，相同 SQL 的 `PreparedStatement` 会被复用。省的是 prepare 的开销，代价是 Statement 一直占着连接资源。",
-      "when": {
-        "executor": "REUSE"
-      },
-      "state": {
-        "tables": [
-          [
-            "openSession → executor",
-            "ReuseExecutor"
-          ],
-          [
-            "statement 缓存",
-            "按 SQL 文本复用"
-          ]
-        ]
-      }
+      "log": [
+        {
+          "k": "openSession → executor",
+          "v": "ReuseExecutor"
+        },
+        {
+          "k": "statement 缓存",
+          "v": "按 SQL 文本复用"
+        }
+      ]
     },
     {
       "title": "BATCH：攒够了一次发",
       "file": "org/apache/ibatis/session/Configuration.java",
       "line": 132,
-      "lines": 1,
+      "code": "  protected ExecutorType defaultExecutorType = ExecutorType.SIMPLE;",
+      "language": "java",
+      "focus": [
+        1
+      ],
+      "nodes": [
+        "config"
+      ],
+      "edges": [],
       "explain": "`BatchExecutor` 把 update 攒起来，直到 `flushStatements()` 或提交。批量插入用它，但**查不到未提交的数据**，写一读一的时候别开。",
-      "when": {
-        "executor": "BATCH"
-      },
-      "state": {
-        "tables": [
-          [
-            "openSession → executor",
-            "BatchExecutor"
-          ],
-          [
-            "待执行",
-            "攒到 flush 才发"
-          ]
-        ]
-      }
+      "log": [
+        {
+          "k": "openSession → executor",
+          "v": "BatchExecutor"
+        },
+        {
+          "k": "待执行",
+          "v": "攒到 flush 才发"
+        }
+      ]
     },
     {
       "title": "第三组：四个注册表",
       "file": "org/apache/ibatis/session/Configuration.java",
       "line": 152,
-      "lines": 3,
+      "code": "  protected final MapperRegistry mapperRegistry = new MapperRegistry(this);\n  protected final InterceptorChain interceptorChain = new InterceptorChain();\n  protected final TypeHandlerRegistry typeHandlerRegistry = new TypeHandlerRegistry(this);",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3
+      ],
+      "nodes": [
+        "config"
+      ],
+      "edges": [],
       "explain": "`mapperRegistry` 记「哪个接口有哪些方法」；`interceptorChain` 是插件链；`typeHandlerRegistry` 负责 Java 类型 ↔ JDBC 类型。它们都是**启动期填满、运行期只读**。",
-      "state": {
-        "tables": [
-          [
-            "mapperRegistry",
-            "com.example.UserMapper"
-          ],
-          [
-            "interceptorChain",
-            "0 个（没配插件）"
-          ],
-          [
-            "typeHandlerRegistry",
-            "内置 30+ 个"
-          ]
-        ]
-      }
+      "log": [
+        {
+          "k": "mapperRegistry",
+          "v": "com.example.UserMapper"
+        },
+        {
+          "k": "interceptorChain",
+          "v": "0 个（没配插件）"
+        },
+        {
+          "k": "typeHandlerRegistry",
+          "v": "内置 30+ 个"
+        }
+      ]
     },
     {
       "title": "映射表：MappedStatement 的 StrictMap",
       "file": "org/apache/ibatis/session/Configuration.java",
       "line": 158,
-      "lines": 4,
+      "code": "  protected final Map<String, MappedStatement> mappedStatements = new StrictMap<MappedStatement>(\n      \"Mapped Statements collection\")\n          .conflictMessageProducer((savedValue, targetValue) -> \". please check \" + savedValue.getResource() + \" and \"\n              + targetValue.getResource());",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "nodes": [
+        "config"
+      ],
+      "edges": [],
       "explain": "所有解析出来的语句都进 `mappedStatements`，键是 `namespace.id`。它用 `StrictMap`：重复键不是覆盖，而是抛异常并把两个来源文件都打出来——所以「两个 Mapper 写了同一条 id」会在启动时报错，不会静默生效。",
+      "log": [
+        {
+          "k": "mappedStatements",
+          "v": "com.example.UserMapper.selectById"
+        },
+        {
+          "k": "resultMaps",
+          "v": "com.example.UserMapper.userMap"
+        }
+      ],
       "predict": {
         "question": "两个 XML 里写了同一个 namespace + id，会发生什么？",
         "options": [
@@ -211,25 +338,23 @@ status: published
         ],
         "answer": 1,
         "reveal": "`StrictMap` 的冲突消息会指出两个资源文件。这也解释了为什么 Mapper 的 namespace 必须写全限定接口名。"
-      },
-      "state": {
-        "tables": [
-          [
-            "mappedStatements",
-            "com.example.UserMapper.selectById"
-          ],
-          [
-            "resultMaps",
-            "com.example.UserMapper.userMap"
-          ]
-        ]
       }
     },
     {
       "title": "addMapper 只是转发",
       "file": "org/apache/ibatis/session/Configuration.java",
       "line": 942,
-      "lines": 3,
+      "code": "  public <T> void addMapper(Class<T> type) {\n    mapperRegistry.addMapper(type);\n  }",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3
+      ],
+      "nodes": [
+        "config"
+      ],
+      "edges": [],
       "explain": "Configuration 自己不维护接口表，直接转给 `MapperRegistry`。下一关会看 Registry 里到底存了什么。",
       "state": {
         "stack": [

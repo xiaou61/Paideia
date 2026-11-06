@@ -14,53 +14,100 @@ status: published
 
 这一关只看清楚**这几种执行器各自在哪一行分叉**。
 
-```source-walk
+```code-flow
 {
   "id": "executor-family",
   "title": "Executor 的四种形态",
   "repo": "mybatis/mybatis-3",
-  "ref": "mybatis-3.5.19",
   "commit": "ee0d4f4831ffdd311b0183c202f4ad6492a3f404",
   "license": "Apache-2.0",
-  "base": "source/mybatis-3.5.19",
-  "files": [
+  "file": "org/apache/ibatis/executor/BaseExecutor.java",
+  "nodes": [
     {
-      "path": "org/apache/ibatis/executor/BaseExecutor.java",
-      "label": "BaseExecutor"
+      "id": "api",
+      "label": "Mapper 接口 / SqlSession",
+      "sub": "调用入口",
+      "layer": 0,
+      "order": 0
     },
     {
-      "path": "org/apache/ibatis/executor/SimpleExecutor.java",
-      "label": "SimpleExecutor"
+      "id": "config",
+      "label": "Configuration",
+      "sub": "配置与映射",
+      "layer": 1,
+      "order": 0
     },
     {
-      "path": "org/apache/ibatis/executor/BatchExecutor.java",
-      "label": "BatchExecutor"
+      "id": "proxy",
+      "label": "MapperProxy",
+      "sub": "动态代理",
+      "layer": 2,
+      "order": 0
     },
     {
-      "path": "org/apache/ibatis/executor/CachingExecutor.java",
-      "label": "CachingExecutor"
+      "id": "executor",
+      "label": "Executor",
+      "sub": "执行器",
+      "layer": 3,
+      "order": 0
+    },
+    {
+      "id": "statement",
+      "label": "StatementHandler",
+      "sub": "JDBC 语句",
+      "layer": 4,
+      "order": 0
+    },
+    {
+      "id": "result",
+      "label": "ResultSetHandler",
+      "sub": "结果映射",
+      "layer": 5,
+      "order": 0
+    },
+    {
+      "id": "base",
+      "label": "基础模块",
+      "sub": "反射 / 类型 / 缓存 / 插件",
+      "layer": 6,
+      "order": 0
     }
   ],
-  "controls": [
+  "edges": [
     {
-      "id": "kind",
-      "type": "select",
-      "label": "用哪个执行器",
-      "default": "simple",
-      "options": [
-        {
-          "value": "simple",
-          "label": "SimpleExecutor"
-        },
-        {
-          "value": "batch",
-          "label": "BatchExecutor"
-        },
-        {
-          "value": "caching",
-          "label": "CachingExecutor（二级缓存）"
-        }
-      ]
+      "from": "api",
+      "to": "proxy",
+      "label": "调用接口方法"
+    },
+    {
+      "from": "config",
+      "to": "proxy",
+      "label": "注册 Mapper"
+    },
+    {
+      "from": "proxy",
+      "to": "executor",
+      "label": "MapperMethod"
+    },
+    {
+      "from": "config",
+      "to": "executor",
+      "label": "默认执行器"
+    },
+    {
+      "from": "executor",
+      "to": "statement",
+      "label": "prepare"
+    },
+    {
+      "from": "statement",
+      "to": "result",
+      "label": "ResultSet"
+    },
+    {
+      "from": "executor",
+      "to": "base",
+      "label": "用到时才取"
     }
   ],
   "steps": [
@@ -68,18 +115,45 @@ status: published
       "title": "BaseExecutor：所有实现的公共前半段",
       "file": "org/apache/ibatis/executor/BaseExecutor.java",
       "line": 142,
-      "lines": 32,
+      "code": "  public <E> List<E> query(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler,\n      CacheKey key, BoundSql boundSql) throws SQLException {\n    ErrorContext.instance().resource(ms.getResource()).activity(\"executing a query\").object(ms.getId());\n    if (closed) {\n      throw new ExecutorException(\"Executor was closed.\");\n    }\n    if (queryStack == 0 && ms.isFlushCacheRequired()) {\n      clearLocalCache();\n    }\n    List<E> list;\n    try {\n      queryStack++;\n      list = resultHandler == null ? (List<E>) localCache.getObject(key) : null;\n      if (list != null) {\n        handleLocallyCachedOutputParameters(ms, key, parameter, boundSql);\n      } else {\n        list = queryFromDatabase(ms, parameter, rowBounds, resultHandler, key, boundSql);\n      }\n    } finally {\n      queryStack--;\n    }\n    if (queryStack == 0) {\n      for (DeferredLoad deferredLoad : deferredLoads) {\n        deferredLoad.load();\n      }\n      // issue #601\n      deferredLoads.clear();\n      if (configuration.getLocalCacheScope() == LocalCacheScope.STATEMENT) {\n        // issue #482\n        clearLocalCache();\n      }\n    }",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20
+      ],
+      "nodes": [
+        "executor"
+      ],
+      "edges": [],
       "explain": "查一级缓存、维护 `queryStack`、处理延迟加载、按 `localCacheScope` 清理——这些与「用哪种执行器」无关，所以放在抽象基类。子类只实现 `doQuery` / `doUpdate`。",
       "state": {
+        "vars": [
+          {
+            "name": "queryStack",
+            "value": "1"
+          }
+        ],
         "stack": [
           "BaseExecutor.query",
           "localCache.getObject"
-        ],
-        "vars": [
-          [
-            "queryStack",
-            "1"
-          ]
         ]
       }
     },
@@ -87,78 +161,152 @@ status: published
       "title": "真正查库的那一步",
       "file": "org/apache/ibatis/executor/BaseExecutor.java",
       "line": 331,
-      "lines": 15,
+      "code": "  private <E> List<E> queryFromDatabase(MappedStatement ms, Object parameter, RowBounds rowBounds,\n      ResultHandler resultHandler, CacheKey key, BoundSql boundSql) throws SQLException {\n    List<E> list;\n    localCache.putObject(key, EXECUTION_PLACEHOLDER);\n    try {\n      list = doQuery(ms, parameter, rowBounds, resultHandler, boundSql);\n    } finally {\n      localCache.removeObject(key);\n    }\n    localCache.putObject(key, list);\n    if (ms.getStatementType() == StatementType.CALLABLE) {\n      localOutputParameterCache.putObject(key, parameter);\n    }\n    return list;\n  }",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "nodes": [
+        "executor"
+      ],
+      "edges": [],
       "explain": "`queryFromDatabase` 先放一个占位对象（防止嵌套查询重复查），再 `doQuery`，最后把结果写进一级缓存。**占位是为了递归查询**：同一条语句在结果映射里再次触发时不会死循环。",
-      "state": {
-        "tables": [
-          [
-            "localCache",
-            "key → EXECUTION_PLACEHOLDER → 结果"
-          ]
-        ]
-      }
+      "log": [
+        {
+          "k": "localCache",
+          "v": "key → EXECUTION_PLACEHOLDER → 结果"
+        }
+      ]
     },
     {
       "title": "Simple：每次新建 Statement，用完就关",
       "file": "org/apache/ibatis/executor/SimpleExecutor.java",
       "line": 57,
-      "lines": 13,
+      "code": "  public <E> List<E> doQuery(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler,\n      BoundSql boundSql) throws SQLException {\n    Statement stmt = null;\n    try {\n      Configuration configuration = ms.getConfiguration();\n      StatementHandler handler = configuration.newStatementHandler(wrapper, ms, parameter, rowBounds, resultHandler,\n          boundSql);\n      stmt = prepareStatement(handler, ms.getStatementLog());\n      return handler.query(stmt, resultHandler);\n    } finally {\n      closeStatement(stmt);\n    }\n  }",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "nodes": [
+        "executor"
+      ],
+      "edges": [],
       "explain": "拿 `StatementHandler` → `prepareStatement` → `handler.query` → finally 关闭。没有复用、没有攒批，最好理解。",
-      "when": {
-        "kind": "simple"
-      },
-      "state": {
-        "tables": [
-          [
-            "每次查询",
-            "新建并关闭 Statement"
-          ]
-        ]
-      }
+      "log": [
+        {
+          "k": "每次查询",
+          "v": "新建并关闭 Statement"
+        }
+      ]
     },
     {
       "title": "Batch：查询前先把攒的写发掉",
       "file": "org/apache/ibatis/executor/BatchExecutor.java",
       "line": 83,
-      "lines": 15,
+      "code": "  public <E> List<E> doQuery(MappedStatement ms, Object parameterObject, RowBounds rowBounds,\n      ResultHandler resultHandler, BoundSql boundSql) throws SQLException {\n    Statement stmt = null;\n    try {\n      flushStatements();\n      Configuration configuration = ms.getConfiguration();\n      StatementHandler handler = configuration.newStatementHandler(wrapper, ms, parameterObject, rowBounds,\n          resultHandler, boundSql);\n      Connection connection = getConnection(ms.getStatementLog());\n      stmt = handler.prepare(connection, transaction.getTimeout());\n      handler.parameterize(stmt);\n      return handler.query(stmt, resultHandler);\n    } finally {\n      closeStatement(stmt);\n    }",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "nodes": [
+        "executor"
+      ],
+      "edges": [],
       "explain": "`flushStatements()` 在查询之前——因为同一个连接上，未执行的批处理会影响后续读。然后照常 prepare/query。",
-      "when": {
-        "kind": "batch"
-      },
-      "state": {
-        "tables": [
-          [
-            "待执行批",
-            "先 flush"
-          ],
-          [
-            "查询",
-            "照常走"
-          ]
-        ]
-      }
+      "log": [
+        {
+          "k": "待执行批",
+          "v": "先 flush"
+        },
+        {
+          "k": "查询",
+          "v": "照常走"
+        }
+      ]
     },
     {
       "title": "Batch 的 flush：逐条 executeBatch",
       "file": "org/apache/ibatis/executor/BatchExecutor.java",
       "line": 115,
-      "lines": 21,
+      "code": "  public List<BatchResult> doFlushStatements(boolean isRollback) throws SQLException {\n    try {\n      List<BatchResult> results = new ArrayList<>();\n      if (isRollback) {\n        return Collections.emptyList();\n      }\n      for (int i = 0, n = statementList.size(); i < n; i++) {\n        Statement stmt = statementList.get(i);\n        applyTransactionTimeout(stmt);\n        BatchResult batchResult = batchResultList.get(i);\n        try {\n          batchResult.setUpdateCounts(stmt.executeBatch());\n          MappedStatement ms = batchResult.getMappedStatement();\n          List<Object> parameterObjects = batchResult.getParameterObjects();\n          KeyGenerator keyGenerator = ms.getKeyGenerator();\n          if (Jdbc3KeyGenerator.class.equals(keyGenerator.getClass())) {\n            Jdbc3KeyGenerator jdbc3KeyGenerator = (Jdbc3KeyGenerator) keyGenerator;\n            jdbc3KeyGenerator.processBatch(ms, stmt, parameterObjects);\n          } else if (!NoKeyGenerator.class.equals(keyGenerator.getClass())) { // issue #141\n            for (Object parameter : parameterObjects) {\n              keyGenerator.processAfter(this, ms, stmt, parameter);",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20
+      ],
+      "nodes": [
+        "executor"
+      ],
+      "edges": [],
       "explain": "回滚时直接返回空；否则对每个攒下的 `Statement` 调 `executeBatch()`，再把影响行数写回 `BatchResult`，主键回填也在这之后。",
-      "when": {
-        "kind": "batch"
-      },
-      "state": {
-        "tables": [
-          [
-            "executeBatch",
-            "返回 int[]"
-          ],
-          [
-            "主键回填",
-            "在 flush 之后"
-          ]
-        ]
-      },
+      "log": [
+        {
+          "k": "executeBatch",
+          "v": "返回 int[]"
+        },
+        {
+          "k": "主键回填",
+          "v": "在 flush 之后"
+        }
+      ],
       "predict": {
         "question": "executeBatch() 返回什么？",
         "options": [
@@ -174,23 +322,43 @@ status: published
       "title": "CachingExecutor：二级缓存套在最外面",
       "file": "org/apache/ibatis/executor/CachingExecutor.java",
       "line": 94,
-      "lines": 18,
+      "code": "  public <E> List<E> query(MappedStatement ms, Object parameterObject, RowBounds rowBounds, ResultHandler resultHandler,\n      CacheKey key, BoundSql boundSql) throws SQLException {\n    Cache cache = ms.getCache();\n    if (cache != null) {\n      flushCacheIfRequired(ms);\n      if (ms.isUseCache() && resultHandler == null) {\n        ensureNoOutParams(ms, boundSql);\n        @SuppressWarnings(\"unchecked\")\n        List<E> list = (List<E>) tcm.getObject(cache, key);\n        if (list == null) {\n          list = delegate.query(ms, parameterObject, rowBounds, resultHandler, key, boundSql);\n          tcm.putObject(cache, key, list); // issue #578 and #116\n        }\n        return list;\n      }\n    }\n    return delegate.query(ms, parameterObject, rowBounds, resultHandler, key, boundSql);\n  }",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18
+      ],
+      "nodes": [
+        "executor"
+      ],
+      "edges": [],
       "explain": "先算 `CacheKey`，再看 `ms.getCache()`（二级缓存）。命中就直接返回；没命中才委派给真正的执行器，并把结果放进缓存。**它不改变 SQL 执行，只加一层缓存**。",
-      "when": {
-        "kind": "caching"
-      },
-      "state": {
-        "tables": [
-          [
-            "cache",
-            "namespace 级二级缓存"
-          ],
-          [
-            "命中",
-            "不进 delegate"
-          ]
-        ]
-      },
+      "log": [
+        {
+          "k": "cache",
+          "v": "namespace 级二级缓存"
+        },
+        {
+          "k": "命中",
+          "v": "不进 delegate"
+        }
+      ],
       "predict": {
         "question": "CachingExecutor 是四选一的执行器吗？",
         "options": [

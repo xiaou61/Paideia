@@ -17,53 +17,100 @@ status: published
 
 这三件事分别由 `StatementHandler` 与 `ParameterHandler` 负责。
 
-```source-walk
+```code-flow
 {
   "id": "statement-handler",
   "title": "从 Routing 到 PreparedStatement",
   "repo": "mybatis/mybatis-3",
-  "ref": "mybatis-3.5.19",
   "commit": "ee0d4f4831ffdd311b0183c202f4ad6492a3f404",
   "license": "Apache-2.0",
-  "base": "source/mybatis-3.5.19",
-  "files": [
+  "file": "org/apache/ibatis/executor/statement/RoutingStatementHandler.java",
+  "nodes": [
     {
-      "path": "org/apache/ibatis/executor/statement/RoutingStatementHandler.java",
-      "label": "RoutingStatementHandler"
+      "id": "api",
+      "label": "Mapper 接口 / SqlSession",
+      "sub": "调用入口",
+      "layer": 0,
+      "order": 0
     },
     {
-      "path": "org/apache/ibatis/executor/statement/BaseStatementHandler.java",
-      "label": "BaseStatementHandler"
+      "id": "config",
+      "label": "Configuration",
+      "sub": "配置与映射",
+      "layer": 1,
+      "order": 0
     },
     {
-      "path": "org/apache/ibatis/executor/statement/PreparedStatementHandler.java",
-      "label": "PreparedStatementHandler"
+      "id": "proxy",
+      "label": "MapperProxy",
+      "sub": "动态代理",
+      "layer": 2,
+      "order": 0
     },
     {
-      "path": "org/apache/ibatis/scripting/defaults/DefaultParameterHandler.java",
-      "label": "DefaultParameterHandler"
+      "id": "executor",
+      "label": "Executor",
+      "sub": "执行器",
+      "layer": 3,
+      "order": 0
+    },
+    {
+      "id": "statement",
+      "label": "StatementHandler",
+      "sub": "JDBC 语句",
+      "layer": 4,
+      "order": 0
+    },
+    {
+      "id": "result",
+      "label": "ResultSetHandler",
+      "sub": "结果映射",
+      "layer": 5,
+      "order": 0
+    },
+    {
+      "id": "base",
+      "label": "基础模块",
+      "sub": "反射 / 类型 / 缓存 / 插件",
+      "layer": 6,
+      "order": 0
     }
   ],
-  "controls": [
+  "edges": [
     {
-      "id": "statementType",
-      "type": "select",
-      "label": "statementType",
-      "default": "PREPARED",
-      "options": [
-        {
-          "value": "PREPARED",
-          "label": "PREPARED（默认）"
-        },
-        {
-          "value": "STATEMENT",
-          "label": "STATEMENT"
-        },
-        {
-          "value": "CALLABLE",
-          "label": "CALLABLE"
-        }
-      ]
+      "from": "api",
+      "to": "proxy",
+      "label": "调用接口方法"
+    },
+    {
+      "from": "config",
+      "to": "proxy",
+      "label": "注册 Mapper"
+    },
+    {
+      "from": "proxy",
+      "to": "executor",
+      "label": "MapperMethod"
+    },
+    {
+      "from": "config",
+      "to": "executor",
+      "label": "默认执行器"
+    },
+    {
+      "from": "executor",
+      "to": "statement",
+      "label": "prepare"
+    },
+    {
+      "from": "statement",
+      "to": "result",
+      "label": "ResultSet"
+    },
+    {
+      "from": "executor",
+      "to": "base",
+      "label": "用到时才取"
     }
   ],
   "steps": [
@@ -71,53 +118,106 @@ status: published
       "title": "Routing：按 statementType 造不同的 handler",
       "file": "org/apache/ibatis/executor/statement/RoutingStatementHandler.java",
       "line": 39,
-      "lines": 18,
+      "code": "  public RoutingStatementHandler(Executor executor, MappedStatement ms, Object parameter, RowBounds rowBounds,\n      ResultHandler resultHandler, BoundSql boundSql) {\n\n    switch (ms.getStatementType()) {\n      case STATEMENT:\n        delegate = new SimpleStatementHandler(executor, ms, parameter, rowBounds, resultHandler, boundSql);\n        break;\n      case PREPARED:\n        delegate = new PreparedStatementHandler(executor, ms, parameter, rowBounds, resultHandler, boundSql);\n        break;\n      case CALLABLE:\n        delegate = new CallableStatementHandler(executor, ms, parameter, rowBounds, resultHandler, boundSql);\n        break;\n      default:\n        throw new ExecutorException(\"Unknown statement type: \" + ms.getStatementType());\n    }\n\n  }",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18
+      ],
+      "nodes": [
+        "executor"
+      ],
+      "edges": [],
       "explain": "`switch (ms.getStatementType())`：STATEMENT → `SimpleStatementHandler`，PREPARED → `PreparedStatementHandler`，CALLABLE → `CallableStatementHandler`。构造完就把一切委派给它。",
-      "state": {
-        "tables": [
-          [
-            "delegate",
-            "PreparedStatementHandler"
-          ]
-        ]
-      }
+      "log": [
+        {
+          "k": "delegate",
+          "v": "PreparedStatementHandler"
+        }
+      ]
     },
     {
       "title": "Base：四个 handler 共享的初始化",
       "file": "org/apache/ibatis/executor/statement/BaseStatementHandler.java",
       "line": 53,
-      "lines": 22,
+      "code": "  protected BaseStatementHandler(Executor executor, MappedStatement mappedStatement, Object parameterObject,\n      RowBounds rowBounds, ResultHandler resultHandler, BoundSql boundSql) {\n    this.configuration = mappedStatement.getConfiguration();\n    this.executor = executor;\n    this.mappedStatement = mappedStatement;\n    this.rowBounds = rowBounds;\n\n    this.typeHandlerRegistry = configuration.getTypeHandlerRegistry();\n    this.objectFactory = configuration.getObjectFactory();\n\n    if (boundSql == null) { // issue #435, get the key before calculating the statement\n      generateKeys(parameterObject);\n      boundSql = mappedStatement.getBoundSql(parameterObject);\n    }\n\n    this.boundSql = boundSql;\n\n    this.parameterHandler = configuration.newParameterHandler(mappedStatement, parameterObject, boundSql);\n    this.resultSetHandler = configuration.newResultSetHandler(executor, mappedStatement, rowBounds, parameterHandler,\n        resultHandler, boundSql);\n  }",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20
+      ],
+      "nodes": [
+        "executor"
+      ],
+      "edges": [],
       "explain": "存 executor / ms / rowBounds，拿 TypeHandlerRegistry 与 ObjectFactory；`boundSql == null` 时先生成主键再取 BoundSql；最后建 `ParameterHandler` 与 `ResultSetHandler`。",
-      "state": {
-        "tables": [
-          [
-            "parameterHandler",
-            "DefaultParameterHandler"
-          ],
-          [
-            "resultSetHandler",
-            "DefaultResultSetHandler"
-          ]
-        ]
-      }
+      "log": [
+        {
+          "k": "parameterHandler",
+          "v": "DefaultParameterHandler"
+        },
+        {
+          "k": "resultSetHandler",
+          "v": "DefaultResultSetHandler"
+        }
+      ]
     },
     {
       "title": "PREPARED：带 ? 的语句",
       "file": "org/apache/ibatis/executor/statement/RoutingStatementHandler.java",
       "line": 46,
-      "lines": 3,
+      "code": "      case PREPARED:\n        delegate = new PreparedStatementHandler(executor, ms, parameter, rowBounds, resultHandler, boundSql);\n        break;",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3
+      ],
+      "nodes": [
+        "executor"
+      ],
+      "edges": [],
       "explain": "默认就是它。SQL 里已经是 `?`，参数由 `ParameterHandler` 按位置绑。",
-      "when": {
-        "statementType": "PREPARED"
-      },
-      "state": {
-        "tables": [
-          [
-            "handler",
-            "PreparedStatementHandler"
-          ]
-        ]
-      },
+      "log": [
+        {
+          "k": "handler",
+          "v": "PreparedStatementHandler"
+        }
+      ],
       "predict": {
         "question": "默认 statementType 是？",
         "options": [
@@ -133,62 +233,101 @@ status: published
       "title": "STATEMENT：没有占位符，SQL 必须已经拼好",
       "file": "org/apache/ibatis/executor/statement/RoutingStatementHandler.java",
       "line": 42,
-      "lines": 5,
+      "code": "    switch (ms.getStatementType()) {\n      case STATEMENT:\n        delegate = new SimpleStatementHandler(executor, ms, parameter, rowBounds, resultHandler, boundSql);\n        break;\n      case PREPARED:",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "nodes": [
+        "executor"
+      ],
+      "edges": [],
       "explain": "`SimpleStatementHandler` 直接把 `BoundSql.getSql()` 交给 `Statement.execute`。`#{ }` 在这种模式下会被当成普通文本——所以不能混用。",
-      "when": {
-        "statementType": "STATEMENT"
-      },
-      "state": {
-        "tables": [
-          [
-            "handler",
-            "SimpleStatementHandler"
-          ],
-          [
-            "参数",
-            "不绑定"
-          ]
-        ]
-      }
+      "log": [
+        {
+          "k": "handler",
+          "v": "SimpleStatementHandler"
+        },
+        {
+          "k": "参数",
+          "v": "不绑定"
+        }
+      ]
     },
     {
       "title": "CALLABLE：存储过程",
       "file": "org/apache/ibatis/executor/statement/RoutingStatementHandler.java",
       "line": 49,
-      "lines": 3,
+      "code": "      case CALLABLE:\n        delegate = new CallableStatementHandler(executor, ms, parameter, rowBounds, resultHandler, boundSql);\n        break;",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3
+      ],
+      "nodes": [
+        "executor"
+      ],
+      "edges": [],
       "explain": "`CallableStatementHandler` 额外处理 OUT 参数，`{call proc(?, ?)}` 这种写法就是它。",
-      "when": {
-        "statementType": "CALLABLE"
-      },
-      "state": {
-        "tables": [
-          [
-            "handler",
-            "CallableStatementHandler"
-          ],
-          [
-            "OUT 参数",
-            "额外处理"
-          ]
-        ]
-      }
+      "log": [
+        {
+          "k": "handler",
+          "v": "CallableStatementHandler"
+        },
+        {
+          "k": "OUT 参数",
+          "v": "额外处理"
+        }
+      ]
     },
     {
       "title": "造 PreparedStatement：预编译与主键",
       "file": "org/apache/ibatis/executor/statement/PreparedStatementHandler.java",
       "line": 77,
-      "lines": 20,
+      "code": "  protected Statement instantiateStatement(Connection connection) throws SQLException {\n    String sql = boundSql.getSql();\n    if (mappedStatement.getKeyGenerator() instanceof Jdbc3KeyGenerator) {\n      String[] keyColumnNames = mappedStatement.getKeyColumns();\n      if (keyColumnNames == null) {\n        return connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);\n      } else {\n        return connection.prepareStatement(sql, keyColumnNames);\n      }\n    }\n    if (mappedStatement.getResultSetType() == ResultSetType.DEFAULT) {\n      return connection.prepareStatement(sql);\n    } else {\n      return connection.prepareStatement(sql, mappedStatement.getResultSetType().getValue(),\n          ResultSet.CONCUR_READ_ONLY);\n    }\n  }\n\n  @Override\n  public void parameterize(Statement statement) throws SQLException {",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20
+      ],
+      "nodes": [
+        "executor"
+      ],
+      "edges": [],
       "explain": "按 `resultSetType` / `resultSetConcurrency` 调 `connection.prepareStatement(...)`；配了 `keyProperty` 的 INSERT 还要带 `RETURN_GENERATED_KEYS`。语句超时也在这里设。",
       "state": {
         "vars": [
-          [
-            "sql",
-            "select ... where id = ?"
-          ],
-          [
-            "generatedKeys",
-            "true（INSERT）"
-          ]
+          {
+            "name": "sql",
+            "value": "select ... where id = ?"
+          },
+          {
+            "name": "generatedKeys",
+            "value": "true（INSERT）"
+          }
         ]
       }
     },
@@ -196,7 +335,17 @@ status: published
       "title": "绑参数只占一行",
       "file": "org/apache/ibatis/executor/statement/PreparedStatementHandler.java",
       "line": 96,
-      "lines": 3,
+      "code": "  public void parameterize(Statement statement) throws SQLException {\n    parameterHandler.setParameters((PreparedStatement) statement);\n  }",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3
+      ],
+      "nodes": [
+        "executor"
+      ],
+      "edges": [],
       "explain": "`parameterize` 把活全交给 `parameterHandler.setParameters(ps)`。职责切得很干净：StatementHandler 管 JDBC 语句，ParameterHandler 管值。",
       "state": {
         "stack": [
@@ -219,7 +368,19 @@ status: published
       "title": "执行只有两行",
       "file": "org/apache/ibatis/executor/statement/PreparedStatementHandler.java",
       "line": 63,
-      "lines": 5,
+      "code": "  public <E> List<E> query(Statement statement, ResultHandler resultHandler) throws SQLException {\n    PreparedStatement ps = (PreparedStatement) statement;\n    ps.execute();\n    return resultSetHandler.handleResultSets(ps);\n  }",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "nodes": [
+        "executor"
+      ],
+      "edges": [],
       "explain": "`ps.execute()` 然后 `resultSetHandler.handleResultSets(ps)`。到这里 JDBC 的部分结束，后面全是映射。",
       "state": {
         "stack": [
@@ -232,20 +393,45 @@ status: published
       "title": "绑参数：按 ParameterMapping 逐个取",
       "file": "org/apache/ibatis/scripting/defaults/DefaultParameterHandler.java",
       "line": 62,
-      "lines": 22,
+      "code": "  public void setParameters(PreparedStatement ps) {\n    ErrorContext.instance().activity(\"setting parameters\").object(mappedStatement.getParameterMap().getId());\n    List<ParameterMapping> parameterMappings = boundSql.getParameterMappings();\n    if (parameterMappings != null) {\n      MetaObject metaObject = null;\n      for (int i = 0; i < parameterMappings.size(); i++) {\n        ParameterMapping parameterMapping = parameterMappings.get(i);\n        if (parameterMapping.getMode() != ParameterMode.OUT) {\n          Object value;\n          String propertyName = parameterMapping.getProperty();\n          if (boundSql.hasAdditionalParameter(propertyName)) { // issue #448 ask first for additional params\n            value = boundSql.getAdditionalParameter(propertyName);\n          } else if (parameterObject == null) {\n            value = null;\n          } else if (typeHandlerRegistry.hasTypeHandler(parameterObject.getClass())) {\n            value = parameterObject;\n          } else {\n            if (metaObject == null) {\n              metaObject = configuration.newMetaObject(parameterObject);\n            }\n            value = metaObject.getValue(propertyName);\n          }",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20
+      ],
+      "nodes": [
+        "statement"
+      ],
+      "edges": [],
       "explain": "遍历 `parameterMappings`：先从 additionalParameters 找（`__frch_*`），再判断参数本身、最后用 `MetaObject` 反射。取到值再交给 `typeHandler.setParameter`。",
-      "state": {
-        "tables": [
-          [
-            "#{id}",
-            "LongTypeHandler"
-          ],
-          [
-            "#{user.name}",
-            "StringTypeHandler"
-          ]
-        ]
-      }
+      "log": [
+        {
+          "k": "#{id}",
+          "v": "LongTypeHandler"
+        },
+        {
+          "k": "#{user.name}",
+          "v": "StringTypeHandler"
+        }
+      ]
     }
   ]
 }

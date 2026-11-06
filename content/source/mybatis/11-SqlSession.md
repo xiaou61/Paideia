@@ -13,41 +13,100 @@ status: published
 
 这一关只看三件事：**它怎么被创建**、**查询怎么落到 Executor**、**为什么它不能跨线程共享**。
 
-```source-walk
+```code-flow
 {
   "id": "sql-session",
   "title": "openSession 到 executor.query",
   "repo": "mybatis/mybatis-3",
-  "ref": "mybatis-3.5.19",
   "commit": "ee0d4f4831ffdd311b0183c202f4ad6492a3f404",
   "license": "Apache-2.0",
-  "base": "source/mybatis-3.5.19",
-  "files": [
+  "file": "org/apache/ibatis/session/defaults/DefaultSqlSessionFactory.java",
+  "nodes": [
     {
-      "path": "org/apache/ibatis/session/defaults/DefaultSqlSessionFactory.java",
-      "label": "DefaultSqlSessionFactory"
+      "id": "api",
+      "label": "Mapper 接口 / SqlSession",
+      "sub": "调用入口",
+      "layer": 0,
+      "order": 0
     },
     {
-      "path": "org/apache/ibatis/session/defaults/DefaultSqlSession.java",
-      "label": "DefaultSqlSession"
+      "id": "config",
+      "label": "Configuration",
+      "sub": "配置与映射",
+      "layer": 1,
+      "order": 0
+    },
+    {
+      "id": "proxy",
+      "label": "MapperProxy",
+      "sub": "动态代理",
+      "layer": 2,
+      "order": 0
+    },
+    {
+      "id": "executor",
+      "label": "Executor",
+      "sub": "执行器",
+      "layer": 3,
+      "order": 0
+    },
+    {
+      "id": "statement",
+      "label": "StatementHandler",
+      "sub": "JDBC 语句",
+      "layer": 4,
+      "order": 0
+    },
+    {
+      "id": "result",
+      "label": "ResultSetHandler",
+      "sub": "结果映射",
+      "layer": 5,
+      "order": 0
+    },
+    {
+      "id": "base",
+      "label": "基础模块",
+      "sub": "反射 / 类型 / 缓存 / 插件",
+      "layer": 6,
+      "order": 0
     }
   ],
-  "controls": [
+  "edges": [
     {
-      "id": "autoCommit",
-      "type": "select",
-      "label": "openSession(autoCommit)",
-      "default": "false",
-      "options": [
-        {
-          "value": "false",
-          "label": "false（默认，要手动 commit）"
-        },
-        {
-          "value": "true",
-          "label": "true（自动提交）"
-        }
-      ]
+      "from": "api",
+      "to": "proxy",
+      "label": "调用接口方法"
+    },
+    {
+      "from": "config",
+      "to": "proxy",
+      "label": "注册 Mapper"
+    },
+    {
+      "from": "proxy",
+      "to": "executor",
+      "label": "MapperMethod"
+    },
+    {
+      "from": "config",
+      "to": "executor",
+      "label": "默认执行器"
+    },
+    {
+      "from": "executor",
+      "to": "statement",
+      "label": "prepare"
+    },
+    {
+      "from": "statement",
+      "to": "result",
+      "label": "ResultSet"
+    },
+    {
+      "from": "executor",
+      "to": "base",
+      "label": "用到时才取"
     }
   ],
   "steps": [
@@ -55,18 +114,28 @@ status: published
       "title": "openSession：默认执行器 + 不自动提交",
       "file": "org/apache/ibatis/session/defaults/DefaultSqlSessionFactory.java",
       "line": 46,
-      "lines": 3,
+      "code": "  public SqlSession openSession() {\n    return openSessionFromDataSource(configuration.getDefaultExecutorType(), null, false);\n  }",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3
+      ],
+      "nodes": [
+        "api"
+      ],
+      "edges": [],
       "explain": "无参 `openSession()` 用的是 `configuration.getDefaultExecutorType()` 与 `autoCommit=false`。**默认不自动提交**——这是很多人第一次用 MyBatis 插入不生效的原因。",
       "state": {
         "vars": [
-          [
-            "execType",
-            "SIMPLE"
-          ],
-          [
-            "autoCommit",
-            "false"
-          ]
+          {
+            "name": "execType",
+            "value": "SIMPLE"
+          },
+          {
+            "name": "autoCommit",
+            "value": "false"
+          }
         ]
       }
     },
@@ -74,23 +143,46 @@ status: published
       "title": "一句 openSession 里发生了四件事",
       "file": "org/apache/ibatis/session/defaults/DefaultSqlSessionFactory.java",
       "line": 94,
-      "lines": 16,
+      "code": "  private SqlSession openSessionFromDataSource(ExecutorType execType, TransactionIsolationLevel level,\n      boolean autoCommit) {\n    Transaction tx = null;\n    try {\n      final Environment environment = configuration.getEnvironment();\n      final TransactionFactory transactionFactory = getTransactionFactoryFromEnvironment(environment);\n      tx = transactionFactory.newTransaction(environment.getDataSource(), level, autoCommit);\n      final Executor executor = configuration.newExecutor(tx, execType);\n      return createSqlSession(configuration, executor, autoCommit);\n    } catch (Exception e) {\n      closeTransaction(tx); // may have fetched a connection so lets call close()\n      throw ExceptionFactory.wrapException(\"Error opening session.  Cause: \" + e, e);\n    } finally {\n      ErrorContext.instance().reset();\n    }\n  }",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "nodes": [
+        "api"
+      ],
+      "edges": [],
       "explain": "取 Environment → 建 Transaction（这一步可能拿连接）→ `configuration.newExecutor(tx, execType)`（按需套缓存/插件）→ 包成 `DefaultSqlSession`。失败时关闭事务，避免连接泄漏。",
+      "log": [
+        {
+          "k": "transaction",
+          "v": "JdbcTransaction"
+        },
+        {
+          "k": "executor",
+          "v": "SimpleExecutor"
+        }
+      ],
       "state": {
         "stack": [
           "openSessionFromDataSource",
           "transactionFactory.newTransaction",
           "configuration.newExecutor"
-        ],
-        "tables": [
-          [
-            "transaction",
-            "JdbcTransaction"
-          ],
-          [
-            "executor",
-            "SimpleExecutor"
-          ]
         ]
       }
     },
@@ -98,62 +190,87 @@ status: published
       "title": "autoCommit=true：事务照样建，只是自动提交",
       "file": "org/apache/ibatis/session/defaults/DefaultSqlSessionFactory.java",
       "line": 100,
-      "lines": 1,
+      "code": "      tx = transactionFactory.newTransaction(environment.getDataSource(), level, autoCommit);",
+      "language": "java",
+      "focus": [
+        1
+      ],
+      "nodes": [
+        "api"
+      ],
+      "edges": [],
       "explain": "`autoCommit` 一路传给 `newTransaction`。注意它**不改变执行器**，只改变连接是否自动提交；一级缓存照样在。",
-      "when": {
-        "autoCommit": "true"
-      },
-      "state": {
-        "tables": [
-          [
-            "connection.autoCommit",
-            "true"
-          ],
-          [
-            "一级缓存",
-            "仍然生效"
-          ]
-        ]
-      }
+      "log": [
+        {
+          "k": "connection.autoCommit",
+          "v": "true"
+        },
+        {
+          "k": "一级缓存",
+          "v": "仍然生效"
+        }
+      ]
     },
     {
       "title": "autoCommit=false：忘了 commit 就白写",
       "file": "org/apache/ibatis/session/defaults/DefaultSqlSessionFactory.java",
       "line": 100,
-      "lines": 1,
+      "code": "      tx = transactionFactory.newTransaction(environment.getDataSource(), level, autoCommit);",
+      "language": "java",
+      "focus": [
+        1
+      ],
+      "nodes": [
+        "api"
+      ],
+      "edges": [],
       "explain": "连接不自动提交，`session.close()` 之前没有 `commit()`，事务会回滚。**同一个 session 里能查到刚插入的数据**（没走库或走了同事务），换一个 session 就没了。",
-      "when": {
-        "autoCommit": "false"
-      },
-      "state": {
-        "tables": [
-          [
-            "connection.autoCommit",
-            "false"
-          ],
-          [
-            "未 commit 就 close",
-            "回滚"
-          ]
-        ]
-      }
+      "log": [
+        {
+          "k": "connection.autoCommit",
+          "v": "false"
+        },
+        {
+          "k": "未 commit 就 close",
+          "v": "回滚"
+        }
+      ]
     },
     {
       "title": "selectList：三行就到 Executor",
       "file": "org/apache/ibatis/session/defaults/DefaultSqlSession.java",
       "line": 146,
-      "lines": 12,
+      "code": "  public <E> List<E> selectList(String statement, Object parameter, RowBounds rowBounds) {\n    return selectList(statement, parameter, rowBounds, Executor.NO_RESULT_HANDLER);\n  }\n\n  private <E> List<E> selectList(String statement, Object parameter, RowBounds rowBounds, ResultHandler handler) {\n    try {\n      MappedStatement ms = configuration.getMappedStatement(statement);\n      dirty |= ms.isDirtySelect();\n      return executor.query(ms, wrapCollection(parameter), rowBounds, handler);\n    } catch (Exception e) {\n      throw ExceptionFactory.wrapException(\"Error querying database.  Cause: \" + e, e);\n    } finally {",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "nodes": [
+        "api"
+      ],
+      "edges": [],
       "explain": "取 `MappedStatement` → `wrapCollection(parameter)`（集合参数包成 map）→ `executor.query(...)`。SqlSession 自己**不做查询**，它只是把参数摆好。",
       "state": {
+        "vars": [
+          {
+            "name": "statement",
+            "value": "com.example.UserMapper.selectById"
+          }
+        ],
         "stack": [
           "DefaultSqlSession.selectList",
           "Executor.query"
-        ],
-        "vars": [
-          [
-            "statement",
-            "com.example.UserMapper.selectById"
-          ]
         ]
       },
       "predict": {
@@ -171,8 +288,40 @@ status: published
       "title": "selectOne：查完再判断数量",
       "file": "org/apache/ibatis/session/defaults/DefaultSqlSession.java",
       "line": 73,
-      "lines": 13,
+      "code": "  public <T> T selectOne(String statement, Object parameter) {\n    // Popular vote was to return null on 0 results and throw exception on too many.\n    List<T> list = this.selectList(statement, parameter);\n    if (list.size() == 1) {\n      return list.get(0);\n    }\n    if (list.size() > 1) {\n      throw new TooManyResultsException(\n          \"Expected one result (or null) to be returned by selectOne(), but found: \" + list.size());\n    } else {\n      return null;\n    }\n  }",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "nodes": [
+        "api"
+      ],
+      "edges": [],
       "explain": "`selectOne` 不是单独的查询路径，它调 `selectList` 然后判断：1 条返回、0 条 null、多条抛 `TooManyResultsException`。",
+      "state": {
+        "vars": [
+          {
+            "name": "list.size()",
+            "value": "3"
+          },
+          {
+            "name": "结果",
+            "value": "TooManyResultsException"
+          }
+        ]
+      },
       "predict": {
         "question": "selectOne 查到 3 条会怎样？",
         "options": [
@@ -182,34 +331,30 @@ status: published
         ],
         "answer": 2,
         "reveal": "源码里明确 `list.size() > 1` 就抛异常。想只要一条就写 `limit 1` 或用 selectList 自己取。"
-      },
-      "state": {
-        "vars": [
-          [
-            "list.size()",
-            "3"
-          ],
-          [
-            "结果",
-            "TooManyResultsException"
-          ]
-        ]
       }
     },
     {
       "title": "getMapper：session 把 configuration 借出去",
       "file": "org/apache/ibatis/session/defaults/DefaultSqlSession.java",
       "line": 290,
-      "lines": 3,
+      "code": "  public <T> T getMapper(Class<T> type) {\n    return configuration.getMapper(type, this);\n  }",
+      "language": "java",
+      "focus": [
+        1,
+        2,
+        3
+      ],
+      "nodes": [
+        "api"
+      ],
+      "edges": [],
       "explain": "`configuration.getMapper(type, this)`——注意第二个参数是 `this`：代理拿到的就是当前 session。这就是「Mapper 不能跨 session 复用」的根源。",
-      "state": {
-        "tables": [
-          [
-            "MapperProxy.sqlSession",
-            "当前 DefaultSqlSession"
-          ]
-        ]
-      }
+      "log": [
+        {
+          "k": "MapperProxy.sqlSession",
+          "v": "当前 DefaultSqlSession"
+        }
+      ]
     }
   ]
 }
