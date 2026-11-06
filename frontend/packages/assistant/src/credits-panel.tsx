@@ -5,26 +5,13 @@ import type { AssistantApi } from './client'
 import type { CreditsView } from './types'
 import { errorMessage } from '@paideia/core'
 
-/** 流水的种类 → 人话。认不出的就照原样显示，不做兜底猜测。 */
-const KIND_LABEL: Record<string, string> = {
-  ADJUST: '管理员调整',
-  RESERVE: '预扣',
-  SETTLE: '结算',
-  REFUND: '退还',
-  // 下面三种是"用途单独记"的消耗。不登记的话面板会显示原始英文码，
-  // 而那正是"我没聊几次怎么花了这么多"最需要看懂的地方。
-  MEMORY_EXTRACT: '自动整理记忆',
-  INTERVIEW_REVIEW: '面试点评',
-  RESUME: '简历优化',
-}
-
 /**
- * 积分面板：还剩多少、每一笔花在哪（WORK-009 REQ-008）。
+ * 积分摘要：只剩「余额多少」这一行（WORK-009 REQ-008；2026-11-06 做减法）。
  *
- * <p>通用助手与记忆面板下线后，本面板独立挂在设置页里，只回答"AI 用量花了我多少"。
+ * <p>通用助手与记忆面板下线后，明细流水被砍掉，只把余额并进「身份与目标」页——
+ * 用户需要知道的只有“我还能不能用 AI”，而不是每一笔的 token 账。
  *
- * <p>**只读**：本项不做充值，所以这里没有任何写操作。积分只能由管理员发放，那是管理端的事；
- * 这里出现的每一笔都是既成事实。
+ * <p>**只读**：本项不做充值，所以这里没有任何写操作。积分只能由管理员发放，那是管理端的事。
  */
 export function CreditsPanel({ api }: { api: AssistantApi }) {
   const [view, setView] = useState<CreditsView | null>(null)
@@ -50,7 +37,7 @@ export function CreditsPanel({ api }: { api: AssistantApi }) {
   }, [api])
 
   return (
-    <div className="space-y-2" data-testid="credits-panel">
+    <div className="space-y-1" data-testid="credits-panel">
       {error === null ? null : (
         <p className="text-destructive text-xs" data-testid="credits-error">
           {error}
@@ -66,38 +53,11 @@ export function CreditsPanel({ api }: { api: AssistantApi }) {
             <span className="font-medium tabular-nums" data-testid="credits-balance">
               {view.balance}
             </span>{' '}
-            积分
+            分
           </p>
           <p className="text-muted-foreground text-xs">
-            按实际用量扣积分。当前没有自动充值——需要时请联系管理员。
+            按实际用量扣分，暂不支持自助充值——需要时请联系管理员。
           </p>
-
-          {view.ledger.length === 0 ? (
-            <p className="text-muted-foreground text-sm" data-testid="credits-empty">
-              还没有任何消耗。
-            </p>
-          ) : (
-            <ul className="space-y-1">
-              {view.ledger.map((row, index) => (
-                <li
-                  key={`${row.createdAt ?? ''}-${row.kind}-${String(index)}`}
-                  data-testid="credits-row"
-                  className="border-border flex items-start justify-between gap-2 rounded border px-2 py-1"
-                >
-                  <span className="text-muted-foreground text-xs break-words">
-                    {KIND_LABEL[row.kind] ?? row.kind}
-                    {row.inputTokens === null ? '' : ` · 用 ${row.inputTokens}/${row.outputTokens ?? 0} token`}
-                    {row.note === null ? '' : ` · ${row.note}`}
-                  </span>
-                  <span
-                    className={`shrink-0 text-xs tabular-nums ${row.delta < 0 ? 'text-destructive' : ''}`}
-                  >
-                    {row.delta > 0 ? `+${row.delta}` : row.delta}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
         </>
       )}
     </div>

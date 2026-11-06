@@ -8,6 +8,7 @@ import {
   type JobTimeline,
   type LearnerProfileInput,
 } from '@paideia/identity'
+import { createAssistantApi, CreditsPanel } from '@paideia/assistant'
 import { useQuery } from '@tanstack/react-query'
 import {
   Alert,
@@ -34,7 +35,7 @@ import {
   Landmark,
   MapPin,
 } from 'lucide-react'
-import { useEffect, useState, type ComponentType } from 'react'
+import { useEffect, useMemo, useState, type ComponentType } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
 import { api } from '../api'
@@ -76,6 +77,7 @@ export function ProfilePage() {
   const { data, isLoading, error } = useQuery({ queryKey: ['profile'], queryFn: () => identity.profile() })
   const navigate = useNavigate()
   const location = useLocation()
+  const assistantApi = useMemo(() => createAssistantApi(api), [])
 
   const [form, setForm] = useState<LearnerProfileInput | null>(null)
   const [saving, setSaving] = useState(false)
@@ -317,6 +319,12 @@ export function ProfilePage() {
 
           {/* 账号与安全（WORK-037）：登录方式与身份是两件事，所以单独一块、单独保存 */}
           <AccountSecuritySection />
+
+          {/* AI 积分（原独立设置页撤销后并入）：只留余额一行，明细不再展示 */}
+          <section className="border-border border-t p-6" data-testid="profile-credits">
+            <h2 className="mb-2 text-sm font-medium">AI 积分</h2>
+            <CreditsPanel api={assistantApi} />
+          </section>
         </div>
       </div>
 
