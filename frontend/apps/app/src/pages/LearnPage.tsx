@@ -245,6 +245,33 @@ export function LearnPage() {
   }, [sections])
 
   /**
+   * 主题组的先后**跟着岗位走**。
+   *
+   * <p>原来组顺序写死在 `TRACK_GROUPS` 里，于是切岗位时只有组内几条卡挪位，
+   * 用户看到的是"上面切换、下面不动"（2026-11-06 反馈）——联动做了，但看不见。
+   * 这里按「该组在当前岗位里的核心条数 → 进阶条数」重排，切岗位时整页结构换一次。
+   * 同分保持 `TRACK_GROUPS` 的原顺序，否则每次进来都像随机。
+   */
+  const groupOrder = useMemo(() => {
+    const weight = new Map<string, { core: number; advanced: number }>()
+    for (const track of tracks.data ?? []) {
+      const key = groupKeyOf(track.slug)
+      const entry = weight.get(key) ?? { core: 0, advanced: 0 }
+      const { tier } = tierOf(role, track.slug)
+      if (tier === 'core') entry.core += 1
+      if (tier === 'advanced') entry.advanced += 1
+      weight.set(key, entry)
+    }
+    const order = [...TRACK_GROUPS.map((group) => group.key), OTHER_GROUP.key]
+    const base = new Map(order.map((key, index) => [key, index]))
+    return order.sort((left, right) => {
+      const a = weight.get(left) ?? { core: 0, advanced: 0 }
+      const b = weight.get(right) ?? { core: 0, advanced: 0 }
+      return b.core - a.core || b.advanced - a.advanced || base.get(left)! - base.get(right)!
+    })
+  }, [tracks.data, role])
+
+  /**
    * 主题目录：先按搜索词与所选分类过滤，再按主题分组。
    *
    * <p>组内排序用**岗位 rank**（核心在前），同 rank 按名字——让"这个岗位该先看的"
@@ -264,8 +291,7 @@ export function LearnPage() {
       if (list) list.push(track)
       else grouped.set(key, [track])
     }
-    const order = [...TRACK_GROUPS.map((group) => group.key), OTHER_GROUP.key]
-    return order
+    return groupOrder
       .filter((key) => (grouped.get(key)?.length ?? 0) > 0)
       .map((key) => {
         const def = groupDefOf(key)
@@ -277,7 +303,7 @@ export function LearnPage() {
         })
         return { key, label: def.label, hint: def.hint, tracks: list }
       })
-  }, [tracks.data, query, groupKey, role])
+  }, [tracks.data, query, groupKey, role, groupOrder])
 
   /** 每个分类下的轨道总数（不随搜索变化），供分类 chip 显示数量。 */
   const groupCounts = useMemo(() => {
@@ -295,8 +321,15 @@ export function LearnPage() {
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
       <PageHeader
         title="从零开始"
-        description="按主题找，或被岗位推荐带路。岗位只影响推荐顺序，不影响你能看什么。"
+        description="按主题找，或被岗位推荐带路。岗位只影响排序，不影响你能看什么。"
       />
+
+      {/* 分区标题不是装饰：没有它，上面这排 chip 会被读成"目录的筛选器"，
+          切了下面的内容却没明显变化，就成了 bug 手感（2026-11-06 反馈）。 */}
+      <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 className="text-lg font-semibold">你的路线</h2>
+        <span className="text-muted-foreground text-sm">按「{meta.label}」排 · 岗位只改顺序，不藏内容</span>
+      </div>
 
       <RolePicker role={role} onChoose={chooseRole} />
 
@@ -365,12 +398,19 @@ export function LearnPage() {
       ) : null}
 
       {tracks.isSuccess && tracks.data.length > 0 ? (
-        <div data-testid="learn-catalog">
+        <div data-testid="learn-catalog" className="border-border border-t pt-6">
+          <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h2 className="text-lg font-semibold">全部轨道</h2>
+            <span className="text-muted-foreground text-sm">
+              {tracks.data.length} 条 · 按主题分，和岗位无关；组的先后跟着上面的岗位
+            </span>
+          </div>
           <CatalogToolbar
             query={query}
             onQuery={setQuery}
             groupKey={groupKey}
             onGroup={setGroupKey}
+            groupOrder={groupOrder}
             counts={groupCounts}
             total={tracks.data.length}
             matched={matchedCount}
@@ -475,6 +515,7 @@ function CatalogToolbar({
   onQuery,
   groupKey,
   onGroup,
+  groupOrder,
   counts,
   total,
   matched,
@@ -483,17 +524,17 @@ function CatalogToolbar({
   onQuery: (next: string) => void
   groupKey: string
   onGroup: (next: string) => void
+  /** 已按岗位相关度排好的组 key：chip 的顺序与下面分组的顺序必须一致。 */
+  groupOrder: string[]
   counts: Map<string, number>
   total: number
   matched: number
 }) {
   const chips = [
     { key: 'all', label: '全部', count: total },
-    ...TRACK_GROUPS.filter((group) => (counts.get(group.key) ?? 0) > 0).map((group) => ({
-      key: group.key,
-      label: group.label,
-      count: counts.get(group.key) ?? 0,
-    })),
+    ...groupOrder
+      .filter((key) => key !== OTHER_GROUP.key && (counts.get(key) ?? 0) > 0)
+      .map((key) => ({ key, label: groupDefOf(key).label, count: counts.get(key) ?? 0 })),
   ]
   const otherCount = counts.get(OTHER_GROUP.key) ?? 0
   if (otherCount > 0) {
