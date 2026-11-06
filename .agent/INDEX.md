@@ -8,7 +8,7 @@ updated: 2026-11-05
 
 本页只负责按模块导航，帮助定位“代码改在哪里、依据和验证到哪里看”。工作项阶段、批准、任务进度和验证结果仍以对应工件及 `project-lifecycle.ps1 status` 输出为准，不在这里重复维护。状态、恢复和严格校验脚本属于已安装 Skill 的内部实现，不在目标项目 `.agent/scripts/` 中查找。
 
-> 最近核对：2026-11-05。后端 12 个 Maven 模块、前端 16 个 workspace 包（11 个库 + 5 个可运行端）、18 篇 HTML 专题。
+> 最近核对：2026-11-06。后端 12 个 Maven 模块、前端 16 个 workspace 包（11 个库 + 5 个可运行端）、18 篇 HTML 专题。
 
 ## 内容在哪里
 
@@ -16,7 +16,7 @@ updated: 2026-11-05
 | --- | --- |
 | 项目常驻规范 | `.agent/rules/always.md` |
 | 当前稳定规格 | `.agent/specs/`（目前为 `platform-contracts.md`） |
-| 需求与变更依据 | `.agent/changes/WORK-编号-中文名/`（当前 WORK-001…WORK-072，共 71 项；无 WORK-008） |
+| 需求与变更依据 | `.agent/changes/WORK-编号-中文名/`（当前 WORK-001…WORK-075，共 74 项；无 WORK-008） |
 | 决策说明与共享资料 | `.agent/notes/`、`.agent/references/` |
 | 长期记忆 | `.agent/memory.md` |
 | 代码审查报告 | `.agent/reviews/`（按 ref 区间归档） |

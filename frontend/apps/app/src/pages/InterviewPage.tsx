@@ -6,16 +6,27 @@ import {
   AlertDescription,
   AlertTitle,
   AppShell,
+  Badge,
   Button,
   Card,
   CardContent,
-  Input,
   PageHeader,
   Separator,
   Spinner,
 } from '@paideia/ui'
+import {
+  ArrowRight,
+  Bot,
+  ChevronDown,
+  Lightbulb,
+  MessageSquareText,
+  Send,
+  Sparkles,
+  Target,
+  TrendingUp,
+  User,
+} from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
 
 import { api } from '../api'
 import { createAssistantApi } from '@paideia/assistant'
@@ -29,11 +40,10 @@ const assistant: AssistantApi = createAssistantApi(api)
 interface Line {
   role: 'interviewer' | 'candidate'
   content: string
-  thinking?: string
 }
 
 /**
- * 模拟面试（WORK-010 T-09 / T-11）。
+ * 模拟面试（WORK-010 T-09 / T-11；WORK-075 视觉重做）。
  *
  * <p><b>行为由会话决定，不由页面决定</b>：会话建的时候带 `harness=interview`，之后即使从通用助手
  * 继续这段对话，说话的还是面试官。页面只是"发起这段会话的地方"。
@@ -44,6 +54,10 @@ interface Line {
  * 批量读，属后续；眼下把"默认不送"这条做成界面上的**明示**。
  *
  * <p><b>评分是独立的一次调用</b>：点「生成点评」才发，返回结构化评分并落库。
+ *
+ * <p><b>思考过程不展示（WORK-075）</b>：模型每次的 `thinking` 事件一律丢弃，不再渲染成
+ * 折叠框。等待回答时改在面试官气泡位置显示"正在思考…"的转圈指示器——那是"现场感"，
+ * 把推理噪音糊在页面上只是干扰。
  */
 export function InterviewPage() {
   const { data: profile } = useQuery({ queryKey: ['profile'], queryFn: () => identity.profile(), retry: false })
@@ -78,13 +92,24 @@ export function InterviewPage() {
     abortRef.current?.abort()
   }, [])
 
+  /** 消息区滚到底：新消息进来、或正在等待时，最新那句要看得见。 */
+  const bodyRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const element = bodyRef.current
+    if (element !== null) {
+      element.scrollTop = element.scrollHeight
+    }
+  }, [lines, busy])
+
   const send = useCallback(async (text: string, openingTurn = false) => {
     if (text.trim() === '' || busy) {
       return
     }
     setError(null)
     setBusy(true)
-    setLines((current) => [...current, { role: 'candidate', content: text }])
+    // 开场那一步发给上游的是一段"开始面试 + 岗位"的指令，界面上不该原样显示出来，
+    // 用一个"开始面试"的气泡代替，读起来更像真在跟面试官说话。
+    setLines((current) => [...current, { role: 'candidate', content: openingTurn ? '开始面试' : text }])
     setInput('')
 
     let id = conversationId
@@ -100,8 +125,7 @@ export function InterviewPage() {
       abortRef.current = controller
       const message = openingTurn ? openingMessage(profile, config.interviewIntro, text) : text
 
-      const interviewer: Line = { role: 'interviewer', content: '' }
-      setLines((current) => [...current, interviewer])
+      setLines((current) => [...current, { role: 'interviewer', content: '' }])
 
       await assistant.sendMessage(
         id,
@@ -112,14 +136,10 @@ export function InterviewPage() {
               ...line,
               content: line.content + (event.delta ?? ''),
             })))
-          } else if (event.type === 'thinking' && event.delta !== undefined) {
-            setLines((current) => updateLast(current, 'interviewer', (line) => ({
-              ...line,
-              thinking: (line.thinking ?? '') + (event.delta ?? ''),
-            })))
           } else if (event.type === 'error') {
             setError(event.message ?? '生成失败，请稍后再试')
           }
+          // thinking 事件刻意忽略：推理过程不展示（WORK-075）。
         },
         controller.signal,
       )
@@ -154,83 +174,127 @@ export function InterviewPage() {
     }
   }
 
+  const role = profile?.targetRole ?? undefined
+
   return (
-    <AppShell title="Paideia" actions={<LearnerHeader />}>
-      <div className="mx-auto max-w-3xl space-y-6">
+    <AppShell title="Paideia" actions={<LearnerHeader />} wide>
+      <div className="mx-auto w-full max-w-5xl space-y-6">
         <PageHeader
           title="模拟面试"
           description="一次一个问题，答不上来就说不会。随时可以点「生成点评」拿一份结构化评分。"
+          actions={
+            role === undefined || role === '' ? undefined : (
+              <Badge variant="secondary" className="gap-1">
+                <Target className="size-3.5" />
+                {role}
+              </Badge>
+            )
+          }
         />
 
-        <Alert>
-          <AlertTitle>关于隐私</AlertTitle>
-          <AlertDescription>
-            这场对话会发给你配置的 AI 服务（第三方）。
-            <strong>你的笔记默认不参与</strong>——只有你自己选择带上时才会发出去。
-          </AlertDescription>
-        </Alert>
-
         {lines.length === 0 ? (
-          <Card>
-            <CardContent className="space-y-4 pt-6">
-              <p className="text-sm">{config.interviewIntro}</p>
-              <Button data-testid="interview-start" disabled={busy} onClick={start}>
-                {busy ? '开场中…' : '开始面试'}
-              </Button>
-              {busy ? <Spinner /> : null}
-            </CardContent>
-          </Card>
+          <>
+            <StartPanel intro={config.interviewIntro} role={role} busy={busy} onStart={start} />
+            <Alert>
+              <AlertTitle>关于隐私</AlertTitle>
+              <AlertDescription>
+                这场对话会发给你配置的 AI 服务（第三方）。
+                <strong>你的笔记默认不参与</strong>——只有你自己选择带上时才会发出去。
+              </AlertDescription>
+            </Alert>
+          </>
         ) : (
-          <div className="space-y-3" data-testid="interview-transcript">
-            {lines.map((line, index) => (
-              <article
-                key={index}
-                data-testid={`interview-line-${line.role}`}
-                className={line.role === 'candidate' ? 'text-right' : ''}
-              >
-                {line.thinking === undefined || line.thinking === '' ? null : (
-                  <details className="border-border mb-1 rounded border px-2 py-1 text-xs">
-                    <summary className="text-muted-foreground cursor-pointer">思考过程</summary>
-                    <p className="text-muted-foreground mt-1 whitespace-pre-wrap">{line.thinking}</p>
-                  </details>
-                )}
-                <p
-                  className={
-                    line.role === 'candidate'
-                      ? 'bg-muted inline-block rounded px-2 py-1 text-sm whitespace-pre-wrap'
-                      : 'text-sm whitespace-pre-wrap'
-                  }
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            {/* 对话主轴：头（面试官身份 + 生成点评）+ 消息区 + 输入区 */}
+            <div className="flex min-h-[34rem] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-card">
+              <div className="flex items-center gap-3 border-b border-border px-4 py-3 sm:px-5">
+                <div className="relative">
+                  <Avatar kind="bot" />
+                  <span className="border-card bg-success absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full border-2" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">AI 面试官</p>
+                  <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                    {busy ? (
+                      <>
+                        <Spinner className="size-3" />
+                        正在思考…
+                      </>
+                    ) : (
+                      '在线 · 随时作答'
+                    )}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid="interview-review"
+                  disabled={reviewing || busy}
+                  onClick={() => { void review() }}
+                  className="gap-1.5"
                 >
-                  {line.content}
+                  <Sparkles className="size-3.5" />
+                  {reviewing ? '点评中…' : '生成点评'}
+                </Button>
+              </div>
+
+              <div
+                ref={bodyRef}
+                data-testid="interview-transcript"
+                className="flex-1 space-y-5 overflow-y-auto px-4 py-6 sm:px-5"
+                style={{ maxHeight: 'min(60vh, 40rem)' }}
+              >
+                {lines.map((line, index) => {
+                  const last = index === lines.length - 1
+                  return (
+                    <Bubble key={index} line={line} thinking={last && line.content === '' && busy} />
+                  )
+                })}
+              </div>
+
+              <div className="border-t border-border bg-card p-3">
+                <div className="flex items-end gap-2">
+                  <textarea
+                    data-testid="interview-input"
+                    rows={1}
+                    placeholder="输入你的回答…（Enter 发送，Shift+Enter 换行）"
+                    value={input}
+                    disabled={busy}
+                    onChange={(event) => { setInput(event.target.value) }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault()
+                        void send(input)
+                      }
+                    }}
+                    className="border-border bg-background text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/30 max-h-40 min-h-11 flex-1 resize-none rounded-xl border px-3.5 py-2.5 text-sm leading-6 outline-none focus-visible:ring-2 disabled:opacity-60"
+                  />
+                  <Button
+                    data-testid="interview-send"
+                    disabled={busy || input.trim() === ''}
+                    onClick={() => { void send(input) }}
+                    className="h-11 shrink-0 gap-1.5"
+                  >
+                    <Send className="size-4" />
+                    发送
+                  </Button>
+                </div>
+                <p className="text-muted-foreground mt-1.5 px-1 text-xs">
+                  Enter 发送 · Shift+Enter 换行 · 答不上来就说不会
                 </p>
-              </article>
-            ))}
+              </div>
+            </div>
+
+            <aside className="space-y-4">
+              <TipCard />
+              {history.data === undefined || history.data.length === 0 ? null : (
+                <HistoryCard items={history.data} />
+              )}
+            </aside>
           </div>
         )}
 
-        {started ? (
-          <div className="flex gap-2">
-            <Input
-              data-testid="interview-input"
-              placeholder="回答…（Enter 发送）"
-              value={input}
-              disabled={busy}
-              onChange={(event) => { setInput(event.target.value) }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault()
-                  void send(input)
-                }
-              }}
-            />
-            <Button data-testid="interview-send" disabled={busy || input.trim() === ''} onClick={() => { void send(input) }}>
-              发送
-            </Button>
-            <Button variant="outline" data-testid="interview-review" disabled={reviewing || busy} onClick={() => { void review() }}>
-              {reviewing ? '点评中…' : '生成点评'}
-            </Button>
-          </div>
-        ) : null}
+        {evaluation === null ? null : <EvaluationCard view={evaluation} />}
 
         {error === null ? null : (
           <Alert variant="destructive">
@@ -238,101 +302,290 @@ export function InterviewPage() {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-
-        {evaluation === null ? null : <EvaluationCard view={evaluation} />}
-
-        {history.data === undefined || history.data.length === 0 ? null : (
-          <Card data-testid="interview-history">
-            <CardContent className="pt-6">
-              <div className="mb-4 flex items-baseline justify-between gap-3">
-                <h2 className="text-sm font-medium">历次面试</h2>
-                <span className="text-muted-foreground text-xs">
-                  共 {history.data.length} 次 · 最近一次总分{' '}
-                  {history.data[0]?.evaluation.overall ?? '—'} / 5
-                </span>
-              </div>
-              <ul className="divide-border divide-y">
-                {history.data.map((item) => (
-                  <li key={item.id} data-testid="interview-history-item">
-                    <details className="group py-2.5">
-                      <summary className="flex cursor-pointer items-center justify-between gap-3 text-sm">
-                        <span className="text-muted-foreground">
-                          {new Date(item.createdAt).toLocaleString('zh-CN', {
-                            dateStyle: 'short',
-                            timeStyle: 'short',
-                          })}
-                        </span>
-                        <span className="flex items-center gap-2">
-                          <span className="font-medium">{item.evaluation.overall} / 5</span>
-                          <ChevronDown className="text-muted-foreground size-4 transition-transform group-open:rotate-180" />
-                        </span>
-                      </summary>
-                      <div className="mt-3 space-y-2">
-                        {item.evaluation.dimensions.map((dimension) => (
-                          <div key={dimension.name} className="flex items-baseline justify-between gap-3 text-sm">
-                            <span className="text-muted-foreground shrink-0">{dimension.name}</span>
-                            <span className="min-w-0 flex-1 truncate text-right">{dimension.comment}</span>
-                            <span className="text-muted-foreground w-10 shrink-0 text-right">
-                              {dimension.score}/5
-                            </span>
-                          </div>
-                        ))}
-                        {item.evaluation.improvements.length === 0 ? null : (
-                          <ul className="text-muted-foreground mt-2 list-disc space-y-1 pl-5 text-sm">
-                            {item.evaluation.improvements.map((line) => (
-                              <li key={line}>{line}</li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    </details>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </AppShell>
   )
 }
 
-/** 评估卡片：总分 + 各维度 + 优点 + 改进点。 */
+/** 头像：面试官是机器人图标，候选人是人形图标，颜色都走令牌。 */
+function Avatar({ kind }: { kind: 'bot' | 'user' }) {
+  const bot = kind === 'bot'
+  return (
+    <span
+      aria-hidden
+      className={
+        'flex size-8 shrink-0 items-center justify-center rounded-full border ' +
+        (bot ? 'border-border bg-card text-primary' : 'border-transparent bg-primary text-primary-foreground')
+      }
+    >
+      {bot ? <Bot className="size-4" /> : <User className="size-4" />}
+    </span>
+  )
+}
+
+/** 一条消息气泡：面试官靠左、候选人靠右。
+ *
+ * <p>`data-testid="interview-line-*"` **只包正文**（不含头像/称呼/思考提示），
+ * 因为 e2e 用它判断"失败时不该留一条空气泡"——把装饰也算进去会让那条断言失真。
+ */
+function Bubble({ line, thinking }: { line: Line; thinking: boolean }) {
+  const isInterviewer = line.role === 'interviewer'
+  const empty = line.content === ''
+
+  if (isInterviewer) {
+    return (
+      <article className="flex items-start gap-3">
+        <Avatar kind="bot" />
+        <div className="min-w-0 max-w-[85%]">
+          <p className="text-muted-foreground mb-1 text-xs">面试官</p>
+          <div
+            data-testid="interview-line-interviewer"
+            className={
+              'rounded-2xl rounded-tl-md bg-muted px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap text-foreground ' +
+              (empty && !thinking ? 'hidden' : '')
+            }
+          >
+            {empty ? <Spinner className="text-muted-foreground size-4" /> : line.content}
+          </div>
+          {thinking ? <p className="text-muted-foreground mt-1.5 text-xs">面试官正在思考…</p> : null}
+        </div>
+      </article>
+    )
+  }
+
+  return (
+    <article className="flex items-start justify-end gap-3">
+      <div className="max-w-[85%] min-w-0">
+        <p className="text-muted-foreground mb-1 text-right text-xs">我</p>
+        <div
+          data-testid="interview-line-candidate"
+          className="bg-primary text-primary-foreground rounded-2xl rounded-tr-md px-4 py-2.5 text-left text-sm leading-relaxed whitespace-pre-wrap"
+        >
+          {line.content}
+        </div>
+      </div>
+      <Avatar kind="user" />
+    </article>
+  )
+}
+
+/** 起始态：左边讲清楚要做什么，右边讲这场面试怎么进行。 */
+function StartPanel({
+  intro,
+  role,
+  busy,
+  onStart,
+}: {
+  intro: string
+  role: string | undefined
+  busy: boolean
+  onStart: () => void
+}) {
+  return (
+    <Card className="overflow-hidden">
+      <div className="grid md:grid-cols-[1.35fr_1fr]">
+        <div className="p-6 sm:p-8">
+          <span className="from-primary to-primary/75 text-primary-foreground inline-flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br">
+            <MessageSquareText className="size-6" />
+          </span>
+          <h2 className="mt-4 text-xl font-semibold">准备好开始了吗？</h2>
+          <p className="text-muted-foreground mt-2 text-sm leading-6">{intro}</p>
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <Badge variant="secondary" className="gap-1">
+              <Target className="size-3.5" />
+              {role === undefined || role === '' ? '未填写目标岗位' : role}
+            </Badge>
+          </div>
+          <Button data-testid="interview-start" size="lg" className="mt-6 gap-2" disabled={busy} onClick={onStart}>
+            {busy ? <Spinner /> : <Sparkles className="size-4" />}
+            {busy ? '开场中…' : '开始面试'}
+            {busy ? null : <ArrowRight className="size-4" />}
+          </Button>
+        </div>
+        <div className="border-border bg-muted/40 border-t p-6 sm:p-8 md:border-t-0 md:border-l">
+          <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">这场面试怎么进行</p>
+          <ol className="mt-4 space-y-4">
+            <Step n={1} title="面试官一次问一题" desc="围绕你的目标岗位，从基础到深入逐个追问。" />
+            <Step n={2} title="像真面试一样作答" desc="答不上来就说不会，面试官会换个角度继续问。" />
+            <Step n={3} title="结束拿结构化点评" desc="随时点「生成点评」，按维度给出分数与改进建议。" />
+          </ol>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+function Step({ n, title, desc }: { n: number; title: string; desc: string }) {
+  return (
+    <li className="flex gap-3">
+      <span className="bg-primary text-primary-foreground flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
+        {n}
+      </span>
+      <div className="min-w-0">
+        <p className="text-sm font-medium">{title}</p>
+        <p className="text-muted-foreground mt-0.5 text-xs leading-5">{desc}</p>
+      </div>
+    </li>
+  )
+}
+
+/** 右侧栏的小贴士：把隐私与操作方式在"面试间"里也留一份。 */
+function TipCard() {
+  return (
+    <Card>
+      <CardContent className="space-y-3 pt-6">
+        <h2 className="flex items-center gap-1.5 text-sm font-medium">
+          <Lightbulb className="text-primary size-4" />
+          小贴士
+        </h2>
+        <ul className="text-muted-foreground space-y-1.5 text-xs leading-5">
+          <li>
+            · 隐私：这场对话会发给 AI 服务，<strong className="text-foreground font-medium">你的笔记默认不参与</strong>。
+          </li>
+          <li>· Enter 发送，Shift+Enter 换行。</li>
+          <li>· 随时点右上「生成点评」拿一份评分。</li>
+        </ul>
+      </CardContent>
+    </Card>
+  )
+}
+
+/** 历次面试：默认收起，展开看分维度与改进点。 */
+function HistoryCard({ items }: { items: InterviewEvaluationView[] }) {
+  const latest = items[0]
+  return (
+    <Card data-testid="interview-history">
+      <CardContent className="pt-6">
+        <div className="mb-3 flex items-baseline justify-between gap-2">
+          <h2 className="text-sm font-medium">历次面试</h2>
+          <span className="text-muted-foreground text-xs">
+            共 {items.length} 次{latest === undefined ? '' : ` · 最近 ${latest.evaluation.overall}/5`}
+          </span>
+        </div>
+        <ul className="divide-border divide-y">
+          {items.map((item) => (
+            <li key={item.id} data-testid="interview-history-item">
+              <details className="group py-2.5">
+                <summary className="flex cursor-pointer items-center justify-between gap-2 text-sm">
+                  <span className="text-muted-foreground text-xs">
+                    {new Date(item.createdAt).toLocaleString('zh-CN', {
+                      dateStyle: 'short',
+                      timeStyle: 'short',
+                    })}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="font-medium">{item.evaluation.overall} / 5</span>
+                    <ChevronDown className="text-muted-foreground size-4 transition-transform group-open:rotate-180" />
+                  </span>
+                </summary>
+                <div className="mt-3 space-y-2.5">
+                  {item.evaluation.dimensions.map((dimension) => (
+                    <div key={dimension.name}>
+                      <div className="flex items-baseline justify-between gap-2 text-xs">
+                        <span className="text-muted-foreground">{dimension.name}</span>
+                        <span className="text-muted-foreground">{dimension.score}/5</span>
+                      </div>
+                      <ScoreBar score={dimension.score} className="mt-1 h-1" />
+                    </div>
+                  ))}
+                  {item.evaluation.improvements.length === 0 ? null : (
+                    <ul className="text-muted-foreground mt-1 list-disc space-y-1 pl-4 text-xs leading-5">
+                      {item.evaluation.improvements.map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </details>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  )
+}
+
+/** 维度进度条：宽度按 score/5 算，颜色只取令牌。 */
+function ScoreBar({ score, className = 'h-1.5' }: { score: number; className?: string }) {
+  const percent = Math.max(0, Math.min(100, (score / 5) * 100))
+  return (
+    <div className={'bg-muted w-full overflow-hidden rounded-full ' + className}>
+      <div className="bg-primary h-full rounded-full transition-all" style={{ width: `${percent}%` }} />
+    </div>
+  )
+}
+
+/** 评估卡片：总分 + 各维度进度条 + 优点 / 改进两栏。 */
 function EvaluationCard({ view }: { view: InterviewEvaluationView }) {
   const { evaluation } = view
   return (
-    <Card data-testid="interview-evaluation">
-      <CardContent className="space-y-4 pt-6">
-        <div className="flex items-baseline gap-3">
-          <h2 className="text-lg font-semibold">评估结果</h2>
-          <span className="text-3xl font-semibold" data-testid="interview-overall">{evaluation.overall}</span>
-          <span className="text-muted-foreground text-sm">/ 5</span>
+    <Card data-testid="interview-evaluation" className="mt-0">
+      <CardContent className="space-y-5 pt-6">
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+          <div>
+            <h2 className="text-lg font-semibold">面试点评</h2>
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              {new Date(view.createdAt).toLocaleString('zh-CN', { dateStyle: 'medium', timeStyle: 'short' })}
+            </p>
+          </div>
+          <div className="ml-auto flex items-end gap-1">
+            <span className="text-4xl leading-none font-semibold" data-testid="interview-overall">
+              {evaluation.overall}
+            </span>
+            <span className="text-muted-foreground pb-1 text-sm">/ 5</span>
+          </div>
         </div>
+
         <Separator />
-        <dl className="space-y-3">
-          {evaluation.dimensions.map((dimension) => (
-            <div key={dimension.name} data-testid="interview-dimension">
-              <div className="flex items-center justify-between text-sm">
-                <dt className="font-medium">{dimension.name}</dt>
-                <dd className="text-muted-foreground">{dimension.score} / 5</dd>
+
+        <div className="grid gap-6 sm:grid-cols-2">
+          <div className="space-y-3.5">
+            <h3 className="text-sm font-medium">各维度评分</h3>
+            {evaluation.dimensions.map((dimension) => (
+              <div key={dimension.name} data-testid="interview-dimension">
+                <div className="flex items-baseline justify-between gap-2 text-sm">
+                  <span className="font-medium">{dimension.name}</span>
+                  <span className="text-muted-foreground text-xs">{dimension.score} / 5</span>
+                </div>
+                <ScoreBar score={dimension.score} className="mt-1.5 h-1.5" />
+                <p className="text-muted-foreground mt-1 text-xs leading-5">{dimension.comment}</p>
               </div>
-              <p className="text-muted-foreground mt-1 text-sm">{dimension.comment}</p>
-            </div>
-          ))}
-        </dl>
-        {evaluation.improvements.length === 0 ? null : (
-          <>
-            <Separator />
-            <div>
-              <h3 className="text-sm font-medium">可以改进的地方</h3>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
-                {evaluation.improvements.map((item) => (
-                  <li key={item} data-testid="interview-improvement">{item}</li>
-                ))}
-              </ul>
-            </div>
-          </>
-        )}
+            ))}
+          </div>
+
+          <div className="space-y-5">
+            {evaluation.strengths.length === 0 ? null : (
+              <div>
+                <h3 className="flex items-center gap-1.5 text-sm font-medium">
+                  <TrendingUp className="text-success size-4" />
+                  做得好的地方
+                </h3>
+                <ul className="mt-2 space-y-1.5">
+                  {evaluation.strengths.map((item) => (
+                    <li key={item} className="text-muted-foreground text-xs leading-5">
+                      · {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {evaluation.improvements.length === 0 ? null : (
+              <div>
+                <h3 className="flex items-center gap-1.5 text-sm font-medium">
+                  <Lightbulb className="text-warning size-4" />
+                  可以改进的地方
+                </h3>
+                <ul className="mt-2 space-y-1.5">
+                  {evaluation.improvements.map((item) => (
+                    <li key={item} data-testid="interview-improvement" className="text-muted-foreground text-xs leading-5">
+                      · {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
       </CardContent>
     </Card>
   )
