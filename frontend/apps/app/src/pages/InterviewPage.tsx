@@ -1,4 +1,4 @@
-import { createIdentityApi, configFor, type LearnerProfile } from '@paideia/identity'
+import { createIdentityApi, configFor, TIMELINE_LABELS, type JobTimeline, type LearnerProfile } from '@paideia/identity'
 import { adaptiveContextText, computeAbility, difficultyLabel, type AssistantApi, type AdaptiveBrief, type InterviewEvaluationView } from '@paideia/assistant'
 import {
   createResumeApi,
@@ -29,6 +29,7 @@ import { Link, useBlocker } from 'react-router'
 import {
   ArrowRight,
   Bot,
+  CalendarDays,
   Check,
   ChevronDown,
   Lightbulb,
@@ -63,6 +64,17 @@ interface Line {
 type ResumeChoice = 'none' | 'upload' | number
 
 /**
+ * 面试页上给用户看的一句话：本场按哪个季节、侧重什么（2026-11-09）。
+ *
+ * <p>**这里只是界面文案**——真正约束模型的是 `InterviewPrompt` 第 8 条。两处都写是因为
+ * 用户需要知道"我选了秋招，面试会怎么变"；但规则只有后端那一份，前端不跟着复述细节。
+ */
+const SEASON_FOCUS: Record<JobTimeline, string> = {
+  autumn: '秋招按广度出题：先把常见考点过一遍，再挑一个方向深入。',
+  spring: '春招按深度出题：围绕简历里的项目与技术栈追问，基础只做抽查。',
+}
+
+/**
  * 模拟面试（WORK-010 T-09 / T-11；WORK-075 视觉重做）。
  *
  * <p><b>行为由会话决定，不由页面决定</b>：会话建的时候带 `harness=interview`，之后即使从通用助手
@@ -82,6 +94,20 @@ type ResumeChoice = 'none' | 'upload' | number
 export function InterviewPage() {
   const { data: profile } = useQuery({ queryKey: ['profile'], queryFn: () => identity.profile(), retry: false })
   const config = configFor(profile?.identity)
+
+  /**
+   * 本场求职季（2026-11-09）。
+   *
+   * <p>画像里的 `timeline` 原来**只存不读**：选了"秋招"和没选，面试一模一样。
+   * 现在它作为 `【求职季】秋招` 这一行进 pageContext，只进提示词、不落库；
+   * 面试官按季节换侧重（秋招铺广度、春招抠深度），规则写在 `InterviewPrompt` 的第 8 条。
+   *
+   * <p>没填就不传——**猜错的侧重比不侧重更糟**，prompt 里也明写了"没给就别假设"。
+   */
+  const season =
+    profile?.timeline === null || profile?.timeline === undefined
+      ? null
+      : { label: TIMELINE_LABELS[profile.timeline], focus: SEASON_FOCUS[profile.timeline] }
 
   /**
    * 历次评估（`GET /ai/interviews/evaluations`）。
@@ -265,8 +291,12 @@ export function InterviewPage() {
       setPreparing(false)
     }
 
-    // 自适应设置（WORK-078）+ 简历（WORK-077）一起作为 pageContext：只进提示词、不落库。
+    // 自适应设置（WORK-078）+ 求职季（2026-11-09）+ 简历（WORK-077）一起作为 pageContext：
+    // 只进提示词、不落库。
     const parts: string[] = []
+    if (season !== null) {
+      parts.push(`【求职季】${season.label}`)
+    }
     if (adaptive !== null) {
       parts.push(adaptiveContextText(adaptive, history.data?.[0]?.evaluation.improvements ?? []))
     }
@@ -336,6 +366,8 @@ export function InterviewPage() {
             <StartPanel
               intro={config.interviewIntro}
               role={role}
+              season={season?.label ?? null}
+              seasonFocus={season?.focus ?? null}
               busy={busy}
               preparing={preparing}
               adaptive={adaptive}
@@ -614,6 +646,8 @@ function Bubble({ line, thinking }: { line: Line; thinking: boolean }) {
 function StartPanel({
   intro,
   role,
+  season,
+  seasonFocus,
   busy,
   preparing,
   adaptive,
@@ -628,6 +662,10 @@ function StartPanel({
 }: {
   intro: string
   role: string | undefined
+  /** 本场求职季的显示名（秋招 / 春招）；没填就是 null，不显示这一枚。 */
+  season: string | null
+  /** 本场侧重的一句话说明。规则以后端提示词为准，这里只是让用户知道选了它会怎样。 */
+  seasonFocus: string | null
   busy: boolean
   preparing: boolean
   adaptive: AdaptiveBrief | null
@@ -655,7 +693,19 @@ function StartPanel({
               <Target className="size-3.5" />
               {role === undefined || role === '' ? '未填写目标岗位' : role}
             </Badge>
+            {season === null ? null : (
+              <Badge variant="secondary" className="gap-1" data-testid="interview-season">
+                <CalendarDays className="size-3.5" />
+                {season}
+              </Badge>
+            )}
           </div>
+
+          {seasonFocus === null ? null : (
+            <p className="text-muted-foreground mt-2 text-xs leading-5" data-testid="interview-season-focus">
+              {seasonFocus}
+            </p>
+          )}
 
           {adaptive === null ? null : (
             <div className="border-border bg-muted/40 mt-3 rounded-lg border px-3 py-2 text-xs leading-5">
