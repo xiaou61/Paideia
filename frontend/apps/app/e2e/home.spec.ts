@@ -149,12 +149,13 @@ test('首页有去处；笔记页与知识库页共用同一套外壳', async ({
  * <p>断言分两段，第二段才是关键：卡片存在只说明渲染了，**点进去到达的是那个分类页**才说明
  * id 解析对了。分类 id 在生产是 20、全新库是 900，写死任何一个都会让另一侧指向空分类。
  */
-test('首页有「八股文专区」入口，点进去到达该分类', async ({ page }) => {
+test('首页有「面经」横幅，四个方向各进各的分类', async ({ page }) => {
   await signIn(page)
 
-  const entrance = page.getByTestId('home-entry-essay')
-  await expect(entrance).toBeVisible()
-  await entrance.click()
+  // 2026-11-09：从「所有入口」列表底部提到 hero 正下方，并扩成四个方向。
+  await expect(page.getByTestId('home-essay-banner')).toBeVisible()
+  await expect(page.getByTestId('home-essay-essay-java')).toBeVisible()
+  await page.getByTestId('home-essay-essay-java').click()
 
   // 分类页（不是"全部条目"）：url 带 categories 段
   await expect(page).toHaveURL(/#\/knowledge\/categories\/\d+$/)

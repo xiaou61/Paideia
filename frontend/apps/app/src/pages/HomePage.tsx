@@ -9,7 +9,7 @@ import { createIdentityApi, NAV_PREFERENCE, stageCue } from '@paideia/identity'
 import { AppShell, Button, Card, Input, LoadingRow, Section, Spinner } from '@paideia/ui'
 import { useAuth } from '@paideia/auth'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, BookOpen, Container, Database, Dumbbell, FileQuestion, GraduationCap, Layers, MessagesSquare, Network, Newspaper, NotebookPen, Search, Target, Terminal } from 'lucide-react'
+import { ArrowRight, BookOpen, Container, Database, Dumbbell, Flame, GraduationCap, Layers, MessagesSquare, Network, Newspaper, NotebookPen, Search, Target, Terminal } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 
@@ -145,6 +145,14 @@ const QUICK_LINKS: {
  * <p>现在首页回答三件事：**我在哪、最近有什么可读、我的学习痕迹**。三个数字都来自接口，
  * 没有一条是写死的。
  */
+/** 面经方向在首页上的短名：分类全名太长，四个入口挤一行会换行。 */
+const ESSAY_LABELS: Record<string, string> = {
+  'essay-java': 'Java 后端',
+  'essay-frontend': '前端',
+  'essay-testing': '测试',
+  'essay-data': '数据',
+}
+
 export function HomePage() {
   const { user } = useAuth()
   // 画像只用来读「当前阶段」那一条建议；入口顺序是常量（2026-11-09 起不再按身份排）
@@ -219,20 +227,21 @@ export function HomePage() {
    * <p>找不到就**不渲染这张卡**——分类不存在时（比如刚部署、定时任务还没建）指向一个
    * 空分类页比不显示入口更糟。
    */
-  const essayCategory = useMemo(() => {
-    const find = (nodes: CategoryNode[]): CategoryNode | undefined => {
+  const essayCategories = useMemo(() => {
+    // 四个方向固定顺序：后端 → 前端 → 测试 → 数据。抓取管线一个合集对应一个分类
+    // （见 application.yml 的 paideia.ai.essay.sources），顺序按岗位热度排。
+    const order = ['essay-java', 'essay-frontend', 'essay-testing', 'essay-data']
+    const found = new Map<string, CategoryNode>()
+    const walk = (nodes: CategoryNode[]) => {
       for (const node of nodes) {
-        if (node.slug === 'essay-java') {
-          return node
+        if (order.includes(node.slug)) {
+          found.set(node.slug, node)
         }
-        const hit = find(node.children)
-        if (hit !== undefined) {
-          return hit
-        }
+        walk(node.children)
       }
-      return undefined
     }
-    return find(categories.data ?? [])
+    walk(categories.data ?? [])
+    return order.map((slug) => found.get(slug)).filter((node): node is CategoryNode => node !== undefined)
   }, [categories.data])
   const assessments = useQuery({
     queryKey: ['my-assessments'],
@@ -445,6 +454,48 @@ export function HomePage() {
         </Card>
       </section>
 
+      {/*
+        面经专区（2026-11-09 从「所有入口」列表底部提到 hero 正下方）。
+        原来它只是一行不起眼的索引项，而且只连 essay-java 一个分类——前端/测试/数据三类
+        根本进不去。现在改成一张带主色的横幅：四个方向各一个 chip，点哪个进哪个分类。
+        数据来自已经加载的 categories 树，**不额外发请求**（条数在分类页里显示）。
+      */}
+      {essayCategories.length === 0 ? null : (
+        <section
+          data-testid="home-essay-banner"
+          className="border-primary/25 from-primary/[0.09] via-primary/[0.05] to-background mb-6 rounded-2xl border bg-gradient-to-r px-4 py-3.5 sm:px-5"
+        >
+          {/*
+            一行装下：左边是什么、右边去哪。900 高的屏上它必须完整露在首屏里——
+            留两行说明就又被挤到折线以下，等于白提上来（2026-11-09 实测）。
+          */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Flame className="text-primary size-5 shrink-0" aria-hidden />
+              <div className="min-w-0">
+                <h2 className="text-base leading-6 font-semibold">面试前，刷一遍面经</h2>
+                <p className="text-muted-foreground text-xs leading-5">
+                  每天从牛客面经里抽题、AI 逐题解析，四个方向按岗位挑
+                </p>
+              </div>
+            </div>
+            <div className="ml-auto flex flex-wrap gap-2">
+              {essayCategories.map((category) => (
+                <Link
+                  key={category.id}
+                  to={`/knowledge/categories/${category.id}`}
+                  data-testid={`home-essay-${category.slug}`}
+                  className="border-primary/30 bg-background/70 hover:border-primary hover:bg-primary hover:text-primary-foreground inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors"
+                >
+                  {ESSAY_LABELS[category.slug] ?? category.name}
+                  <ArrowRight className="size-3.5" aria-hidden />
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* 「继续学习」：服务端有记录就优先用它（跨设备一致），否则退回本地阅读痕迹。
           只有真读过才出现——空着一条"还没开始"只是噪音。 */}
       {continueLearning.length > 0 ? (
@@ -581,32 +632,6 @@ export function HomePage() {
               </Link>
             </li>
           ))}
-          {/*
-            八股文专区（WORK-025 REQ-004）。它是知识库里的一个分类，不是独立页面，
-            所以不进 `QUICK_LINKS`（那张表要求静态 `to`，而这里的 id 必须运行时解析）。
-          */}
-          {essayCategory === undefined ? null : (
-            <li>
-              <Link
-                to={`/knowledge/categories/${essayCategory.id}`}
-                data-testid="home-entry-essay"
-                className="hover:bg-accent/40 group flex items-center gap-3.5 px-4 py-3 transition-colors"
-              >
-                <span className="text-muted-foreground group-hover:text-primary flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors">
-                  <FileQuestion className="size-4" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="group-hover:text-primary block text-sm font-medium transition-colors">
-                    八股文专区
-                  </span>
-                  <span className="text-muted-foreground mt-0.5 block truncate text-xs">
-                    每天从面经里抽题，AI 逐题解析，面试前刷一遍。
-                  </span>
-                </span>
-                <ArrowRight className="text-muted-foreground group-hover:text-primary size-4 shrink-0 transition-colors" />
-              </Link>
-            </li>
-          )}
         </ul>
       </Section>
     </AppShell>
