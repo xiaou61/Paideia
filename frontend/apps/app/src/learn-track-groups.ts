@@ -84,7 +84,7 @@ export const TRACK_GROUPS: TrackGroupDef[] = [
     key: 'source',
     label: '源码与框架精读',
     hint: '拆开一个真实项目，学它内部是怎么做到的。',
-    slugs: ['sprig-deepdive', 'dsh-core', 'open-source'],
+    slugs: ['sprig-deepdive', 'dsh-core', 'pi', 'open-source'],
   },
   {
     key: 'books',
