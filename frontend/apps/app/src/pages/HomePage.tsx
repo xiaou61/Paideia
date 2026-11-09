@@ -445,7 +445,7 @@ export function HomePage() {
                 <li key={entry.id}>
                   <Link
                     to={`/knowledge/entries/${entry.id}`}
-                    className="hover:bg-accent/40 group flex items-start gap-3 px-5 py-3.5 transition-colors"
+                    className="hover:bg-accent/40 group flex items-start gap-3 px-5 py-3.5 transition-colors focus-ring"
                   >
                     <span className="min-w-0 flex-1">
                       <span className="group-hover:text-primary block truncate text-sm font-medium transition-colors">
@@ -635,7 +635,7 @@ export function HomePage() {
               <Link
                 to={item.to}
                 data-testid={item.testId}
-                className="hover:bg-accent/40 group flex items-center gap-3.5 px-4 py-3 transition-colors"
+                className="hover:bg-accent/40 group flex items-center gap-3.5 px-4 py-3 transition-colors focus-ring"
               >
                 <span className="text-muted-foreground group-hover:text-primary flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors">
                   <item.icon className="size-4" />
@@ -671,7 +671,7 @@ function HeroStat({
   return (
     <Link
       to={to}
-      className="border-border/70 bg-background/70 hover:border-primary/40 group rounded-lg border p-3 transition-colors"
+      className="border-border/70 bg-background/70 hover:border-primary/40 group rounded-lg border p-3 transition-colors focus-ring"
     >
       <span className="text-muted-foreground block text-xs">{label}</span>
       <span className="mt-1 flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-1.5">

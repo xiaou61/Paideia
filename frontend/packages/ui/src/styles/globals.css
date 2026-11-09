@@ -130,6 +130,15 @@
   --input: hsl(220 14% 84%);
   /* 焦点环要单独满足 3:1（WCAG 1.4.11），所以用纯色而不是半透明 */
   --ring: hsl(243 62% 44%);
+  /*
+   * 补一个真正的 CSS 变量（2026-11-09）。
+   *
+   * 下面 @theme inline 里的 `--color-ring: var(--ring)` 只用来生成工具类、**不产出变量**：
+   * 在 :root 上取 `--color-ring` 是空串。而 `ring-ring/50` 编译出来是
+   * color-mix(in oklab, var(--color-ring) 50%, transparent)——变量为空时整条阴影无效，
+   * 焦点环就只剩下"什么都没画"。这里显式定义，让依赖该变量的工具类重新有颜色。
+   */
+  --color-ring: var(--ring);
   --overlay: hsl(222 30% 12% / 40%);
   /* 可选玻璃层的填充。默认卡面不用它，见文件末尾 .glass 的说明。 */
   --glass: hsl(0 0% 100% / 70%);
@@ -194,6 +203,8 @@
   --border: hsl(222 14% 20%);
   --input: hsl(222 14% 26%);
   --ring: hsl(243 72% 74%);
+  /* 深色同理：`--color-ring` 必须在运行期真的存在，否则 ring-ring 系列算出来是透明的。 */
+  --color-ring: var(--ring);
   --overlay: hsl(0 0% 0% / 62%);
   --glass: hsl(222 20% 12% / 70%);
   --card-shadow: 0 1px 2px hsl(0 0% 0% / 35%), 0 10px 20px -6px hsl(0 0% 0% / 45%);
@@ -404,6 +415,25 @@
 }
 
 @layer components {
+  /*
+   * 键盘焦点环（2026-11-09）。
+   *
+   * 为什么单独写一条规则，而不是在每处堆 `focus-visible:ring-3 ring-ring/50`：
+   * 卡片普遍带 `transition-all`，焦点环的颜色与偏移也会跟着过渡；再叠上
+   * `--tw-ring-*` / `--tw-outline-style` 这些只在特定工具类下才定义的中转变量，
+   * 出问题时既难看出"环到底画没画"，也难验证。一条显式规则读起来就是答案本身。
+   *
+   * 3px 实线 + 2px 间距、颜色取品牌色的 --ring：深色主题下 --ring 会换成更亮的一档，
+   * 所以不用为暗色再写一遍。只加在可点的卡片/列表项上；按钮与输入框仍走各自的 border-ring。
+   *
+   * 验证时注意：这些卡片有 `transition-all`，聚焦后要等过渡结束（约 150ms）再读计算样式，
+   * 否则读到的是过渡起点的颜色（2026-11-09 就因此误判过一次）。
+   */
+  .focus-ring:focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 2px;
+  }
+
   /*
    * 手绘图（WORK-051）。图是内联 SVG：宽度跟栏宽走，高度由 viewBox 决定。
    * `min-height` 只为"字体与 roughjs 还没到手"那段空窗期留位，避免正文跳动一下。

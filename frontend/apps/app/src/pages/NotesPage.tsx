@@ -287,7 +287,7 @@ export function NotesPage() {
                       data-testid={`note-item-${item.id}`}
                       onClick={() => openNote(item.id)}
                       // 选中态用左侧一条品牌色竖线 + 淡底：一眼看出"正在编辑的是这条"
-                      className={`w-full border-l-2 px-3.5 py-3 text-left transition-colors ${
+                      className={`focus-ring w-full border-l-2 px-3.5 py-3 text-left transition-colors ${
                         selected === item.id
                           ? 'border-primary bg-accent/50'
                           : 'hover:bg-accent/30 border-transparent'

@@ -379,7 +379,7 @@ export function LearnPage() {
         <Link
           to={`/learn/${next.slug}`}
           data-testid="learn-continue"
-          className="border-primary/30 bg-primary/[0.04] hover:border-primary/60 group mb-6 flex items-center gap-4 rounded-xl border p-4 transition-colors sm:p-5"
+          className="border-primary/30 bg-primary/[0.04] hover:border-primary/60 group mb-6 flex items-center gap-4 rounded-xl border p-4 transition-colors focus-ring sm:p-5"
         >
           <span className="bg-primary/10 text-primary flex size-11 shrink-0 items-center justify-center rounded-lg">
             <Play className="size-5" />
@@ -764,7 +764,7 @@ function TrackCard({ track, role }: { track: TrackSummary; role: RoleKey }) {
       data-testid={`learn-track-${track.slug}`}
       data-mode={track.mode}
       data-progress={done ? 'done' : started ? 'started' : 'idle'}
-      className="border-border bg-card hover:border-primary/40 hover:shadow-card group flex h-full flex-col rounded-xl border p-5 transition-all"
+      className="border-border bg-card hover:border-primary/40 hover:shadow-card group flex h-full flex-col rounded-xl border focus-ring p-5 transition-all"
     >
       <div className="flex items-start gap-3">
         <span

@@ -54,7 +54,7 @@ export function PageBreadcrumb({
               <Link
                 to={item.to!}
                 data-testid={item.testId}
-                className="hover:text-foreground focus-visible:ring-ring/50 max-w-[18rem] truncate rounded transition-colors outline-none focus-visible:ring-3"
+                className="hover:text-foreground focus-ring max-w-[18rem] truncate rounded transition-colors"
                 title={item.label}
               >
                 {item.label}

@@ -4,6 +4,7 @@ import {
   Badge,
   Button,
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -179,15 +180,45 @@ export function CategoryEntriesPage() {
         <ErrorAlert title="条目加载失败" error={entries.error} testId="entry-state" />
       ) : null}
 
+      {/*
+        空态要给出**下一条路**（2026-11-09）：只说"没有符合条件的条目"等于把用户留在原地。
+        搜索为空时给"清空搜索"，分类为空时给"看全部条目"——都是这个页面上真能做到的事。
+      */}
       {entries.isSuccess && entries.data.items.length === 0 ? (
         <Empty data-testid="entry-empty">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <FileText />
             </EmptyMedia>
-            <EmptyTitle>没有符合条件的条目</EmptyTitle>
-            <EmptyDescription>换个关键词，或回到所有分类看看。</EmptyDescription>
+            <EmptyTitle>
+              {keyword.trim() === '' ? '这里还没有条目' : `没有找到「${keyword.trim()}」`}
+            </EmptyTitle>
+            <EmptyDescription>
+              {keyword.trim() === '' ? '换一个分类看看，或者直接浏览全库。' : '换一个词试试，或者去看全库内容。'}
+            </EmptyDescription>
           </EmptyHeader>
+          <EmptyContent>
+            {keyword.trim() === '' ? (
+              <Button
+                variant="outline"
+                data-testid="entry-empty-all"
+                render={<Link to="/knowledge/entries" />}
+              >
+                看全部条目
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                data-testid="entry-empty-clear"
+                onClick={() => {
+                  setDraft('')
+                  applyKeyword('')
+                }}
+              >
+                清空搜索
+              </Button>
+            )}
+          </EmptyContent>
         </Empty>
       ) : null}
 
@@ -198,7 +229,7 @@ export function CategoryEntriesPage() {
               key={item.id}
               to={`/knowledge/entries/${item.id}`}
               data-testid={`entry-link-${item.id}`}
-              className="border-border bg-card hover:border-primary/40 hover:shadow-card group animate-fade-up flex flex-col overflow-hidden rounded-xl border transition-all hover:-translate-y-0.5"
+              className="border-border bg-card hover:border-primary/40 hover:shadow-card group animate-fade-up flex flex-col overflow-hidden rounded-xl border transition-all hover:-translate-y-0.5 focus-ring"
               style={{ animationDelay: `${index * 30}ms` }}
             >
               {/* 卡片封面：色块 + 分类。没有它，卡片就是一排"标题孤零零浮在空白里" */}

@@ -55,7 +55,7 @@ export function KnowledgeCategoriesPage() {
       <Link
         to="/knowledge/entries"
         data-testid="all-entries-card"
-        className="border-border from-primary/10 to-background hover:border-primary/40 hover:shadow-card group mb-8 flex items-center justify-between rounded-xl border bg-gradient-to-r p-5 transition-all hover:-translate-y-0.5"
+        className="border-border from-primary/10 to-background hover:border-primary/40 hover:shadow-card group mb-8 flex items-center justify-between rounded-xl border bg-gradient-to-r p-5 transition-all hover:-translate-y-0.5 focus-ring"
       >
         <span className="flex items-center gap-4">
           <span className="bg-primary text-primary-foreground flex size-11 items-center justify-center rounded-xl">
@@ -72,7 +72,7 @@ export function KnowledgeCategoriesPage() {
       <Link
         to="/knowledge/wiki"
         data-testid="wiki-reader-card"
-        className="border-border bg-card hover:border-primary/40 hover:shadow-card group mb-8 flex items-center justify-between rounded-xl border p-5 transition-all hover:-translate-y-0.5"
+        className="border-border bg-card hover:border-primary/40 hover:shadow-card group mb-8 flex items-center justify-between rounded-xl border p-5 transition-all hover:-translate-y-0.5 focus-ring"
       >
         <span className="flex items-center gap-4">
           <span className="bg-muted text-foreground flex size-11 items-center justify-center rounded-xl">
@@ -112,7 +112,7 @@ export function KnowledgeCategoriesPage() {
               key={category.id}
               to={`/knowledge/categories/${category.id}`}
               data-testid={`category-card-${category.id}`}
-              className="border-border bg-card hover:border-primary/40 hover:shadow-card group animate-fade-up flex flex-col overflow-hidden rounded-xl border transition-all hover:-translate-y-0.5"
+              className="border-border bg-card hover:border-primary/40 hover:shadow-card group animate-fade-up flex flex-col overflow-hidden rounded-xl border transition-all hover:-translate-y-0.5 focus-ring"
               // 逐个淡入：一次性铺满的网格没有任何"进入"的感觉
               style={{ animationDelay: `${index * 40}ms` }}
             >
