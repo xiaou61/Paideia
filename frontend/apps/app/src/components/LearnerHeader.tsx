@@ -22,7 +22,7 @@ import {
   Input,
 } from '@paideia/ui'
 import { ChevronDown, LogOut, Menu, Plug, Search, UserRound, UserX } from 'lucide-react'
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 
 import { api } from '../api'
@@ -117,6 +117,40 @@ export function LearnerHeader() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [keyword, setKeyword] = useState('')
+  /** 桌面搜索框：`/` 快捷键要能直接聚焦它（2026-11-09）。 */
+  const searchRef = useRef<HTMLInputElement>(null)
+  /**
+   * 按 `/` 聚焦搜索（2026-11-09）。
+   *
+   * <p>GitHub / Linear / Vercel 这一族的通用手势。三处刻意不抢：
+   * <ul>
+   *   <li>输入框 / 文本域 / 可编辑区里按 `/` 是打字，不是快捷键；</li>
+   *   <li>带 Ctrl / Cmd / Alt 的是浏览器或系统快捷键；</li>
+   *   <li>窄屏（&lt;md）下搜索框是 display:none，聚焦一个看不见的元素没有意义。</li>
+   * </ul>
+   */
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) {
+        return
+      }
+      const target = event.target as HTMLElement | null
+      if (
+        target !== null
+        && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+      ) {
+        return
+      }
+      const input = searchRef.current
+      if (input === null || input.offsetParent === null) {
+        return
+      }
+      event.preventDefault()
+      input.focus()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
   const [navOpen, setNavOpen] = useState(false)
   /**
    * 这个账号有没有密码（WORK-037）。第三方注册的用户从来没有密码，
@@ -276,17 +310,28 @@ export function LearnerHeader() {
         ))}
       </nav>
 
-      <form onSubmit={submitSearch} className="ml-2 hidden md:block">
+      <form onSubmit={submitSearch} className="group ml-2 hidden md:block">
         <div className="relative">
           <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
           <Input
+            ref={searchRef}
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
             placeholder="搜索知识库…"
             aria-label="搜索知识库"
             data-testid="header-search"
-            className="h-9 w-56 rounded-full pl-8 text-sm"
+            className="h-9 w-56 rounded-full pr-8 pl-8 text-sm"
           />
+          {/*
+            按 / 聚焦搜索（2026-11-09）：GitHub / Linear 这一族的通用手势。
+            提示只在没聚焦时显示，聚焦后让位给光标——否则光标和小方块挤在一起。
+          */}
+          <kbd
+            aria-hidden
+            className="border-border bg-muted text-muted-foreground group-focus-within:opacity-0 pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded border px-1.5 py-0.5 text-[0.6875rem] leading-none transition-opacity"
+          >
+            /
+          </kbd>
         </div>
       </form>
 

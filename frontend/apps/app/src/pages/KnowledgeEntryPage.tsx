@@ -27,7 +27,7 @@ import {
 } from '@paideia/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createAssistantApi, SummaryCardView } from '@paideia/assistant'
-import { ArrowLeft, ArrowRight, ChevronLeft, ListTree } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ArrowUp, ChevronLeft, ListTree } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 
@@ -159,6 +159,42 @@ export function KnowledgeEntryPage() {
   }, [categories.data, entry.data?.categoryId])
 
   /**
+   * 阅读进度与「回到顶部」（2026-11-09）。
+   *
+   * <p>长条目（有的上万字）最常被问的两件事就是"我读到哪了"和"怎么回去"。
+   * 进度按**整篇文档**算而不是按正文元素算：目录、关系列表与页脚也在阅读区里，
+   * 按正文元素算会在目录还没滚完时就走满，读起来像个坏掉的进度条。
+   *
+   * <p>滚动回调里只记一个 rAF 句柄：长文滚动一次会触发几十次事件，逐次 setState 会让
+   * 阅读变成掉帧（实测在低配笔记本上可见）。
+   */
+  const [readingProgress, setReadingProgress] = useState(0)
+  useEffect(() => {
+    let frame = 0
+    const update = () => {
+      frame = 0
+      const scrollable = document.documentElement.scrollHeight - window.innerHeight
+      const next = scrollable <= 0 ? 0 : (window.scrollY / scrollable) * 100
+      setReadingProgress(Math.min(100, Math.max(0, next)))
+    }
+    const onScroll = () => {
+      if (frame === 0) {
+        frame = window.requestAnimationFrame(update)
+      }
+    }
+    update()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    return () => {
+      if (frame !== 0) {
+        window.cancelAnimationFrame(frame)
+      }
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+    }
+  }, [])
+
+  /**
    * 学习记录（WORK-020）：**先取再渲染正文**。
    *
    * <p>顺序很重要：渲染块时会用进度端口读出"上次做到哪"，服务端的值必须在那之前到手，
@@ -268,6 +304,38 @@ export function KnowledgeEntryPage() {
 
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
+      {/*
+        进度条贴在页头下沿（页头 h-14 且 sticky）：它必须永远可见，所以用 fixed 而不是
+        sticky 放在正文里——正文一滚它就跟着走了。低于 4% 不显示，避免刚进页面就有一条线。
+      */}
+      {readingProgress > 4 ? (
+        <div
+          role="progressbar"
+          aria-label="阅读进度"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(readingProgress)}
+          data-testid="entry-reading-progress"
+          className="pointer-events-none fixed inset-x-0 top-14 z-20 h-0.5"
+        >
+          <div className="bg-primary h-full" style={{ width: `${readingProgress}%` }} />
+        </div>
+      ) : null}
+
+      {readingProgress > 8 ? (
+        <button
+          type="button"
+          onClick={() => {
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+          }}
+          data-testid="entry-back-to-top"
+          aria-label="回到顶部"
+          title="回到顶部"
+          className="border-border bg-background/95 hover:bg-accent focus-visible:ring-ring/50 fixed right-4 bottom-6 z-30 grid size-11 place-items-center rounded-full border shadow-lg transition-colors outline-none focus-visible:ring-3 sm:right-6"
+        >
+          <ArrowUp className="size-4" aria-hidden />
+        </button>
+      ) : null}
       {fromTrack?.fromTrackSlug ? (
         // 从学习线进来时，"回到关卡地图"比面包屑更有用——那才是他刚才在走的路
         <Link

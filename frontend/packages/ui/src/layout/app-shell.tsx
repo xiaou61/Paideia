@@ -66,6 +66,18 @@ export function AppShell({
 
   return (
     <div className={cn('flex min-h-dvh flex-col', className)}>
+      {/*
+        跳到正文（2026-11-09）：键盘用户每换一页都要先 Tab 过 logo + 四组导航 + 搜索 +
+        账号菜单才能到内容——十几个焦点。一个常驻隐藏、聚焦即显示的链接能省掉它们，
+        这是 GitHub / Vercel 这类站的标准做法，成本只有一行。
+      */}
+      <a
+        href="#main-content"
+        data-testid="skip-to-content"
+        className="bg-background border-border text-foreground sr-only rounded-lg border px-3 py-2 text-sm shadow-lg focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:outline-none focus-visible:ring-3"
+      >
+        跳到正文
+      </a>
       <header className="border-border bg-background/95 sticky top-0 z-30 border-b">
         <div className="safe-px mx-auto flex h-14 w-full max-w-[86rem] items-center gap-2 sm:gap-3 sm:px-6">
           {homeHref === null ? (
@@ -91,10 +103,14 @@ export function AppShell({
 
       {/*
         原底部留白是给已下线的 AI 助手浮标让位的；浮标随 WORK-066 删除后这里不再需要额外 padding。
+        `tabIndex={-1}` 是给上面那条「跳到正文」用的：不设它，焦点只能移到容器上但滚不过去，
+        读屏也读不出"正文从这里开始"。
       */}
       <main
+        id="main-content"
+        tabIndex={-1}
         className={cn(
-          'mx-auto w-full flex-1 px-4 py-8 sm:px-6 sm:py-10',
+          'mx-auto w-full flex-1 px-4 py-8 sm:px-6 sm:py-10 focus:outline-none',
           wide ? 'max-w-[86rem]' : 'max-w-3xl',
         )}
       >

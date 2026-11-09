@@ -89,6 +89,20 @@ export function CategoryEntriesPage() {
     applyKeyword(draft.trim())
   }
 
+  /**
+   * 面包屑（2026-11-09）。搜索时最后一级换成「搜索：关键词」——
+   * 否则 h1 还写着分类名，列表却已经跨分类了，人会以为自己在看这个分类的所有内容。
+   * 中间层级始终可点，所以"清空搜索"只要点一下分类名就回去了。
+   */
+  const breadcrumb = useMemo(() => {
+    const base = [{ label: '知识库', to: '/knowledge', testId: 'back-to-categories' }]
+    const trail = path.map((node) => ({ label: node.name, to: `/knowledge/categories/${node.id}` }))
+    if (keyword.trim() !== '') {
+      return [...base, ...trail, { label: `搜索：${keyword.trim()}` }]
+    }
+    return scopedId === null ? [...base, { label: '全部条目' }] : [...base, ...trail]
+  }, [path, keyword, scopedId])
+
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
       {/*
@@ -96,19 +110,7 @@ export function CategoryEntriesPage() {
         现在 知识库 › [父级…] › 当前分类，中间每一级都能点回去；最后一项不可点。
         首页那一级（知识库）保留 back-to-categories 这个 testid，既有 e2e 仍然走同一条路。
       */}
-      <PageBreadcrumb
-        items={
-          scopedId === null
-            ? [
-                { label: '知识库', to: '/knowledge', testId: 'back-to-categories' },
-                { label: '全部条目' },
-              ]
-            : [
-                { label: '知识库', to: '/knowledge', testId: 'back-to-categories' },
-                ...path.map((node) => ({ label: node.name, to: `/knowledge/categories/${node.id}` })),
-              ]
-        }
-      />
+      <PageBreadcrumb items={breadcrumb} />
 
       <PageHeader
         title={title}
