@@ -250,7 +250,7 @@ export function ProfilePage() {
             <div>
               <h2 className="text-sm font-medium">进度</h2>
               <p className="text-muted-foreground mt-1 text-xs">
-                让首页更贴近你现在所处的阶段。
+                「当前阶段」决定首页最上面那条建议：投递期先体检简历、笔试期先清到期复习、面试期先练一场模拟面试。没填就不显示建议。
               </p>
             </div>
 

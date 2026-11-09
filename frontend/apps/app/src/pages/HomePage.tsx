@@ -5,7 +5,7 @@ import {
   recentReading,
   type CategoryNode,
 } from '@paideia/knowledge'
-import { configFor, createIdentityApi } from '@paideia/identity'
+import { configFor, createIdentityApi, stageCue } from '@paideia/identity'
 import { AppShell, Button, Card, Input, LoadingRow, Section, Spinner } from '@paideia/ui'
 import { useAuth } from '@paideia/auth'
 import { useQuery } from '@tanstack/react-query'
@@ -163,6 +163,14 @@ export function HomePage() {
     // **用 includes 判断而不是按 key 去重**：null 不是合法 nav key，去重会把固定卡一起丢掉。
     return [...ordered, ...QUICK_LINKS.filter((item) => !ordered.includes(item))]
   }, [profile?.identity])
+  /**
+   * 当前阶段的那条建议（2026-11-09）。
+   *
+   * <p>画像里的「当前阶段」以前只存不读：填了"面试"和没填，首页长得一模一样。
+   * 现在三个阶段各接一条站内真实去处（投递→简历体检、笔试→到期复习、面试→模拟面试），
+   * 由 `@paideia/identity` 的 `stageCue` 给出；没填阶段就返回 null，这里什么也不渲染。
+   */
+  const cue = stageCue(profile?.stage)
   const navigate = useNavigate()
   const [keyword, setKeyword] = useState('')
   /**
@@ -293,6 +301,26 @@ export function HomePage() {
           <p className="text-muted-foreground mt-3 max-w-xl text-base leading-7">
             需要 AI 的时候，正文页能生成摘要、按文章出题自测，复习页还能看错题讲解。
           </p>
+
+          {/*
+            阶段建议（2026-11-09）：一条链接，不是一段话。
+            放在搜索框上方而不是页底——它是"现在最该做的一件事"，和下面那排"所有入口"是两种信息。
+            没填阶段时整块不渲染（`cue === null`），不给没选阶段的人硬塞建议。
+          */}
+          {cue === null ? null : (
+            <Link
+              to={cue.to}
+              data-testid="home-stage-cue"
+              className="border-primary/30 bg-primary/[0.06] hover:border-primary/60 mt-5 flex max-w-xl items-start gap-3 rounded-xl border px-3.5 py-3 transition-colors"
+            >
+              <Target className="text-primary mt-0.5 size-4 shrink-0" aria-hidden />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">{cue.label}</span>
+                <span className="text-muted-foreground mt-0.5 block text-xs leading-5">{cue.hint}</span>
+              </span>
+              <ArrowRight className="text-muted-foreground mt-1 size-4 shrink-0" aria-hidden />
+            </Link>
+          )}
 
           <form onSubmit={submitSearch} className="mt-7 flex max-w-lg flex-col items-stretch gap-2 sm:flex-row sm:items-center">
             <div className="relative flex-1">

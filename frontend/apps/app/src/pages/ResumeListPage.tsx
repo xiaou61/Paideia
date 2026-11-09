@@ -29,6 +29,7 @@ import {
   type ResumeDraft,
   type ResumeDocumentSummary,
 } from '@paideia/resume'
+import { createIdentityApi } from '@paideia/identity'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FileText, Plus, Star, Trash2, Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
@@ -293,9 +294,35 @@ export function ResumeCreatePage() {
   const queryClient = useQueryClient()
   const [title, setTitle] = useState('我的简历')
   const [error, setError] = useState<string | null>(null)
+  /**
+   * 画像里的目标岗位／城市（2026-11-09）。
+   *
+   * <p>这两格以前只存不读：资料页填了「后端开发 · 武汉」，新建简历时还要再手填一遍。
+   * 读不到画像也不阻塞——退回空白，和改动前一致。
+   */
+  const { data: profile } = useQuery({
+    queryKey: ['profile'],
+    queryFn: () => createIdentityApi(api).profile(),
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
+  const prefill =
+    profile?.targetRole !== undefined && profile?.targetRole !== null && profile.targetRole !== ''
+      ? { role: profile.targetRole, city: profile.targetCity ?? '' }
+      : null
 
   const create = useMutation({
-    mutationFn: () => resumes.create({ title: title.trim(), data: emptyResume(), plainText: '' }),
+    mutationFn: () => {
+      const blank = emptyResume()
+      return resumes.create({
+        title: title.trim(),
+        data:
+          prefill === null
+            ? blank
+            : { ...blank, intent: { ...blank.intent, role: prefill.role, city: prefill.city } },
+        plainText: '',
+      })
+    },
     onSuccess: (document) => {
       void queryClient.invalidateQueries({ queryKey: ['resumes'] })
       navigate(`/resume/${document.id}`)
@@ -321,6 +348,13 @@ export function ResumeCreatePage() {
             <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
               用「后端方向」「算法方向」这类能区分用途的名字，之后一眼能找到。
             </p>
+            {prefill === null ? null : (
+              <p className="mt-1 text-xs text-[var(--color-muted-foreground)]" data-testid="resume-create-prefill">
+                会用资料里的「
+                {prefill.city === '' ? prefill.role : `${prefill.role} · ${prefill.city}`}
+                」预填求职意向，建好后还能改。
+              </p>
+            )}
           </div>
           {error !== null && <p className="text-sm text-[var(--color-destructive)]">{error}</p>}
           <Button onClick={() => create.mutate()} disabled={create.isPending || title.trim() === ''}>
