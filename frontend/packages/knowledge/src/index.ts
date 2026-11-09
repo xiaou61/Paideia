@@ -38,7 +38,7 @@ export type {
 export { stripDuplicateTitle } from './entry-body'
 export { EntryToc } from './entry-toc'
 export { PracticeEntry } from './practice-entry'
-export { findCategoryBySlug } from './category-tree'
+export { findCategoryBySlug, findCategoryPath } from './category-tree'
 export { orderChapters } from './chapter-order'
 export { MAX_HEADING_LEVEL, createSlugger, extractHeadings, slugify } from './heading-slug'
 export type { Heading } from './heading-slug'

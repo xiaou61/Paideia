@@ -1,4 +1,4 @@
-import { createKnowledgeApi, plainText } from '@paideia/knowledge'
+import { createKnowledgeApi, findCategoryPath, plainText } from '@paideia/knowledge'
 import {
   AppShell,
   Badge,
@@ -14,12 +14,13 @@ import {
   PageHeader,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, BookOpenCheck, ChevronLeft, FileText, Search } from 'lucide-react'
-import { useEffect, useState, type FormEvent } from 'react'
+import { ArrowRight, BookOpenCheck, FileText, Search } from 'lucide-react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { errorMessage } from '@paideia/core'
 
 const knowledge = createKnowledgeApi(api)
@@ -59,7 +60,17 @@ export function CategoryEntriesPage() {
   })
 
   // 标题用当前分类名；分类还没加载出来时退回一句通用的
-  const current = categories.data?.find((node) => node.id === scopedId)
+  /**
+   * 从根到当前分类的整条路径（2026-11-09）。
+   *
+   * <p>原来这里写的是 `categories.data?.find(...)`——只在顶层找。二级分类（「操作系统」
+   * 挂在「计算机基础」下）进来时找不到自己，标题退化成「分类」，面包屑也无从生成。
+   */
+  const path = useMemo(
+    () => (scopedId === null ? [] : findCategoryPath(categories.data ?? [], scopedId)),
+    [categories.data, scopedId],
+  )
+  const current = path.length === 0 ? undefined : path[path.length - 1]
   const title = scopedId === null ? '全部条目' : (current?.name ?? '分类')
 
   /** 关键词只写地址栏：查询键跟着它走，界面因此不会有第二份"当前检索词"。 */
@@ -80,15 +91,24 @@ export function CategoryEntriesPage() {
 
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
-      <Link
-        to="/knowledge"
-        // py-1 把命中区从 20px 抬到 28px（WCAG 2.5.8 要 24px）；-my-1 与 mb-4 一起保持原视觉间距。
-        className="text-muted-foreground hover:text-foreground -my-1 mb-4 inline-flex items-center gap-1 py-1 text-sm transition-colors"
-        data-testid="back-to-categories"
-      >
-        <ChevronLeft className="size-4" />
-        所有分类
-      </Link>
+      {/*
+        面包屑（2026-11-09）：原来只有一行「‹ 所有分类」，进了二级分类就不知道自己在哪。
+        现在 知识库 › [父级…] › 当前分类，中间每一级都能点回去；最后一项不可点。
+        首页那一级（知识库）保留 back-to-categories 这个 testid，既有 e2e 仍然走同一条路。
+      */}
+      <PageBreadcrumb
+        items={
+          scopedId === null
+            ? [
+                { label: '知识库', to: '/knowledge', testId: 'back-to-categories' },
+                { label: '全部条目' },
+              ]
+            : [
+                { label: '知识库', to: '/knowledge', testId: 'back-to-categories' },
+                ...path.map((node) => ({ label: node.name, to: `/knowledge/categories/${node.id}` })),
+              ]
+        }
+      />
 
       <PageHeader
         title={title}

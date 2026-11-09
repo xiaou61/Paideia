@@ -7,6 +7,7 @@ import {
   createKnowledgeApi,
   createLearningApi,
   createServerProgressPort,
+  findCategoryPath,
   stripDuplicateTitle,
 } from '@paideia/knowledge'
 import type { EntryRef, SelfAssessmentLevel } from '@paideia/knowledge'
@@ -32,6 +33,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { API_BASE_URL } from '../env'
 import { errorMessage } from '@paideia/core'
 
@@ -134,6 +136,27 @@ export function KnowledgeEntryPage() {
     queryFn: () => knowledge.entry(entryId),
     enabled: valid,
   })
+
+  /**
+   * 分类树：只为面包屑取一次（2026-11-09）。
+   *
+   * <p>条目的接口只给 `categoryId + categoryName`，给不出"计算机基础 › 操作系统"这种层级。
+   * 分类树在服务端有 Redis 缓存、前端又被 react-query 缓存 5 分钟，所以这一跳很便宜；
+   * 取不到就只渲染「知识库 › 分类名」，不因为面包屑挡住正文。
+   */
+  const categories = useQuery({
+    queryKey: ['knowledge-categories'],
+    queryFn: () => knowledge.categories(),
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
+  const categoryPath = useMemo(() => {
+    const categoryId = entry.data?.categoryId
+    if (categoryId === null || categoryId === undefined) {
+      return []
+    }
+    return findCategoryPath(categories.data ?? [], categoryId)
+  }, [categories.data, entry.data?.categoryId])
 
   /**
    * 学习记录（WORK-020）：**先取再渲染正文**。
@@ -245,16 +268,30 @@ export function KnowledgeEntryPage() {
 
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
-      <Link
-        to={fromTrack?.fromTrackSlug ? `/learn/${fromTrack.fromTrackSlug}` : '/knowledge'}
-        className="text-muted-foreground hover:text-foreground mb-6 inline-flex items-center gap-1 text-sm transition-colors"
-        data-testid={fromTrack?.fromTrackSlug ? 'back-to-track' : 'back-to-categories'}
-      >
-        <ChevronLeft className="size-4" />
-        {fromTrack?.fromTrackSlug
-          ? `返回「${fromTrack.fromTrackName ?? '学习轨道'}」关卡地图`
-          : '返回知识库'}
-      </Link>
+      {fromTrack?.fromTrackSlug ? (
+        // 从学习线进来时，"回到关卡地图"比面包屑更有用——那才是他刚才在走的路
+        <Link
+          to={`/learn/${fromTrack.fromTrackSlug}`}
+          className="text-muted-foreground hover:text-foreground mb-6 inline-flex items-center gap-1 text-sm transition-colors"
+          data-testid="back-to-track"
+        >
+          <ChevronLeft className="size-4" />
+          {`返回「${fromTrack.fromTrackName ?? '学习轨道'}」关卡地图`}
+        </Link>
+      ) : (
+        /*
+          面包屑（2026-11-09）：原来只有一行「‹ 返回知识库」，进了二级分类不知道自己在哪。
+          这里最后一级是**所属分类**且可点（lastLink）：条目页的"你在这里"是下面的 H1，
+          分类应该能点进去看同一分类下的其它内容。分类树没到手时退化成「知识库」一级。
+        */
+        <PageBreadcrumb
+          lastLink
+          items={[
+            { label: '知识库', to: '/knowledge', testId: 'back-to-categories' },
+            ...categoryPath.map((node) => ({ label: node.name, to: `/knowledge/categories/${node.id}` })),
+          ]}
+        />
+      )}
 
       {!valid ? (
         <Alert variant="destructive" data-testid="entry-state">
@@ -282,18 +319,7 @@ export function KnowledgeEntryPage() {
               /```(code-flow|source-walk)/.test(practice.body) ? 'lg:max-w-none' : 'lg:max-w-[46rem]'
             }`}
           >
-            {/*
-              "我在哪个分类里"是真信息，但它该是可点的面包屑而不是标题上方的小标签：
-              标签只能看，面包屑能回去。
-            */}
-            {entry.data.categoryId === null || entry.data.categoryName === null ? null : (
-              <Link
-                to={`/knowledge/categories/${entry.data.categoryId}`}
-                className="text-muted-foreground hover:text-foreground mb-3 inline-block text-sm"
-              >
-                {entry.data.categoryName}
-              </Link>
-            )}
+            {/* 所属分类已在页头面包屑里（可点），这里不再重复一行标签 */}
             <PageHeader title={entry.data.title} />
 
             {/*

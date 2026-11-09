@@ -322,3 +322,31 @@ test('AI 出一道题：弹窗里作答并看到解析（接口打桩）', async
   await page.getByTestId('entry-quiz-option-1').click()
   await expect(page.getByTestId('entry-quiz-explain')).toContainText('边界在递减')
 })
+
+/**
+ * 条目页的面包屑（2026-11-09）。
+ *
+ * <p>原来的「‹ 返回知识库」只能退到知识库首页；换成面包屑之后，最后一级是**所属分类**
+ * 且可点——这条钉住"从正文能一步回到同一分类的其它内容"。
+ * 不依赖具体分类是否为空，所以线上与测试库都能跑。
+ */
+test('条目页面包屑：知识库可退回，最后一级是分类且可点', async ({ page }) => {
+  await signIn(page)
+  await openAllEntries(page)
+  await firstEntryLink(page).click()
+  await expect(page).toHaveURL(/#\/knowledge\/entries\/\d+$/)
+
+  const breadcrumb = page.getByTestId('breadcrumb')
+  await expect(breadcrumb).toBeVisible()
+  // 第一级固定是「知识库」（也是既有用例依赖的 back-to-categories）
+  await expect(page.getByTestId('back-to-categories')).toHaveText('知识库')
+
+  // 最后一级是分类链接：点进去应落在某个分类页。分类为空的条目会只有「知识库」一级，
+  // 那种情况下没有可点的分类，跳过最后这段。
+  const levels = breadcrumb.locator('a')
+  if ((await levels.count()) >= 2) {
+    await levels.last().click()
+    await expect(page).toHaveURL(/#\/knowledge\/categories\/\d+$/)
+    await expect(page.getByTestId('breadcrumb')).toBeVisible()
+  }
+})
