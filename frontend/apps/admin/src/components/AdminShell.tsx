@@ -169,7 +169,13 @@ export function AdminShell({ actions, children }: { actions?: ReactNode; childre
           drawerOpen ? 'translate-x-0' : '-translate-x-full'
         } ${collapsed ? 'md:w-14' : 'md:w-56'}`}
       >
-        <div className="border-border flex h-14 items-center gap-2.5 border-b px-3">
+        <Link
+          to="/"
+          data-testid="admin-brand-home"
+          aria-label="回到管理端首页"
+          title="回到管理端首页"
+          className="border-border hover:bg-accent/60 focus-visible:ring-ring/50 flex h-14 items-center gap-2.5 border-b px-3 transition-colors outline-none focus-visible:ring-3"
+        >
           <span className="bg-primary text-primary-foreground grid size-7 shrink-0 place-items-center rounded-md text-xs font-bold">
             P
           </span>
@@ -177,7 +183,7 @@ export function AdminShell({ actions, children }: { actions?: ReactNode; childre
             <div className="truncate text-sm leading-tight font-semibold">Paideia</div>
             <div className="text-muted-foreground truncate text-[11px] leading-tight">管理端</div>
           </div>
-        </div>
+        </Link>
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-2">
           {MENU.map((item) => {

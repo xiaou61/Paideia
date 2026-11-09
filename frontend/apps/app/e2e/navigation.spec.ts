@@ -138,3 +138,22 @@ test.describe('导航覆盖', () => {
     }
   })
 })
+
+/**
+ * 点页头品牌回首页（2026-11-09）。
+ *
+ * <p>用户反馈"点了 Paideia 没反应"——它原来是一段纯文本，在深页面上只能靠浏览器后退。
+ * 这条钉住"品牌可点、落到首页"，避免哪天被改回 span 没人发现。
+ */
+test('点页头品牌回到首页', async ({ page }) => {
+  await signIn(page)
+  await page.goto('/#/knowledge')
+
+  const brand = page.getByTestId('brand-home')
+  await expect(brand).toBeVisible()
+  await brand.click()
+
+  await expect(page).toHaveURL(/#\/$/)
+  // 首页的标志：那条「所有入口」列表
+  await expect(page.getByTestId('home-entries')).toBeVisible()
+})

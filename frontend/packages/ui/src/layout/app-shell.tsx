@@ -16,6 +16,16 @@ import { ThemeToggle } from '../theme/theme-toggle'
  *
  * <p>**品牌标识是色块 + 首字母**，不引图标也不是图片：这块地方是"这是一件产品"最便宜的信号，
  * 而它必须跟着主题走，所以颜色只来自令牌。
+ *
+ * <p><b>品牌可以点回首页（2026-11-09）</b>：用户反馈"点了 Paideia 没反应"——它是纯文本，
+ * 在任何一个深页面上都只能靠浏览器后退。这条通例在文档站/后台里都是"点 logo 回首页"，
+ * 缺了它第一个反应就是"这个站没做导航"。
+ *
+ * <p>这里**破例**带了一点路由假设：默认 {@code homeHref = '#/'}。理由是三个应用都用
+ * Hash 路由、首页都在 {@code #/}，而 {@code <AppShell>} 在学习者端有 38 处调用——为一行
+ * 链接改 38 个文件，收益远小于把这条约定写在这里。不想带链接的调用方传 {@code null}。
+ * 用 {@code <a href>} 而不是 router 的 {@code <Link>}：设计系统不引 react-router，
+ * 改 hash 会触发 HashRouter 的 hashchange，效果与 Link 一致。
  */
 export function AppShell({
   title,
@@ -24,6 +34,7 @@ export function AppShell({
   children,
   wide = false,
   className,
+  homeHref = '#/',
 }: {
   title: string
   subtitle?: ReactNode
@@ -33,25 +44,43 @@ export function AppShell({
   /** 列表/总览类页面用宽档：窄档在 1440 屏上两侧留白太多，读起来像"没做完"。 */
   wide?: boolean
   className?: string
+  /** 点品牌回到哪里；传 `null` 渲染成不可点的纯文本。 */
+  homeHref?: string | null
 }) {
+  const brand = (
+    <>
+      <span
+        aria-hidden
+        className="from-primary to-primary/75 text-primary-foreground flex size-8 items-center justify-center rounded-lg bg-gradient-to-br text-sm font-bold"
+      >
+        {title.slice(0, 1).toUpperCase()}
+      </span>
+      <span className="text-[0.9375rem] font-semibold tracking-tight">{title}</span>
+      {subtitle === undefined ? null : (
+        <span className="border-border text-muted-foreground hidden rounded-full border px-2 py-0.5 text-xs sm:inline-block">
+          {subtitle}
+        </span>
+      )}
+    </>
+  )
+
   return (
     <div className={cn('flex min-h-dvh flex-col', className)}>
       <header className="border-border bg-background/95 sticky top-0 z-30 border-b">
         <div className="safe-px mx-auto flex h-14 w-full max-w-[86rem] items-center gap-2 sm:gap-3 sm:px-6">
-          <div className="flex shrink-0 items-center gap-2.5">
-            <span
-              aria-hidden
-              className="from-primary to-primary/75 text-primary-foreground flex size-8 items-center justify-center rounded-lg bg-gradient-to-br text-sm font-bold"
+          {homeHref === null ? (
+            <div className="flex shrink-0 items-center gap-2.5">{brand}</div>
+          ) : (
+            <a
+              href={homeHref}
+              data-testid="brand-home"
+              aria-label={`回到首页：${title}`}
+              title="回到首页"
+              className="hover:bg-accent/60 focus-visible:ring-ring/50 -ml-1.5 flex shrink-0 items-center gap-2.5 rounded-lg px-1.5 py-1 transition-colors outline-none focus-visible:ring-3"
             >
-              {title.slice(0, 1).toUpperCase()}
-            </span>
-            <span className="text-[0.9375rem] font-semibold tracking-tight">{title}</span>
-            {subtitle === undefined ? null : (
-              <span className="border-border text-muted-foreground hidden rounded-full border px-2 py-0.5 text-xs sm:inline-block">
-                {subtitle}
-              </span>
-            )}
-          </div>
+              {brand}
+            </a>
+          )}
 
           <div className="flex min-w-0 flex-1 items-center gap-2">
             {actions}
