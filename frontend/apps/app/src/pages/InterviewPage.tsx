@@ -1,4 +1,4 @@
-import { createIdentityApi, configFor, TIMELINE_LABELS, type JobTimeline, type LearnerProfile } from '@paideia/identity'
+import { createIdentityApi, INTERVIEW_INTRO, TIMELINE_LABELS, type JobTimeline, type LearnerProfile } from '@paideia/identity'
 import { adaptiveContextText, computeAbility, difficultyLabel, type AssistantApi, type AdaptiveBrief, type InterviewEvaluationView } from '@paideia/assistant'
 import {
   createResumeApi,
@@ -93,7 +93,6 @@ const SEASON_FOCUS: Record<JobTimeline, string> = {
  */
 export function InterviewPage() {
   const { data: profile } = useQuery({ queryKey: ['profile'], queryFn: () => identity.profile(), retry: false })
-  const config = configFor(profile?.identity)
 
   /**
    * 本场求职季（2026-11-09）。
@@ -235,7 +234,7 @@ export function InterviewPage() {
 
       const controller = new AbortController()
       abortRef.current = controller
-      const message = openingTurn ? openingMessage(profile, config.interviewIntro, text) : text
+      const message = openingTurn ? openingMessage(profile, INTERVIEW_INTRO, text) : text
 
       setLines((current) => [...current, { role: 'interviewer', content: '' }])
 
@@ -264,7 +263,7 @@ export function InterviewPage() {
       abortRef.current = null
       setBusy(false)
     }
-  }, [busy, conversationId, profile, config.interviewIntro])
+  }, [busy, conversationId, profile])
 
   /**
    * 开始面试：先按所选简历拼出**只进提示词、不落库**的上下文，再发第一条消息（WORK-077）。
@@ -364,7 +363,7 @@ export function InterviewPage() {
         {lines.length === 0 ? (
           <>
             <StartPanel
-              intro={config.interviewIntro}
+              intro={INTERVIEW_INTRO}
               role={role}
               season={season?.label ?? null}
               seasonFocus={season?.focus ?? null}

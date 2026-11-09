@@ -1,59 +1,39 @@
 import { describe, expect, it } from 'vitest'
 
-import { configFor, stageCue } from './config'
-import type { Identity, JobStage } from './types'
+import { INTERVIEW_INTRO, NAV_PREFERENCE, stageCue } from './config'
+import type { JobStage } from './types'
 
 /**
- * 按身份的推荐配置（WORK-010 T-12）。
+ * 导航顺序与阶段提示（2026-11-09 起不再按身份分叉）。
  *
- * <p>这里验的是"配置真的按身份分开了"，而不是"某个字符串长什么样"——后者改一次文案就红，
- * 前者才是这一层要守的东西。
+ * <p>这里验的是"顺序里该有的都在、该在前面的在前"，而不是某一段文案长什么样——
+ * 后者改一次措辞就红，前者才是这一层要守的东西。
  */
-describe('按身份的推荐配置', () => {
-  it('求职者的导航把面试排第一，其它身份没有面试入口（否则切换身份看不出变化）', () => {
-    const jobSeeker = configFor('job_seeker')
-    const daily = configFor('daily_learning')
-
-    expect(jobSeeker.preferredNav[0]).toBe('interview')
-    expect(daily.preferredNav).not.toContain('interview')
+describe('导航推荐顺序', () => {
+  it('面试与速递排在最前：求职者每天要用的是这两处，而不是泛读知识库', () => {
+    expect(NAV_PREFERENCE[0]).toBe('interview')
+    expect(NAV_PREFERENCE[1]).toBe('digest')
   })
 
-  it('每个身份的 preferredNav 都含 digest——漏一处首页排序就取不到那张卡（WORK-027）', () => {
-    const all: Identity[] = ['job_seeker', 'postgrad', 'civil_service', 'daily_learning']
-    for (const identity of all) {
-      expect(configFor(identity).preferredNav).toContain('digest')
-    }
+  it('知识库与笔记在列表里——漏一处首页排序就取不到那张卡', () => {
+    expect(NAV_PREFERENCE).toContain('knowledge')
+    expect(NAV_PREFERENCE).toContain('notes')
   })
 
-  it('留位的三个身份也各有一份配置，不会拿到空壳', () => {
-    const placeholders: Identity[] = ['postgrad', 'civil_service', 'daily_learning']
-    for (const identity of placeholders) {
-      const config = configFor(identity)
-      expect(config.preferredNav.length).toBeGreaterThan(0)
-      expect(config.interviewIntro.length).toBeGreaterThan(0)
-    }
+  it('没有重复项：重复会让首页因为同一张卡被取两次而少一张', () => {
+    expect(new Set(NAV_PREFERENCE).size).toBe(NAV_PREFERENCE.length)
   })
+})
 
-  it('身份缺失或不认识时退回求职者配置——与后端同一个兜底方向', () => {
-    // 两处兜底方向必须一致：一边退回 job_seeker、另一边退回默认 harness，
-    // 否则"没有画像的新用户"会看到一个与后端行为不符的界面。
-    expect(configFor(null)).toEqual(configFor('job_seeker'))
-    expect(configFor(undefined)).toEqual(configFor('job_seeker'))
-    expect(configFor('nonsense' as Identity)).toEqual(configFor('job_seeker'))
-  })
-
-  it('配置里不再有没人读的字段（2026-11-09 清理的回归位）', () => {
-    // 这两个字段曾经存在但**没有任何消费者**：preferredCategories 在首页改用 preferredNav
-    // 排快捷卡之后就没人读了，assistantGreeting 随助手面板下线一起失效。
-    // 留一条断言挡住"又加回来"——加回来的人必须先说清谁在读它。
-    const config = configFor('job_seeker') as unknown as Record<string, unknown>
-    expect(config).not.toHaveProperty('preferredCategories')
-    expect(config).not.toHaveProperty('assistantGreeting')
+describe('面试开场说明', () => {
+  it('非空，且写清了"一次只问一个问题"这条硬规则', () => {
+    expect(INTERVIEW_INTRO.length).toBeGreaterThan(0)
+    expect(INTERVIEW_INTRO).toContain('一次问一个问题')
   })
 })
 
 /**
- * 当前阶段 → 首页那条建议（2026-11-09）。
+ * 当前阶段 → 首页那条建议。
  *
  * <p>它存在的理由：画像的 `stage` 以前只存不读，填了跟没填一样。这张表把三个阶段
  * 各接一条真实去处，所以两件事必须验——**每个阶段都有去处**、**没填就什么都不给**。

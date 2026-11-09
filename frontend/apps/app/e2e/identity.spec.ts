@@ -4,26 +4,29 @@ import { REMOTE } from './env'
 import { signIn } from './session'
 
 /**
- * 身份化与模拟面试（WORK-010 T-03 / T-09 / T-12 / AC-002）。
+ * 目标与阶段 + 导航顺序（原 WORK-010 T-03 / T-09 / T-12；2026-11-09 去掉身份选择）。
  *
- * <p>只验**界面上真能走通的那部分**：设置页写读回、导航按身份重排、面试页能发起会话。
+ * <p>只验**界面上真能走通的那部分**：资料页写读回、导航组顺序固定、面试页能发起会话。
+ *
+ * <p><b>为什么还留着这个文件名</b>：它原来叫「身份与导航」，身份选择删掉之后剩下的正是
+ * "资料能改能读回 + 导航顺序"这两件事；改名会连带改 AGENTS.md 里的 spec 对应表，
+ * 收益不抵成本。文件名沿用，内容改成现在测的东西。
  *
  * <p><b>不断言"回复内容好不好"</b>：那取决于模型与积分（种子账号余额为 0 时这一轮会被积分闸
- * 拦下，界面显示"积分不足"）。这里验的是"入口在、请求发出去了、状态说清楚了"，
- * 不把上游质量当成验收对象。
+ * 拦下，界面显示"积分不足"）。这里验的是"入口在、请求发出去了、状态说清楚了"。
  */
-test('身份与目标：能改画像并读回，且明写"不影响你能做什么"', async ({ page }) => {
+test('目标与阶段：能改画像并读回，页面上不再有身份选择', async ({ page }) => {
   await signIn(page)
   await page.goto('/#/profile')
 
-  // 这句话是这一页最要紧的文案：身份不是第二套权限。
-  // 用更长的前缀定位：登录方式那一段也有"不影响你能做什么"，短词会同时命中两处（strict mode）。
-  await expect(page.getByText('身份只影响推荐顺序与首页入口')).toBeVisible()
+  // 身份选择整块移除（2026-11-09 用户要求）：页面上不该再出现那个按钮或弹窗选项。
+  await expect(page.getByTestId('profile-identity')).toHaveCount(0)
+  await expect(page.getByTestId('identity-option-job_seeker')).toHaveCount(0)
 
-  // 身份选择是弹窗式卡片：一期只有求职者可点，其余在弹窗里标「准备中」
-  await page.getByTestId('profile-identity').click()
-  await expect(page.getByTestId('identity-option-postgrad')).toBeDisabled()
-  await page.getByTestId('identity-option-job_seeker').click()
+  // 真正被消费的四个字段还在，且页头说清了它们各自影响什么。
+  await expect(page.getByTestId('profile-target-role')).toBeVisible()
+  await expect(page.getByTestId('profile-stage')).toBeVisible()
+  await expect(page.getByTestId('profile-timeline')).toBeVisible()
 
   const role = `后端开发-${String(Date.now())}`
   await page.getByTestId('profile-target-role').fill(role)
@@ -38,21 +41,13 @@ test('身份与目标：能改画像并读回，且明写"不影响你能做什�
   await expect(page.getByTestId('profile-target-role')).toHaveValue(role)
 })
 
-test('导航按身份重排：求职者有面试入口、且排在第一', async ({ page }) => {
+test('导航组顺序固定：「求职」在第一位，且组内有面试入口', async ({ page }) => {
   await signIn(page)
-  // 先把身份确认为求职者（默认就是，但显式存一次避免被别的用例改过）
-  await page.goto('/#/profile')
-  await page.getByTestId('profile-identity').click()
-  await page.getByTestId('identity-option-job_seeker').click()
-  await page.getByTestId('profile-save').click()
-  // 存完会自动离开这一页（保存成功才跳），等它跳完再往下走
-  await expect(page).not.toHaveURL(/\/profile/, { timeout: 15_000 })
-
   await page.goto('/#/knowledge')
   const nav = page.getByRole('navigation', { name: '主导航' })
 
-  // 2026-10-26 起导航分成四个下拉组，所以"面试排第一"落在**组间顺序**上：
-  // 身份的 preferredNav 里 interview 在首位 ⇒「求职」组是第一个触发器。
+  // 2026-10-26 起导航分成四个下拉组；2026-11-09 起组间顺序是常量（面试与速递在前），
+  // 不再随画像变化——这条断言把那个顺序钉住，改成别处时应先想清楚谁排前面。
   const firstGroup = nav.locator('button').first()
   await expect(firstGroup).toHaveAttribute('data-testid', 'learner-nav-group-job')
   await expect(firstGroup).toHaveText('求职')

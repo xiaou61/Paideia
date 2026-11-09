@@ -98,9 +98,9 @@
 | --- | --- |
 | ![模拟面试](docs/screenshots/interview.png) | ![简历](docs/screenshots/resume.png) |
 
-| 身份与目标 | 我的笔记 |
+| 目标与阶段 | 我的笔记 |
 | --- | --- |
-| ![身份与目标](docs/screenshots/profile.png) | ![我的笔记](docs/screenshots/notes.png) |
+| ![目标与阶段](docs/screenshots/profile.png) | ![我的笔记](docs/screenshots/notes.png) |
 
 **管理端**：分类、条目、概念、内容导入、用户、举报、SQL 数据集、AI 运行与积分审计、运维与事件。
 
@@ -183,7 +183,7 @@ frontend/          pnpm workspace：5 个可运行端 + 11 个库包
   packages/ui        设计系统：令牌、基元、外壳、markdown 渲染（全站唯一实现）
   packages/core      端口与 API 客户端
   packages/auth      令牌存储、401 刷新重放、登录门
-  packages/identity  按身份决定推荐顺序与入口
+  packages/identity  画像读写（目标岗位/城市/阶段/求职季）、导航顺序常量、阶段建议
   packages/assistant 摘要卡、积分面板、SSE 客户端
   packages/knowledge 知识库客户端、目录、图谱布局、学习进度
   packages/camp      训练营：薄弱点、主题表、每日计划

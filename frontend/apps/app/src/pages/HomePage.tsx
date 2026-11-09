@@ -5,7 +5,7 @@ import {
   recentReading,
   type CategoryNode,
 } from '@paideia/knowledge'
-import { configFor, createIdentityApi, stageCue } from '@paideia/identity'
+import { createIdentityApi, NAV_PREFERENCE, stageCue } from '@paideia/identity'
 import { AppShell, Button, Card, Input, LoadingRow, Section, Spinner } from '@paideia/ui'
 import { useAuth } from '@paideia/auth'
 import { useQuery } from '@tanstack/react-query'
@@ -22,7 +22,7 @@ const knowledge = createKnowledgeApi(api)
 const learning = createLearningApi(api)
 
 /**
- * 快捷入口。`key` 与身份的 `preferredNav` 对齐（WORK-010 T-12）。
+ * 快捷入口。`key` 与 `NAV_PREFERENCE` 对齐（顺序是常量，2026-11-09 起不再读画像）。
  *
  * <p>只有顺序会变，**集合不变**（面试页是导航里的入口，这里不重复）：首页是"我该从哪开始"，
  * 把身份最相关的那张卡排前面就够了；藏掉入口会让"推荐"变成"限制"。
@@ -147,7 +147,7 @@ const QUICK_LINKS: {
  */
 export function HomePage() {
   const { user } = useAuth()
-  // 推荐顺序按身份来（WORK-010 T-12）。读不到身份就用默认：首页不能因为推荐接口慢而空掉
+  // 画像只用来读「当前阶段」那一条建议；入口顺序是常量（2026-11-09 起不再按身份排）
   const { data: profile } = useQuery({
     queryKey: ['profile'],
     queryFn: () => createIdentityApi(api).profile(),
@@ -155,14 +155,13 @@ export function HomePage() {
     retry: false,
   })
   const quickLinks = useMemo(() => {
-    const config = configFor(profile?.identity)
-    const ordered = config.preferredNav
+    const ordered = NAV_PREFERENCE
       .map((key) => QUICK_LINKS.find((item) => item.key === key))
       .filter((item): item is (typeof QUICK_LINKS)[number] => item !== undefined)
-    // 配置只表达"谁排前面"，没提到的（含 key=null 的固定卡）追加在后面。
+    // 常量只表达"谁排前面"，没提到的（含 key=null 的固定卡）追加在后面。
     // **用 includes 判断而不是按 key 去重**：null 不是合法 nav key，去重会把固定卡一起丢掉。
     return [...ordered, ...QUICK_LINKS.filter((item) => !ordered.includes(item))]
-  }, [profile?.identity])
+  }, [])
   /**
    * 当前阶段的那条建议（2026-11-09）。
    *
@@ -559,7 +558,7 @@ export function HomePage() {
       */}
       <Section
         title="所有入口"
-        description={profile?.identity === undefined ? undefined : '按你的身份排过序。'}
+        description="面试与速递在前，其余按常用程度排。"
       >
         <ul className="border-border divide-border divide-y overflow-hidden rounded-xl border" data-testid="home-entries">
           {quickLinks.map((item) => (

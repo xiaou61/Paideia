@@ -1,6 +1,5 @@
 import { createAuthApi, useAuth } from '@paideia/auth'
-import { configFor, createIdentityApi } from '@paideia/identity'
-import { useQuery } from '@tanstack/react-query'
+import { NAV_PREFERENCE } from '@paideia/identity'
 import {
   Alert,
   AlertDescription,
@@ -47,9 +46,9 @@ import { JSON_HEADERS, errorMessage } from '@paideia/core'
  * 仍然只有一处。
  */
 /**
- * 导航项。`key` 与 `@paideia/identity` 的 `preferredNav` 对齐，`group` 决定它落在哪个下拉里。
+ * 导航项。`key` 与 `@paideia/identity` 的 `NAV_PREFERENCE` 对齐，`group` 决定它落在哪个下拉里。
  *
- * <p>**不按身份隐藏入口**：身份只决定"哪一组排前面"，四个组对所有身份都出现。
+ * <p>**不按人隐藏入口**：四个组对所有登录用户都出现，组间顺序由 `NAV_PREFERENCE` 决定（常量，2026-11-09 起不再读画像）。
  *
  * <p>为什么不横排：2026-10-22 加到 10 项时，1280 宽下每个标签被挤成竖排断字（"每日速/递"），
  * 于是拆成"主干 + 更多"；2026-10-26 用户仍说"可选择的项太多，要分类可下拉"，改成四组。
@@ -61,17 +60,17 @@ const NAV = [
   // 复习（WORK-034）：每天要看的入口。
   { key: 'review' as const, group: 'learn' as const, to: '/review', label: '复习', testId: 'learner-nav-review' },
   // 学习记录（WORK-053）：进度 / 卡关 / 到期 / 薄弱四块，外加三个 AI 入口。
-  // 不进 preferredNav —— 身份排序只管那几个老入口，新入口固定排在后面。
+  // 不进 NAV_PREFERENCE —— 推荐顺序只管那几个老入口，新入口固定排在后面。
   { key: 'progress' as const, group: 'learn' as const, to: '/progress', label: '学习记录', testId: 'learner-nav-progress' },
   // 训练营（WORK-029）：它是"还没有学习记录的人"的入口。
-  // 不进 preferredNav —— 身份排序只管那几个老入口，新入口固定排在后面。
+  // 不进 NAV_PREFERENCE —— 推荐顺序只管那几个老入口，新入口固定排在后面。
   { key: 'camp' as const, group: 'learn' as const, to: '/camp', label: '训练营', testId: 'learner-nav-camp' },
   { key: 'knowledge' as const, group: 'knowledge' as const, to: '/knowledge', label: '知识库', testId: 'learner-nav-knowledge' },
   // 书籍详解（WORK-046）：按书读，和"按主题查"并列的第二条轴。
-  // 不进 preferredNav —— 它靠组内排后，不靠身份推荐。
+  // 不进 NAV_PREFERENCE —— 它靠组内排后，不靠推荐顺序。
   { key: 'books' as const, group: 'knowledge' as const, to: '/books', label: '书籍详解', testId: 'learner-nav-books' },
   // 源码精读（WORK-057）：读第三方项目源码的独立入口，和知识库浏览是两条路。
-  // 不进 preferredNav —— 与 books 同理，靠组内排位。
+  // 不进 NAV_PREFERENCE —— 与 books 同理，靠组内排位。
   { key: 'source' as const, group: 'knowledge' as const, to: '/source', label: '源码精读', testId: 'learner-nav-source' },
   { key: 'graph' as const, group: 'knowledge' as const, to: '/graph', label: '知识图谱', testId: 'learner-nav-graph' },
   { key: 'notes' as const, group: 'knowledge' as const, to: '/notes', label: '我的笔记', testId: 'learner-nav-notes' },
@@ -79,7 +78,7 @@ const NAV = [
   { key: 'my-assessments' as const, group: 'practice' as const, to: '/my-assessments', label: '我的自评', testId: 'learner-nav-my-assessments' },
   { key: 'interview' as const, group: 'job' as const, to: '/interview', label: '模拟面试', testId: 'learner-nav-interview' },
   // 简历（WORK-018）：求职者面上每次投递都要用的入口。
-  // **不复用 `interview` 这个 key**：身份排序按 key 匹配，复用会让"面试排第一"这条既有
+  // **不复用 `interview` 这个 key**：推荐顺序按 key 匹配，复用会让"面试排第一"这条既有
   // 验收失去观察点（2026-10-18 实测：identity.spec 里首链接断言因此变红）。
   { key: 'resume' as const, group: 'job' as const, to: '/resume', label: '我的简历', testId: 'learner-nav-resume' },
 ]
@@ -95,26 +94,21 @@ const GROUPS = [
 export function LearnerHeader() {
   const { user, logout } = useAuth()
   const { pathname } = useLocation()
-  // 导航按身份重排（WORK-010 T-12）。读不到身份时退回默认配置、**不阻塞页头**：
-  // 页头是每页都有的东西，不能因为一个推荐用的接口慢就整页转圈。
-  const { data: profile } = useQuery({
-    queryKey: ['profile'],
-    queryFn: () => createIdentityApi(api).profile(),
-    staleTime: 5 * 60_000,
-    retry: false,
-  })
   /**
-   * 组内顺序固定，**组间按身份重排**：取组内最早出现的那个 `preferredNav` 位置当这组的名次，
-   * 没被配置提到的组排最后（`sort` 稳定，所以并列时仍按 GROUPS 的顺序）。
+   * 组内顺序固定，**组间按推荐顺序重排**：取组内最早出现的那个 `NAV_PREFERENCE` 位置当这组的名次，
+   * 没被提到的组排最后（`sort` 稳定，所以并列时仍按 GROUPS 的顺序）。
+   *
+   * <p>2026-11-09：原来这里先读画像再查"按身份配置"，而身份只有一个可选值——排序实际上是常量。
+   * 身份选择移除后连那次 `profile` 请求一起删掉：页头每页都有，少一个请求就少一处会变慢的地方。
    */
   const grouped = useMemo(() => {
-    const preferred = configFor(profile?.identity).preferredNav as readonly string[]
+    const preferred = NAV_PREFERENCE as readonly string[]
     return GROUPS.map((group) => {
       const items = NAV.filter((item) => item.group === group.key)
       const ranks = items.map((item) => preferred.indexOf(item.key)).filter((rank) => rank >= 0)
       return { ...group, items, rank: ranks.length === 0 ? Number.MAX_SAFE_INTEGER : Math.min(...ranks) }
     }).sort((left, right) => left.rank - right.rank)
-  }, [profile?.identity])
+  }, [])
   /** 条目页的地址是 /knowledge/entries/:id，所以前缀匹配也算在那一项里。 */
   const isActive = (to: string) => pathname === to || pathname.startsWith(`${to}/`)
   const navigate = useNavigate()
@@ -337,10 +331,10 @@ export function LearnerHeader() {
             </DropdownMenuLabel>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
-          {/* 身份是"我是谁"的一部分，与账号同级；它不是权限设置，所以不放在"危险动作"那一簇 */}
+          {/* 学习资料与账号同级；它不是权限设置，所以不放在"危险动作"那一簇 */}
           <DropdownMenuItem data-testid="account-profile" onClick={() => { void navigate('/profile'); setNavOpen(false) }}>
             <UserRound className="size-4" />
-            身份与目标
+            目标与阶段
           </DropdownMenuItem>
           {/* 积分（WORK-066）：原先在助手面板里，面板下线后并入「身份与目标」页 */}
           {/* MCP 接入入口（WORK-019）：它是"给外部助手用的钥匙"，低频且带凭据含义，

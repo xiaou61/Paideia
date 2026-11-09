@@ -6,7 +6,10 @@ import { Link } from 'react-router'
  * 零数据首页的三步路径（WORK-034 REQ-007）。
  *
  * <p>只在「没自评、没学习记录、图谱一个概念都没碰过」时出现。三个去处按顺序：
- * 先补身份（决定推荐）、再从零开始、最后直接进第一条线的第一关。
+ * 先补目标与阶段（决定推荐与首页建议）、再从零开始、最后直接进第一条线的第一关。
+ *
+ * <p>2026-11-09：第一步原来叫「先说一下你是谁」（选身份）。身份选择已移除，这里改成
+ * 填真实被消费的四个字段之一——不再让人先做一个没有第二选项的选择。
  */
 export function HomeFirstRun({
   entryHref,
@@ -16,7 +19,7 @@ export function HomeFirstRun({
   onDismiss: () => void
 }) {
   const steps = [
-    { title: '先说一下你是谁', detail: '在个人资料里选身份和目标，首页会按它调整。', to: '/profile' },
+    { title: '填一下目标与阶段', detail: '目标岗位、城市与当前阶段，推荐和首页建议会跟着变。', to: '/profile' },
     { title: '挑一条线开始', detail: 'Python / Java / MySQL，一关二十分钟，边学边练。', to: '/learn' },
     { title: '直接进第一关', detail: '不用挑，从第一条线的第一课开始。', to: entryHref },
   ]

@@ -1,10 +1,9 @@
-import type { Identity, JobStage } from './types'
+import type { JobStage } from './types'
 
 /**
  * 导航键：与 `LearnerHeader` 的 `NAV[].key`、首页快捷卡的 `key` 一一对应。
  *
- * <p>它是联合字面量而不是 `string`：加了新入口却忘了给某个身份补排序时，编译期就会红，
- * 不用等到界面上发现某一行排错位置。
+ * <p>它是联合字面量而不是 `string`：加了新入口却忘了补排序时，编译期就会红。
  */
 export type NavKey =
   | 'learn'
@@ -18,66 +17,39 @@ export type NavKey =
   | 'progress'
 
 /**
- * 按身份的推荐配置包（WORK-010 T-12）。
+ * 导航与首页入口的推荐顺序（`interview` 与 `digest` 在前）。
  *
- * <p><b>为什么是代码里的映射而不是一张表</b>（design §6）：线上一共两个账号，规则映射都无从调参，
- * 建表只会多一处要维护的配置载体。等真有第二个真身份、且这些值需要按数据调时再迁移。
+ * <p><b>2026-11-09：从"按身份分叉的配置表"降成一组常量。</b>原来这里是一张
+ * `Record<Identity, IdentityConfig>`，四个身份四份 `preferredNav`，但后端只让
+ * `job_seeker` 可选——于是"按身份排序"实际上永远取到同一份，界面上还多了一个
+ * 只能选一项的选择器。用户要求"注册就注册，不要选身份"，于是：
  *
- * <p>它决定两件**纯展示**的事：导航里哪些入口排前面、面试开场说什么。
- * **它不决定任何权限**——身份与 role 正交，这里改什么都影响不了能不能做什么。
+ * <ul>
+ *   <li>身份选择器与画像页的「当前身份」整块删除；
+ *   <li>排序不再读画像，变成这组常量（写死的就是原来求职者那份的顺序，界面上看不出变化）；
+ *   <li>画像里真正被消费的四个字段（岗位/城市/阶段/求职季）保持原样，与身份无关。
+ * </ul>
  *
- * <p><b>2026-11-09 删掉了两个字段</b>：`preferredCategories`（首页早改成读 `preferredNav`
- * 排快捷卡，它没人读了）与 `assistantGreeting`（助手面板下线后开场白没有消费者）。
- * 留着它们比删掉更危险：下一个改配置的人会以为改这几行界面就会变。
+ * <p>**为什么还要保留这个包**：画像的读写客户端（`createIdentityApi`）、阶段提示
+ * （`stageCue`）与求职季标签都在这里，删包等于把三件事各搬一次家。
  */
-export interface IdentityConfig {
-  /** 导航顺序：把哪几个入口提前。 */
-  preferredNav: readonly NavKey[]
-  /** 面试页的开场说明（面试官自己会再问第一题）。 */
-  interviewIntro: string
-}
+export const NAV_PREFERENCE: readonly NavKey[] = [
+  'interview',
+  'digest',
+  'learn',
+  'knowledge',
+  'notes',
+  'my-assessments',
+]
 
-/**
- * 各身份的配置。
- *
- * <p>留位的三个身份**也给了配置**：这不是"做了界面"，而是让"按身份配置"这件事有真实的
- * 第二个取值可测（数据层与单测能覆盖），同时保证它们万一被启用时不会拿到空配置。
- */
-const CONFIGS: Record<Identity, IdentityConfig> = {
-  job_seeker: {
-    // 'digest' 排第 2：求职者每天看速递比泛读知识库更贴合场景（WORK-027）
-    preferredNav: ['interview', 'digest', 'learn', 'knowledge', 'notes', 'my-assessments'],
-    interviewIntro: '我会一次问一个问题，答不上来就说"不会"，我会换个角度。随时可以说"结束"。',
-  },
-  postgrad: {
-    preferredNav: ['digest', 'learn', 'knowledge', 'notes', 'my-assessments'],
-    interviewIntro: '我会一次问一个问题。随时可以说"结束"。',
-  },
-  civil_service: {
-    preferredNav: ['digest', 'learn', 'knowledge', 'notes', 'my-assessments'],
-    interviewIntro: '我会一次问一个问题。随时可以说"结束"。',
-  },
-  daily_learning: {
-    preferredNav: ['digest', 'learn', 'knowledge', 'notes', 'my-assessments'],
-    interviewIntro: '我会一次问一个问题。随时可以说"结束"。',
-  },
-}
-
-/** 取某个身份的配置。不认识的身份退回 `job_seeker`（与后端同一个兜底方向）。 */
-export function configFor(identity: Identity | null | undefined): IdentityConfig {
-  if (identity === null || identity === undefined) {
-    return CONFIGS.job_seeker
-  }
-  return CONFIGS[identity] ?? CONFIGS.job_seeker
-}
+/** 面试页的开场说明（面试官自己会再问第一题）。 */
+export const INTERVIEW_INTRO = '我会一次问一个问题，答不上来就说"不会"，我会换个角度。随时可以说"结束"。'
 
 /**
  * 当前求职阶段最该先做的一件事（2026-11-09）。
  *
- * <p><b>为什么单独做一张表</b>：画像里的 `stage` 原来**只存不读**——填了"面试"和没填，
- * 首页一模一样，那这个字段就是在骗人。三个阶段各给一条**真实存在**的去处：
- * 投递期补简历、笔试期清复习队列、面试期练面试。它们都是站内已经做好的页面，
- * 不是占位链接。
+ * <p>画像里的 `stage` 原来只存不读——填了"面试"和没填，首页一模一样。三个阶段各给一条
+ * **真实存在**的去处：投递期补简历、笔试期清复习队列、面试期练面试。
  *
  * <p>表里只有 `to` / `label` / `hint` 三个字段，且 `to` 全是字面量：路由改名时这里会编译不过，
  * 不会留下一个点了 404 的提示。

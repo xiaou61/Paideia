@@ -1,6 +1,6 @@
 import type { ApiClient } from '@paideia/core'
 
-import type { Identity, LearnerProfile, LearnerProfileInput } from './types'
+import type { LearnerProfile, LearnerProfileInput } from './types'
 import { JSON_HEADERS } from '@paideia/core'
 
 /**
@@ -24,12 +24,4 @@ export function createIdentityApi(client: ApiClient): IdentityApi {
         body: JSON.stringify(input),
       }),
   }
-}
-
-/** 身份的可读名。后端也给了 `identityLabel`，这份是给"还没有画像时"的兜底显示用。 */
-export const IDENTITY_LABELS: Record<Identity, string> = {
-  job_seeker: '找工作',
-  postgrad: '考研',
-  civil_service: '考公',
-  daily_learning: '日常学习',
 }
