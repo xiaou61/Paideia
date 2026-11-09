@@ -66,7 +66,7 @@ updated: 2026-11-05
 | 管理端 `@paideia/admin` | `frontend/apps/admin/` | 仅 Web，端口 5174；Hash 路由 + `components/AdminShell.tsx`；知识库分类/条目/概念、用户、报表、SQL 数据集、AI 运行与积分、运维、Analytics | `e2e/` 10 个 spec（admin、knowledge、users、concepts、ai-runs、analytics、feedback、incidents、ops、layout.mobile） | WORK-002、WORK-004、WORK-030、WORK-039、WORK-044、WORK-045 |
 | 公开页 `@paideia/public` | `frontend/apps/public/` | 预渲染静态页（SEO surface），不引 `core` 的 API 客户端、不用 `AppShell` | — | WORK-001、WORK-002 |
 | 组件展览 `@paideia/ui-kit` | `frontend/apps/ui-kit/` | 仅开发与内审，端口 5175，不进任何产品产物 | `e2e/ui-kit.spec.ts` | WORK-002 |
-| 桌面壳 `@paideia/desktop` | `frontend/apps/desktop/` | Electron 主进程与 preload 在 `electron/` | `e2e/desktop.spec.ts`（本机环境未运行） | WORK-001、WORK-002 |
+| 桌面壳 `@paideia/desktop` | `frontend/apps/desktop/` | **Tauri 2**：Rust 侧在 `src-tauri/`（进程内 tiny_http 提供渲染产物，来源钉 `http://127.0.0.1:5310`）；`renderer/` 是 SPA 产物的拷贝，构建期生成、不入库 | `scripts/smoke-desktop.mjs`（WebView2 调试端口，非 Playwright） | WORK-001、WORK-002 |
 
 ## HTML 理解材料
 
