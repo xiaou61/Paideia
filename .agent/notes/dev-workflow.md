@@ -15,7 +15,7 @@
 **没有"发布前"这一档**（2026-10-16 用户裁掉）：本项目上线就是随手跑一次 `release.ps1` 部署，不存在"攒批次、一次性跑全量"的节点，所以不要把任何检查挂在一个虚构的阶段上。另两件事因此都是**按需**而非按阶段：
 
 - `pnpm test:e2e:all`（三端全量）只在**改动跨端**、动了共享包（`@paideia/ui`、`@paideia/auth`、`@paideia/core`）时才跑。
-- 桌面产物只在要更新桌面安装包时才打（约 15 分钟：四个应用构建 + 桌面产物 + 全部 e2e）。
+- 桌面产物只在要更新桌面安装包时才打（Tauri：首次编译约 5 分钟，之后 `pnpm -w build:desktop` 约 2 分钟；不再像 Electron 那样下载运行时）。
 
 ## 发版耗时（2026-10-19 实测：183 秒 → 75 秒）
 
@@ -115,7 +115,7 @@
 | 前端单测 `pnpm -r test`（176 条） | **11.5–14 秒** |
 | 学习者端 e2e（35 条） | **约 1.6 分** |
 | 管理端 e2e（8 条） | **39 秒**（打线上约 15 秒） |
-| 桌面打包 `pnpm -w build:desktop` | **59 秒**（Electron 已缓存；首次下载约 20 分钟） |
+| 桌面打包 `pnpm -w build:desktop` | **约 2 分钟**（Tauri 增量；首次编译依赖约 5 分钟，安装包约 5MB） |
 
 **分层（本地库）**：纯单测 22 类 131 条 **14.4 秒**；集成 17 类 126 条 **47.0 秒**。集成那 47 秒里 `AssistantConversationIntegrationTest` 占 23.6 秒——它要真跑 10 轮来验限流，属于测试内容本身，不是浪费。
 
@@ -272,10 +272,10 @@ git branch -d <分支>                       # 合并后 -d 安全；未合并�
 
 ## 踩过的坑
 
-- **不要用 `pnpm -r build`**：`apps/desktop` 的 `build` 会跑 `electron-builder`（下载 Electron 再打包），一轮接近 20 分钟。构建用 `pnpm --filter @paideia/<app> build` 或 `pnpm -r --filter '!@paideia/desktop' build`。
+- **不要用 `pnpm -r build`**：`apps/desktop` 的 `build` 会跑 `tauri build`（先编 Rust release，再打 NSIS），一轮比单编前端慢得多（增量约 2 分钟，冷编译 5 分钟+）。构建用 `pnpm --filter @paideia/<app> build` 或 `pnpm -r --filter '!@paideia/desktop' build`。
 - **不要用 `@SpringBootTest(properties = …)` 覆盖测试配置**：配置键不同 = 又一个 Spring 上下文。需要的数据源统一列在 `paideia-app/src/test/resources/application-test.yml`；测试装配统放在 `TestProfileConfiguration`（`@Profile("test")`，会被组件扫描）。
 - **删掉一个资源文件（如迁移 SQL）后必须 `mvn clean`**：Maven 不会从 `target/classes` 删掉已移除的资源，它会继续被打进 jar。2026-10-10 把两个临时探针迁移带上了部署。
-- **`pnpm -r test:e2e` 会把桌面端也跑起来**，而它的 e2e 需要已打包的 Electron 产物、本机跑不起来，整条命令会失败。用 `pnpm test:e2e:all`（已排除桌面端）。
+- **`pnpm -r test:e2e` 会把桌面端也跑起来**，而它的验收需要已构建的 Tauri 产物（`pnpm --filter @paideia/desktop smoke`，走 WebView2 调试端口，不是 Playwright）。用 `pnpm test:e2e:all`（已排除桌面端）。
 - **管道会吃掉退出码**：`cmd | head` 的退出码是 `head` 的；判断成败不要走管道，或显式取 `${PIPESTATUS[0]}`。
 - **写断言前先读数据**：写 e2e 断言时凭印象假设种子内容，连错两次（条目只有一个标题所以没有目录、种子里的已发布条目各占一个分类所以没有上下篇），每次都要完整跑一轮 e2e 才发现。读一次文件比跑两轮便宜得多。
 

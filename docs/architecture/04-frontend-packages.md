@@ -86,5 +86,5 @@ flowchart TB
 | `@paideia/public` | `apps` | `@paideia/ui` |
 | `@paideia/ui-kit` | `apps` | `@paideia/platform-web`、`@paideia/ui` |
 
-`@paideia/desktop` 是 Electron 外壳，它的"依赖"是构建期的 app 产物（脚本里 `--filter @paideia/app build:desktop`），
+`@paideia/desktop` 是 Tauri 2 外壳，它的"依赖"是构建期的 app 产物（脚本里 `--filter @paideia/app build:desktop`），
 不是包依赖，所以图上没有边。

@@ -54,7 +54,7 @@
 - AI 引擎只用 AgentScope Java，不叠加 Spring AI；harness 是自己写的循环。
 - 前端 React（最新版）+ Tailwind v4 + shadcn/ui 结构；单仓多包（`frontend/packages/*` 与 `frontend/apps/*`）。
 - 一个 jar 同时供 API 与两个前端静态产物；学习者端在 `/`、管理端在 `/admin/`。
-- 桌面端是 Electron 壳（因本机缺 Rust/MSVC 从 Tauri 改过来）。
+- 桌面端是 Tauri 2 壳：复用同一份 SPA，经 `window.paideiaDesktop` 桥取缓存与深链；渲染来源固定 `http://127.0.0.1:5310`，后端 CORS 与 OAuth 都按这个来源写死。
 
 **产品约束**
 - **界面只有中文**，不引 webfont（CJK 整包约 74MB）。
@@ -82,7 +82,7 @@
 
 ## Platform
 
-`web`（桌面 + 移动浏览器）+ Electron 桌面壳。管理端是同一个后端的独立前端产物。移动端不是原生设计语言，是同一套 Web 的响应式适配。
+`web`（桌面 + 移动浏览器）+ Tauri 2 桌面壳（同一套前端产物）。管理端是同一个后端的独立前端产物。移动端不是原生设计语言，是同一套 Web 的响应式适配。
 
 ## Accessibility
 

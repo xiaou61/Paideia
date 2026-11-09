@@ -10,7 +10,7 @@
 flowchart TB
   subgraph 公网
     U["浏览器"]
-    D["Electron 桌面壳<br/>（同一套前端代码）"]
+    D["Tauri 2 桌面壳<br/>（同一套前端代码）"]
   end
 
   subgraph 服务器

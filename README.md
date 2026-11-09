@@ -7,7 +7,7 @@
   <img alt="Spring Boot 4.1" src="https://img.shields.io/badge/Spring%20Boot-4.1-brightgreen">
   <img alt="React 19" src="https://img.shields.io/badge/React-19-61dafb">
   <img alt="MySQL 8" src="https://img.shields.io/badge/MySQL-8-4479A1">
-  <img alt="Electron" src="https://img.shields.io/badge/Electron-44-47848F">
+  <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB">
 </p>
 
 ![首页](docs/screenshots/home.png)
@@ -63,13 +63,14 @@ AI 由平台统一出账，用户按积分消耗，不需要自备 Key。内容�
 | 身份 | 求职者等身份影响推荐顺序与助手形态，不构成权限 |
 | MCP 接入 | 外部助手（ZCode、Claude Desktop 等）通过访问令牌读写你的内容 |
 | 代码沙箱 | 可运行练习，**默认关闭**，需要本机 Docker |
-| 桌面端 | Electron 外壳，与 Web 共用同一套前端产物 |
+| 桌面端 | Tauri 2 外壳，与 Web 共用同一套前端产物 |
 
 ## 快速开始
 
 ### 前置
 
 JDK 25、Maven 3.9+、Node 20.19+（或 22.12+）、pnpm 12、MySQL 8。
+桌面端另需 Rust（rustup，stable-msvc）与 MSVC 生成工具；运行需系统 WebView2（Windows 11 自带，Windows 10 需安装运行时）。
 
 ### 1. 建库
 
@@ -115,7 +116,7 @@ pnpm dev          # 学习者端 http://localhost:5173
 pnpm dev:admin    # 管理端   http://localhost:5174
 ```
 
-桌面安装包：`pnpm -w build:desktop`（首次会下载 Electron，约 20 分钟）。
+桌面安装包：`pnpm -w build:desktop`（需要 Rust 工具链 + MSVC 生成工具；首次编译依赖约 5 分钟，产出约 5MB 的 NSIS 安装包）。
 
 ## 仓库结构
 
@@ -133,7 +134,7 @@ backend/           Spring Boot 4 多模块，每个模块一个 Maven 工程
 frontend/          pnpm workspace
   apps/app           学习者端（Web + 桌面共用）
   apps/admin         管理端
-  apps/desktop       Electron 外壳
+  apps/desktop       Tauri 2 外壳（内含 src-tauri）
   apps/ui-kit        组件展览（仅开发）
   packages/ui        设计系统：令牌、基元、外壳、markdown 渲染
   packages/core      端口与 API 客户端

@@ -183,7 +183,7 @@ function frontendDoc() {
     lines.push(`| \`${self}\` | \`${dir}\` | ${deps.length === 0 ? '（无）' : deps.map((d) => `\`${d}\``).join('、')} |`);
   }
   lines.push('');
-  lines.push('`@paideia/desktop` 是 Electron 外壳，它的"依赖"是构建期的 app 产物（脚本里 `--filter @paideia/app build:desktop`），');
+  lines.push('`@paideia/desktop` 是 Tauri 2 外壳，它的"依赖"是构建期的 app 产物（脚本里 `--filter @paideia/app build:desktop`），');
   lines.push('不是包依赖，所以图上没有边。');
   lines.push('');
   return { output: lines.join('\n'), summary: `${rows.length} 个包 / ${edges.length} 条依赖`,

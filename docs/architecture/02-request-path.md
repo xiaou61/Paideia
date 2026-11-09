@@ -7,7 +7,7 @@
 ```mermaid
 sequenceDiagram
   autonumber
-  participant B as 浏览器 / Electron
+  participant B as 浏览器 / Tauri 桌面壳
   participant F as TraceIdFilter
   participant S as Spring Security
   participant C as 模块 Controller
