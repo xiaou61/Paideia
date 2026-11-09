@@ -28,7 +28,7 @@ mermaid 在 GitHub 上原生渲染，且在 `frontend/` 里已有渲染链路（
 | [`03-deployment.md`](03-deployment.md) | AI 撰写 | 部署形态、信任边界与端口拓扑 |
 | [`04-frontend-packages.md`](04-frontend-packages.md) | 脚本生成 | 前端 16 个 workspace 包的依赖方向 |
 | [`05-database-tables.md`](05-database-tables.md) | 脚本生成 | 65 张表与 15 条真实外键 |
-| [`06-api-surface.md`](06-api-surface.md) | 脚本生成 | 194 个端点 / 48 个控制器的清单 |
+| [`06-api-surface.md`](06-api-surface.md) | 脚本生成 | 195 个端点 / 48 个控制器的清单 |
 
 ## 这份存档**不**包含什么
 

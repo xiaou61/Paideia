@@ -6,9 +6,14 @@ import io.github.xiaou61.knowledge.internal.entry.EntryService;
 import io.github.xiaou61.knowledge.internal.entry.SearchLogService;
 import io.github.xiaou61.platform.ApiAccess;
 import io.github.xiaou61.platform.ApiResponse;
+import io.github.xiaou61.platform.BizException;
+import io.github.xiaou61.platform.ErrorCode;
 import io.github.xiaou61.platform.PageQuery;
 import io.github.xiaou61.platform.PageResult;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,6 +35,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/knowledge")
 class KnowledgeReadController {
+
+    /** 一次最多查多少个分类的条数：首页只用到 4 个，50 是给将来留的余量。 */
+    private static final int MAX_COUNT_IDS = 50;
 
     private final CategoryService categoryService;
     private final EntryService entryService;
@@ -73,6 +81,34 @@ class KnowledgeReadController {
             searchLog.record(CurrentUserId.orNull(), q, result.total());
         }
         return ApiResponse.ok(result);
+    }
+
+    /**
+     * 若干分类下的已发布条目数（2026-11-09）。
+     *
+     * <p>给首页「面经」四个方向显示条数：一次请求拿完，避免四个入口各打一次列表接口。
+     * 只统计已发布——草稿数不该出现在学习者的首页上。
+     *
+     * @param ids 逗号分隔的分类 id（Spring 直接绑成 List&lt;Long&gt;）
+     */
+    @GetMapping("/categories/counts")
+    ApiResponse<List<CategoryCountView>> categoryCounts(@RequestParam(name = "ids") List<Long> ids) {
+        if (ids.size() > MAX_COUNT_IDS) {
+            // 这不是批量接口的入口：传一百个 id 说明调用方用错了，直接拒绝比慢慢查更好
+            throw new BizException(ErrorCode.INVALID_ARGUMENT,
+                    "一次最多查询 " + MAX_COUNT_IDS + " 个分类的条数");
+        }
+        Map<Long, Long> counts = entryService.publishedCounts(ids);
+        // 按入参顺序返回、缺的补 0：调用方按下发顺序渲染入口，缺项不补会让它对不上
+        List<CategoryCountView> views = new ArrayList<>(ids.size());
+        for (Long id : new LinkedHashSet<>(ids)) {
+            views.add(new CategoryCountView(id, counts.getOrDefault(id, 0L)));
+        }
+        return ApiResponse.ok(views);
+    }
+
+    /** 一个分类的已发布条目数。放在这里而不是另开文件：它唯一的调用方就是上面那个端点。 */
+    record CategoryCountView(long id, long count) {
     }
 
     /** 条目详情：正文、分类、同分类内的上一篇／下一篇、反向链接、以及**自己的**自评标记。 */

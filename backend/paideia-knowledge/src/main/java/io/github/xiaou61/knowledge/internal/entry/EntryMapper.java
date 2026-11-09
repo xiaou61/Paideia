@@ -2,6 +2,7 @@ package io.github.xiaou61.knowledge.internal.entry;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
@@ -201,6 +202,26 @@ public interface EntryMapper {
 
     @Select("SELECT COUNT(*) FROM knowledge_entries WHERE category_id = #{id}")
     long countByCategory(@Param("id") Long id);
+
+    /**
+     * 若干分类下**已发布**条目数（2026-11-09，首页面经四个方向的入口显示条数用）。
+     *
+     * <p>一次查完而不是逐分类 COUNT：首页那条横幅有四个方向，逐个查会把一次渲染变成四次往返。
+     *
+     * <p>返回 {@code Map} 而不是实体/DTO：本项目**没有开启 MyBatis 的构造器自动映射**
+     * （全仓没有 {@code @ConstructorArgs}，也没有 {@code argNameBasedConstructorAutoMapping}），
+     * 拿 record 当结果类型并不可靠；这里只有两列，用 Map 最省且不会静默映射错。
+     */
+    @Select("""
+            <script>
+            SELECT category_id, COUNT(*) AS total
+            FROM knowledge_entries
+            WHERE status = 'published' AND category_id IN
+            <foreach item="id" collection="ids" open="(" separator="," close=")">#{id}</foreach>
+            GROUP BY category_id
+            </script>
+            """)
+    List<Map<String, Object>> countPublishedByCategoryIds(@Param("ids") List<Long> ids);
 
     /**
      * 按 id 批量取已发布条目的标题（WORK-021）。

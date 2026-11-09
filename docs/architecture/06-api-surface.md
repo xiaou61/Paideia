@@ -6,7 +6,7 @@
 
 # API 端点清单
 
-由后端 48 个 Controller 生成：**194 个端点**，分布在 9 个模块。
+由后端 48 个 Controller 生成：**195 个端点**，分布在 9 个模块。
 
 这是**结构性的清单**，不是手写文档——端点加一个这里就多一行，
 所以它不会像手写的接口文档那样过期。真正的授权规则在 `SecurityConfiguration`，
@@ -38,7 +38,7 @@
 | `paideia-app` | `/api/v1/account/admin/users` | `AdminUserController` | 仅管理员 | 5 |
 | `paideia-knowledge` | `/api/v1/knowledge` | `EntryViewController` | 登录即可 | 1 |
 | `paideia-knowledge` | `/api/v1/knowledge` | `KnowledgeFileController` | 登录即可 | 2 |
-| `paideia-knowledge` | `/api/v1/knowledge` | `KnowledgeReadController` | 登录即可 | 3 |
+| `paideia-knowledge` | `/api/v1/knowledge` | `KnowledgeReadController` | 登录即可 | 4 |
 | `paideia-knowledge` | `/api/v1/knowledge` | `SelfAssessmentController` | 登录即可 | 3 |
 | `paideia-knowledge` | `/api/v1/knowledge/admin` | `KnowledgeAdminController` | 仅管理员 | 20 |
 | `paideia-knowledge` | `/api/v1/learn` | `LearnTrackController` | 登录即可 | 2 |
@@ -67,7 +67,7 @@
 
 | 方法 | 数量 |
 | --- | --- |
-| `GET` | 88 |
+| `GET` | 89 |
 | `POST` | 72 |
 | `DELETE` | 19 |
 | `PUT` | 12 |

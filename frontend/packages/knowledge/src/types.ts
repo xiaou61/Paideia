@@ -17,6 +17,17 @@ export interface PageResult<T> {
   items: T[]
 }
 
+/**
+ * 一个分类下**已发布**的条目数（2026-11-09）。
+ *
+ * <p>首页「面经」四个方向用它显示条数。后端按入参顺序返回、缺的补 0，
+ * 所以拿到之后可以直接按下发顺序对上，不必自己找。
+ */
+export interface CategoryCount {
+  id: number
+  count: number
+}
+
 /** 列表项：**不含正文**（后端列表查询刻意不取 body），但带一句截断的摘要。 */
 export interface EntrySummary {
   id: number

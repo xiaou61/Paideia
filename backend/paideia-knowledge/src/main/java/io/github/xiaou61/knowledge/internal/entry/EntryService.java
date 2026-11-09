@@ -47,6 +47,29 @@ public class EntryService {
     }
 
     /**
+     * 若干分类下**已发布**条目数（2026-11-09）。
+     *
+     * <p>给首页「面经」四个方向的入口显示条数：一次请求拿完，不在前端打四次列表接口。
+     *
+     * <p>**空集合直接返回空 Map**：SQL 里的 {@code IN ()} 是语法错误，这个分支必须自己挡，
+     * 不能指望调用方永远不传空。
+     */
+    public Map<Long, Long> publishedCounts(List<Long> categoryIds) {
+        if (categoryIds == null || categoryIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, Long> counts = new java.util.LinkedHashMap<>();
+        entryMapper.countPublishedByCategoryIds(List.copyOf(categoryIds)).forEach(row -> {
+            Object id = row.get("category_id");
+            Object total = row.get("total");
+            if (id instanceof Number idNumber && total instanceof Number totalNumber) {
+                counts.put(idNumber.longValue(), totalNumber.longValue());
+            }
+        });
+        return counts;
+    }
+
+    /**
      * 列表项：**不含正文**（正文可能有几十 KB），但带一句**截断的摘要**——只给标题的列表
      * 卡片会显得空荡（用户反馈"页面过于单调"）。
      *

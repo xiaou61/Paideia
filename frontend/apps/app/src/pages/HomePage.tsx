@@ -243,6 +243,21 @@ export function HomePage() {
     walk(categories.data ?? [])
     return order.map((slug) => found.get(slug)).filter((node): node is CategoryNode => node !== undefined)
   }, [categories.data])
+  const essayIds = useMemo(() => essayCategories.map((category) => category.id), [essayCategories])
+  /**
+   * 四个方向各有多少题（2026-11-09）。
+   *
+   * <p>**一次请求拿完**：后端 `/knowledge/categories/counts` 按 id 批量统计已发布条目数。
+   * 不在前端按分类各打一次列表接口——那会让首页一次渲染多出四个请求。
+   * 拿不到条数时入口照样可用（chip 只是少一个数字），不因为一次统计失败挡住主路径。
+   */
+  const essayCounts = useQuery({
+    queryKey: ['category-counts', essayIds],
+    queryFn: () => knowledge.categoryCounts(essayIds),
+    enabled: essayIds.length > 0,
+    staleTime: 5 * 60_000,
+  })
+  const essayCountOf = (id: number) => essayCounts.data?.find((item) => item.id === id)?.count
   const assessments = useQuery({
     queryKey: ['my-assessments'],
     queryFn: () => knowledge.myAssessments(),
@@ -488,6 +503,9 @@ export function HomePage() {
                   className="border-primary/30 bg-background/70 hover:border-primary hover:bg-primary hover:text-primary-foreground inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors"
                 >
                   {ESSAY_LABELS[category.slug] ?? category.name}
+                  {essayCountOf(category.id) === undefined ? null : (
+                    <span className="tabular-nums opacity-70">{essayCountOf(category.id)}</span>
+                  )}
                   <ArrowRight className="size-3.5" aria-hidden />
                 </Link>
               ))}

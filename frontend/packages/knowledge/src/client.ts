@@ -3,6 +3,7 @@ import { JSON_HEADERS } from '@paideia/core'
 
 import type {
   AssessedItem,
+  CategoryCount,
   CategoryNode,
   EntryDetail,
   EntrySummary,
@@ -21,6 +22,13 @@ export interface ListEntriesOptions {
 
 export interface KnowledgeApi {
   categories(): Promise<CategoryNode[]>
+  /**
+   * 若干分类下已发布条目数（2026-11-09）。
+   *
+   * <p>给首页「面经」四个方向显示条数：一次请求拿完，不在前端按分类各打一次列表接口。
+   * 后端按入参顺序返回、查不到的分类补 0。
+   */
+  categoryCounts(ids: number[]): Promise<CategoryCount[]>
   entries(options?: ListEntriesOptions): Promise<PageResult<EntrySummary>>
   entry(id: number): Promise<EntryDetail>
   /** 标记「懂了／还不懂」。同一用户重复标记是更新，不会产生第二条。 */
@@ -205,6 +213,20 @@ export interface TraceCodeResult {
 export function createKnowledgeApi(client: ApiClient): KnowledgeApi {
   return {
     categories: () => client.requestEnvelope<CategoryNode[]>('/api/v1/knowledge/categories'),
+
+    categoryCounts: (ids) => {
+      // 空数组直接返回空：后端对空 ids 会返回全 0，但没必要为了一个空结果打一次请求
+      if (ids.length === 0) {
+        return Promise.resolve([])
+      }
+      const params = new URLSearchParams()
+      for (const id of ids) {
+        params.append('ids', String(id))
+      }
+      return client.requestEnvelope<CategoryCount[]>(
+        `/api/v1/knowledge/categories/counts?${params.toString()}`,
+      )
+    },
 
     entries: (options = {}) => {
       const params = new URLSearchParams()
