@@ -3,16 +3,14 @@ packages:
   - "packages/*"
 
 # pnpm 12 默认不执行依赖的构建脚本。下面这些必须放行，否则装不完整：
-# - electron：postinstall 负责下载 Electron 二进制，不放行则应用根本起不来
-# - electron-winstaller：打包 Windows 安装包所需的辅助工具
 # - esbuild：Vite 的转译器，需要它的原生二进制
+# 桌面壳用 Tauri：它不下载运行时（用系统 WebView2），Rust 侧的构建由 cargo 自己完成，
+# 因此这里不再需要放行任何 electron* 包。
 minimumReleaseAgeExclude:
   - vite@8.3.4
   - lucide-react@1.54.0
 
 allowBuilds:
-  # 上面注释点名的三个都必须在这里：清单漏了 electron 或 esbuild 时，pnpm 不装它们的原生二进制，
-  # 而这一步是静默跳过的——只有到 `pnpm build:desktop` 或 Vite 构建时才炸。
-  electron: true
-  electron-winstaller: true
+  # 清单漏了 esbuild 时 pnpm 不装它的原生二进制，而这一步是静默跳过的——
+  # 只有到 Vite 构建时才炸。
   esbuild: true

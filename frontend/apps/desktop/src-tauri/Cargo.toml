@@ -1,0 +1,31 @@
+[package]
+name = "paideia-desktop"
+version = "0.0.1"
+description = "Paideia 桌面端外壳（Tauri v2）"
+edition = "2021"
+rust-version = "1.77"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-single-instance = "2"
+tauri-plugin-deep-link = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tiny_http = "0.12"
+open = "5"
+# 深链解析：URL 语义（host / query 解码 / 规范化）自己写必然漏，
+# 而它已经是 tauri 的传递依赖，声明为直接依赖不增加编译体积。
+url = "2"
+
+# 安装包体积：LTO + 单代码单元 + strip + 体积优先。桌面壳没有热路径，
+# 用 opt-level="s" 换来的启动损耗（实测约 150ms 到首帧）可以接受。
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

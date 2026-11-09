@@ -1,0 +1,7 @@
+# 桌面桥（对应 preload 版 window.paideiaDesktop）。
+# 只放这四个命令：缓存读写与"用系统浏览器打开外链"。
+# 文件系统、Shell、任意进程启动一律不开放。
+[[permission]]
+identifier = "allow-desktop-bridge"
+description = "Paideia 桌面桥：缓存读写与打开外部链接"
+commands.allow = ["cache_get", "cache_set", "cache_remove", "open_external"]

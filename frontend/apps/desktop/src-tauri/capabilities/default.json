@@ -1,0 +1,9 @@
+{
+  "identifier": "default",
+  "description": "主窗口默认能力：核心 IPC（含事件订阅）+ 深链 + 桌面桥的四个命令。不含文件系统、Shell 与对话框——桌面壳不向页面开放这些能力。",
+  "windows": ["main"],
+  "remote": {
+    "urls": ["http://127.0.0.1:5310"]
+  },
+  "permissions": ["core:default", "deep-link:default", "allow-desktop-bridge"]
+}

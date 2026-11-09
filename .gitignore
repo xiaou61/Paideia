@@ -38,11 +38,10 @@ dist-ssr/
 .vite/
 .turbo/
 .cache/
-src-tauri/target/
-src-tauri/gen/
-# 桌面端：renderer 是 SPA 产物的拷贝，release 是安装包输出
+**/src-tauri/target/
+**/src-tauri/gen/
+# 桌面端：renderer 是 SPA 产物的拷贝；安装包与中间产物都在 src-tauri/target 下（上面已忽略）
 frontend/apps/desktop/renderer/
-frontend/apps/desktop/release/
 
 # ---- 运行期数据 ----
 *.log

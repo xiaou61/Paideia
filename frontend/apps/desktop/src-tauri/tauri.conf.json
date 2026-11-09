@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Paideia",
+  "version": "0.0.1",
+  "identifier": "io.github.xiaou61.paideia",
+  "build": {
+    "beforeDevCommand": "pnpm --filter @paideia/app exec vite --mode desktop --port 5310 --strictPort",
+    "devUrl": "http://127.0.0.1:5310",
+    "beforeBuildCommand": "pnpm run prepare-renderer",
+    "frontendDist": "../renderer"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["icons/icon.ico"],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["paideia"]
+      }
+    }
+  }
+}
