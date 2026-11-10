@@ -20,6 +20,16 @@ describe('stripDuplicateTitle', () => {
     expect(stripDuplicateTitle(md, '00 · Java 从零开始')).toBe(md)
   })
 
+  it('正文以二级标题开头、且与标题同文时也剥掉（面经形态）', () => {
+    // 面经管线生成的正文首行就是 `## <题目>`，标题也是这个题目——不剥就重复两遍
+    expect(
+      stripDuplicateTitle(
+        '## MySQL 的 Doublewrite Buffer 解决什么问题？\n\n**结论：** 解决部分写。\n',
+        'MySQL 的 Doublewrite Buffer 解决什么问题？',
+      ),
+    ).toBe('**结论：** 解决部分写。\n')
+  })
+
   it('正文以二级标题开头时不动', () => {
     const md = '## 这一关要练什么\n\n正文\n'
     expect(stripDuplicateTitle(md, '对象与集合')).toBe(md)

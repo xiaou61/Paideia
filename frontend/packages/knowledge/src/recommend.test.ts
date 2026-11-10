@@ -53,10 +53,13 @@ describe('岗位映射（WORK-047）', () => {
     expect(normalizeRole(undefined)).toBe(DEFAULT_ROLE)
   })
 
-  it('每个岗位都有 meta，前端岗位明确标成不可用', () => {
+  // 2026-11-10：前端岗位在「前端从零开始 + 前端工程化」两条线就位后已可用，
+  // 原来这条断言 `available === false` 的前提过期了，改成"每个岗位都可选"。
+  it('每个岗位都有 meta，且都已可用', () => {
     expect(ROLES).toHaveLength(4)
-    expect(roleMeta('frontend').available).toBe(false)
-    expect(roleMeta('backend').available).toBe(true)
+    for (const role of ROLES) {
+      expect(roleMeta(role).available).toBe(true)
+    }
   })
 })
 
@@ -76,8 +79,11 @@ describe('打分（WORK-047）', () => {
     expect(scored).toEqual([])
   })
 
-  it('岗位没有内容时返回空，不抛错', () => {
-    expect(scoreTracks([track('spring'), track('redis')], 'frontend', NOW)).toEqual([])
+  // 2026-11-10：设计早已改成"没标岗位的轨道兜底为选读、排在最后"（见上面那条
+  // 「新增轨道不会从所有岗位里消失」），所以这里不再是空数组，而是两条选读。
+  it('岗位没有专属内容时，其余轨道兜底成选读而不是消失', () => {
+    const scored = scoreTracks([track('spring'), track('redis')], 'frontend', NOW)
+    expect(scored.map((item) => item.slug).sort()).toEqual(['redis', 'spring'])
   })
 
   it('岗位为空列表时返回空', () => {
