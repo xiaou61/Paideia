@@ -18,14 +18,28 @@ export function SelfAssessmentButtons({
   current,
   disabled,
   onChange,
+  variant = 'inline',
 }: {
   current: SelfAssessmentLevel | null
   disabled?: boolean
   onChange: (next: SelfAssessmentLevel | null) => void
+  /**
+   * `bar` 是给移动端底部操作条用的（2026-11-10）：去掉外框与说明文字，按钮加大一档。
+   * 做成变体而不是另写一份组件，是因为"点一下标记、再点一下取消"的规则只能有一处实现。
+   * testid 也带 `-bar` 后缀——同一条内容上两个实例共存时，重复 testid 会让 e2e 直接报
+   * strict mode 冲突。
+   */
+  variant?: 'inline' | 'bar'
 }) {
+  const bar = variant === 'bar'
   return (
-    <div className="border-border flex flex-wrap items-center gap-2 rounded-md border p-3" data-testid="self-assessment">
-      <span className="text-muted-foreground text-xs">这条内容你掌握了吗</span>
+    <div
+      className={
+        bar ? 'flex items-center gap-2' : 'border-border flex flex-wrap items-center gap-2 rounded-md border p-3'
+      }
+      data-testid={bar ? 'self-assessment-bar' : 'self-assessment'}
+    >
+      {bar ? null : <span className="text-muted-foreground text-xs">这条内容你掌握了吗</span>}
       {OPTIONS.map((option) => {
         const active = current === option.level
         return (
@@ -34,19 +48,19 @@ export function SelfAssessmentButtons({
             type="button"
             disabled={disabled === true}
             aria-pressed={active}
-            data-testid={`self-assessment-${option.level}`}
+            data-testid={`self-assessment-${option.level}${bar ? '-bar' : ''}`}
             onClick={() => onChange(active ? null : option.level)}
             className={
               active
-                ? 'border-foreground bg-muted rounded-md border px-3 py-1 text-xs font-medium'
-                : 'border-border text-muted-foreground hover:text-foreground rounded-md border px-3 py-1 text-xs'
+                ? `border-foreground bg-muted rounded-md border font-medium ${bar ? 'px-4 py-2 text-sm' : 'px-3 py-1 text-xs'}`
+                : `border-border text-muted-foreground hover:text-foreground rounded-md border ${bar ? 'px-4 py-2 text-sm' : 'px-3 py-1 text-xs'}`
             }
           >
             {option.label}
           </button>
         )
       })}
-      {current === null ? null : (
+      {current === null || bar ? null : (
         <span className="text-muted-foreground text-xs">（再点一次可取消）</span>
       )}
     </div>

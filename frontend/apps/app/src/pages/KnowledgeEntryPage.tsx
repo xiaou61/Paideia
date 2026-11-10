@@ -322,6 +322,29 @@ export function KnowledgeEntryPage() {
         </div>
       ) : null}
 
+      {/*
+        移动端底部操作条（2026-11-10）：手机上「懂了／还不懂」原本在正文末尾，
+        长文要滑十几屏才够得着——而它恰恰是"读完了"那一刻最想点的东西。
+        只在 <md 出现；桌面端沿用正文里那一块（视线本来就在正文里，浮条反而挡字）。
+        正文末尾还留了一段等高占位，否则最后一块内容会被这条压住。
+      */}
+      {entry.isSuccess ? (
+        <div
+          data-testid="entry-mobile-actions"
+          className="border-border bg-background/95 fixed inset-x-0 bottom-0 z-30 border-t px-4 py-2.5 backdrop-blur md:hidden print:hidden"
+        >
+          <div className="mx-auto flex max-w-3xl items-center gap-3">
+            <span className="text-muted-foreground flex-1 text-xs">这条内容你掌握了吗</span>
+            <SelfAssessmentButtons
+              variant="bar"
+              current={entry.data.selfAssessment}
+              disabled={assess.isPending}
+              onChange={(next) => assess.mutate(next)}
+            />
+          </div>
+        </div>
+      ) : null}
+
       {readingProgress > 8 ? (
         <button
           type="button"
@@ -331,7 +354,7 @@ export function KnowledgeEntryPage() {
           data-testid="entry-back-to-top"
           aria-label="回到顶部"
           title="回到顶部"
-          className="border-border bg-background/95 hover:bg-accent focus-visible:ring-ring/50 fixed right-4 bottom-6 z-30 grid size-11 place-items-center rounded-full border shadow-lg transition-colors outline-none focus-visible:ring-3 sm:right-6"
+          className="border-border bg-background/95 hover:bg-accent focus-visible:ring-ring/50 fixed right-4 bottom-20 z-30 grid size-11 place-items-center rounded-full border shadow-lg md:bottom-6 transition-colors outline-none focus-visible:ring-3 sm:right-6"
         >
           <ArrowUp className="size-4" aria-hidden />
         </button>
@@ -546,6 +569,9 @@ export function KnowledgeEntryPage() {
             </nav>
 
             <KnowledgeNeighborhood entry={entry.data} />
+
+            {/* 给移动端底部操作条留出高度：不加的话最后一屏内容永远差一截 */}
+            <div className="h-16 md:hidden" aria-hidden />
 
             <section className="mt-10 grid gap-6 sm:grid-cols-3">
               <RelationList title="需要先看" items={entry.data.prerequisites} testId="entry-prerequisites" />
