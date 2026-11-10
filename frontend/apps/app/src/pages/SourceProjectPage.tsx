@@ -5,6 +5,7 @@ import {
   orderChapters,
   plainText,
   stripDuplicateTitle,
+  fetchAllEntries,
 } from '@paideia/knowledge'
 import {
   AppShell,
@@ -50,7 +51,7 @@ export function SourceProjectPage() {
 
   const entries = useQuery({
     queryKey: ['knowledge-entries', project?.id ?? null, '', 'source-project'],
-    queryFn: () => knowledge.entries({ categoryId: project?.id, size: 100 }),
+    queryFn: () => fetchAllEntries(knowledge, { categoryId: project?.id }),
     enabled: project !== undefined,
   })
   const progress = useQuery({
@@ -59,7 +60,7 @@ export function SourceProjectPage() {
     retry: false,
   })
 
-  const chapters = useMemo(() => orderChapters(entries.data?.items ?? []), [entries.data])
+  const chapters = useMemo(() => orderChapters(entries.data ?? []), [entries.data])
   const overview = chapters.find((chapter) => chapter.sortOrder === 0)
   const overviewEntry = useQuery({
     queryKey: ['knowledge-entry', overview?.id ?? null],

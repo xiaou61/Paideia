@@ -1,4 +1,10 @@
-import { createKnowledgeApi, findCategoryBySlug, orderChapters, plainText } from '@paideia/knowledge'
+import {
+  createKnowledgeApi,
+  fetchAllEntries,
+  findCategoryBySlug,
+  orderChapters,
+  plainText,
+} from '@paideia/knowledge'
 import {
   AppShell,
   Badge,
@@ -44,11 +50,11 @@ export function BookChaptersPage() {
 
   const entries = useQuery({
     queryKey: ['knowledge-entries', book?.id ?? null, '', 'book'],
-    queryFn: () => knowledge.entries({ categoryId: book?.id, size: 100 }),
+    queryFn: () => fetchAllEntries(knowledge, { categoryId: book?.id }),
     enabled: book !== undefined,
   })
 
-  const chapters = useMemo(() => orderChapters(entries.data?.items ?? []), [entries.data])
+  const chapters = useMemo(() => orderChapters(entries.data ?? []), [entries.data])
   const overview = chapters.find((chapter) => chapter.sortOrder === 0)
   const blurb = overview?.excerpt ? plainText(overview.excerpt) : null
 

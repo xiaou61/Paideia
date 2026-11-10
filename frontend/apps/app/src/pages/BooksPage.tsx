@@ -1,4 +1,4 @@
-import { createKnowledgeApi, plainText } from '@paideia/knowledge'
+import { createKnowledgeApi, fetchAllEntries, plainText } from '@paideia/knowledge'
 import {
   AppShell,
   Badge,
@@ -43,12 +43,12 @@ export function BooksPage() {
 
   const entries = useQuery({
     queryKey: ['knowledge-entries', root?.id ?? null, '', 'books'],
-    queryFn: () => knowledge.entries({ categoryId: root?.id, size: 100 }),
+    queryFn: () => fetchAllEntries(knowledge, { categoryId: root?.id }),
     enabled: root !== undefined,
   })
 
   const books = useMemo(() => {
-    const items = entries.data?.items ?? []
+    const items = entries.data ?? []
     return (root?.children ?? []).map((book) => {
       const mine = items.filter((item) => item.categoryId === book.id)
       const overview = mine.find((item) => item.sortOrder === 0)

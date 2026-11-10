@@ -1,4 +1,4 @@
-import { createKnowledgeApi, createLearningApi, plainText } from '@paideia/knowledge'
+import { createKnowledgeApi, createLearningApi, fetchAllEntries, plainText } from '@paideia/knowledge'
 import {
   Alert,
   AlertDescription,
@@ -43,7 +43,7 @@ export function SourceProjectsPage() {
 
   const entries = useQuery({
     queryKey: ['knowledge-entries', root?.id ?? null, '', 'source'],
-    queryFn: () => knowledge.entries({ categoryId: root?.id, size: 100 }),
+    queryFn: () => fetchAllEntries(knowledge, { categoryId: root?.id }),
     enabled: root !== undefined,
   })
   const progress = useQuery({
@@ -58,7 +58,7 @@ export function SourceProjectsPage() {
   )
 
   const projects = useMemo(() => {
-    const items = entries.data?.items ?? []
+    const items = entries.data ?? []
     return (root?.children ?? []).map((project) => {
       const mine = items.filter((item) => item.categoryId === project.id)
       const overview = mine.find((item) => item.sortOrder === 0)

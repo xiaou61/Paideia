@@ -6,6 +6,7 @@ import {
   findCategoryBySlug,
   orderChapters,
   stripDuplicateTitle,
+  fetchAllEntries,
 } from '@paideia/knowledge'
 import {
   AppShell,
@@ -53,10 +54,10 @@ export function SourceChapterPage() {
 
   const chaptersQuery = useQuery({
     queryKey: ['knowledge-entries', entry.data?.categoryId ?? null, '', 'source-chapters'],
-    queryFn: () => knowledge.entries({ categoryId: entry.data?.categoryId, size: 100 }),
+    queryFn: () => fetchAllEntries(knowledge, { categoryId: entry.data?.categoryId }),
     enabled: entry.data?.categoryId !== null && entry.data?.categoryId !== undefined,
   })
-  const chapters = useMemo(() => orderChapters(chaptersQuery.data?.items ?? []), [chaptersQuery.data])
+  const chapters = useMemo(() => orderChapters(chaptersQuery.data ?? []), [chaptersQuery.data])
   const index = chapters.findIndex((chapter) => chapter.id === entryId)
 
   const overview = chapters.find((chapter) => chapter.sortOrder === 0)
