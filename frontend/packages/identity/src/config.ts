@@ -15,6 +15,7 @@ export type NavKey =
   | 'interview'
   | 'digest'
   | 'progress'
+  | 'essay'
 
 /**
  * 导航与首页入口的推荐顺序（`interview` 与 `digest` 在前）。

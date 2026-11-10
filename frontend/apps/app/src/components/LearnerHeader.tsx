@@ -76,6 +76,10 @@ const NAV = [
   { key: 'notes' as const, group: 'knowledge' as const, to: '/notes', label: '我的笔记', testId: 'learner-nav-notes' },
   { key: 'sql-practice' as const, group: 'practice' as const, to: '/practice/sql', label: 'SQL 练习', testId: 'learner-nav-sql-practice' },
   { key: 'my-assessments' as const, group: 'practice' as const, to: '/my-assessments', label: '我的自评', testId: 'learner-nav-my-assessments' },
+  // 面经题库（2026-11-10）：每天抓的牛客面经按岗位分四个方向。
+  // 放进「求职」组而不是「知识」组——读者是在准备面试时才来刷它，和模拟面试、简历是同一趟事。
+  // 不进 NAV_PREFERENCE —— 与 books / source 同理，靠组内排位。
+  { key: 'essay' as const, group: 'job' as const, to: '/essay', label: '面经题库', testId: 'learner-nav-essay' },
   { key: 'interview' as const, group: 'job' as const, to: '/interview', label: '模拟面试', testId: 'learner-nav-interview' },
   // 简历（WORK-018）：求职者面上每次投递都要用的入口。
   // **不复用 `interview` 这个 key**：推荐顺序按 key 匹配，复用会让"面试排第一"这条既有

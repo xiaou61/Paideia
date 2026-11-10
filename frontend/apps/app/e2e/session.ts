@@ -54,6 +54,7 @@ const NAV_GROUP_OF = {
   'learner-nav-notes': 'learner-nav-group-knowledge',
   'learner-nav-sql-practice': 'learner-nav-group-practice',
   'learner-nav-my-assessments': 'learner-nav-group-practice',
+  'learner-nav-essay': 'learner-nav-group-job',
   'learner-nav-interview': 'learner-nav-group-job',
   'learner-nav-resume': 'learner-nav-group-job',
 } as const

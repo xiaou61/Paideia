@@ -49,6 +49,8 @@ const NAV_GROUPS = [
     testId: 'learner-nav-group-job',
     label: '求职',
     items: [
+      // 面经题库（2026-11-10）。原来面经只有首页横幅一个入口，页头找不到它。
+      { testId: 'learner-nav-essay', label: '面经题库' },
       { testId: 'learner-nav-interview', label: '模拟面试' },
       { testId: 'learner-nav-resume', label: '我的简历' },
     ],
@@ -108,6 +110,24 @@ test.describe('导航覆盖', () => {
     await page.goto('/#/')
     await clickNav(page, 'learner-nav-sql-practice')
     await expect(page).toHaveURL(/#\/practice\/sql/)
+  })
+
+  /**
+   * 「面经题库」入口有效（2026-11-10）。
+   *
+   * <p>断的是**四个方向都渲染出来**，不断"有题"：新库上抓取任务没跑过，条目数是 0 是正常的，
+   * 而"入口指向一个空页/错页"才是真缺陷。分类由迁移建好（essay-java 在 V24，
+   * 其余三个在 V20261106153000），所以四个方向必须出现。
+   */
+  test('「面经题库」从「求职」组点进去，四个方向都在', async ({ page }) => {
+    await page.goto('/#/')
+    await clickNav(page, 'learner-nav-essay')
+    await expect(page).toHaveURL(/#\/essay/)
+
+    await expect(page.getByTestId('essay-directions')).toBeVisible({ timeout: 15_000 })
+    for (const slug of ['essay-java', 'essay-frontend', 'essay-testing', 'essay-data']) {
+      await expect(page.getByTestId(`essay-direction-${slug}`)).toBeVisible()
+    }
   })
 
   test('账号菜单里能到身份与目标、MCP 接入', async ({ page }) => {

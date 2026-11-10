@@ -3,7 +3,6 @@ import {
   createLearningApi,
   plainText,
   recentReading,
-  type CategoryNode,
 } from '@paideia/knowledge'
 import { createIdentityApi, NAV_PREFERENCE, stageCue } from '@paideia/identity'
 import { AppShell, Button, Card, Input, LoadingRow, Section, Spinner } from '@paideia/ui'
@@ -17,6 +16,7 @@ import { api } from '../api'
 import { HomeFirstRun } from '../components/HomeFirstRun'
 import { LearnerHeader } from '../components/LearnerHeader'
 import { HomeListSkeleton } from '../components/skeletons'
+import { ESSAY_LABELS, essayDirections } from '../essay'
 import { errorMessage } from '@paideia/core'
 
 const knowledge = createKnowledgeApi(api)
@@ -146,14 +146,6 @@ const QUICK_LINKS: {
  * <p>现在首页回答三件事：**我在哪、最近有什么可读、我的学习痕迹**。三个数字都来自接口，
  * 没有一条是写死的。
  */
-/** 面经方向在首页上的短名：分类全名太长，四个入口挤一行会换行。 */
-const ESSAY_LABELS: Record<string, string> = {
-  'essay-java': 'Java 后端',
-  'essay-frontend': '前端',
-  'essay-testing': '测试',
-  'essay-data': '数据',
-}
-
 export function HomePage() {
   const { user } = useAuth()
   // 画像只用来读「当前阶段」那一条建议；入口顺序是常量（2026-11-09 起不再按身份排）
@@ -228,22 +220,11 @@ export function HomePage() {
    * <p>找不到就**不渲染这张卡**——分类不存在时（比如刚部署、定时任务还没建）指向一个
    * 空分类页比不显示入口更糟。
    */
-  const essayCategories = useMemo(() => {
-    // 四个方向固定顺序：后端 → 前端 → 测试 → 数据。抓取管线一个合集对应一个分类
-    // （见 application.yml 的 paideia.ai.essay.sources），顺序按岗位热度排。
-    const order = ['essay-java', 'essay-frontend', 'essay-testing', 'essay-data']
-    const found = new Map<string, CategoryNode>()
-    const walk = (nodes: CategoryNode[]) => {
-      for (const node of nodes) {
-        if (order.includes(node.slug)) {
-          found.set(node.slug, node)
-        }
-        walk(node.children)
-      }
-    }
-    walk(categories.data ?? [])
-    return order.map((slug) => found.get(slug)).filter((node): node is CategoryNode => node !== undefined)
-  }, [categories.data])
+  // 四个方向的定义与查找在 `../essay`：首页横幅与 `/essay` 面经页共用同一份顺序与短名。
+  const essayCategories = useMemo(
+    () => essayDirections(categories.data ?? []).map((direction) => direction.category),
+    [categories.data],
+  )
   const essayIds = useMemo(() => essayCategories.map((category) => category.id), [essayCategories])
   /**
    * 四个方向各有多少题（2026-11-09）。

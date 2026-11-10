@@ -14,6 +14,7 @@ import { CampListPage } from './pages/CampListPage'
 import { CategoryEntriesPage } from './pages/CategoryEntriesPage'
 import { KnowledgeCategoriesPage } from './pages/KnowledgeCategoriesPage'
 import { DigestPage } from './pages/DigestPage'
+import { EssayPage } from './pages/EssayPage'
 import { LearnPage } from './pages/LearnPage'
 import { TrackMapPage } from './pages/TrackMapPage'
 import { SqlPracticePage } from './pages/SqlPracticePage'
@@ -258,6 +259,16 @@ export const router = createHashRouter([
     element: (
       <RequireAuth>
         <CampDetailPage />
+      </RequireAuth>
+    ),
+  },
+  // 面经题库（WORK-025）：每天抓的牛客面经按四个方向落库。
+  // 原来只在首页横幅里出现，导航栏没有入口；2026-11-10 起是「求职」组里的固定一项。
+  {
+    path: '/essay',
+    element: (
+      <RequireAuth>
+        <EssayPage />
       </RequireAuth>
     ),
   },
