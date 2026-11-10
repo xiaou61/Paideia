@@ -20,6 +20,35 @@ export interface ListEntriesOptions {
   size?: number
 }
 
+/**
+ * 取**全部**匹配条目（内部循环翻页，2026-11-10）。
+ *
+ * <p>为什么需要：目录阅读页要一次列出整库并按分类树渲染，而列表接口单页有上限。
+ * 原来那边写死 `size: 200`——线上已发布 571 条，于是目录里**静默少了三分之二**，
+ * 既不报错也没有任何提示。凡是"必须完整"的场合都该用它，而不是随手给个大数。
+ *
+ * <p>终止条件用 `total` 而不是"某页为空"：后端总数与分页同源，前者能在最后一页
+ * 刚好取满时少发一次请求；两者都留着，任何一边异常都不会死循环。
+ */
+export async function fetchAllEntries(
+  api: KnowledgeApi,
+  options: Omit<ListEntriesOptions, 'page' | 'size'> = {},
+  pageSize = 200,
+): Promise<EntrySummary[]> {
+  const first = await api.entries({ ...options, page: 1, size: pageSize })
+  const items = [...first.items]
+  let page = 2
+  while (items.length < first.total) {
+    const next = await api.entries({ ...options, page, size: pageSize })
+    if (next.items.length === 0) {
+      break
+    }
+    items.push(...next.items)
+    page += 1
+  }
+  return items
+}
+
 export interface KnowledgeApi {
   categories(): Promise<CategoryNode[]>
   /**

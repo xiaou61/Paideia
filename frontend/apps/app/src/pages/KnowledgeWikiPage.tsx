@@ -1,4 +1,4 @@
-import { MarkdownBody, createKnowledgeApi, plainText } from '@paideia/knowledge'
+import { MarkdownBody, createKnowledgeApi, fetchAllEntries, plainText } from '@paideia/knowledge'
 import type { CategoryNode, EntrySummary } from '@paideia/knowledge'
 import { AppShell, Empty, EmptyDescription, EmptyHeader, EmptyTitle, ErrorAlert, LoadingRow, PageHeader } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
@@ -22,9 +22,10 @@ export function KnowledgeWikiPage() {
   const [entryId, setEntryId] = useState<number | null>(null)
 
   const categories = useQuery({ queryKey: ['knowledge-categories'], queryFn: () => knowledge.categories() })
+  // 目录必须**完整**：原来写死 size: 200，线上 571 条时后面三百多条直接不出现（2026-11-10）
   const entries = useQuery({
     queryKey: ['wiki-entries', categoryId],
-    queryFn: () => knowledge.entries({ categoryId: categoryId ?? undefined, size: 200 }),
+    queryFn: () => fetchAllEntries(knowledge, { categoryId: categoryId ?? undefined }),
   })
   const detail = useQuery({
     queryKey: ['wiki-entry', entryId],
@@ -78,11 +79,11 @@ export function KnowledgeWikiPage() {
         </nav>
 
         <div className="border-border bg-card h-fit rounded-xl border p-2" data-testid="wiki-entries">
-          {(entries.data?.items ?? []).map((item) => (
+          {(entries.data ?? []).map((item) => (
             <EntryRow key={item.id} item={item} active={entryId === item.id} onSelect={() => setEntryId(item.id)} />
           ))}
           {entries.isPending ? <p className="text-muted-foreground p-2 text-sm">加载中…</p> : null}
-          {entries.isSuccess && entries.data.items.length === 0 ? (
+          {entries.isSuccess && entries.data.length === 0 ? (
             <p className="text-muted-foreground p-2 text-sm">该分类下还没有条目</p>
           ) : null}
         </div>

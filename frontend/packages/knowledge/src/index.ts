@@ -25,7 +25,7 @@ export type {
   KnowledgeAdminApi,
   KnowledgeImportRow,
 } from './admin-client'
-export { createKnowledgeApi } from './client'
+export { createKnowledgeApi, fetchAllEntries } from './client'
 export type {
   DatasetCatalogItem,
   DatasetVisibility,

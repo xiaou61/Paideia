@@ -57,8 +57,10 @@ describe('岗位映射（WORK-047）', () => {
   // 原来这条断言 `available === false` 的前提过期了，改成"每个岗位都可选"。
   it('每个岗位都有 meta，且都已可用', () => {
     expect(ROLES).toHaveLength(4)
-    for (const role of ROLES) {
-      expect(roleMeta(role).available).toBe(true)
+    for (const meta of ROLES) {
+      // ROLES 本身就是 RoleMeta 列表，这里直接断言字段；roleMeta(key) 查表与它同源
+      expect(meta.available).toBe(true)
+      expect(roleMeta(meta.key).label).not.toBe('')
     }
   })
 })
