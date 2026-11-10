@@ -395,7 +395,12 @@ export function KnowledgeEntryPage() {
       ) : null}
 
       {valid && entry.isError ? (
-        <ErrorAlert title="打不开这条内容" error={entry.error} testId="entry-state" />
+        <ErrorAlert
+            title="打不开这条内容"
+            error={entry.error}
+            testId="entry-state"
+            onRetry={() => void entry.refetch()}
+          />
       ) : null}
 
       {entry.isSuccess && serverProgress.isPending ? (

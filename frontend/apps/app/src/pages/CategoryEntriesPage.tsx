@@ -190,7 +190,12 @@ export function CategoryEntriesPage() {
       {/* 骨架屏而不是转圈：位置先占住，数据到了文字直接填进去，页面不跳（2026-11-10） */}
       {entries.isPending ? <EntryGridSkeleton /> : null}
       {entries.isError ? (
-        <ErrorAlert title="条目加载失败" error={entries.error} testId="entry-state" />
+        <ErrorAlert
+          title="条目加载失败"
+          error={entries.error}
+          testId="entry-state"
+          onRetry={() => void entries.refetch()}
+        />
       ) : null}
 
       {/*

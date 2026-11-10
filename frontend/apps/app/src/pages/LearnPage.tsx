@@ -352,7 +352,12 @@ export function LearnPage() {
       {tracks.isPending ? <TrackGridSkeleton /> : null}
 
       {tracks.isError ? (
-        <ErrorAlert title="学习轨道加载失败" error={tracks.error} testId="learn-state" />
+        <ErrorAlert
+          title="学习轨道加载失败"
+          error={tracks.error}
+          testId="learn-state"
+          onRetry={() => void tracks.refetch()}
+        />
       ) : null}
 
       {tracks.isSuccess && tracks.data.length === 0 ? (

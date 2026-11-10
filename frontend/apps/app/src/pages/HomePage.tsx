@@ -431,9 +431,12 @@ export function HomePage() {
           </div>
           {entries.isPending ? <HomeListSkeleton count={4} /> : null}
           {entries.isError ? (
-            <p className="text-muted-foreground p-5 text-sm">
-              暂时读不到内容（{errorMessage(entries.error)}）
-            </p>
+            <div className="flex flex-wrap items-center gap-3 p-5" data-testid="home-recent-error">
+              <p className="text-muted-foreground text-sm">暂时读不到内容（{errorMessage(entries.error)}）</p>
+              <Button variant="outline" size="sm" data-testid="error-retry" onClick={() => void entries.refetch()}>
+                重试
+              </Button>
+            </div>
           ) : null}
           {entries.isSuccess ? (
             <ul className="divide-border divide-y">

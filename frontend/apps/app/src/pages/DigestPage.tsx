@@ -161,9 +161,14 @@ export function DigestPage() {
           {current.isPending ? (
             <DigestListSkeleton />
           ) : current.isError ? (
-            <Alert variant="destructive" className="mt-6">
+            <Alert variant="destructive" className="mt-6" data-testid="digest-error">
               <AlertTitle>速递加载失败</AlertTitle>
-              <AlertDescription>稍后重试一下。这不会影响其它功能。</AlertDescription>
+              <AlertDescription>这不会影响其它功能。</AlertDescription>
+              <div className="mt-2">
+                <Button variant="outline" size="sm" data-testid="error-retry" onClick={() => void current.refetch()}>
+                  重试
+                </Button>
+              </div>
             </Alert>
           ) : total === 0 ? (
             <Alert className="mt-6" data-testid="digest-empty">

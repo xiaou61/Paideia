@@ -90,7 +90,12 @@ export function KnowledgeCategoriesPage() {
         <LoadingRow label="加载分类…" testId="category-state" />
       ) : null}
       {categories.isError ? (
-        <ErrorAlert title="分类加载失败" error={categories.error} testId="category-state" />
+        <ErrorAlert
+          title="分类加载失败"
+          error={categories.error}
+          testId="category-state"
+          onRetry={() => void categories.refetch()}
+        />
       ) : null}
 
       {categories.isSuccess && categories.data.length === 0 ? (

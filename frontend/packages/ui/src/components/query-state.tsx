@@ -1,4 +1,5 @@
 import { Alert, AlertDescription, AlertTitle } from './alert'
+import { Button } from './button'
 import { Spinner } from './spinner'
 
 /**
@@ -41,17 +42,32 @@ export function ErrorAlert({
   error,
   testId,
   className,
+  onRetry,
 }: {
   title: string
   error: unknown
   testId?: string
   className?: string
+  /**
+   * 传了就显示「重试」（2026-11-10）。
+   *
+   * <p>原来所有错误块都是"死路"：告诉用户"读不到内容"，然后没有任何下一步——只能刷新整页。
+   * 调用方把 react-query 的 `refetch` 传进来即可；ui 仍然不认识数据层。
+   */
+  onRetry?: () => void
 }) {
   const text = error instanceof Error ? error.message : String(error)
   return (
     <Alert variant="destructive" className={className} data-testid={testId}>
       <AlertTitle>{title}</AlertTitle>
       <AlertDescription>{text}</AlertDescription>
+      {onRetry === undefined ? null : (
+        <div className="mt-2">
+          <Button variant="outline" size="sm" onClick={onRetry} data-testid="error-retry">
+            重试
+          </Button>
+        </div>
+      )}
     </Alert>
   )
 }
