@@ -49,6 +49,33 @@ class EssaySourceFanOutTest {
         assertThat(result.skipReason()).isNull();
     }
 
+    /**
+     * 一帖多题（2026-11-10）。
+     *
+     * <p>抽题提示词原来是"只挑 1 道"，于是帖子里其余技术问题永远进不来；现在一帖最多 5 道，
+     * 编排层要**逐题**调用入库，而不是只取第一道。
+     */
+    @Test
+    @DisplayName("一帖抽出多道题时每道都入库，不只第一道")
+    void everyExtractedQuestionIsStored() {
+        RecordingKnowledge knowledge = new RecordingKnowledge(List.of(node(1, "essay-java")));
+
+        EssayCollectionService.RunResult result = run(
+                properties(List.of(new EssayProperties.SourceSpec(JAVA_JOB, "essay-java"))),
+                knowledge,
+                postingSource(TECH_BODY),
+                List.of(
+                        new EssayExtractionPrompt.ExtractedQuestion("HashMap 为什么线程不安全", "并发扩容会成环"),
+                        new EssayExtractionPrompt.ExtractedQuestion("ConcurrentHashMap 分段锁去哪儿了", "改成了 CAS 加桶头锁"),
+                        new EssayExtractionPrompt.ExtractedQuestion("为什么扩容是两倍", "让哈希位运算等价于取模")));
+
+        assertThat(result.created()).isEqualTo(3);
+        assertThat(knowledge.titles).containsExactly(
+                "HashMap 为什么线程不安全",
+                "ConcurrentHashMap 分段锁去哪儿了",
+                "为什么扩容是两倍");
+    }
+
     @Test
     @DisplayName("分类不存在只跳过该源，其它源照跑")
     void missingCategorySkipsOnlyThatSource() {
@@ -176,10 +203,17 @@ class EssaySourceFanOutTest {
     private static EssayCollectionService.RunResult run(EssayProperties properties,
                                                         KnowledgeApi knowledge,
                                                         EssaySource source) {
+        return run(properties, knowledge, source, List.of(
+                new EssayExtractionPrompt.ExtractedQuestion("为什么这么设计", "因为这样更稳")));
+    }
+
+    private static EssayCollectionService.RunResult run(EssayProperties properties,
+                                                        KnowledgeApi knowledge,
+                                                        EssaySource source,
+                                                        List<EssayExtractionPrompt.ExtractedQuestion> questions) {
         EssayExtractor extractor = mock(EssayExtractor.class);
         when(extractor.extract(any(), any(), anyInt())).thenReturn(
-                new EssayExtractionPrompt.Extraction(
-                        List.of(new EssayExtractionPrompt.ExtractedQuestion("为什么这么设计", "因为这样更稳"))));
+                new EssayExtractionPrompt.Extraction(questions));
 
         CredentialService credentials = mock(CredentialService.class);
         when(credentials.access(0)).thenReturn(
@@ -206,6 +240,7 @@ class EssaySourceFanOutTest {
 
         private final List<CategoryNode> categories;
         private final List<Long> categoryIds = new ArrayList<>();
+        private final List<String> titles = new ArrayList<>();
 
         private RecordingKnowledge(List<CategoryNode> categories) {
             this.categories = categories;
@@ -234,6 +269,7 @@ class EssaySourceFanOutTest {
         @Override
         public CreateOutcome createCollected(CollectedEntry input) {
             categoryIds.add(input.categoryId());
+            titles.add(input.title());
             return new CreateOutcome(1L, true);
         }
     }

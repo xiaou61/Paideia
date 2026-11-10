@@ -130,7 +130,8 @@ paideia:
       # 抓来直接发布还是先进草稿。默认草稿——无人值守的自动入库，先让人过一眼更稳。
       publish-directly: false
       # 成本闸：单次最多解析多少题（**全局**，跨源合计）、每源最多处理多少帖。
-      max-questions-per-run: 40
+      # 2026-11-10：抽题改成一帖最多 5 道后从 40 提到 80（同一篇帖子仍只发一次模型调用）。
+      max-questions-per-run: 80
       max-posts-per-run: 6
     decision:
       # 决策模型（Laya，WORK-026）。**默认关闭**：它要连一个外部 Python 进程，

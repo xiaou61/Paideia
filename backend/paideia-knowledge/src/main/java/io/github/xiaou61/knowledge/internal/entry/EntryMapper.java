@@ -308,20 +308,23 @@ public interface EntryMapper {
     int insert(Entry entry);
 
     /**
-     * 按指纹查是否已存在（WORK-025，2026-11-06 改为**跨分类**）。
+     * 同一指纹下的全部条目（WORK-025，2026-11-06 起**跨分类**；2026-11-10 起**一帖多题**）。
      *
-     * <p><b>为什么不再限定分类</b>：指纹是「来源站点 + 上游内容 id」的哈希，**一篇帖子一个指纹**，
-     * 不是题目文本的哈希。同一篇帖子会同时出现在多个牛客合集里（实测 Java 合集与「软件开发」合集
-     * 撞帖），而多方向抓取会把它分别写进不同分类——限定分类判重的话，同一篇帖子会在库里有两份。
-     * 原注释担心的"同一道题出现在不同分类里"在指纹改成帖子 id 之后已不成立：两道不同的帖子
-     * 本来就是两个指纹。
+     * <p>指纹是「来源站点 + 上游内容 id」，**一篇帖子一个指纹**——所以同一篇面经抽出的几道题
+     * 共享同一个指纹。判重不能只看指纹（那会把一帖的第二道题当成重复丢掉），还要看题目：
+     * 调用方拿回这批候选后在 Java 侧按**归一化标题**比对，标题相同才算已入库。
+     *
+     * <p><b>为什么不把标题并进指纹</b>：存量条目的指纹是帖子级的，换算法会让它们全部失配，
+     * 于是最近两天的老帖会被整篇重灌一遍。按「指纹 + 标题」判重既能给老帖补上之前被丢掉
+     * 的其余题目，又不会重复写入已经有的那道。
+     *
+     * <p>只取 id 与 title：判重不需要正文，而正文可能有几十 KB。
      */
     @Select("""
-            SELECT id FROM knowledge_entries
+            SELECT id, title FROM knowledge_entries
             WHERE fingerprint = #{fingerprint}
-            LIMIT 1
             """)
-    Long findIdByFingerprint(@Param("fingerprint") String fingerprint);
+    List<Entry> findAllByFingerprint(@Param("fingerprint") String fingerprint);
 
     @Update("""
             UPDATE knowledge_entries

@@ -20,6 +20,7 @@ import io.github.xiaou61.knowledge.internal.learning.LearningProgressService;
 import io.github.xiaou61.platform.PageQuery;
 import io.github.xiaou61.platform.PageResult;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
@@ -144,13 +145,16 @@ class KnowledgeApiImplementation implements KnowledgeApi {
 
     @Override
     public CreateOutcome createCollected(CollectedEntry input) {
-        // 先查后插：指纹是「来源站点 + 上游内容 id」，一篇帖子一个。
+        // 先查后插：指纹是「来源站点 + 上游内容 id」，一篇帖子一个；**判重还得看题目**
+        // （2026-11-10 一帖多题）：同一篇面经抽出的几道题共享指纹，只有标题也一样才是重复。
         // **跨分类查**（2026-11-06）：同一篇帖子会出现在多个牛客合集里，多方向抓取时
         // 限定分类判重会让它在库里存两份。并发下理论上仍可能双写（两个任务同时抓到同一帖），
         // 但抓取是单实例定时任务，不为此加唯一约束——那会让"指纹为空"的存量条目行为变得微妙。
-        Long existing = entryMapper.findIdByFingerprint(input.fingerprint());
-        if (existing != null) {
-            return new CreateOutcome(existing, false);
+        String title = normalizeTitle(input.title());
+        for (Entry existing : entryMapper.findAllByFingerprint(input.fingerprint())) {
+            if (title.equals(normalizeTitle(existing.getTitle()))) {
+                return new CreateOutcome(existing.getId(), false);
+            }
         }
         Entry entry = new Entry();
         entry.setTitle(input.title());
@@ -163,6 +167,20 @@ class KnowledgeApiImplementation implements KnowledgeApi {
         entryMapper.insert(entry);
         cache.evictEntryBriefs();
         return new CreateOutcome(entry.getId(), true);
+    }
+
+    /**
+     * 标题归一化（判重用）：去掉空白与中英文标点、统一小写。
+     *
+     * <p>模型两轮抽同一道题，标点与空格常有出入（「HashMap 为什么线程不安全？」/
+     * 「HashMap为什么线程不安全」）。不归一化的话，每轮抓取都会因为一个问号多出一条。
+     */
+    private static String normalizeTitle(String title) {
+        if (title == null) {
+            return "";
+        }
+        return title.replaceAll("[\\s\\p{Punct}，。；：！？、“”‘’「」『』（）【】《》〈〉·…—～]+", "")
+                .toLowerCase(Locale.ROOT);
     }
 
     // ── 文档入库（WORK-076） ───────────────────────────────────────────

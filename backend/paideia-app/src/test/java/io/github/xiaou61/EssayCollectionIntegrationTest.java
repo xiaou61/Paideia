@@ -74,15 +74,16 @@ class EssayCollectionIntegrationTest {
     }
 
     @Test
-    @DisplayName("同一指纹重复写入只产生一条")
-    void duplicateFingerprintDoesNotCreateTwice() {
+    @DisplayName("同一指纹下的同一道题（标点不同）只产生一条")
+    void duplicateFingerprintAndTitleDoesNotCreateTwice() {
         KnowledgeApi.CollectedEntry input = new KnowledgeApi.CollectedEntry(
                 "HashMap 为什么线程不安全", "第一次", categoryId, "draft", FINGERPRINT, null);
 
         KnowledgeApi.CreateOutcome first = knowledge.createCollected(input);
+        // 同一篇帖子被再抽一次：题目没变，只差一个问号与空格
         KnowledgeApi.CreateOutcome second = knowledge.createCollected(
                 new KnowledgeApi.CollectedEntry(
-                        "HashMap 为什么线程不安全（换个标题）", "第二次", categoryId, "draft",
+                        "HashMap为什么线程不安全？", "第二次", categoryId, "draft",
                         FINGERPRINT, null));
 
         assertThat(first.created()).isTrue();
@@ -91,6 +92,27 @@ class EssayCollectionIntegrationTest {
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM knowledge_entries WHERE fingerprint = ?", Integer.class, FINGERPRINT))
                 .isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("同一指纹下的不同题目各存一条（一帖多题，2026-11-10）")
+    void sameFingerprintDifferentQuestionsAreAllStored() {
+        List<String> titles = List.of(
+                "HashMap 为什么线程不安全",
+                "ConcurrentHashMap 的分段锁去哪儿了",
+                "为什么扩容是两倍而不是一点五倍");
+
+        for (String title : titles) {
+            assertThat(knowledge.createCollected(new KnowledgeApi.CollectedEntry(
+                    title, "解析", categoryId, "published", FINGERPRINT,
+                    "https://www.nowcoder.com/feed/main/detail/multi")).created())
+                    .as("同一篇帖子里的不同题目都该入库：%s", title)
+                    .isTrue();
+        }
+
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM knowledge_entries WHERE fingerprint = ?", Integer.class, FINGERPRINT))
+                .isEqualTo(3);
     }
 
     @Test
