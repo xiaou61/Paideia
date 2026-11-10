@@ -262,6 +262,30 @@ async function ensureParent(client, tree, spec, options) {
   return id
 }
 
+/**
+ * 已经建过的分类要和 frontmatter 对齐：改线名不用再去后台点一遍。
+ *
+ * <p>只比 `name`——管理端返回的分类树里没有 sortOrder / parentId，比不了别的，
+ * 拿不准的字段一律原样带回去（PUT 是整体替换，parentId 传错会把子分类挪出去）。
+ */
+async function syncCategoryName(client, existing, spec, parentId, options) {
+  if (existing.name === spec.name) {
+    return
+  }
+  if (options.dryRun) {
+    console.log(`  [dry-run] 将改分类名 ${existing.name} → ${spec.name}`)
+    return
+  }
+  await client.put(`/api/v1/knowledge/admin/categories/${existing.id}`, {
+    parentId,
+    name: spec.name,
+    slug: existing.slug,
+    sortOrder: spec.sortOrder,
+    lineKind: existing.lineKind ?? null,
+  })
+  console.log(`  ~ 分类名 ${existing.name} → ${spec.name}`)
+}
+
 async function ensureCategory(client, language, lessons, options) {
   const spec = lineSpecOf(language, lessons)
   // 挂在父分类下的线（书籍详解）不是学习轨道：带了 lineKind 它就会以"一条线"的身份
@@ -276,6 +300,7 @@ async function ensureCategory(client, language, lessons, options) {
   const parentId = await ensureParent(client, tree, spec, options)
   const existing = findCategory(tree, spec.slug)
   if (existing) {
+    await syncCategoryName(client, existing, spec, parentId, options)
     return existing
   }
   if (options.dryRun) {
