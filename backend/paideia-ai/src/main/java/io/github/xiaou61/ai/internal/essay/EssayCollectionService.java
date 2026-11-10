@@ -117,6 +117,7 @@ public class EssayCollectionService {
         int sourcesRun = 0;
         int sourcesFailed = 0;
         int sourcesMissingCategory = 0;
+        int alreadyCollected = 0;
 
         for (EssayProperties.SourceSpec spec : properties.effectiveSources()) {
             Long defaultCategoryId = categoryIdOf(spec.getCategorySlug());
@@ -165,6 +166,14 @@ public class EssayCollectionService {
                     skipped++;
                     continue;
                 }
+                String fingerprint = fingerprintOfPost(post);
+                // 整帖已入库就跳过：回溯窗口里的老帖每天都会被重新抓到，重抽一次不但多花模型钱，
+                // 还会因为模型措辞变了（"MySQL 的 Doublewrite Buffer" → "MySQL InnoDB 的 Doublewrite Buffer"）
+                // 把同一道题再存一遍。抽题之前判，才是真的省下这次调用。
+                if (knowledge.hasCollected(fingerprint)) {
+                    alreadyCollected++;
+                    continue;
+                }
                 Long categoryId = categoryIdFor(verdict.topic(), defaultCategoryId);
                 if (!categoryId.equals(defaultCategoryId)) {
                     routed++;
@@ -186,7 +195,7 @@ public class EssayCollectionService {
                                         render(question, post),
                                         categoryId,
                                         properties.isPublishDirectly() ? "published" : "draft",
-                                        fingerprintOfPost(post),
+                                        fingerprint,
                                         post.url()));
                         if (outcome.created()) {
                             created++;
@@ -219,10 +228,10 @@ public class EssayCollectionService {
 
         log.info("八股文抓取完成：源 {} 个（失败 {} / 缺分类 {}），抓 {} 篇，跳过非技术 {} 篇"
                         + "（边界 {} / 问模型 {} / 改判 {} / 分流 {}），抽出 {} 题，新建 {} 条，"
-                        + "重复 {} 条，失败 {} 篇",
+                + "重复 {} 条，已入库跳过 {} 篇，失败 {} 篇",
                 sourcesRun, sourcesFailed, sourcesMissingCategory, fetched, skipped,
                 borderline, askedModel, changedByModel, routed,
-                extracted, created, duplicated, failed);
+                extracted, created, duplicated, alreadyCollected, failed);
         return new RunResult(fetched, skipped,
                 new FilterStats(borderline, askedModel, changedByModel, routed),
                 extracted, created, duplicated, failed, null);
@@ -270,8 +279,13 @@ public class EssayCollectionService {
      * 库里 4 条变 8 条，就是这么来的。
      *
      * <p>模型每次复述的措辞本来就不该被当成身份标识。改成按 `externalId`（帖子 id）去重：
-     * 那一列由上游给定，不会漂移。代价是"同一道题出现在两篇不同面经里"会存两份——
-     * 那是可以接受的（当前一篇只抽一道题，量很小），而"每天都重复入库"不可接受。
+     * 那一列由上游给定，不会漂移。
+     *
+     * <p>2026-11-10 起一帖最多抽 5 道题，同一篇帖子的几道题**共享这一个指纹**：判重因此不能
+     * 只看指纹（见 `KnowledgeApiImplementation.createCollected` 的「指纹 + 归一化标题」），
+     * 抓取任务也要在抽题前用 {@link KnowledgeApi#hasCollected} 整帖跳过，免得每轮重抽、
+     * 再因措辞漂移把同一道题存两遍。代价仍是"同一道题出现在两篇不同面经里"会存两份——
+     * 那是可以接受的，而"每天都重复入库"不可接受。
      */
     static String fingerprintOfPost(FetchedPost post) {
         // 前缀区分来源：将来接第二个站时，不同站的同名 id 不会撞。

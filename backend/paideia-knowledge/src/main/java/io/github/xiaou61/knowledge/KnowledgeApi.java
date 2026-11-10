@@ -92,6 +92,20 @@ public interface KnowledgeApi {
         throw new UnsupportedOperationException("本实现不支持自动采集写入");
     }
 
+    /**
+     * 这篇帖子是否已经入过库（按帖子指纹判断，WORK-025）。
+     *
+     * <p>抓取任务在抽题**之前**问一次：整帖已入库就跳过，不再花一次模型调用。没有这一步，
+     * 每天都会把回溯窗口里的老帖重新抽一遍——模型措辞稍有不同（"MySQL 的 Doublewrite Buffer"
+     * 与 "MySQL InnoDB 的 Doublewrite Buffer"）就会被当成新题，重复计费也重复入库。
+     *
+     * <p>默认 false：测试桩与不支持自动采集的实现保持原行为（照常尝试写入，由
+     * {@link #createCollected} 按「指纹 + 标题」判重兜底）。
+     */
+    default boolean hasCollected(String fingerprint) {
+        return false;
+    }
+
     // ── 文档入库（WORK-076） ───────────────────────────────────────────
 
     /**

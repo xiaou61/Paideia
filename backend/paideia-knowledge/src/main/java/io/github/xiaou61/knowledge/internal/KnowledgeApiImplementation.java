@@ -183,6 +183,12 @@ class KnowledgeApiImplementation implements KnowledgeApi {
                 .toLowerCase(Locale.ROOT);
     }
 
+    @Override
+    public boolean hasCollected(String fingerprint) {
+        // 复用同一个查询：一帖最多 5 道题，候选行就那么几条，没必要为它单开一个 COUNT。
+        return !entryMapper.findAllByFingerprint(fingerprint).isEmpty();
+    }
+
     // ── 文档入库（WORK-076） ───────────────────────────────────────────
 
     @Override

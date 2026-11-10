@@ -14,8 +14,10 @@ import io.github.xiaou61.ai.internal.decision.TechEssayFilter;
 import io.github.xiaou61.knowledge.EntryContent;
 import io.github.xiaou61.knowledge.KnowledgeApi;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -74,6 +76,28 @@ class EssaySourceFanOutTest {
                 "HashMap 为什么线程不安全",
                 "ConcurrentHashMap 分段锁去哪儿了",
                 "为什么扩容是两倍");
+    }
+
+    /**
+     * 整帖跳过（2026-11-10）。
+     *
+     * <p>回溯窗口里的老帖每天都会被重新抓到。整帖已入库就不该再抽——否则白花一次模型调用，
+     * 而且模型措辞一变，同一道题就会以另一个标题再进一条。
+     */
+    @Test
+    @DisplayName("整帖已入库时不再抽题")
+    void alreadyCollectedPostIsSkippedBeforeExtraction() {
+        RecordingKnowledge knowledge = new RecordingKnowledge(List.of(node(1, "essay-java")));
+        knowledge.markCollected(EssayCollectionService.fingerprintOfPost(post(JAVA_JOB, TECH_BODY)));
+
+        EssayCollectionService.RunResult result = run(
+                properties(List.of(new EssayProperties.SourceSpec(JAVA_JOB, "essay-java"))),
+                knowledge,
+                postingSource(TECH_BODY));
+
+        assertThat(result.created()).isZero();
+        assertThat(result.extracted()).isZero();
+        assertThat(knowledge.titles).isEmpty();
     }
 
     @Test
@@ -241,9 +265,14 @@ class EssaySourceFanOutTest {
         private final List<CategoryNode> categories;
         private final List<Long> categoryIds = new ArrayList<>();
         private final List<String> titles = new ArrayList<>();
+        private final Set<String> collected = new HashSet<>();
 
         private RecordingKnowledge(List<CategoryNode> categories) {
             this.categories = categories;
+        }
+
+        private void markCollected(String fingerprint) {
+            collected.add(fingerprint);
         }
 
         @Override
@@ -271,6 +300,11 @@ class EssaySourceFanOutTest {
             categoryIds.add(input.categoryId());
             titles.add(input.title());
             return new CreateOutcome(1L, true);
+        }
+
+        @Override
+        public boolean hasCollected(String fingerprint) {
+            return collected.contains(fingerprint);
         }
     }
 }
