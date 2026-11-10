@@ -106,3 +106,56 @@ export function TrackGridSkeleton({
     </div>
   )
 }
+
+/** 笔记列表：左竖条 + 标题 + 一行摘要，与左侧列表项同构。 */
+export function NoteListSkeleton({
+  count = 5,
+  testId = 'notes-skeleton',
+  label = '加载笔记…',
+}: {
+  count?: number
+  testId?: string
+  label?: string
+}) {
+  return (
+    <div className="divide-border divide-y" data-testid={testId} aria-busy="true">
+      <LoadingAnnounce label={label} />
+      {KEYS.slice(0, count).map((key) => (
+        <div key={key} className="border-l-2 border-transparent px-3.5 py-3">
+          <Skeleton className="h-3.5 w-3/5" />
+          <Skeleton className="mt-2 h-3 w-4/5" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** 每日速递：分组标题 + 条目卡片（标题 + 摘要 + 元信息）。 */
+export function DigestListSkeleton({
+  count = 3,
+  testId = 'digest-skeleton',
+  label = '加载速递…',
+}: {
+  count?: number
+  testId?: string
+  label?: string
+}) {
+  return (
+    <div className="mt-6 space-y-8" data-testid={testId} aria-busy="true">
+      <LoadingAnnounce label={label} />
+      {KEYS.slice(0, 2).map((groupKey) => (
+        <div key={groupKey} className="space-y-3">
+          <Skeleton className="h-4 w-24" />
+          {KEYS.slice(0, count).map((key) => (
+            <div key={`${groupKey}-${key}`} className="border-border bg-card rounded-xl border p-4">
+              <Skeleton className="h-4 w-3/5" />
+              <Skeleton className="mt-2 h-3 w-full" />
+              <Skeleton className="mt-2 h-3 w-4/5" />
+              <Skeleton className="mt-3 h-3 w-20" />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}

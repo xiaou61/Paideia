@@ -29,6 +29,7 @@ import { useLocation, useNavigate } from 'react-router'
 import { useEffect, useRef, useState } from 'react'
 
 import { LearnerHeader } from '../components/LearnerHeader'
+import { NoteListSkeleton } from '../components/skeletons'
 import { notes, type NoteSummary } from '../notes-api'
 
 const assistant = createAssistantApi(api)
@@ -265,11 +266,9 @@ export function NotesPage() {
           </div>
 
           <div className="lg:max-h-[30rem] lg:overflow-y-auto">
+            {/* 骨架而不是转圈：位置先占住，列表到手时不会整块跳动（2026-11-10） */}
             {list.isLoading ? (
-              <p className="text-muted-foreground flex items-center gap-2 p-4 text-sm">
-                <Spinner />
-                加载笔记…
-              </p>
+              <NoteListSkeleton />
             ) : (list.data ?? []).length === 0 ? (
               <p className="text-muted-foreground p-4 text-sm" data-testid="notes-empty">
                 还没有笔记。点上面的「新建笔记」开始记第一条。

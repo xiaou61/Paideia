@@ -26,6 +26,7 @@ import { Link } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { DigestListSkeleton } from '../components/skeletons'
 
 const digest = createDigestApi(api)
 
@@ -158,9 +159,7 @@ export function DigestPage() {
           ) : null}
 
           {current.isPending ? (
-            <div className="mt-8 flex justify-center">
-              <Spinner />
-            </div>
+            <DigestListSkeleton />
           ) : current.isError ? (
             <Alert variant="destructive" className="mt-6">
               <AlertTitle>速递加载失败</AlertTitle>
