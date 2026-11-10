@@ -99,6 +99,19 @@ public interface DigestMapper {
     @Delete("DELETE FROM digest_items WHERE id = #{id}")
     int deleteById(@Param("id") long id);
 
+    /**
+     * 按来源名删某天某组（补抓用）。
+     *
+     * <p>页面通路挂掉那天先入库的是兜底来源（「GitHub 新项目」）；同一天补抓成功拿到真热榜后，
+     * 这些兜底条目要清掉，否则页面上「热榜」与「新项目」混在一组里，前排反倒是兜底那几条。
+     */
+    @Delete("""
+            DELETE FROM digest_items
+            WHERE edition_date = #{date} AND group_key = #{groupKey} AND source_name = #{sourceName}
+            """)
+    int deleteBySource(@Param("date") LocalDate date, @Param("groupKey") String groupKey,
+                       @Param("sourceName") String sourceName);
+
     /** 周报 upsert：同周重跑只留一条（AC-016）。 */
     @Insert("""
             INSERT INTO digest_weeklies (week_start, body, item_count, created_at)

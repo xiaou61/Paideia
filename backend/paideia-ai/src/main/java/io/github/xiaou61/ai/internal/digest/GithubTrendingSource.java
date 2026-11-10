@@ -54,8 +54,18 @@ class GithubTrendingSource {
     /** 前端分组。 */
     static final String GROUP = "github";
 
-    private static final String SOURCE_PAGE = "GitHub 热榜";
-    private static final String SOURCE_FALLBACK = "GitHub 新项目";
+    static final String SOURCE_PAGE = "GitHub 热榜";
+    static final String SOURCE_FALLBACK = "GitHub 新项目";
+
+    /**
+     * Search 兜底的建仓时间窗口（天）。
+     *
+     * <p>**必须 ≥ 门禁的 7 天**：原先是 3 天，而 {@link #passesGate} 只给「满 7 天」的仓库直接放行，
+     * 结果是窗口里的候选一个都过不去，只能靠「昨日 1000★ 且 100 fork」这条硬门——2026-11-10 线上
+     * 页面通路全超时，30 条候选门禁后只剩 2 条，用户当天只看到 2 条热榜（10-31 只剩 1 条）。
+     * 30 天还让「连续几天榜上有名」的仓库在页面挂掉时能顶上来。
+     */
+    private static final int SEARCH_WINDOW_DAYS = 30;
 
     /**
      * 日榜/周榜各取前 25，并集最多 50。
@@ -322,8 +332,8 @@ class GithubTrendingSource {
     }
 
     private List<Candidate> searchApi(String token, DigestHttp http, LocalDate referenceDay) {
-        // 3 天窗口 + 50 星：更长的窗口会被指纹去重吃掉，更短会漏掉周末。
-        String since = referenceDay.minusDays(3).toString();
+        // 30 天窗口 + 50 星：与门禁的 7 天对齐，页面挂掉时兜底才拿得出量。
+        String since = referenceDay.minusDays(SEARCH_WINDOW_DAYS).toString();
         String query = java.net.URLEncoder.encode("created:>=" + since + " stars:>50",
                 java.nio.charset.StandardCharsets.UTF_8);
         try {

@@ -68,4 +68,29 @@ class DigestJob {
             log.error("速递{}任务异常", trigger, exception);
         }
     }
+
+    /**
+     * 当天 GitHub 组没抓够就只补抓 GitHub（10:10 起每 2 小时看一次）。
+     *
+     * <p>**2026-11-10 线上**：08:00 抓 `github.com/trending` 的四个边缘 IP 全部超时，页面通路整组为空，
+     * 兜底（Search）又险些一条不给——当天只有 2 条；之后重启部署时启动补跑见「今天已有内容」
+     * 直接跳过，于是**一整天没有第二次机会**。热榜的通路是唯一会整天被网络打挂的一路，
+     * 所以给它单独的补抓班次，而不是把整天重跑一遍（新闻/社区早上已经入库，重抓没有意义）。
+     */
+    @Scheduled(cron = "${paideia.ai.digest.refill-cron:0 10 10-20/2 * * *}",
+            zone = "${paideia.ai.digest.zone:Asia/Shanghai}")
+    void refillGithubWhenThin() {
+        try {
+            if (!service.needsGithubRefill()) {
+                return;
+            }
+            log.info("速递补抓：当天 GitHub 组不足，只重跑 GitHub 源");
+            DigestCollectionService.RunResult result = service.refillGithub();
+            if (result.skipReason() != null) {
+                log.info("速递补抓跳过：{}", result.skipReason());
+            }
+        } catch (RuntimeException exception) {
+            log.error("速递补抓任务异常", exception);
+        }
+    }
 }

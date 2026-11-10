@@ -37,6 +37,9 @@ class DigestIntegrationTest {
     io.github.xiaou61.ai.internal.digest.DigestCollectionService service;
 
     @Autowired
+    io.github.xiaou61.ai.internal.digest.DigestProperties properties;
+
+    @Autowired
     JdbcTemplate jdbc;
 
     @BeforeEach
@@ -175,5 +178,43 @@ class DigestIntegrationTest {
         assertThat(mapper.deleteById(id)).isEqualTo(1);
         assertThat(mapper.findByDate(TODAY)).isEmpty();
         assertThat(mapper.deleteById(id)).as("再删一次影响 0 行").isZero();
+    }
+
+    private void insertGithub(LocalDate date, String sourceName, String repo) {
+        mapper.insert(date, "github", "github-trending", sourceName, repo, "摘要",
+                "https://github.com/" + repo, "fp-" + repo, 100, 100, 300,
+                "1000★", "Java", 1_800_000_000_000L, "ready", java.time.Instant.now());
+    }
+
+    @Test
+    @DisplayName("2026-11-10：当天 GitHub 组不足 8 条就要补抓，够了就不补")
+    void thinGithubGroupNeedsRefill() {
+        LocalDate today = properties.today();
+        for (int index = 0; index < 7; index++) {
+            insertGithub(today, "GitHub 热榜", "owner/repo" + index);
+        }
+
+        assertThat(service.needsGithubRefill()).as("7 条偏少，需要补抓").isTrue();
+
+        insertGithub(today, "GitHub 热榜", "owner/repo7");
+
+        assertThat(service.needsGithubRefill()).as("8 条算够").isFalse();
+    }
+
+    @Test
+    @DisplayName("2026-11-10：当天还留着兜底来源就算没抓够，补抓成功后可按来源清掉")
+    void fallbackRowsKeepRefillPendingUntilCleared() {
+        LocalDate today = properties.today();
+        insertGithub(today, "GitHub 新项目", "fallback/one");
+        insertGithub(today, "GitHub 新项目", "fallback/two");
+        for (int index = 0; index < 10; index++) {
+            insertGithub(today, "GitHub 热榜", "owner/page" + index);
+        }
+
+        assertThat(service.needsGithubRefill()).as("兜底条目没清掉就算没抓够").isTrue();
+
+        assertThat(mapper.deleteBySource(today, "github", "GitHub 新项目")).isEqualTo(2);
+        assertThat(mapper.findByDate(today)).hasSize(10);
+        assertThat(service.needsGithubRefill()).isFalse();
     }
 }

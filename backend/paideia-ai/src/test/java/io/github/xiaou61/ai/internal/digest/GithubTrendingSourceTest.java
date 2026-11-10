@@ -165,6 +165,23 @@ class GithubTrendingSourceTest {
     }
 
     @Test
+    @DisplayName("兜底窗口必须覆盖门禁的 7 天：否则页面一挂，30 条候选只剩 1–2 条")
+    void fallbackSearchWindowCoversGate() {
+        // 2026-11-10 线上：页面通路全超时，30 条候选门禁后只剩 2 条（窗口只有 3 天，必然过不了 7 天门禁）。
+        StubHttp http = new StubHttp(url -> {
+            if (url.contains("search/repositories")) {
+                return "{\"items\":[]}";
+            }
+            return "";
+        });
+
+        source.fetch(properties(), http, NOW);
+
+        // referenceDay = 2026-10-25，窗口 30 天 → created:>=2026-09-25
+        assertThat(http.requested).anyMatch(url -> url.contains("created%3A%3E%3D2026-09-25"));
+    }
+
+    @Test
     @DisplayName("页面两条与 Search 都坏：返回空，不抛异常")
     void bothPathsBrokenReturnsEmpty() {
         StubHttp http = new StubHttp(url -> {

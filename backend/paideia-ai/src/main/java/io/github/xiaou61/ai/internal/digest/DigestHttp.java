@@ -1,12 +1,16 @@
 package io.github.xiaou61.ai.internal.digest;
 
 import java.net.URI;
+import java.net.InetSocketAddress;
+import java.net.ProxySelector;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 抓取用的 HTTP 薄封装（WORK-027）。
@@ -28,15 +32,62 @@ import java.util.Map;
  */
 class DigestHttp {
 
+    private static final Logger log = LoggerFactory.getLogger(DigestHttp.class);
+
     private final HttpClient client;
     private final Duration timeout;
 
     DigestHttp(int timeoutSeconds) {
+        this(timeoutSeconds, null);
+    }
+
+    /** 带代理的构造：`proxy` 为 null 表示直连。 */
+    DigestHttp(int timeoutSeconds, InetSocketAddress proxy) {
         this.timeout = Duration.ofSeconds(timeoutSeconds);
-        this.client = HttpClient.newBuilder()
+        HttpClient.Builder builder = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(Math.min(timeoutSeconds, 10)))
-                .followRedirects(HttpClient.Redirect.NEVER)
-                .build();
+                .followRedirects(HttpClient.Redirect.NEVER);
+        if (proxy != null) {
+            builder.proxy(ProxySelector.of(proxy));
+        }
+        this.client = builder.build();
+    }
+
+    /**
+     * 按配置里的代理建一个客户端；地址为空或写错就退回直连。
+     *
+     * <p>**只在 GitHub 那一路用**：那一路直连会持续超时，其它源本来就通，绕代理只多一个失败点。
+     * 解析失败不抛——抓取整组因为一个配置字符串写错而变空，比直连失败更难查。
+     */
+    static DigestHttp withOptionalProxy(int timeoutSeconds, String proxyUrl) {
+        InetSocketAddress address = proxyAddress(proxyUrl);
+        if (address == null && proxyUrl != null && !proxyUrl.isBlank()) {
+            log.warn("速递代理地址无法解析（{}），这一路退回直连", proxyUrl);
+        }
+        return new DigestHttp(timeoutSeconds, address);
+    }
+
+    /**
+     * 解析 `host:port` 或 `http://host:port`；空串或解析不出来返回 null。
+     *
+     * <p>只支持 HTTP 代理：mihomo 的 mixed-port 就是这个形态，SOCKS 要另配且没有需求。
+     */
+    static InetSocketAddress proxyAddress(String proxyUrl) {
+        if (proxyUrl == null || proxyUrl.isBlank()) {
+            return null;
+        }
+        String raw = proxyUrl.contains("://") ? proxyUrl : "http://" + proxyUrl;
+        try {
+            URI uri = URI.create(raw);
+            String host = uri.getHost();
+            int port = uri.getPort();
+            if (host == null || host.isBlank() || port <= 0) {
+                return null;
+            }
+            return InetSocketAddress.createUnresolved(host, port);
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 
     /**

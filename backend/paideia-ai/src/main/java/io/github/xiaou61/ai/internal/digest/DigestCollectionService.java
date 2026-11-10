@@ -50,6 +50,13 @@ public class DigestCollectionService {
     /** 处理中异常（重复键）按"已存在"处理，不算失败。 */
     private static final String DUPLICATE_KEY = "Duplicate";
 
+    /**
+     * 当天 GitHub 组少于这个数就算「没抓够」，需要补抓。
+     *
+     * <p>正常日 16–35 条（日榜 4 页 + 周榜合并后再按 d1 取）；只有一个通路能走时才是 1–2 条。
+     */
+    static final int GITHUB_REFILL_THRESHOLD = 8;
+
     private final DigestProperties properties;
     private final RssDigestSource rssSource;
     private final GithubTrendingSource githubSource;
@@ -89,6 +96,20 @@ public class DigestCollectionService {
      * <p>**任何阶段失败都不抛给调用方**：定时任务里抛异常只会让下一轮更难排查。
      */
     public RunResult runOnce() {
+        return collect(false);
+    }
+
+    /**
+     * 只重抓 GitHub 组，其它源一条都不碰。
+     *
+     * <p>给"当天热榜没抓够"的补抓用：新闻/社区/HN 早上已经入库，重抓它们只是白跑十几分钟，
+     * 而 GitHub 的通路是唯一一个会整天被网络打挂的。
+     */
+    public RunResult refillGithub() {
+        return collect(true);
+    }
+
+    private RunResult collect(boolean githubOnly) {
         if (!properties.isEnabled()) {
             return RunResult.skipped("未启用");
         }
@@ -100,25 +121,32 @@ public class DigestCollectionService {
         List<FetchedItem> fetched = new ArrayList<>();
         int sourcesFailed = 0;
         DigestHttp http = new DigestHttp(properties.getTimeoutSeconds());
-        for (DigestProperties.RssSource source : properties.getRss()) {
-            try {
-                fetched.addAll(rssSource.fetch(source, http, sinceMillis, nowMillis));
-            } catch (RuntimeException exception) {
-                sourcesFailed++;
-                log.warn("速递源 {} 抓取失败：{}", source.getKey(), exception.getMessage());
+        // GitHub 单独一个客户端：它要绕代理，其它源直连（见 DigestProperties#githubProxy）
+        DigestHttp githubHttp = DigestHttp.withOptionalProxy(
+                properties.getTimeoutSeconds(), properties.getGithubProxy());
+        if (!githubOnly) {
+            for (DigestProperties.RssSource source : properties.getRss()) {
+                try {
+                    fetched.addAll(rssSource.fetch(source, http, sinceMillis, nowMillis));
+                } catch (RuntimeException exception) {
+                    sourcesFailed++;
+                    log.warn("速递源 {} 抓取失败：{}", source.getKey(), exception.getMessage());
+                }
             }
         }
         try {
-            fetched.addAll(githubSource.fetch(properties, http, nowMillis));
+            fetched.addAll(githubSource.fetch(properties, githubHttp, nowMillis));
         } catch (RuntimeException exception) {
             sourcesFailed++;
             log.warn("GitHub 热榜抓取失败：{}", exception.getMessage());
         }
-        try {
-            fetched.addAll(hackerNewsSource.fetch(http, nowMillis));
-        } catch (RuntimeException exception) {
-            sourcesFailed++;
-            log.warn("Hacker News 抓取失败：{}", exception.getMessage());
+        if (!githubOnly) {
+            try {
+                fetched.addAll(hackerNewsSource.fetch(http, nowMillis));
+            } catch (RuntimeException exception) {
+                sourcesFailed++;
+                log.warn("Hacker News 抓取失败：{}", exception.getMessage());
+            }
         }
 
         if (fetched.isEmpty()) {
@@ -192,6 +220,7 @@ public class DigestCollectionService {
         Instant now = Instant.now();
         int created = 0;
         int degraded = 0;
+        boolean pageGithubCreated = false;
         for (int index = 0; index < items.size(); index++) {
             FetchedItem item = items.get(index);
             String fingerprint = selected.get(index);
@@ -219,12 +248,25 @@ public class DigestCollectionService {
                         item.meta(), item.language(), item.publishedAt(),
                         ready ? STATE_READY : STATE_DEGRADED, now);
                 created++;
+                if (github && GithubTrendingSource.SOURCE_PAGE.equals(item.sourceName())) {
+                    pageGithubCreated = true;
+                }
             } catch (RuntimeException exception) {
                 // 并发两个实例同时跑时，唯一约束会挡住后来者——按"已存在"处理，不记失败
                 if (String.valueOf(exception.getMessage()).contains(DUPLICATE_KEY)) {
                     continue;
                 }
                 log.warn("速递入库失败（{}）：{}", item.url(), exception.getMessage());
+            }
+        }
+
+        // 真热榜抓到了，就把当天早上兜底来源的条目清掉：否则「热榜」与「新项目」混在一组，
+        // 而兜底条目的 d1 往往很高，会顶在真热榜前面。
+        if (pageGithubCreated) {
+            int removed = mapper.deleteBySource(today, GithubTrendingSource.GROUP,
+                    GithubTrendingSource.SOURCE_FALLBACK);
+            if (removed > 0) {
+                log.info("速递：热榜已抓到，清掉当天 {} 条兜底条目", removed);
             }
         }
 
@@ -273,6 +315,27 @@ public class DigestCollectionService {
     /** 某天有没有内容。启动补跑用它决定要不要真抓一轮。 */
     public boolean hasContentFor(LocalDate date) {
         return !mapper.findByDate(date).isEmpty();
+    }
+
+    /**
+     * 当天的 GitHub 组是不是没抓够（补抓的触发条件）。
+     *
+     * <p>两条判据任一成立：条数低于 {@link #GITHUB_REFILL_THRESHOLD}，或当天还留着兜底来源的条目
+     * ——兜底只该在页面通路挂掉时出现，它出现本身就说明主通路没成。
+     */
+    public boolean needsGithubRefill() {
+        int github = 0;
+        boolean fallback = false;
+        for (DigestMapper.Row row : mapper.findByDate(properties.today())) {
+            if (!GithubTrendingSource.GROUP.equals(row.groupKey())) {
+                continue;
+            }
+            github++;
+            if (GithubTrendingSource.SOURCE_FALLBACK.equals(row.sourceName())) {
+                fallback = true;
+            }
+        }
+        return fallback || github < GITHUB_REFILL_THRESHOLD;
     }
 
     /** 某天的条目，按 {@link #GROUP_ORDER} 分组。给读接口用。 */

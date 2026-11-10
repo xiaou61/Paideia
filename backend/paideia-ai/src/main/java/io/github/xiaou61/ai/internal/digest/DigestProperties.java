@@ -33,6 +33,15 @@ public class DigestProperties {
      */
     private String githubTrendingUrl = "https://github.com/trending";
 
+    /**
+     * GitHub 那一路的出口代理（`host:port` 或 `http://host:port`），空=直连。
+     *
+     * <p>**只有 GitHub 走它**：生产机到 `github.com` 网页的直连 2026-11-10 实测 8 次里 6 次挂满
+     * 15 秒（api.github.com 反而 3/3 秒回），而本机 mihomo 的 7890 稳定 5/5 成功。
+     * RSS / Hacker News / AI 不经过这里——它们本来就通，绕一圈只是多一个失败点。
+     */
+    private String githubProxy = "";
+
     /** 单次运行最多入库条数。**这是成本闸**：决定喂给 AI 的候选池上限。 */
     private int maxItemsPerRun = 60;
 
@@ -152,6 +161,14 @@ public class DigestProperties {
 
     public void setGithubTrendingUrl(String githubTrendingUrl) {
         this.githubTrendingUrl = githubTrendingUrl;
+    }
+
+    public String getGithubProxy() {
+        return githubProxy;
+    }
+
+    public void setGithubProxy(String githubProxy) {
+        this.githubProxy = githubProxy;
     }
 
     public int getMaxItemsPerRun() {
