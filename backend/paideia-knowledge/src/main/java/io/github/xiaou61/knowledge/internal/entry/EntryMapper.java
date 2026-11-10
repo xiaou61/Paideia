@@ -21,9 +21,12 @@ import org.apache.ibatis.annotations.Update;
  * 不在控制器里"查完再判断"。这样漏改一处的后果只是少一个接口，而不是把草稿泄露出去。
  *
  * <p>检索走两条路（由 {@code SearchQuery} 判定），都用参数绑定：
- * 长查询走 `MATCH … AGAINST`（ngram 全文索引），短查询退回 `LIKE`。
- * 用自然语言模式而不是 BOOLEAN 模式——BOOLEAN 把 `+ - * "` 当操作符，而检索串是用户随手
- * 输入的，把它当查询语法解析既容易报错也容易给出意外结果。
+ * 长查询走 `MATCH … AGAINST (… IN BOOLEAN MODE)`（ngram 全文索引），短查询退回 `LIKE`。
+ *
+ * <p><b>2026-11-10 之前是自然语言模式</b>：ngram 下它的语义是"任意一个二字片段命中就算命中"，
+ * 搜「不存在的词啊」能因"存在"召回 209 条。改成 BOOLEAN 模式后，检索串由
+ * {@code SearchQuery.booleanMode} 生成——**每个词加引号做短语匹配、词之间用 `+` 要求同时出现**。
+ * 用户输入的 `+ - * "` 在那一步就被处理掉了，不会当语法解析。
  */
 @Mapper
 public interface EntryMapper {
@@ -44,7 +47,7 @@ public interface EntryMapper {
             </if>
             <if test="keyword != null">
               <choose>
-                <when test="fulltext">AND MATCH(title, body) AGAINST(#{keyword})</when>
+                <when test="fulltext">AND MATCH(title, body) AGAINST(#{booleanText} IN BOOLEAN MODE)</when>
                 <otherwise>AND (title LIKE #{likePattern} OR body LIKE #{likePattern})</otherwise>
               </choose>
             </if>
@@ -57,6 +60,7 @@ public interface EntryMapper {
             """)
     List<Entry> pagePublished(@Param("categoryIds") List<Long> categoryIds,
                               @Param("keyword") String keyword,
+                              @Param("booleanText") String booleanText,
                               @Param("fulltext") boolean fulltext,
                               @Param("likePattern") String likePattern,
                               @Param("byChapter") boolean byChapter,
@@ -73,7 +77,7 @@ public interface EntryMapper {
             </if>
             <if test="keyword != null">
               <choose>
-                <when test="fulltext">AND MATCH(title, body) AGAINST(#{keyword})</when>
+                <when test="fulltext">AND MATCH(title, body) AGAINST(#{booleanText} IN BOOLEAN MODE)</when>
                 <otherwise>AND (title LIKE #{likePattern} OR body LIKE #{likePattern})</otherwise>
               </choose>
             </if>
@@ -81,6 +85,7 @@ public interface EntryMapper {
             """)
     long countPublished(@Param("categoryIds") List<Long> categoryIds,
                         @Param("keyword") String keyword,
+                        @Param("booleanText") String booleanText,
                         @Param("fulltext") boolean fulltext,
                         @Param("likePattern") String likePattern);
 

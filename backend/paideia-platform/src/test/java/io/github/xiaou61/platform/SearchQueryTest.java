@@ -41,4 +41,35 @@ class SearchQueryTest {
         assertThat(SearchQuery.likePattern("a\\b")).isEqualTo("%a\\\\b%");
         assertThat(SearchQuery.likePattern("并发")).isEqualTo("%并发%");
     }
+
+    /**
+     * BOOLEAN 模式串（2026-11-10）。
+     *
+     * <p>钉住三件事：单个词就是一条短语；多个词要求**同时**出现；用户的引号/反斜杠不会被
+     * 当成语法。第一条正是修掉"搜什么都有一堆结果"的那个改动。
+     */
+    @Test
+    void booleanModeQuotesEachTermAsPhrase() {
+        assertThat(SearchQuery.booleanMode("联合索引")).isEqualTo("+\"联合索引\"");
+        assertThat(SearchQuery.booleanMode("MySQL 索引")).isEqualTo("+\"MySQL\" +\"索引\"");
+        assertThat(SearchQuery.booleanMode("  并发   编程 ")).isEqualTo("+\"并发\" +\"编程\"");
+    }
+
+    @Test
+    void booleanModeDropsTermsTooShortForNgram() {
+        // 单字在 ngram 上召回恒为零，留着会让整条查询"永远没有结果"
+        assertThat(SearchQuery.booleanMode("锁")).isNull();
+        assertThat(SearchQuery.booleanMode("a")).isNull();
+        // 混在长查询里的单字被丢掉，其余照常
+        assertThat(SearchQuery.booleanMode("a 并发")).isEqualTo("+\"并发\"");
+        assertThat(SearchQuery.booleanMode("   ")).isNull();
+        assertThat(SearchQuery.booleanMode(null)).isNull();
+    }
+
+    @Test
+    void booleanModeNeutralisesOperatorsAndQuotes() {
+        assertThat(SearchQuery.booleanMode("\"并发\"")).isEqualTo("+\"并发\"");
+        assertThat(SearchQuery.booleanMode("-并发")).isEqualTo("+\"-并发\"");
+        assertThat(SearchQuery.booleanMode("a\\\\b_c")).isEqualTo("+\"ab_c\"");
+    }
 }

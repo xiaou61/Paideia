@@ -123,7 +123,11 @@ public class EntryService {
             }
         }
 
-        boolean fulltext = SearchQuery.usesFulltext(keyword);
+        // 全文这一路走 BOOLEAN 模式（每个词加引号做短语匹配，见 SearchQuery.booleanMode）：
+        // 自然语言模式只要命中任意一个二字片段就返回，搜「不存在的词啊」能召回 209 条。
+        // 单字这类短查询 booleanMode 会返回 null，自动退回 LIKE。
+        String booleanText = SearchQuery.booleanMode(keyword);
+        boolean fulltext = booleanText != null;
         String likePattern = keyword == null ? null : SearchQuery.likePattern(keyword);
 
         Map<Long, Category> categoriesById = categoriesById();
@@ -132,12 +136,12 @@ public class EntryService {
         Category scoped = categoryId == null ? null : categoriesById.get(categoryId);
         boolean byChapter = scoped != null && scoped.getLineKind() != null && !scoped.getLineKind().isBlank();
 
-        long total = entryMapper.countPublished(categoryIds, keyword, fulltext, likePattern);
+        long total = entryMapper.countPublished(categoryIds, keyword, booleanText, fulltext, likePattern);
         if (total == 0L) {
             return PageResult.of(0L, page, List.of());
         }
         List<Entry> rows = entryMapper.pagePublished(
-                categoryIds, keyword, fulltext, likePattern, byChapter, page.limit(), page.offset());
+                categoryIds, keyword, booleanText, fulltext, likePattern, byChapter, page.limit(), page.offset());
         List<EntrySummary> items = rows.stream()
                 .map(row -> new EntrySummary(
                         row.getId(),

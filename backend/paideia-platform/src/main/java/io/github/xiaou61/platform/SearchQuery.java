@@ -40,6 +40,57 @@ public final class SearchQuery {
     }
 
     /**
+     * 构造 BOOLEAN 模式的检索串，用于 `MATCH … AGAINST(? IN BOOLEAN MODE)`（2026-11-10）。
+     *
+     * <p><b>为什么不再用自然语言模式</b>：ngram 解析器把中文切成二字片段，自然语言模式的
+     * 语义是"**任意一个片段命中就算命中**"。于是搜「不存在的词啊」会因为里面有"存在"这个词
+     * 召回 209 条，搜 `qqqqq` 也能出 2 条——用户看到的是"搜什么都有一堆不相干结果"。
+     *
+     * <p>这里改成：按空白拆词、**每个词加引号做短语匹配**，词与词之间用 `+` 要求同时出现。
+     * 效果是"我打的每个词都得在正文里挨着出现"，这才是搜索框该有的行为。
+     *
+     * <p>三条防御：
+     * <ul>
+     *   <li>引号在 BOOLEAN 语法里是短语定界符，反斜杠是转义符——词里出现就删掉，
+     *       否则用户能构造出 `-foo` 之类的操作符（参数是绑定的，不会有注入，但会得到意外结果）；</li>
+     *   <li>长度小于 ngram 词元（2）的词会被丢弃：它在全文索引上召回恒为零，留着会让整条
+     *       查询变成"永远没有结果"；</li>
+     *   <li>全被丢弃时返回 null，调用方退回 LIKE（单字查询仍走老路）。</li>
+     * </ul>
+     */
+    public static String booleanMode(String normalized) {
+        if (normalized == null) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder(normalized.length() + 8);
+        int terms = 0;
+        for (String raw : normalized.split("[\\s\\u3000]+")) {
+            String term = sanitizeTerm(raw);
+            if (term.codePointCount(0, term.length()) < NGRAM_TOKEN_SIZE) {
+                continue;
+            }
+            if (terms > 0) {
+                out.append(' ');
+            }
+            out.append("+\"").append(term).append('"');
+            terms++;
+        }
+        return terms == 0 ? null : out.toString();
+    }
+
+    /** 去掉 BOOLEAN 语法里有特殊含义的字符（短语定界引号与转义反斜杠）。 */
+    private static String sanitizeTerm(String raw) {
+        StringBuilder out = new StringBuilder(raw.length());
+        for (int index = 0; index < raw.length(); index++) {
+            char current = raw.charAt(index);
+            if (current != '"' && current != '\\') {
+                out.append(current);
+            }
+        }
+        return out.toString();
+    }
+
+    /**
      * 构造 LIKE 用的模式串，并**转义 LIKE 的通配符**。
      *
      * <p>不转义的话，用户搜 `%` 会匹配全部条目、搜 `_` 会匹配任意单字——不是 SQL 注入
