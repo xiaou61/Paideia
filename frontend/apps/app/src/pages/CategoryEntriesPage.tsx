@@ -55,9 +55,23 @@ export function CategoryEntriesPage() {
     queryFn: () => knowledge.categories(),
   })
 
+  /**
+   * 分页（2026-11-10）：原来固定 `size: 50`、也没有任何翻页入口——而页头明明白白写着
+   * 「共 567 条」。超过 50 条的内容**只能靠搜索**摸到，等于其余五百多条在"全部条目"里不存在。
+   * 这里改成"加载更多"：每点一次多要 50 条，页面上同时给出"已显示 M / N"。
+   *
+   * <p>没有做成页码跳转：这个页面的主要入口是分类与搜索，逐页翻完整库的人很少，
+   * 而"加载更多"不会把已经看过的内容从眼前拿走。
+   */
+  const PAGE_SIZE = 50
+  const [size, setSize] = useState(PAGE_SIZE)
+  // 换分类或换关键词时回到第一批：否则会带着上一次的 150 条去查新条件
+  useEffect(() => {
+    setSize(PAGE_SIZE)
+  }, [scopedId, keyword])
   const entries = useQuery({
-    queryKey: ['knowledge-entries', scopedId, keyword],
-    queryFn: () => knowledge.entries({ categoryId: scopedId, q: keyword, size: 50 }),
+    queryKey: ['knowledge-entries', scopedId, keyword, size],
+    queryFn: () => knowledge.entries({ categoryId: scopedId, q: keyword, size }),
   })
 
   // 标题用当前分类名；分类还没加载出来时退回一句通用的
@@ -258,6 +272,23 @@ export function CategoryEntriesPage() {
               </span>
             </Link>
           ))}
+        </div>
+      ) : null}
+
+      {/* 还有没显示出来的就给出下一步：没有这个按钮时，超出 50 条的内容在页面上等于不存在 */}
+      {entries.isSuccess && entries.data.items.length < entries.data.total ? (
+        <div className="mt-8 flex flex-col items-center gap-2">
+          <Button
+            variant="outline"
+            data-testid="entry-load-more"
+            disabled={entries.isFetching}
+            onClick={() => setSize((current) => current + PAGE_SIZE)}
+          >
+            {entries.isFetching ? '加载中…' : `加载更多（还有 ${entries.data.total - entries.data.items.length} 条）`}
+          </Button>
+          <span className="text-muted-foreground text-xs" data-testid="entry-shown-count">
+            已显示 {entries.data.items.length} / {entries.data.total}
+          </span>
         </div>
       ) : null}
     </AppShell>
