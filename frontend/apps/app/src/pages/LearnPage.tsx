@@ -23,7 +23,6 @@ import {
   CardContent,
   ErrorAlert,
   Input,
-  LoadingRow,
   PageHeader,
 } from '@paideia/ui'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -62,6 +61,7 @@ import { Link } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { TrackGridSkeleton } from '../components/skeletons'
 import { OTHER_GROUP, TRACK_GROUPS, groupDefOf, groupKeyOf } from '../learn-track-groups'
 
 const learning = createLearningApi(api)
@@ -349,9 +349,7 @@ export function LearnPage() {
         </Alert>
       ) : null}
 
-      {tracks.isPending ? (
-        <LoadingRow label="加载学习轨道…" testId="learn-state" />
-      ) : null}
+      {tracks.isPending ? <TrackGridSkeleton /> : null}
 
       {tracks.isError ? (
         <ErrorAlert title="学习轨道加载失败" error={tracks.error} testId="learn-state" />

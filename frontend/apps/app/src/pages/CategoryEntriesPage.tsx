@@ -11,7 +11,6 @@ import {
   EmptyTitle,
   ErrorAlert,
   Input,
-  LoadingRow,
   PageHeader,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
@@ -22,6 +21,7 @@ import { Link, useParams, useSearchParams } from 'react-router'
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
 import { PageBreadcrumb } from '../components/PageBreadcrumb'
+import { EntryGridSkeleton } from '../components/skeletons'
 import { errorMessage } from '@paideia/core'
 
 const knowledge = createKnowledgeApi(api)
@@ -173,9 +173,8 @@ export function CategoryEntriesPage() {
         ) : null}
       </form>
 
-      {entries.isPending ? (
-        <LoadingRow label="加载条目…" testId="entry-state" />
-      ) : null}
+      {/* 骨架屏而不是转圈：位置先占住，数据到了文字直接填进去，页面不跳（2026-11-10） */}
+      {entries.isPending ? <EntryGridSkeleton /> : null}
       {entries.isError ? (
         <ErrorAlert title="条目加载失败" error={entries.error} testId="entry-state" />
       ) : null}

@@ -16,6 +16,7 @@ import { Link, useNavigate } from 'react-router'
 import { api } from '../api'
 import { HomeFirstRun } from '../components/HomeFirstRun'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { HomeListSkeleton } from '../components/skeletons'
 import { errorMessage } from '@paideia/core'
 
 const knowledge = createKnowledgeApi(api)
@@ -428,12 +429,7 @@ export function HomePage() {
               全部 →
             </Link>
           </div>
-          {entries.isPending ? (
-            <div className="text-muted-foreground flex items-center gap-2 p-5 text-sm">
-              <Spinner />
-              加载中…
-            </div>
-          ) : null}
+          {entries.isPending ? <HomeListSkeleton count={4} /> : null}
           {entries.isError ? (
             <p className="text-muted-foreground p-5 text-sm">
               暂时读不到内容（{errorMessage(entries.error)}）
