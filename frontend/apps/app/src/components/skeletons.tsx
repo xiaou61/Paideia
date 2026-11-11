@@ -20,9 +20,15 @@ function LoadingAnnounce({ label }: { label: string }) {
   return <span className="sr-only">{label}</span>
 }
 
-/** 条目列表：与 `CategoryEntriesPage` 的卡片网格同构（封面 + 标题 + 两行摘要 + 页脚）。 */
-export function EntryGridSkeleton({
-  count = 6,
+/**
+ * 条目列表：与 `CategoryEntriesPage` 的密排表格行同构（序号 + 标题 + 右对齐日期）。
+ *
+ * <p>2026-11-11 随列表改版重画：原来是"封面 80px + 标题 + 两行摘要"的卡片骨架，容器是
+ * 三列网格；列表改成单列表格行之后，那份骨架会先摆出六张卡再把它们收成一张表，比不画还糟。
+ * 行高照真实的 `py-3` + `leading-6` 抄，宽度用 3/5 的标题条——真实标题两行截断时的常见长度。
+ */
+export function EntryListSkeleton({
+  count = 8,
   testId = 'entry-state',
   label = '加载条目…',
 }: {
@@ -31,21 +37,16 @@ export function EntryGridSkeleton({
   label?: string
 }) {
   return (
-    <div
-      className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
-      data-testid={testId}
-      aria-busy="true"
-    >
+    <div data-testid={testId} aria-busy="true">
       <LoadingAnnounce label={label} />
-      {KEYS.slice(0, count).map((key) => (
-        <div key={key} className="border-border bg-card flex flex-col overflow-hidden rounded-xl border">
-          <Skeleton className="h-20 rounded-none" />
-          <div className="space-y-2 p-4">
-            <Skeleton className="h-4 w-4/5" />
-            <Skeleton className="h-3 w-full" />
-            <Skeleton className="h-3 w-2/3" />
-            <Skeleton className="mt-3 h-3 w-24" />
-          </div>
+      {Array.from({ length: count }, (_, index) => index).map((index) => (
+        <div
+          key={index}
+          className="border-border flex items-center gap-4 border-b px-4 py-3 last:border-b-0"
+        >
+          <Skeleton className="h-3 w-4 shrink-0 rounded-sm" />
+          <Skeleton className="h-4 flex-1" style={{ maxWidth: `${55 + ((index * 7) % 30)}%` }} />
+          <Skeleton className="hidden h-3 w-16 shrink-0 sm:block" />
         </div>
       ))}
     </div>
