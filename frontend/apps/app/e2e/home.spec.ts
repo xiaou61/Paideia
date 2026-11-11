@@ -159,5 +159,8 @@ test('首页有「面经」横幅，四个方向各进各的分类', async ({ pa
 
   // 分类页（不是"全部条目"）：url 带 categories 段
   await expect(page).toHaveURL(/#\/knowledge\/categories\/\d+$/)
-  await expect(page.getByText('八股文 · 面经真题')).toBeVisible()
+  // 按**标题**断言而不是 getByText：分类页 2026-11-09 起有面包屑，末级也写着这个分类名，
+  // 按文本取会同时命中「面包屑」与「H1」两个元素而撞上 strict mode。这里要验的是"进对了分类页"，
+  // 而 H1 就是那句话，所以直接取一级标题。
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('八股文 · 面经真题')
 })
