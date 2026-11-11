@@ -17,6 +17,7 @@ import io.github.xiaou61.ai.RunSpec;
 import io.github.xiaou61.ai.internal.billing.CreditService;
 import io.github.xiaou61.ai.internal.credential.CredentialService;
 import io.github.xiaou61.ai.internal.provider.GuardedHttpTransport;
+import io.github.xiaou61.ai.internal.support.ModelJson;
 import io.github.xiaou61.knowledge.ReviewQuestionPort;
 import io.github.xiaou61.platform.Hashes;
 import java.nio.charset.StandardCharsets;
@@ -183,12 +184,8 @@ class ReviewQuestionGenerator implements ReviewQuestionPort {
 
     /** 解析并校验：结构不合格的题直接丢，不拿坏题去打分。 */
     List<Question> parse(String raw, List<Concept> concepts, Set<String> previousStems) {
-        if (raw == null || raw.isBlank()) {
-            return List.of();
-        }
-        int start = raw.indexOf('{');
-        int end = raw.lastIndexOf('}');
-        if (start < 0 || end <= start) {
+        String body = ModelJson.objectBody(raw);
+        if (body == null) {
             return List.of();
         }
         Set<Long> allowed = new HashSet<>();
@@ -198,7 +195,7 @@ class ReviewQuestionGenerator implements ReviewQuestionPort {
         Set<String> seenStems = new LinkedHashSet<>(previousStems);
         List<Question> result = new ArrayList<>();
         try {
-            JsonNode items = objectMapper.readTree(raw.substring(start, end + 1)).path("items");
+            JsonNode items = objectMapper.readTree(body).path("items");
             if (!items.isArray()) {
                 return List.of();
             }

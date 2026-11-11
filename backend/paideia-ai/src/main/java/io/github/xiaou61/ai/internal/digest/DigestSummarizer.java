@@ -11,6 +11,7 @@ import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.extensions.model.openai.formatter.DeepSeekFormatter;
 import io.github.xiaou61.ai.ModelAccess;
 import io.github.xiaou61.ai.internal.provider.GuardedHttpTransport;
+import io.github.xiaou61.ai.internal.support.ModelJson;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -193,14 +194,13 @@ class DigestSummarizer {
             log.warn("速递 AI 返回空内容（思考 token 可能吃满），全部按降级处理");
             return Map.of();
         }
-        int start = raw.indexOf('{');
-        int end = raw.lastIndexOf('}');
-        if (start < 0 || end <= start) {
+        String body = ModelJson.objectBody(raw);
+        if (body == null) {
             log.warn("速递 AI 返回里没有 JSON 对象，全部按降级处理");
             return Map.of();
         }
         try {
-            JsonNode root = objectMapper.readTree(raw.substring(start, end + 1));
+            JsonNode root = objectMapper.readTree(body);
             JsonNode list = root.path("items");
             if (!list.isArray()) {
                 return Map.of();

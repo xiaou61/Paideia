@@ -17,6 +17,8 @@ import io.github.xiaou61.ai.RunRecorder;
 import io.github.xiaou61.ai.RunSpec;
 import io.github.xiaou61.ai.internal.credential.CredentialService;
 import io.github.xiaou61.ai.internal.provider.GuardedHttpTransport;
+import io.github.xiaou61.ai.internal.support.FinishReasons;
+import io.github.xiaou61.ai.internal.support.ModelJson;
 import io.github.xiaou61.knowledge.QuestionTaggingPort;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -125,6 +127,11 @@ class QuestionTaggingService implements QuestionTaggingPort {
         if (response == null || response.getContent() == null) {
             throw new IllegalStateException("上游没有返回内容");
         }
+        // 打标是按批取的：截断意味着一半题目没有候选。宁可整批失败留一条明确的日志，
+        // 也不要把半截结果当"模型认为无关"写回候选表。
+        if (FinishReasons.truncated(response)) {
+            throw new IllegalStateException("上游输出被长度上限截断");
+        }
         StringBuilder text = new StringBuilder();
         for (var block : response.getContent()) {
             if (block instanceof TextBlock textBlock) {
@@ -177,12 +184,8 @@ class QuestionTaggingService implements QuestionTaggingPort {
 
     /** 解析并过滤：只保留输入里存在的题目与概念 id。 */
     Result parse(String raw, List<Question> questions, List<Concept> concepts, String model) {
-        if (raw == null || raw.isBlank()) {
-            return new Result(List.of(), model, VERSION);
-        }
-        int start = raw.indexOf('{');
-        int end = raw.lastIndexOf('}');
-        if (start < 0 || end <= start) {
+        String body = ModelJson.objectBody(raw);
+        if (body == null) {
             return new Result(List.of(), model, VERSION);
         }
         Set<String> allowedQuestions = new HashSet<>();
@@ -194,7 +197,7 @@ class QuestionTaggingService implements QuestionTaggingPort {
             allowedConcepts.add(concept.id());
         }
         try {
-            JsonNode items = objectMapper.readTree(raw.substring(start, end + 1)).path("items");
+            JsonNode items = objectMapper.readTree(body).path("items");
             List<Suggestion> result = new ArrayList<>();
             Set<String> seen = new LinkedHashSet<>();
             if (items.isArray()) {

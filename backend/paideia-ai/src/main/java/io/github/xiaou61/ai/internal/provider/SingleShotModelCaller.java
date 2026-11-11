@@ -12,6 +12,7 @@ import io.agentscope.extensions.model.openai.formatter.DeepSeekFormatter;
 import io.github.xiaou61.ai.ModelAccess;
 import io.github.xiaou61.ai.TokenUsage;
 import io.github.xiaou61.ai.internal.credential.AiProperties;
+import io.github.xiaou61.ai.internal.support.FinishReasons;
 import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
 import java.time.Duration;
@@ -112,6 +113,11 @@ public abstract class SingleShotModelCaller {
         }
         if (response == null) {
             throw upstreamUnavailable(null);
+        }
+        // 截断要先判：它在解析层看起来跟"模型没按格式回答"一模一样，但处置完全不同
+        // （抬 maxTokens / 压输出规模，而不是改提示词）。见 FinishReasons。
+        if (FinishReasons.truncated(response)) {
+            throw new BizException(ErrorCode.INTERNAL, "模型输出被长度上限截断，本次结果不可用，请重试");
         }
         String text = extractText(response);
         if (text.isBlank()) {

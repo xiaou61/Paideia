@@ -10,6 +10,7 @@ import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.extensions.model.openai.formatter.DeepSeekFormatter;
 import io.github.xiaou61.ai.ModelAccess;
 import io.github.xiaou61.ai.internal.credential.AiProperties;
+import io.github.xiaou61.ai.internal.support.ModelJson;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -134,14 +135,13 @@ public class LearningAdvisor {
         if (raw == null || raw.isBlank()) {
             return result;
         }
-        int start = raw.indexOf('{');
-        int end = raw.lastIndexOf('}');
-        if (start < 0 || end <= start) {
+        String body = ModelJson.objectBody(raw);
+        if (body == null) {
             return result;
         }
         try {
             com.fasterxml.jackson.databind.JsonNode root =
-                    new com.fasterxml.jackson.databind.ObjectMapper().readTree(raw.substring(start, end + 1));
+                    new com.fasterxml.jackson.databind.ObjectMapper().readTree(body);
             for (com.fasterxml.jackson.databind.JsonNode item : root.path("reasons")) {
                 String slug = item.path("slug").asText("");
                 String reason = item.path("reason").asText("").trim();
