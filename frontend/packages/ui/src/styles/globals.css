@@ -86,16 +86,25 @@
   --card-foreground: hsl(222 25% 12%);
   --popover: hsl(0 0% 100%);
   --popover-foreground: hsl(222 25% 12%);
-  /* 品牌靖蓝：主按钮、链接、选中态都用它 */
-  --primary: hsl(243 62% 44%);
+  /*
+   * 2026-11-11 换向：靖蓝 → **黑白**（用户："弄成白黑的，不弄成白蓝的了"）。
+   *
+   * <p>不是"去掉颜色"，而是**把品牌声量交给黑与留白**：`--primary` 取近黑（沿用 ink 的冷调，
+   * 不用纯黑，纯黑在浅灰底上过硬），白底 + 黑按钮 + 灰线。理由记在这里，免得下次谁又"顺手
+   * 加一点蓝"：彩色一旦回到主按钮/链接/选中态，就又变成用户说的"demo 级白蓝"。
+   *
+   * <p>代价是 `--accent`（悬停/选中）没有色相可借，只能走纯灰；所以这一版把 hover 与
+   * 选中态统一交给 `bg-accent` + `font-medium` 承担，不再依赖色相区分。
+   */
+  --primary: hsl(222 22% 11%);
   --primary-foreground: hsl(0 0% 100%);
-  --secondary: hsl(243 30% 95%);
-  --secondary-foreground: hsl(243 45% 28%);
+  --secondary: hsl(220 14% 95%);
+  --secondary-foreground: hsl(222 22% 20%);
   --muted: hsl(220 16% 95%);
   --muted-foreground: hsl(220 12% 38%);
-  /* accent 是"悬停/选中"那一档，带品牌色相——灰底悬停是这套观感最像 demo 的地方 */
-  --accent: hsl(243 45% 95%);
-  --accent-foreground: hsl(243 50% 30%);
+  /* accent 是"悬停/选中"那一档。黑白主题下它只能是中性灰——不再带品牌色相 */
+  --accent: hsl(220 14% 95%);
+  --accent-foreground: hsl(222 22% 12%);
   --destructive: hsl(0 65% 42%);
   --destructive-foreground: hsl(0 0% 100%);
   /* 状态色：自评的懂／不懂、举报的待处理／已下架都靠它们，不再一律是灰 */
@@ -113,7 +122,8 @@
   --tier-unknown: hsl(215 16% 62%);
   --tier-learning: hsl(213 85% 62%);
   --tier-familiar: hsl(152 55% 48%);
-  --tier-mastered: hsl(243 62% 52%);
+  /* 「已掌握」原本是品牌靖蓝；品牌转黑白后改成近黑，否则整站会剩图谱一处蓝 */
+  --tier-mastered: hsl(222 22% 11%);
   /*
    * 简历纸张（WORK-018）。**刻意不跟随明暗主题**：纸永远白、字永远黑。
    * 之前纸张用的是 `--foreground`，深色主题下打印出来是白字白纸。
@@ -129,7 +139,7 @@
   /* 输入控件的线比普通分隔线略重一点，否则表单看起来"没有边界" */
   --input: hsl(220 14% 84%);
   /* 焦点环要单独满足 3:1（WCAG 1.4.11），所以用纯色而不是半透明 */
-  --ring: hsl(243 62% 44%);
+  --ring: hsl(222 22% 11%);
   /*
    * 补一个真正的 CSS 变量（2026-11-09）。
    *
@@ -178,15 +188,18 @@
   --card-foreground: hsl(220 16% 94%);
   --popover: hsl(222 20% 12%);
   --popover-foreground: hsl(220 16% 94%);
-  /* 深色下主色必须变亮，否则按钮像"没上色" */
-  --primary: hsl(243 72% 74%);
-  --primary-foreground: hsl(243 60% 12%);
+  /*
+   * 深色下主色必须反相：黑白主题里 `--primary` 就是**近白**（黑底上的"黑按钮"看不见）。
+   * 这是黑白主题与彩色主题最不一样的一处——彩色主题只提亮，黑白主题要整体翻转。
+   */
+  --primary: hsl(0 0% 96%);
+  --primary-foreground: hsl(222 22% 10%);
   --secondary: hsl(222 16% 16%);
-  --secondary-foreground: hsl(243 40% 88%);
+  --secondary-foreground: hsl(220 14% 88%);
   --muted: hsl(222 14% 16%);
   --muted-foreground: hsl(220 12% 66%);
-  --accent: hsl(243 24% 20%);
-  --accent-foreground: hsl(243 60% 88%);
+  --accent: hsl(222 12% 18%);
+  --accent-foreground: hsl(0 0% 94%);
   --destructive: hsl(0 80% 70%);
   --destructive-foreground: hsl(0 60% 10%);
   --success: hsl(152 45% 62%);
@@ -199,10 +212,10 @@
   --tier-unknown: hsl(215 16% 58%);
   --tier-learning: hsl(213 85% 70%);
   --tier-familiar: hsl(152 45% 62%);
-  --tier-mastered: hsl(243 72% 74%);
+  --tier-mastered: hsl(0 0% 88%);
   --border: hsl(222 14% 20%);
   --input: hsl(222 14% 26%);
-  --ring: hsl(243 72% 74%);
+  --ring: hsl(0 0% 96%);
   /* 深色同理：`--color-ring` 必须在运行期真的存在，否则 ring-ring 系列算出来是透明的。 */
   --color-ring: var(--ring);
   --overlay: hsl(0 0% 0% / 62%);

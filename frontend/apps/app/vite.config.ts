@@ -52,7 +52,7 @@ export default defineConfig(({ mode }) => ({
         display: 'standalone',
         start_url: '.',
         scope: '.',
-        theme_color: '#322bb6',
+        theme_color: '#111418',
         background_color: '#f8f9fb',
         icons: [
           { src: 'pwa-192.png', sizes: '192x192', type: 'image/png' },
@@ -104,3 +104,4 @@ export default defineConfig(({ mode }) => ({
     },
   },
 }))
+
