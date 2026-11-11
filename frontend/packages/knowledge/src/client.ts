@@ -101,6 +101,19 @@ export interface KnowledgeApi {
   traceCode(input: RunCodeInput): Promise<TraceCodeResult>
   /** 记一次浏览（WORK-021）。旁路数据：失败不影响阅读。 */
   recordView(entryId: number): Promise<null>
+  /**
+   * 我「看过」的条目（2026-11-11）。列表页用来把已读行标出来、并算每类「已读 x / y」。
+   *
+   * <p>与 `recordView` 是一对：那边写、这边读，数据都在服务端，所以换设备/清缓存都不丢。
+   */
+  viewedEntries(): Promise<ViewedEntry[]>
+}
+
+/** 「我看过的一条」。只有 id、次数、最近时间——标题列表自己已经有。 */
+export interface ViewedEntry {
+  entryId: number
+  viewCount: number
+  lastViewedAt: string
 }
 
 /** 数据集可见性（WORK-060）。 */
@@ -375,5 +388,7 @@ export function createKnowledgeApi(client: ApiClient): KnowledgeApi {
 
     recordView: (entryId) =>
       client.requestEnvelope<null>(`/api/v1/knowledge/entries/${entryId}/view`, { method: 'POST' }),
+
+    viewedEntries: () => client.requestEnvelope<ViewedEntry[]>('/api/v1/knowledge/entry-views'),
   }
 }

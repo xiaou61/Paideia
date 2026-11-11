@@ -3,6 +3,7 @@ package io.github.xiaou61.knowledge.internal.web;
 import io.github.xiaou61.knowledge.internal.category.CategoryService;
 import io.github.xiaou61.knowledge.internal.category.CategoryTree;
 import io.github.xiaou61.knowledge.internal.entry.EntryService;
+import io.github.xiaou61.knowledge.internal.entry.EntryViewService;
 import io.github.xiaou61.knowledge.internal.entry.SearchLogService;
 import io.github.xiaou61.platform.ApiAccess;
 import io.github.xiaou61.platform.ApiResponse;
@@ -42,12 +43,14 @@ class KnowledgeReadController {
     private final CategoryService categoryService;
     private final EntryService entryService;
     private final SearchLogService searchLog;
+    private final EntryViewService entryViews;
 
     KnowledgeReadController(CategoryService categoryService, EntryService entryService,
-                            SearchLogService searchLog) {
+                            SearchLogService searchLog, EntryViewService entryViews) {
         this.categoryService = categoryService;
         this.entryService = entryService;
         this.searchLog = searchLog;
+        this.entryViews = entryViews;
     }
 
     /**
@@ -109,6 +112,23 @@ class KnowledgeReadController {
 
     /** 一个分类的已发布条目数。放在这里而不是另开文件：它唯一的调用方就是上面那个端点。 */
     record CategoryCountView(long id, long count) {
+    }
+
+    /**
+     * 当前用户看过的条目（2026-11-11）。
+     *
+     * <p>给知识库列表把「已读」标出来，并在左栏显示「已读 x / y」。数据由打开条目时的
+     * 浏览上报累积（{@code POST /entries/{id}/view}，WORK-021），这里只读。
+     *
+     * <p>未登录（读路径不该 401）时返回空列表：列表页照常渲染，只是没有已读标记。
+     */
+    @GetMapping("/entry-views")
+    ApiResponse<List<EntryViewService.ViewedEntry>> entryViews() {
+        Long userId = CurrentUserId.orNull();
+        if (userId == null) {
+            return ApiResponse.ok(List.of());
+        }
+        return ApiResponse.ok(entryViews.listViewed(userId));
     }
 
     /** 条目详情：正文、分类、同分类内的上一篇／下一篇、反向链接、以及**自己的**自评标记。 */

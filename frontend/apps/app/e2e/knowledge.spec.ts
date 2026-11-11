@@ -350,3 +350,32 @@ test('条目页面包屑：知识库可退回，最后一级是分类且可点',
     await expect(page.getByTestId('breadcrumb')).toBeVisible()
   }
 })
+
+/**
+ * 「已读」标记（2026-11-11）。
+ *
+ * <p>数据来自服务端的浏览上报（WORK-021）：打开条目时写 `knowledge_entry_views`，列表页
+ * 再读 `/entry-views` 把已读行变灰并标「已读」。所以这条用例必须**真的打开一次**再看列表，
+ * 直接断言会读到一个还没写过库的账号。
+ *
+ * <p>不写死标题、也不假定一开始是未读：远程测试库上这个账号可能早就看过同一条，两种起点
+ * 都该通过——判据只是"打开过之后，这一行必须有已读标记"。
+ */
+test('看过的条目在列表里会标成「已读」', async ({ page }) => {
+  await signIn(page)
+  await openAllEntries(page)
+
+  const title = await firstEntryTitle(page)
+  await firstEntryLink(page).click()
+  await expect(page.getByTestId('markdown-body')).toBeVisible()
+
+  await page.goBack()
+  await expect(page.getByTestId('entry-list')).toBeVisible()
+
+  const row = page
+    .getByTestId('entry-list')
+    .locator('a[data-testid^="entry-link-"]')
+    .filter({ hasText: title })
+    .first()
+  await expect(row.getByTestId('entry-read-mark')).toBeVisible()
+})

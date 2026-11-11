@@ -14,7 +14,7 @@ import {
   PageHeader,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, BookOpenCheck, ChevronRight, FileText, Layers, Search } from 'lucide-react'
+import { ArrowRight, BookOpenCheck, Check, ChevronRight, FileText, Layers, Search } from 'lucide-react'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 
@@ -95,10 +95,45 @@ export function CategoryEntriesPage() {
     staleTime: 5 * 60 * 1000,
   })
 
+  /**
+   * 「我」看过的条目（2026-11-11）。数据由打开条目时的浏览上报累积在服务端，这里只读。
+   *
+   * <p>`staleTime: 0` 是有意的：从条目页按后退回来会**重新挂载**本页，这一格必须重新拉，
+   * 否则刚看完的那条不会变成「已读」——那正是这个功能唯一要表达的瞬间。
+   */
+  const viewed = useQuery({
+    queryKey: ['knowledge-entry-views'],
+    queryFn: () => knowledge.viewedEntries(),
+    staleTime: 0,
+  })
+  const viewedIds = useMemo(
+    () => new Set((viewed.data ?? []).map((row) => row.entryId)),
+    [viewed.data],
+  )
+
   const categoryCounts = useMemo(() => {
     const direct = new Map<number, number>()
     for (const entry of allEntries.data ?? []) {
       if (entry.categoryId === null) continue
+      direct.set(entry.categoryId, (direct.get(entry.categoryId) ?? 0) + 1)
+    }
+  const counts = new Map<number, number>()
+    const walk = (node: CategoryNode): number => {
+      const own = direct.get(node.id) ?? 0
+      const nested = node.children.reduce((sum, child) => sum + walk(child), 0)
+      const total = own + nested
+      counts.set(node.id, total)
+      return total
+    }
+    for (const node of categories.data ?? []) walk(node)
+    return counts
+  }, [categories.data, allEntries.data])
+
+  /** 每个分类「已读 / 总数」的已读那一半。口径与上面的总数一致（含子分类）。 */
+  const categoryReadCounts = useMemo(() => {
+    const direct = new Map<number, number>()
+    for (const entry of allEntries.data ?? []) {
+      if (entry.categoryId === null || !viewedIds.has(entry.id)) continue
       direct.set(entry.categoryId, (direct.get(entry.categoryId) ?? 0) + 1)
     }
     const counts = new Map<number, number>()
@@ -111,7 +146,7 @@ export function CategoryEntriesPage() {
     }
     for (const node of categories.data ?? []) walk(node)
     return counts
-  }, [categories.data, allEntries.data])
+  }, [categories.data, allEntries.data, viewedIds])
 
   /**
    * 分页（2026-11-10）：原来固定 `size: 50`、也没有翻页入口——"共 567 条"却只能靠搜索摸到其余。
@@ -210,6 +245,8 @@ export function CategoryEntriesPage() {
         <CategoryRail
           flat={flat}
           counts={categoryCounts}
+          readCounts={categoryReadCounts}
+          totalRead={viewed.data?.length ?? 0}
           countsReady={countsReady}
           scopedId={scopedId}
           totalAll={totalAll}
@@ -333,6 +370,7 @@ export function CategoryEntriesPage() {
             >
               {items.map((item) => {
                 const excerpt = cardExcerpt(item.excerpt, item.title)
+                const read = viewedIds.has(item.id)
                 return (
                   <li key={item.id}>
                     <Link
@@ -341,9 +379,16 @@ export function CategoryEntriesPage() {
                       className="group hover:bg-accent/40 focus-ring flex items-start gap-4 px-5 py-4 transition-colors"
                     >
                       <span className="min-w-0 flex-1">
+                        {/*
+                          已读的标题降到次文本色（面试鸭就是"做过的变灰"）。**但 hover 必须回到正文色**，
+                          否则一行灰标题读起来像"已被禁用"，而不是"看过了但还能再看"。
+                        */}
                         <span
                           data-testid="entry-title"
-                          className="group-hover:text-primary block leading-6 font-medium transition-colors"
+                          className={
+                            'block leading-6 font-medium transition-colors group-hover:text-foreground ' +
+                            (read ? 'text-muted-foreground' : 'text-foreground')
+                          }
                         >
                           {item.title}
                         </span>
@@ -361,7 +406,17 @@ export function CategoryEntriesPage() {
                           <span className="tabular-nums">{new Date(item.updatedAt).toLocaleDateString('zh-CN')}</span>
                         </span>
                       </span>
-                      <ChevronRight className="text-muted-foreground group-hover:text-primary mt-1 size-4 shrink-0 transition-colors" />
+                      {read ? (
+                        <span
+                          data-testid="entry-read-mark"
+                          title="你看过这条"
+                          className="text-muted-foreground mt-0.5 flex shrink-0 items-center gap-1 text-xs"
+                        >
+                          <Check className="size-3.5" />
+                          已读
+                        </span>
+                      ) : null}
+                      <ChevronRight className="text-muted-foreground group-hover:text-foreground mt-1 size-4 shrink-0 transition-colors" />
                     </Link>
                   </li>
                 )
@@ -402,6 +457,8 @@ export function CategoryEntriesPage() {
 function CategoryRail({
   flat,
   counts,
+  readCounts,
+  totalRead,
   countsReady,
   scopedId,
   totalAll,
@@ -410,6 +467,8 @@ function CategoryRail({
 }: {
   flat: FlatCategory[]
   counts: Map<number, number>
+  readCounts: Map<number, number>
+  totalRead: number
   countsReady: boolean
   scopedId: number | null
   totalAll: number
@@ -456,8 +515,11 @@ function CategoryRail({
                 <Layers className="size-3.5 shrink-0" />
                 <span className="truncate">全部条目</span>
               </span>
-              <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
-                {countsReady || totalAll > 0 ? totalAll : ''}
+              <span
+                className="text-muted-foreground shrink-0 text-xs tabular-nums"
+                title={countsReady || totalAll > 0 ? `已读 ${totalRead} / 共 ${totalAll}` : undefined}
+              >
+                {countsReady || totalAll > 0 ? `${totalRead}/${totalAll}` : ''}
               </span>
             </Link>
             <ul className="space-y-0.5" data-testid="category-grid">
@@ -484,8 +546,23 @@ function CategoryRail({
                           轨道
                         </Badge>
                       ) : null}
-                      <span className="text-muted-foreground text-xs tabular-nums">
-                        {countsReady ? (counts.get(node.id) ?? 0) : ''}
+                      <span
+                        className="text-muted-foreground text-xs tabular-nums"
+                        title={
+                          countsReady
+                            ? `已读 ${readCounts.get(node.id) ?? 0} / 共 ${counts.get(node.id) ?? 0}`
+                            : undefined
+                        }
+                      >
+                        {/*
+                          只显示「已读/总数」；分类为空时写一个 0 —— 「0/0」是噪音，
+                          读者要的是"这个分类里有多少还没看"。
+                        */}
+                        {countsReady
+                          ? (counts.get(node.id) ?? 0) === 0
+                            ? '0'
+                            : `${readCounts.get(node.id) ?? 0}/${counts.get(node.id) ?? 0}`
+                          : ''}
                       </span>
                     </span>
                   </Link>

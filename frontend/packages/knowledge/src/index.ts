@@ -34,6 +34,7 @@ export type {
   RunCodeInput,
   RunCodeResult,
   SandboxStatus,
+  ViewedEntry,
 } from './client'
 export { stripDuplicateTitle } from './entry-body'
 export { EntryToc } from './entry-toc'

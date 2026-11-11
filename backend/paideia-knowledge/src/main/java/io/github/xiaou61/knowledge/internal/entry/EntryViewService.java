@@ -4,6 +4,7 @@ import io.github.xiaou61.knowledge.internal.entry.Entry;
 import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
 import java.time.Instant;
+import java.util.List;
 import org.springframework.stereotype.Service;
 
 /**
@@ -36,5 +37,25 @@ public class EntryViewService {
         Entry entry = entryMapper.findPublishedById(entryId)
                 .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "条目不存在"));
         mapper.upsert(userId, entry.getId(), Instant.now());
+    }
+
+    /**
+     * 某个用户看过的全部条目（2026-11-11）。
+     *
+     * <p>给知识库列表用：左栏显示「已读 x / y」、右栏把已读行标出来。数据本来就在库里
+     * （{@link #record} 每次打开都在累加），这里只是把它读出来——**不需要客户端自己记**
+     * （换设备、清缓存都不丢）。
+     *
+     * <p>只下发 id、次数、最近时间，不带标题：列表页手里已经有标题，重复下发等于把
+     * 650 条标题再传一遍。
+     */
+    public List<ViewedEntry> listViewed(long userId) {
+        return mapper.findByUser(userId).stream()
+                .map(row -> new ViewedEntry(row.entryId(), row.viewCount(), row.lastViewedAt()))
+                .toList();
+    }
+
+    /** 对外形状：某个条目「看过几次、最后一次什么时候」。 */
+    public record ViewedEntry(long entryId, int viewCount, Instant lastViewedAt) {
     }
 }
