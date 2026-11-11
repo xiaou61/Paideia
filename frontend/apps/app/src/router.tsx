@@ -12,7 +12,6 @@ import { KnowledgeWikiPage } from './pages/KnowledgeWikiPage'
 import { CampDetailPage } from './pages/CampDetailPage'
 import { CampListPage } from './pages/CampListPage'
 import { CategoryEntriesPage } from './pages/CategoryEntriesPage'
-import { KnowledgeCategoriesPage } from './pages/KnowledgeCategoriesPage'
 import { DigestPage } from './pages/DigestPage'
 import { EssayPage } from './pages/EssayPage'
 import { LearnPage } from './pages/LearnPage'
@@ -184,13 +183,13 @@ export const router = createHashRouter([
       </RequireAuth>
     ),
   },
-  // 知识库是两级：先分类（卡片网格），点进去才是条目列表。
-  // 原来把分类塞进一个 16rem 侧栏、条目挤在旁边，一屏又空又单调（用户反馈）。
+  // 知识库：左侧分类目录 + 右侧条目列表，三条路由共用同一个组件（2026-11-11 定稿）。
+  // `/knowledge` 与 `/knowledge/entries` 等价（都显示全部），保留前者是因为导航与旧链接都用它。
   {
     path: '/knowledge',
     element: (
       <RequireAuth>
-        <KnowledgeCategoriesPage />
+        <CategoryEntriesPage />
       </RequireAuth>
     ),
   },

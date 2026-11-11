@@ -144,10 +144,11 @@ test.describe('触控目标', () => {
   test('默认按钮的主档命中区不小于 44px', async ({ page }) => {
     await signIn(page)
     await page.goto('/#/knowledge')
-    // 分类卡片是可点的整块，是这一页最主要的目标
-    await expect(page.getByTestId('category-grid')).toBeVisible({ timeout: 15_000 })
-    const card = page.locator('[data-testid^="category-card-"]').first()
-    const box = await card.boundingBox()
+    // 2026-11-11 知识库改成「左目录 + 右列表」：窄屏左目录换成顶部横向分类标签（`category-chips`），
+    // 分类卡在手机上已不渲染。这一页在手机上的主档目标因此是那些标签，要求仍是 ≥44px。
+    await expect(page.getByTestId('category-chips')).toBeVisible({ timeout: 15_000 })
+    const chip = page.locator('[data-testid^="category-chip-"]').first()
+    const box = await chip.boundingBox()
     expect(Math.min(box!.width, box!.height)).toBeGreaterThanOrEqual(44)
   })
 })
