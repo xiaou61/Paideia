@@ -1,4 +1,4 @@
-import { createKnowledgeApi, plainText } from '@paideia/knowledge'
+import { createKnowledgeApi, fetchAllEntries, plainText, type CategoryNode, type EntrySummary } from '@paideia/knowledge'
 import {
   AppShell,
   Badge,
@@ -9,12 +9,13 @@ import {
   EmptyMedia,
   EmptyTitle,
   ErrorAlert,
-  LoadingRow,
   PageHeader,
   Section,
+  Skeleton,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, ChevronRight, FolderOpen, Layers } from 'lucide-react'
+import { ArrowRight, FolderOpen, Layers } from 'lucide-react'
+import { useMemo } from 'react'
 import { Link } from 'react-router'
 
 import { api } from '../api'
@@ -23,34 +24,76 @@ import { LearnerHeader } from '../components/LearnerHeader'
 const knowledge = createKnowledgeApi(api)
 
 /**
- * 知识库首屏：**分类清单**（取代原来的左侧窄树）。
+ * 知识库首屏：**分类卡网格**，每张卡带上这个分类最新的 3 个标题。
  *
  * <p>原来把分类塞进一个 16rem 的侧栏里，一屏看得到七八条、每条只有名字，整页因此显得又空又单调
  * （用户反馈："分类这里就不能弄成二级页面那样吗……页面过于单调"）。改成"先看分类、点进去才是条目"
- * 之后，卡片能放下名字、子分类与条目去向，点击目标也大得多。
+ * 之后，卡片能放下名字与条目去向，点击目标也大得多。
  *
- * <p><b>2026-11-11 第三次改版：封面卡片网格 → 与条目列表同一套密排表格</b>。上一版的每张卡都顶着
- * 一块 96px 的薰衣草色块（点阵纹理 + 文件夹图标），而那块色块**不承载任何信息**——名字就在它下面
- * 一行。用户看完二级页的改版后说这个风格可以一起换掉，于是这里也换成「一张卡 + 表头 + 分隔线行」：
+ * <p><b>2026-11-11 第二次改版：表格 → 带标题预览的分类卡。</b>上一版做成了「分类 / 子分类 / 去向」
+ * 的表格行，线上实测有两个致命问题：
  *
  * <ul>
- *   <li>分类名、子分类名、去向箭头各占一列，眼睛能纵向比对，而不是在九个方框之间跳；</li>
- *   <li>子分类从一排徽章改成一行文字（`·` 分隔、超长截断）——徽章原本要占两三行，把行高撑到
- *       色块那一侧才停得下来；</li>
- *   <li>「全部条目」「按目录阅读」这两个快捷入口从两块通栏渐变卡收成工具栏上的两个按钮：它们
- *       不是分类，跟分类摆成同样大小的卡片，反而让人以为是一类东西。</li>
+ *   <li><b>46 个分类里 43 个没有子分类</b>——那一列就是 43 个「—」，整页像一张没填完的表；</li>
+ *   <li>"子分类"本来也不是读者关心的东西。他来这儿是想知道<b>这个分类里有什么内容</b>。</li>
  * </ul>
+ *
+ * <p>所以把"子分类"整列换成**这个分类最新的 3 个标题**：那一列从"什么都没有"变成全页信息量
+ * 最大的地方，而且它天然回答了"值不值得点进去"。数据一次取全（645 条，约 200KB，目录阅读页
+ * 也是这么取的），按分类聚合后在本地切前 3 条。
+ *
+ * <p>排序按**条目数从多到少**：内容多的分类先出现，空分类沉到最底下（它们保留，因为那是
+ * 结构的一部分，只是不该占首屏）。
  */
 export function KnowledgeCategoriesPage() {
   const categories = useQuery({
     queryKey: ['knowledge-categories'],
     queryFn: () => knowledge.categories(),
   })
-  // 分类下面那块"最近更新"用得到：分类只有三五个时，光一张表会让下半屏空着
+  // 一次取全库（内部循环翻页）：分类卡要展示"每个分类最新的 3 条"，逐分类请求就是 46 次往返。
+  // 目录阅读页（/knowledge/wiki）早就这么做，645 条约 200KB，一次拿完最省。
+  const allEntries = useQuery({
+    queryKey: ['knowledge-entries-all-compact'],
+    queryFn: () => fetchAllEntries(knowledge),
+    // 分类预览只是"引子"：5 分钟内不重复拉，避免来回切页时反复下载 200KB
+    staleTime: 5 * 60 * 1000,
+  })
+
+  /** 分类卡：分类节点 + 它整棵子树里的条目（按更新时间倒序，取前 3 条做预览）。 */
+  const groups = useMemo(() => {
+    const byCategory = new Map<number, EntrySummary[]>()
+    for (const entry of allEntries.data ?? []) {
+      if (entry.categoryId === null) continue
+      const bucket = byCategory.get(entry.categoryId)
+      if (bucket === undefined) {
+        byCategory.set(entry.categoryId, [entry])
+      } else {
+        bucket.push(entry)
+      }
+    }
+    const collect = (node: CategoryNode): EntrySummary[] => {
+      const own = byCategory.get(node.id) ?? []
+      const nested = node.children.flatMap(collect)
+      return own.concat(nested)
+    }
+    return (categories.data ?? [])
+      .map((node) => {
+        const entries = collect(node).sort(
+          (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+        )
+        return { node, entries, count: entries.length }
+      })
+      // 内容多的先露头；数量相同按名字。空分类留到最后，而不是一排「—」占满首屏
+      .sort((a, b) => b.count - a.count || a.node.name.localeCompare(b.node.name, 'zh-CN'))
+  }, [categories.data, allEntries.data])
+
+  // 分类下面的"最近更新"：分类卡只有标题，想看"最近写了什么"的人还有第二条进路
   const recent = useQuery({
     queryKey: ['knowledge-entries', null, '', 'recent'],
     queryFn: () => knowledge.entries({ size: 6 }),
   })
+
+  const loading = categories.isPending || allEntries.isPending
 
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
@@ -60,24 +103,15 @@ export function KnowledgeCategoriesPage() {
       />
 
       {/*
-        快捷入口（2026-11-11）：从通栏卡片收成工具栏按钮。
-        更细的一层理由：它们是**动作**（去某个列表 / 换一种读法），不是**分类**——原来两块卡与
-        分类卡同尺寸同外观，扫视时会被当成"两个奇怪的分类"。testid 保持原样，既有 e2e 仍走同一条路。
+        快捷入口：它们是**动作**（去某个列表 / 换一种读法），不是**分类**。
+        做成与分类卡同尺寸的大卡，扫视时会被当成"两个奇怪的分类"。
       */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Button
-          variant="outline"
-          data-testid="all-entries-card"
-          render={<Link to="/knowledge/entries" />}
-        >
+      <div className="mb-8 flex flex-wrap items-center gap-2">
+        <Button variant="outline" data-testid="all-entries-card" render={<Link to="/knowledge/entries" />}>
           <Layers className="size-4" />
           全部条目
         </Button>
-        <Button
-          variant="outline"
-          data-testid="wiki-reader-card"
-          render={<Link to="/knowledge/wiki" />}
-        >
+        <Button variant="outline" data-testid="wiki-reader-card" render={<Link to="/knowledge/wiki" />}>
           <FolderOpen className="size-4" />
           按目录阅读
         </Button>
@@ -92,113 +126,82 @@ export function KnowledgeCategoriesPage() {
         />
       ) : null}
 
-      {categories.isError ? null : (
-        <div className="border-border bg-card overflow-hidden rounded-xl border">
-          {/*
-            表头与行**同一套两级结构**（外层 flex-1 容器 + 右箭头占位），列宽才对得上：
-            桌面是「分类 224px / 子分类 自适应」两列，窄屏折成「名字 + 子分类」两行。
-          */}
-          <div className="border-border bg-muted/50 text-muted-foreground flex h-9 items-center gap-4 border-b px-4 text-xs">
-            <span className="flex min-w-0 flex-1 flex-col md:flex-row md:items-center md:gap-4">
-              <span className="md:w-56 md:shrink-0">分类</span>
-              <span className="hidden min-w-0 md:block md:flex-1">子分类</span>
-            </span>
-            <span aria-hidden className="size-4 shrink-0" />
-          </div>
-
-          {categories.isPending ? (
-            <LoadingRow
-              label="加载分类…"
-              testId="category-state"
-              className="text-muted-foreground flex items-center gap-2 px-4 py-6 text-sm"
-            />
-          ) : null}
-
-          {categories.isSuccess && categories.data.length === 0 ? (
-            <Empty className="border-0 py-16" data-testid="category-empty">
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <FolderOpen />
-                </EmptyMedia>
-                <EmptyTitle>还没有建分类</EmptyTitle>
-                <EmptyDescription>分类由管理员在管理端建立。</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ) : null}
-
-          {categories.isSuccess && categories.data.length > 0 ? (
-            <div data-testid="category-grid" className="divide-border divide-y">
-              {categories.data.map((category) => (
-                <Link
-                  key={category.id}
-                  to={`/knowledge/categories/${category.id}`}
-                  data-testid={`category-card-${category.id}`}
-                  className="focus-ring group hover:bg-accent/40 flex items-start gap-4 px-4 py-3 transition-colors md:items-center"
-                >
-                  <span className="flex min-w-0 flex-1 flex-col md:flex-row md:items-center md:gap-4">
-                    <span className="flex min-w-0 items-center gap-2 md:w-56 md:shrink-0">
-                      <span className="group-hover:text-primary min-w-0 truncate font-medium transition-colors">
-                        {category.name}
-                      </span>
-                      {/* 学习轨道与普通分类混在一起，但前者有关卡顺序；标出来才知道去 /learn 有一条引导路线 */}
-                      {category.lineKind ? (
-                        <Badge variant="secondary" className="shrink-0">
-                          从零开始
-                        </Badge>
-                      ) : null}
-                    </span>
-
-                    {/*
-                      子分类用一行文字而不是一排徽章：徽章要占两三行，行高就撑成卡片了。
-                      空的情况在桌面画一个短横（六行都是「没有子分类」会像没填完的表），
-                      窄屏则**整个不出现**——那一行折叠后只剩名字，多一个短横纯属噪音。
-                      短横只是形状，语义由 sr-only 补，别让"没有"只存在于颜色里。
-                    */}
-                    <span
-                      className="text-muted-foreground mt-1 block min-w-0 truncate text-xs md:mt-0 md:flex-1 md:text-sm"
-                      title={category.children.length === 0 ? undefined : childrenText(category.children)}
-                    >
-                      {category.children.length === 0 ? (
-                        <>
-                          <span aria-hidden className="hidden md:inline">
-                            —
-                          </span>
-                          <span className="sr-only">没有子分类</span>
-                        </>
-                      ) : (
-                        childrenText(category.children)
-                      )}
-                    </span>
-                  </span>
-
-                  <ChevronRight className="text-muted-foreground group-hover:text-primary mt-1 size-4 shrink-0 transition-colors md:mt-0" />
-                </Link>
-              ))}
+      {categories.isError ? null : loading ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="category-state">
+          <span className="sr-only">加载分类…</span>
+          {['a', 'b', 'c', 'd', 'e', 'f'].map((key) => (
+            <div key={key} className="border-border bg-card flex flex-col rounded-xl border p-5">
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="mt-2 h-3 w-24" />
+              <Skeleton className="mt-4 h-3 w-full" />
+              <Skeleton className="mt-2 h-3 w-5/6" />
+              <Skeleton className="mt-2 h-3 w-3/4" />
             </div>
-          ) : null}
+          ))}
+        </div>
+      ) : null}
 
-          {/* 表尾与条目列表同构：总数常驻，另一个入口放在右侧 */}
-          {categories.isSuccess && categories.data.length > 0 ? (
-            <div className="border-border flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2.5">
-              <span className="text-muted-foreground text-xs">
-                共 {categories.data.length} 个分类
+      {!loading && groups.length === 0 ? (
+        <Empty data-testid="category-empty">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <FolderOpen />
+            </EmptyMedia>
+            <EmptyTitle>还没有建分类</EmptyTitle>
+            <EmptyDescription>分类由管理员在管理端建立。</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : null}
+
+      {loading || groups.length === 0 ? null : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="category-grid">
+          {groups.map(({ node, entries, count }) => (
+            <Link
+              key={node.id}
+              to={`/knowledge/categories/${node.id}`}
+              data-testid={`category-card-${node.id}`}
+              className="border-border bg-card hover:border-primary/40 hover:shadow-card group focus-ring flex flex-col rounded-xl border p-5 transition-all hover:-translate-y-0.5"
+            >
+              <span className="flex items-start justify-between gap-3">
+                <span className="group-hover:text-primary min-w-0 truncate font-medium transition-colors">
+                  {node.name}
+                </span>
+                {/* 学习轨道与普通分类混在一起，但前者有关卡顺序；标出来才知道去 /learn 有一条引导路线 */}
+                {node.lineKind ? (
+                  <Badge variant="secondary" className="shrink-0">
+                    从零开始
+                  </Badge>
+                ) : null}
               </span>
-              <Link
-                to="/knowledge/entries"
-                className="text-muted-foreground hover:text-primary focus-ring flex items-center gap-1 rounded text-xs transition-colors"
-              >
-                不挑分类，看全部条目
+              <span className="text-muted-foreground mt-1 text-xs">
+                {count} 条内容
+                {node.children.length === 0 ? null : ` · ${node.children.length} 个子分类`}
+              </span>
+
+              {/* 预览标题：这一列就是这张卡的全部价值——读者靠它判断"值不值得点进去" */}
+              <span className="mt-3 flex flex-1 flex-col gap-1.5">
+                {entries.length === 0 ? (
+                  <span className="text-muted-foreground/70 text-xs">还没有内容</span>
+                ) : (
+                  entries.slice(0, 3).map((entry) => (
+                    <span key={entry.id} className="text-muted-foreground block truncate text-sm">
+                      {entry.title}
+                    </span>
+                  ))
+                )}
+              </span>
+
+              <span className="text-primary mt-4 flex items-center gap-1 text-xs">
+                {count === 0 ? '看看这个分类' : `查看全部 ${count} 条`}
                 <ArrowRight className="size-3.5" />
-              </Link>
-            </div>
-          ) : null}
+              </span>
+            </Link>
+          ))}
         </div>
       )}
 
       {/*
-        分类下面是"最近更新"。分类只有三五个时，光一张表会让整页在下半屏空着
-        （用户对上一版的抱怨之一就是"这么多空白"）。这块填的是**真内容**：最近更新的条目，
-        顺带给不想挑分类的人第二条进路。
+        分类下面是"最近更新"。分类卡只有标题，想看"最近写了什么、谁写的"的人有第二条进路。
       */}
       {recent.isSuccess && recent.data.items.length > 0 ? (
         <Section
@@ -241,17 +244,4 @@ export function KnowledgeCategoriesPage() {
       ) : null}
     </AppShell>
   )
-}
-
-/**
- * 子分类清单压成一行（2026-11-11）。
- *
- * <p>最多列 4 个，其余折成「等 N 个」：子分类可以到十几个，全列出来这一列会换行，
- * 行高就不是"一行一个分类"了。用 `·` 而不是徽章：徽章有内边距与圆角，一行里十几个小方块
- * 比文字更难读，而这里要的只是"有哪些子类"。
- */
-function childrenText(children: { name: string }[]): string {
-  const shown = children.slice(0, 4).map((child) => child.name)
-  const rest = children.length - shown.length
-  return rest > 0 ? `${shown.join(' · ')} 等 ${children.length} 个` : shown.join(' · ')
 }

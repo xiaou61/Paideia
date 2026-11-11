@@ -21,14 +21,14 @@ function LoadingAnnounce({ label }: { label: string }) {
 }
 
 /**
- * 条目列表：与 `CategoryEntriesPage` 的密排表格行同构（序号 + 标题 + 右对齐日期）。
+ * 条目列表：与 `CategoryEntriesPage` 的**两列文章卡**同构（标题两行 + 摘要两行 + 页脚一行）。
  *
- * <p>2026-11-11 随列表改版重画：原来是"封面 80px + 标题 + 两行摘要"的卡片骨架，容器是
- * 三列网格；列表改成单列表格行之后，那份骨架会先摆出六张卡再把它们收成一张表，比不画还糟。
- * 行高照真实的 `py-3` + `leading-6` 抄，宽度用 3/5 的标题条——真实标题两行截断时的常见长度。
+ * <p>2026-11-11 第二次改版：列表从"密排表格"改回文章卡（线上 645 条实测后，表格把
+ * "我们没有难度/标签这类字段"这件事暴露得最彻底）。骨架跟着回到两列卡，尺寸照抄真实
+ * 卡片：标题两行（`h-4`×2 + 间距）、摘要两行、页脚一行。差太多就等于换了一种跳动。
  */
-export function EntryListSkeleton({
-  count = 8,
+export function EntryCardSkeleton({
+  count = 6,
   testId = 'entry-state',
   label = '加载条目…',
 }: {
@@ -37,16 +37,18 @@ export function EntryListSkeleton({
   label?: string
 }) {
   return (
-    <div data-testid={testId} aria-busy="true">
+    <div className="grid gap-4 md:grid-cols-2" data-testid={testId} aria-busy="true">
       <LoadingAnnounce label={label} />
-      {Array.from({ length: count }, (_, index) => index).map((index) => (
-        <div
-          key={index}
-          className="border-border flex items-center gap-4 border-b px-4 py-3 last:border-b-0"
-        >
-          <Skeleton className="h-3 w-4 shrink-0 rounded-sm" />
-          <Skeleton className="h-4 flex-1" style={{ maxWidth: `${55 + ((index * 7) % 30)}%` }} />
-          <Skeleton className="hidden h-3 w-16 shrink-0 sm:block" />
+      {KEYS.slice(0, count).map((key) => (
+        <div key={key} className="border-border bg-card flex flex-col rounded-xl border p-5">
+          <Skeleton className="h-4 w-11/12" />
+          <Skeleton className="mt-2 h-4 w-3/5" />
+          <Skeleton className="mt-3 h-3 w-full" />
+          <Skeleton className="mt-2 h-3 w-4/5" />
+          <div className="mt-auto flex items-center gap-2 pt-4">
+            <Skeleton className="h-4 w-14 rounded-full" />
+            <Skeleton className="h-3 w-16" />
+          </div>
         </div>
       ))}
     </div>
