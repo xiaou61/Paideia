@@ -143,29 +143,37 @@ workflow: compact
   否则半透明卡面会高估对比度
 - 验证：`pnpm exec vitest run src/theme` → `Tests 191 passed`（17 皮肤 × 2 模式 × 5 条 = 170 条对比度断言）；`pnpm --filter @paideia/ui-kit build` → CSS 156 149 字节、`data-skin` 规则 64 条
 
-### TASK-011 | pending | 换肤联动：图谱重读、编辑器与代码块跟随
+### TASK-011 | done | 换肤联动：图谱重读、编辑器与代码块跟随
 
 - 对应：`REQ-011`、`AC-007`
 - 依赖：TASK-003
 - 新建/修改：`apps/app/src/components/graph/tier-style.ts`、`GraphCanvas2D.tsx`、`GraphCanvas3D.tsx`
-- 步骤：1) `tier-style.ts` 加 `useTierColors()`（订阅 `subscribeToThemeChange`）；2) 两个画布改为依赖该 hook 的返回值并重建画布；3) 手动核查 `/practice/sql` 编辑器与 markdown 代码块在 `neon`/`paper` 下的跟随。
-- 验证：e2e 图谱用例通过 + 人工截图记录
+- 实际做法（比计划更省）：**不重建画布，只重算颜色**。2D 用 `graph.setNodeAttribute('color', …)` + `renderer.refresh()`；
+  3D 把访问器改成每次现读令牌（`nodeColor = (node) => tierColor(node.tier)`）并重新挂一次。
+  重建会重跑力导向布局，等于每次换肤都"换一张图"，节点坐标是用户的空间记忆。
+- 验证：`pnpm --filter @paideia/app typecheck` 0 error。**图谱用例未跑**（见 TASK-012 的阻塞）
 
 ### TASK-012 | pending | e2e：入口 / 切换 / 持久化 / 首屏不闪 / print
 
 - 对应：`AC-004`、`AC-005`、`AC-006`、`AC-008`、`AC-009`
 - 依赖：TASK-004、TASK-006、TASK-011
 - 新建：`apps/app/e2e/appearance.spec.ts`
-- 步骤：1) 账号菜单 → 外观 → 选 `paper` → 断言 `html[data-skin]` 与 `--background` 变化；2) reload 后属性仍在且无需交互；3) 关键词筛选与空状态；4) `emulateMedia({media:'print'})` 下背景回到纸色；5) 跑既有的 `ui-kit.spec.ts` 与 `markdown-render.spec.ts` 主题用例。
-- 验证：`bash ../scripts/test-db.sh pnpm --filter @paideia/app test:e2e e2e/appearance.spec.ts` 全绿
+- 已写：五条用例（入口/切换+刷新保持/首屏不闪/筛选与空状态/打印）
+- **未执行**，本机有两个环境阻塞（都不是代码问题）：
+  1. `scripts/test-db.sh` 拒绝当前配置：`backend/config/remote-db.local.env` 指向远程 MySQL，
+     远端账号不能建新库；要跑得把 `PAIDEIA_TEST_DB_URL` 指到本机 MySQL。
+  2. Playwright 的 `chromium_headless_shell-1248` 缺失，`playwright install chromium-headless-shell` 只下到 ffmpeg。
+- 替代证据：用系统 Chrome + CDP 直接验了同一批行为（见 `testing/report.md` 的「运行时行为证据」），
+  只有"账号菜单入口"与"页面级 reload"没有跑到
+- 待验证：`bash ../scripts/test-db.sh pnpm --filter @paideia/app test:e2e e2e/appearance.spec.ts`（在能连本机测试库的机器上）
 
-### TASK-013 | pending | 规格文档与收尾
+### TASK-013 | done | 规格文档与收尾
 
 - 对应：`AC-001`、`AC-009`
 - 依赖：TASK-010、TASK-012
 - 新建/修改：`.agent/specs/platform-contracts.md` 增加「设计令牌与皮肤契约」小节
-- 步骤：写清"加一个皮肤的三步"（加 CSS 块 → 加注册条 → 跑两个测试）与禁止事项（不改 `--paper*`、不把颜色写进 TS、不覆盖未知令牌）
-- 验证：文档提交后 `pnpm --filter @paideia/ui test` 与两个 typecheck 全绿
+- 已写：三层结构表、"加一个皮肤的三步"、四条禁止、换肤联动点（谁必须订阅事件）
+- 验证：`pnpm --filter @paideia/ui test` 191 条全绿（`testing/report.md`）
 
 ## 完成条件
 

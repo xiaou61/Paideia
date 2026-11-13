@@ -1,4 +1,11 @@
-import { circularLayout, loadPositions, type ConceptEdge, type ConceptNode } from '@paideia/knowledge'
+import {
+  circularLayout,
+  loadPositions,
+  type ConceptEdge,
+  type ConceptNode,
+  type MasteryTier,
+} from '@paideia/knowledge'
+import { subscribeToThemeChange } from '@paideia/ui'
 import { useEffect, useRef, useState } from 'react'
 
 import { tierColor } from './tier-style'
@@ -50,7 +57,11 @@ export function GraphCanvas3D({ nodes, edges, layoutKeyValue, selectedId, onSele
           nodes: nodes.map((node) => ({
             id: String(node.id),
             name: node.name,
-            color: tierColor(node.tier),
+            /**
+             * 存 `tier` 而不是存颜色（WORK-079）：颜色要能随换肤重新求值。
+             * 存死色值的话，换肤后这张图会留在旧配色里，直到用户刷新页面。
+             */
+            tier: node.tier,
             val: node.tier === 'unknown' ? 1 : 1 + node.score * 2,
             x: points[node.id]?.x ?? 0,
             y: points[node.id]?.y ?? 0,
@@ -62,15 +73,25 @@ export function GraphCanvas3D({ nodes, edges, layoutKeyValue, selectedId, onSele
             .map((edge) => ({ source: String(edge.from), target: String(edge.to) })),
         }
 
+        /** 每次求值都现读令牌：换肤后重新 `nodeColor(...)` 就会拿到新颜色。 */
+        const nodeColor = (node: object): string => tierColor((node as { tier: MasteryTier }).tier)
+
         const element = container.current
         const renderer = new ForceGraph3D(element)
           .graphData(graphData)
           .nodeLabel((node) => (node as { name: string }).name)
-          .nodeColor((node) => (node as { color: string }).color)
+          .nodeColor(nodeColor)
           .onNodeClick((node) => onSelect(Number((node as { id: string }).id)))
           .backgroundColor('transparent')
 
+        // 换肤 / 换明暗：重新挂一次颜色访问器，three.js 会重算材质颜色。
+        // 不动布局——3D 的力导向每重跑一次就要重新收敛，用户的空间记忆会丢。
+        const unsubscribeTheme = subscribeToThemeChange(() => {
+          renderer.nodeColor(nodeColor)
+        })
+
         destroy = () => {
+          unsubscribeTheme()
           renderer.pauseAnimation()
           element.replaceChildren()
         }

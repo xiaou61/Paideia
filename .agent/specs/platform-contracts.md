@@ -53,6 +53,39 @@ updated: 2026-10-09
 - `packages/ui` 与 `packages/core` **不得**引用 `electron` 或 `@tauri-apps/*`，有自动化检查（`packages/core/src/workspace-boundaries.test.ts`）。
 - 资源路径必须相对（Vite `base: './'`）；路由用 Hash 路由，以便同一份产物在 Web 与桌面壳下都成立。
 
+## 设计令牌与皮肤契约
+
+四个前端应用共用 `packages/ui/src/styles/globals.css` 这一份样式入口。颜色**只能**来自其中的令牌——应用与共享包里出现十六进制、`hsl()/rgb()` 字面量或调色板类（`bg-blue-500`）会被 `packages/ui/src/tokens.test.ts` 判红。
+
+### 三层结构
+
+| 层 | 位置 | 职责 |
+| --- | --- | --- |
+| 默认令牌 | `globals.css` 的 `:root` / `.dark` | 结构亮度与默认皮肤（黑白，"墨白"）。这一层不搬家 |
+| 皮肤 | `styles/theme/skins/<族>.css` | 只覆盖需要改的令牌；选择器 `:root[data-skin='x']`（0,2,0）与 `:root[data-skin='x'].dark`（0,3,0） |
+| 装饰 | `styles/theme/decor.css` | `body::before` 一层装饰（纸纹/光斑），由 `--decor-image/size/opacity/blend` 驱动；默认 `--decor-opacity: 0`，即默认主题零变化 |
+
+皮肤目录信息在 `packages/ui/src/theme/skins.ts`（`SKINS` / `SKIN_FAMILIES`），每族一个文件 `theme/skins/<族>.ts`。外观页 `/settings/appearance` 按族分组展示，卡片自带 `data-skin` 做活预览。
+
+### 加一个皮肤的三步
+
+1. 在对应族的 `styles/theme/skins/<族>.css` 里写两块（亮色 + `.dark`），只写要改的令牌。
+2. 在 `theme/skins/<族>.ts` 里登记 `id` / `name` / `summary` / `family` / `tags`。
+3. 跑 `pnpm --filter @paideia/ui exec vitest run src/theme`——新皮肤自动进入对比度遍历与契约检查。
+
+### 四条禁止
+
+- **不许在 TS/TSX 里写颜色**（包括预览色板）：一律用令牌类，预览卡靠自己的 `data-skin` 取色。
+- **不许改 `--paper*`**：简历纸张（WORK-018）的语义是"纸永远白、字永远黑"，由 `skin-contract.test.ts` 的保留名单拦。
+- **不许覆盖未知令牌名**：拼错不会报错、也不会生效，契约测试会点名。
+- **不许只写一半**：亮色块里覆盖了哪个令牌，暗色块就必须也给值——否则暗色下会出现"半新半旧"（典型症状是深底深字）。
+
+### 换肤的联动点
+
+- 令牌变化会派发 `paideia:themechange`（`packages/ui/src/theme/theme-events.ts`）。**读 `getComputedStyle` 取色的地方必须订阅它**，否则换肤后不会变色：知识图谱的 sigma / 3d-force-graph 画布（`apps/app/src/components/graph/*`）就是这么处理的；它们只改颜色、不重跑布局。
+- CodeMirror 主题（`packages/ui/src/code-editor/theme.ts`）与 markdown 代码块都直接用 `var(--*)`，自动跟随，不需要订阅。
+- 打印：`@media print` 下所有令牌强制回纸张语义，深色皮肤不会打出黑底。
+
 ## CORS 白名单
 
 - 未列入白名单的来源会被**直接拒为 403**，不是返回 200 少一个放行头。
