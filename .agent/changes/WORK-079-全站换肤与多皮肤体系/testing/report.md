@@ -15,12 +15,12 @@ commit: 未提交（本轮改动仍在工作区）
 
 | 检查项 | 命令 | 退出码 | 结果 | 证据 |
 | --- | --- | --- | --- | --- |
-| AC-002 / AC-003 皮肤契约（4 类错误）与全皮肤对比度（8 组 × 5 条） | `pnpm --filter @paideia/ui exec vitest run src/theme` | 0 | passed | 输出：`Test Files 3 passed (3)`、`Tests 61 passed`（contrast 40 / skin-contract 12 / theme-context 9） |
+| AC-002 / AC-003 皮肤契约（4 类错误）与全皮肤对比度（17 皮肤 × 2 模式 × 5 条 = 170 条） | `pnpm --filter @paideia/ui exec vitest run src/theme` | 0 | passed | 输出：`Test Files 3 passed (3)`、`Tests 191 passed`（contrast 170 / skin-contract 12 / theme-context 9） |
 | AC-009 共享包类型检查 | `pnpm --filter @paideia/ui typecheck` | 0 | passed | 输出仅 `$ tsc -p tsconfig.json`，无诊断 |
 | AC-009 应用类型检查 | `pnpm --filter @paideia/app typecheck` | 0 | passed | 输出仅 `$ tsc -p tsconfig.json`，无诊断 |
-| AC-004 外观页能进生产构建、皮肤样式真的进了产物 | `pnpm --filter @paideia/ui-kit build` | 0 | passed | `✓ built in 2.32s`；`dist/assets/index-CC-aNQtW.css` 128 603 字节，含 `data-skin=paper` 皮肤块与 `sm:grid-cols-2` |
+| AC-004 外观页能进生产构建、皮肤样式真的进了产物 | `pnpm --filter @paideia/ui-kit build` | 0 | passed | `✓ built in 1.52s`；CSS 156 149 字节，含 `data-skin` 规则 64 条（16 皮肤 × 4 个选择器）与 `sm:grid-cols-2` |
 | AC-001 加皮肤只动样式与注册表，不动组件 | `git status --short` 与 `git diff --stat` | 人工 | passed | 改动集中在 `packages/ui/src/styles/theme/**`、`packages/ui/src/theme/**`、`apps/app/{pages,router,components}`、`apps/ui-kit` 演示页；`paper`/`neon`/`terminal` 三个皮肤的实现只落在这两类文件里 |
-| AC-010 观感抽查（`terminal`、`neon` 深/浅四张） | Chrome headless + CDP 截图（1440×1000） | 人工 | passed | 截图在 `F:\Paideia\.worktrees\WORK-079-shots\`：`top-terminal-light.png`、`top-neon-dark.png`、`top-paper-light.png`、`skins-light.png` |
+| AC-010 观感抽查（`pixel`、`contrast`、`glass`、`forest`、`candy`、`midnight` 等） | Chrome headless + CDP 截图（1440×1000） | 人工 | passed | 截图在 `F:\Paideia\.worktrees\WORK-079-shots\`（v1/v2）：含 17 张皮肤卡片的网格三段、5 个亮色皮肤整页、3 个暗色皮肤整页 |
 
 ## 反向验证（证明守卫真的会拦住）
 
@@ -37,4 +37,3 @@ commit: 未提交（本轮改动仍在工作区）
 - `AC-007` 图谱换肤跟随（`tier-style.ts` 仍是挂载时读一次，TASK-011 未开始）。
 - `AC-008` 打印媒体（`decor.css` 里写了规则，没有任何断言跑过）。
 - `AC-009` 既有的 `ui-kit.spec.ts` / `markdown-render.spec.ts` 主题用例（本轮未跑）。
-- 其余 14 个皮肤（TASK-010）。

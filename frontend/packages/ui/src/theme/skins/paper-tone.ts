@@ -17,4 +17,18 @@ export const PAPER_TONE_SKINS: readonly Skin[] = [
     family: 'paper',
     tags: ['浅色', '纸感', '衬线', '阅读'],
   },
+  {
+    id: 'sepia',
+    name: '旧书',
+    summary: '更黄更重的纸、颗粒看得见，像翻了很多遍的平装书',
+    family: 'paper',
+    tags: ['浅色', '复古', '纸感', '衬线', '低对比'],
+  },
+  {
+    id: 'newsprint',
+    name: '报纸',
+    summary: '灰白底、45° 细网纹、几乎直角，安静得像一张报纸',
+    family: 'paper',
+    tags: ['浅色', '报纸', '灰度', '极简', '网格'],
+  },
 ]

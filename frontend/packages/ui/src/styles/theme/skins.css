@@ -23,5 +23,9 @@
  */
 
 @import './skins/paper-tone.css';
+@import './skins/nature.css';
+@import './skins/pastel.css';
 @import './skins/night.css';
 @import './skins/terminal.css';
+@import './skins/glass.css';
+@import './skins/contrast.css';

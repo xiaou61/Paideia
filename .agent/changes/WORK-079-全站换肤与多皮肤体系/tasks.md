@@ -131,17 +131,17 @@ workflow: compact
 - 依赖：TASK-001、TASK-002
 - 验证：对比度 `终端 · 亮色/暗色` 通过；截图确认等宽字体与零圆角
 
-### TASK-010 | pending | 补齐其余 14 个皮肤
+### TASK-010 | done | 补齐其余 13 个皮肤（首批共 17 个）
 
 - 对应：`REQ-008`
 - 依赖：TASK-001、TASK-002、TASK-006
-- 计划：按族拆成 4 个互不抢文件的子任务（各写自己那族的 CSS + 注册文件）：
-  - 复古纸质追加 `sepia`、`newsprint`（`skins/paper-tone.css`）
-  - 暗夜追加 `midnight`（`skins/night.css`）；终端族追加 `pixel`（`skins/terminal.css`）
-  - 新建 `skins/nature.css`：`forest`、`sand`、`ocean`
-  - 新建 `skins/pastel.css`：`pastel`、`sakura`、`candy`
-  - 新建 `skins/glass.css`：`glass`、`glass-warm`；新建 `skins/contrast.css`：`contrast`
-- 验证：`pnpm exec vitest run src/theme` 全绿（新皮肤自动进入对比度遍历）
+- 实际做法：按族分文件写（每族一个 CSS + 一个注册 TS），互不抢文件：
+  复古纸质追加 `sepia`、`newsprint`；暗夜追加 `midnight`；终端族追加 `pixel`；
+  新建 `nature.css`（`forest`/`sand`/`ocean`）、`pastel.css`（`pastel`/`sakura`/`candy`）、
+  `glass.css`（`glass`/`glass-warm`）、`contrast.css`（`contrast`）
+- 同期补上对比度测试的一个漏洞：`--card` 带 alpha 时（玻璃族）按"卡面与页面底色的合成色"算，
+  否则半透明卡面会高估对比度
+- 验证：`pnpm exec vitest run src/theme` → `Tests 191 passed`（17 皮肤 × 2 模式 × 5 条 = 170 条对比度断言）；`pnpm --filter @paideia/ui-kit build` → CSS 156 149 字节、`data-skin` 规则 64 条
 
 ### TASK-011 | pending | 换肤联动：图谱重读、编辑器与代码块跟随
 

@@ -9,4 +9,11 @@ export const TERMINAL_SKINS: readonly Skin[] = [
     family: 'terminal',
     tags: ['暗色', '终端', '等宽', '像素'],
   },
+  {
+    id: 'pixel',
+    name: '像素',
+    summary: '看得见的边线、实心下落的阴影、无圆角，复古游戏机手感',
+    family: 'terminal',
+    tags: ['像素', '等宽', '硬边框', '复古'],
+  },
 ]

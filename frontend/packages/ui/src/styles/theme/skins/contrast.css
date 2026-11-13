@@ -1,0 +1,92 @@
+/*
+ * 高对比无障碍族（WORK-079）：`contrast`。
+ *
+ * 这一族不追求"好看"，追求**读得清**：纯黑纯白（21:1）、边框提到 3:1 以上（WCAG 1.4.11 对
+ * 界面组件边界的要求）、关掉装饰层、圆角收小、阴影换成实心描边（模糊阴影在低对比设置下会糊）。
+ *
+ * 它同时是这套体系的"下限测试"：任何组件只要在 `contrast` 下还成立，说明它没有依赖
+ * "浅灰配浅灰"这类虚弱的层次手段。正文对比度在本皮肤下应显著高于 4.5:1。
+ */
+
+:root[data-skin='contrast'],
+[data-skin='contrast'] {
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(0 0% 0%);
+  --card: hsl(0 0% 100%);
+  --card-solid: hsl(0 0% 100%);
+  --card-foreground: hsl(0 0% 0%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(0 0% 0%);
+  --primary: hsl(0 0% 0%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(0 0% 96%);
+  --secondary-foreground: hsl(0 0% 0%);
+  --muted: hsl(0 0% 96%);
+  --muted-foreground: hsl(0 0% 20%);
+  --accent: hsl(0 0% 90%);
+  --accent-foreground: hsl(0 0% 0%);
+  --destructive: hsl(0 80% 32%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --success: hsl(150 100% 21%);
+  --success-foreground: hsl(0 0% 100%);
+  --warning: hsl(32 100% 24%);
+  --warning-foreground: hsl(0 0% 100%);
+  --info: hsl(212 100% 26%);
+  --info-foreground: hsl(0 0% 100%);
+  --tier-unknown: hsl(0 0% 30%);
+  --tier-learning: hsl(212 100% 32%);
+  --tier-familiar: hsl(150 100% 21%);
+  --tier-mastered: hsl(0 0% 0%);
+  --border: hsl(0 0% 35%);
+  --input: hsl(0 0% 25%);
+  --ring: hsl(0 0% 0%);
+  --overlay: hsl(0 0% 0% / 60%);
+  --glass: hsl(0 0% 100%);
+  --radius: 0.25rem;
+  /* 实心描边代替模糊阴影：低对比设置下模糊阴影会消失，描边不会 */
+  --card-shadow: 0 0 0 2px hsl(0 0% 0% / 20%);
+  --popover-shadow: 0 0 0 2px hsl(0 0% 0% / 24%);
+  --decor-opacity: 0;
+  --decor-blend: normal;
+}
+
+:root[data-skin='contrast'].dark,
+[data-skin='contrast'].dark {
+  --background: hsl(0 0% 0%);
+  --foreground: hsl(0 0% 100%);
+  --card: hsl(0 0% 0%);
+  --card-solid: hsl(0 0% 0%);
+  --card-foreground: hsl(0 0% 100%);
+  --popover: hsl(0 0% 0%);
+  --popover-foreground: hsl(0 0% 100%);
+  --primary: hsl(0 0% 100%);
+  --primary-foreground: hsl(0 0% 0%);
+  --secondary: hsl(0 0% 12%);
+  --secondary-foreground: hsl(0 0% 100%);
+  --muted: hsl(0 0% 12%);
+  --muted-foreground: hsl(0 0% 88%);
+  --accent: hsl(0 0% 20%);
+  --accent-foreground: hsl(0 0% 100%);
+  --destructive: hsl(0 85% 72%);
+  --destructive-foreground: hsl(0 0% 0%);
+  --success: hsl(150 75% 70%);
+  --success-foreground: hsl(0 0% 0%);
+  --warning: hsl(45 95% 72%);
+  --warning-foreground: hsl(0 0% 0%);
+  --info: hsl(200 85% 72%);
+  --info-foreground: hsl(0 0% 0%);
+  --tier-unknown: hsl(0 0% 70%);
+  --tier-learning: hsl(200 85% 72%);
+  --tier-familiar: hsl(150 75% 70%);
+  --tier-mastered: hsl(0 0% 100%);
+  --border: hsl(0 0% 70%);
+  --input: hsl(0 0% 78%);
+  --ring: hsl(0 0% 100%);
+  --overlay: hsl(0 0% 0% / 80%);
+  --glass: hsl(0 0% 0%);
+  --radius: 0.25rem;
+  --card-shadow: 0 0 0 2px hsl(0 0% 100% / 28%);
+  --popover-shadow: 0 0 0 2px hsl(0 0% 100% / 32%);
+  --decor-opacity: 0;
+  --decor-blend: normal;
+}

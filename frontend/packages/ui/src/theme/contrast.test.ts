@@ -163,7 +163,13 @@ const cases = SKINS.flatMap((skin) =>
 describe.each(cases)('$skinName（$skinId）· $label 的对比度', ({ skinId, mode }) => {
   const tokens = resolveTokens(skinId, mode)
   const background = relativeLuminance(tokens['background']!.rgb)
-  const card = relativeLuminance(tokens['card']!.rgb)
+  /**
+   * 卡面可能是半透明的（玻璃族：`--card: hsl(0 0% 100% / 78%)`）。这时文字落在**卡面与
+   * 页面底色的合成色**上，按令牌原值算会高估对比度——那正是玻璃类皮肤最容易骗过测试的地方。
+   */
+  const card = relativeLuminance(
+    tokens['card']!.alpha < 1 ? composite(tokens['card']!, tokens['background']!.rgb) : tokens['card']!.rgb,
+  )
   const solid = relativeLuminance(tokens['card-solid']!.rgb)
   // 半透明玻璃层上的文字：最坏情形是它叠在页面底色上（页面底色就是它背后最亮/最暗的东西）
   const glass = relativeLuminance(composite(tokens['glass']!, tokens['background']!.rgb))

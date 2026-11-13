@@ -1,6 +1,10 @@
 import { DEFAULT_SKIN, type SkinId } from './keys'
+import { CONTRAST_SKINS } from './skins/contrast'
+import { GLASS_SKINS } from './skins/glass'
+import { NATURE_SKINS } from './skins/nature'
 import { NIGHT_SKINS } from './skins/night'
 import { PAPER_TONE_SKINS } from './skins/paper-tone'
+import { PASTEL_SKINS } from './skins/pastel'
 import { TERMINAL_SKINS } from './skins/terminal'
 
 /**
@@ -67,8 +71,12 @@ export const SKINS: readonly Skin[] = [
     tags: ['浅色', '极简', '默认', '黑白'],
   },
   ...PAPER_TONE_SKINS,
+  ...NATURE_SKINS,
+  ...PASTEL_SKINS,
   ...NIGHT_SKINS,
   ...TERMINAL_SKINS,
+  ...GLASS_SKINS,
+  ...CONTRAST_SKINS,
 ]
 
 /** 这个字符串是不是一个已登记的皮肤 id。存储里读到脏值时用它回退默认皮肤。 */

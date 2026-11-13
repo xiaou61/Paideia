@@ -128,3 +128,106 @@
   --sk-violet-line: hsl(270 45% 72%);
   --sk-violet-fill: hsl(270 25% 20%);
 }
+
+/*
+ * `pixel`：比 `terminal` 更硬——边框提到 3:1 的实线、阴影换成 2px 实心下落，
+ * 圆角归零。它验证的是"皮肤能不能改的不是颜色而是形状语言"。
+ *
+ * 注意 `--border` 明显比默认皮肤深：这是刻意的，像素风靠看得见的边线建立层次，
+ * 而不是靠阴影；顺带把界面边界的对比度做到了 WCAG 1.4.11 的 3:1 以上。
+ */
+:root[data-skin='pixel'],
+[data-skin='pixel'] {
+  --background: hsl(50 30% 94%);
+  --foreground: hsl(150 12% 12%);
+  --card: hsl(50 40% 98%);
+  --card-solid: hsl(50 40% 98%);
+  --card-foreground: hsl(150 12% 12%);
+  --popover: hsl(50 40% 98%);
+  --popover-foreground: hsl(150 12% 12%);
+  --primary: hsl(150 55% 20%);
+  --primary-foreground: hsl(50 40% 98%);
+  --secondary: hsl(50 25% 88%);
+  --secondary-foreground: hsl(150 12% 16%);
+  --muted: hsl(50 25% 89%);
+  --muted-foreground: hsl(150 10% 28%);
+  --accent: hsl(150 20% 84%);
+  --accent-foreground: hsl(150 14% 12%);
+  --destructive: hsl(0 70% 32%);
+  --destructive-foreground: hsl(50 40% 98%);
+  --success: hsl(150 70% 20%);
+  --success-foreground: hsl(50 40% 98%);
+  --warning: hsl(35 85% 26%);
+  --warning-foreground: hsl(50 40% 98%);
+  --info: hsl(210 75% 26%);
+  --info-foreground: hsl(50 40% 98%);
+  --tier-unknown: hsl(150 8% 44%);
+  --tier-learning: hsl(210 70% 34%);
+  --tier-familiar: hsl(150 50% 26%);
+  --tier-mastered: hsl(150 60% 16%);
+  --border: hsl(150 18% 46%);
+  --input: hsl(150 18% 40%);
+  --ring: hsl(150 55% 20%);
+  --overlay: hsl(150 20% 8% / 45%);
+  --glass: hsl(50 40% 98%);
+  --radius: 0rem;
+  --radius-sm: 0rem;
+  --radius-md: 0rem;
+  --radius-lg: 0rem;
+  --radius-xl: 0rem;
+  --font-sans: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Microsoft YaHei UI', monospace;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Microsoft YaHei UI', monospace;
+  --font-display: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Microsoft YaHei UI', monospace;
+  --card-shadow: 0 2px 0 0 hsl(150 20% 18% / 28%);
+  --popover-shadow: 0 3px 0 0 hsl(150 20% 18% / 32%);
+  --decor-opacity: 0;
+  --decor-blend: normal;
+}
+
+:root[data-skin='pixel'].dark,
+[data-skin='pixel'].dark {
+  --background: hsl(150 8% 6%);
+  --foreground: hsl(140 20% 86%);
+  --card: hsl(150 8% 10%);
+  --card-solid: hsl(150 8% 10%);
+  --card-foreground: hsl(140 20% 86%);
+  --popover: hsl(150 8% 12%);
+  --popover-foreground: hsl(140 20% 86%);
+  --primary: hsl(140 70% 62%);
+  --primary-foreground: hsl(150 12% 6%);
+  --secondary: hsl(150 8% 16%);
+  --secondary-foreground: hsl(140 16% 84%);
+  --muted: hsl(150 8% 15%);
+  --muted-foreground: hsl(140 12% 66%);
+  --accent: hsl(150 12% 20%);
+  --accent-foreground: hsl(140 18% 88%);
+  --destructive: hsl(0 75% 66%);
+  --destructive-foreground: hsl(0 60% 8%);
+  --success: hsl(140 65% 60%);
+  --success-foreground: hsl(150 40% 8%);
+  --warning: hsl(40 85% 62%);
+  --warning-foreground: hsl(40 70% 10%);
+  --info: hsl(195 70% 64%);
+  --info-foreground: hsl(195 70% 8%);
+  --tier-unknown: hsl(150 6% 50%);
+  --tier-learning: hsl(195 70% 64%);
+  --tier-familiar: hsl(140 55% 56%);
+  --tier-mastered: hsl(140 75% 64%);
+  --border: hsl(140 20% 44%);
+  --input: hsl(140 18% 38%);
+  --ring: hsl(140 70% 62%);
+  --overlay: hsl(0 0% 0% / 75%);
+  --glass: hsl(150 8% 10%);
+  --radius: 0rem;
+  --radius-sm: 0rem;
+  --radius-md: 0rem;
+  --radius-lg: 0rem;
+  --radius-xl: 0rem;
+  --font-sans: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Microsoft YaHei UI', monospace;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Microsoft YaHei UI', monospace;
+  --font-display: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Microsoft YaHei UI', monospace;
+  --card-shadow: 0 2px 0 0 hsl(140 40% 70% / 26%);
+  --popover-shadow: 0 3px 0 0 hsl(140 40% 70% / 30%);
+  --decor-opacity: 0;
+  --decor-blend: normal;
+}

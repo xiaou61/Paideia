@@ -97,3 +97,93 @@
   --decor-opacity: 1;
   --decor-blend: normal;
 }
+
+/*
+ * `midnight`：深蓝夜。与 `neon` 同一族但收着来——只有一层冷蓝光，主色是电光蓝而不是青色，
+ * 适合"想要暗色但不想太吵"的场景。亮色模式是冷调白（蓝灰），不是把暗色提亮。
+ */
+:root[data-skin='midnight'],
+[data-skin='midnight'] {
+  --background: hsl(215 35% 97%);
+  --foreground: hsl(218 35% 14%);
+  --card: hsl(0 0% 100%);
+  --card-solid: hsl(0 0% 100%);
+  --card-foreground: hsl(218 35% 14%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(218 35% 14%);
+  --primary: hsl(220 70% 34%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(215 30% 94%);
+  --secondary-foreground: hsl(218 30% 22%);
+  --muted: hsl(215 30% 95%);
+  --muted-foreground: hsl(216 14% 36%);
+  --accent: hsl(210 45% 94%);
+  --accent-foreground: hsl(218 30% 15%);
+  --destructive: hsl(352 62% 38%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --success: hsl(158 50% 25%);
+  --success-foreground: hsl(0 0% 100%);
+  --warning: hsl(30 82% 28%);
+  --warning-foreground: hsl(0 0% 100%);
+  --info: hsl(212 70% 32%);
+  --info-foreground: hsl(0 0% 100%);
+  --tier-unknown: hsl(216 10% 50%);
+  --tier-learning: hsl(212 70% 42%);
+  --tier-familiar: hsl(158 45% 32%);
+  --tier-mastered: hsl(220 70% 32%);
+  --border: hsl(215 25% 87%);
+  --input: hsl(215 22% 79%);
+  --ring: hsl(220 70% 34%);
+  --overlay: hsl(218 25% 10% / 40%);
+  --glass: hsl(0 0% 100% / 70%);
+  --radius: 0.5rem;
+  --card-shadow: 0 1px 2px hsl(218 40% 20% / 6%), 0 10px 24px -8px hsl(220 60% 40% / 14%);
+  --decor-image: radial-gradient(1000px 520px at 20% -10%, hsl(215 90% 70% / 14%), transparent 70%);
+  --decor-size: 100% 100%;
+  --decor-opacity: 1;
+  --decor-blend: normal;
+}
+
+:root[data-skin='midnight'].dark,
+[data-skin='midnight'].dark {
+  --background: hsl(220 35% 7%);
+  --foreground: hsl(210 30% 90%);
+  --card: hsl(220 30% 10%);
+  --card-solid: hsl(220 30% 10%);
+  --card-foreground: hsl(210 30% 90%);
+  --popover: hsl(220 30% 12%);
+  --popover-foreground: hsl(210 30% 90%);
+  --primary: hsl(205 90% 62%);
+  --primary-foreground: hsl(220 40% 8%);
+  --secondary: hsl(220 28% 16%);
+  --secondary-foreground: hsl(210 24% 86%);
+  --muted: hsl(220 28% 15%);
+  --muted-foreground: hsl(212 16% 68%);
+  --accent: hsl(220 40% 18%);
+  --accent-foreground: hsl(210 26% 92%);
+  --destructive: hsl(352 75% 70%);
+  --destructive-foreground: hsl(352 60% 9%);
+  --success: hsl(158 45% 62%);
+  --success-foreground: hsl(158 45% 8%);
+  --warning: hsl(38 72% 64%);
+  --warning-foreground: hsl(38 72% 10%);
+  --info: hsl(200 85% 68%);
+  --info-foreground: hsl(200 85% 8%);
+  --tier-unknown: hsl(212 10% 56%);
+  --tier-learning: hsl(200 85% 68%);
+  --tier-familiar: hsl(158 45% 60%);
+  --tier-mastered: hsl(205 90% 66%);
+  --border: hsl(220 30% 22%);
+  --input: hsl(220 28% 28%);
+  --ring: hsl(205 90% 64%);
+  --overlay: hsl(0 0% 0% / 72%);
+  --glass: hsl(220 30% 12% / 70%);
+  --radius: 0.5rem;
+  --card-shadow: 0 1px 2px hsl(0 0% 0% / 45%), 0 14px 32px -12px hsl(205 90% 50% / 26%);
+  --decor-image:
+    radial-gradient(1200px 700px at 15% -12%, hsl(205 95% 55% / 26%), transparent 70%),
+    radial-gradient(900px 560px at 92% 2%, hsl(240 90% 60% / 16%), transparent 70%);
+  --decor-size: 100% 100%;
+  --decor-opacity: 1;
+  --decor-blend: normal;
+}

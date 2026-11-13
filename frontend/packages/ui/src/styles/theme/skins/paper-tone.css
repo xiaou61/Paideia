@@ -123,3 +123,183 @@
   --sk-violet-line: hsl(275 45% 74%);
   --sk-violet-fill: hsl(275 25% 21%);
 }
+
+/*
+ * `sepia`：旧书。比 `paper` 更重、更黄，圆角更小——像一本翻了很多遍的平装书。
+ * 纸纹用同一张噪点图但浓度更高，因为旧书的颗粒本来就该看得见。
+ */
+:root[data-skin='sepia'],
+[data-skin='sepia'] {
+  --background: hsl(35 40% 91%);
+  --foreground: hsl(30 32% 18%);
+  --card: hsl(38 45% 95%);
+  --card-solid: hsl(38 45% 95%);
+  --card-foreground: hsl(30 32% 18%);
+  --popover: hsl(38 48% 96%);
+  --popover-foreground: hsl(30 32% 18%);
+  --primary: hsl(22 50% 26%);
+  --primary-foreground: hsl(40 50% 96%);
+  --secondary: hsl(35 30% 86%);
+  --secondary-foreground: hsl(30 30% 20%);
+  --muted: hsl(35 32% 87%);
+  --muted-foreground: hsl(32 18% 30%);
+  --accent: hsl(34 36% 84%);
+  --accent-foreground: hsl(30 30% 17%);
+  --destructive: hsl(8 58% 32%);
+  --destructive-foreground: hsl(40 50% 96%);
+  --success: hsl(148 40% 23%);
+  --success-foreground: hsl(40 50% 96%);
+  --warning: hsl(28 72% 27%);
+  --warning-foreground: hsl(40 50% 96%);
+  --info: hsl(206 52% 26%);
+  --info-foreground: hsl(40 50% 96%);
+  --tier-unknown: hsl(32 12% 46%);
+  --tier-learning: hsl(206 52% 34%);
+  --tier-familiar: hsl(148 38% 26%);
+  --tier-mastered: hsl(22 45% 19%);
+  --border: hsl(32 22% 74%);
+  --input: hsl(32 20% 66%);
+  --ring: hsl(22 50% 26%);
+  --overlay: hsl(30 30% 10% / 45%);
+  --glass: hsl(38 45% 95% / 74%);
+  --radius: 0.375rem;
+  --font-display: 'Songti SC', 'SimSun', Georgia, 'Times New Roman', serif;
+  --card-shadow: 0 1px 1px hsl(30 25% 12% / 6%), 0 6px 16px -6px hsl(30 25% 12% / 10%);
+  --decor-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23s)'/%3E%3C/svg%3E");
+  --decor-size: 160px 160px;
+  --decor-opacity: 0.07;
+  --decor-blend: multiply;
+}
+
+:root[data-skin='sepia'].dark,
+[data-skin='sepia'].dark {
+  --background: hsl(28 14% 9%);
+  --foreground: hsl(38 28% 88%);
+  --card: hsl(28 14% 12%);
+  --card-solid: hsl(28 14% 12%);
+  --card-foreground: hsl(38 28% 88%);
+  --popover: hsl(28 14% 14%);
+  --popover-foreground: hsl(38 28% 88%);
+  --primary: hsl(36 55% 66%);
+  --primary-foreground: hsl(28 30% 10%);
+  --secondary: hsl(28 14% 17%);
+  --secondary-foreground: hsl(36 18% 82%);
+  --muted: hsl(28 14% 16%);
+  --muted-foreground: hsl(34 14% 68%);
+  --accent: hsl(28 14% 20%);
+  --accent-foreground: hsl(36 20% 89%);
+  --destructive: hsl(8 60% 66%);
+  --destructive-foreground: hsl(8 55% 9%);
+  --success: hsl(148 38% 60%);
+  --success-foreground: hsl(148 40% 8%);
+  --warning: hsl(32 70% 62%);
+  --warning-foreground: hsl(32 70% 10%);
+  --info: hsl(202 50% 64%);
+  --info-foreground: hsl(202 50% 8%);
+  --tier-unknown: hsl(34 10% 54%);
+  --tier-learning: hsl(202 50% 64%);
+  --tier-familiar: hsl(148 38% 58%);
+  --tier-mastered: hsl(36 28% 84%);
+  --border: hsl(28 14% 20%);
+  --input: hsl(28 14% 26%);
+  --ring: hsl(36 55% 68%);
+  --overlay: hsl(0 0% 0% / 64%);
+  --glass: hsl(28 14% 14% / 72%);
+  --radius: 0.375rem;
+  --font-display: 'Songti SC', 'SimSun', Georgia, 'Times New Roman', serif;
+  --card-shadow: 0 1px 2px hsl(0 0% 0% / 45%), 0 8px 18px -6px hsl(0 0% 0% / 55%);
+  --decor-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23s)'/%3E%3C/svg%3E");
+  --decor-size: 160px 160px;
+  --decor-opacity: 0.06;
+  --decor-blend: soft-light;
+}
+
+/*
+ * `newsprint`：报纸。去饱和的灰白 + 等宽标题 + 极小圆角，纹理是 45° 细线（印刷网点的暗示，
+ * 比噪点图省一半字节，而且在小字号下更安静）。
+ */
+:root[data-skin='newsprint'],
+[data-skin='newsprint'] {
+  --background: hsl(40 8% 92%);
+  --foreground: hsl(40 6% 13%);
+  --card: hsl(40 12% 97%);
+  --card-solid: hsl(40 12% 97%);
+  --card-foreground: hsl(40 6% 13%);
+  --popover: hsl(40 12% 98%);
+  --popover-foreground: hsl(40 6% 13%);
+  --primary: hsl(40 8% 12%);
+  --primary-foreground: hsl(40 12% 97%);
+  --secondary: hsl(40 6% 87%);
+  --secondary-foreground: hsl(40 6% 16%);
+  --muted: hsl(40 6% 88%);
+  --muted-foreground: hsl(40 4% 30%);
+  --accent: hsl(40 8% 85%);
+  --accent-foreground: hsl(40 6% 13%);
+  --destructive: hsl(0 65% 32%);
+  --destructive-foreground: hsl(40 12% 97%);
+  --success: hsl(150 60% 22%);
+  --success-foreground: hsl(40 12% 97%);
+  --warning: hsl(30 85% 26%);
+  --warning-foreground: hsl(40 12% 97%);
+  --info: hsl(210 70% 27%);
+  --info-foreground: hsl(40 12% 97%);
+  --tier-unknown: hsl(40 4% 45%);
+  --tier-learning: hsl(210 70% 36%);
+  --tier-familiar: hsl(150 50% 28%);
+  --tier-mastered: hsl(40 8% 14%);
+  --border: hsl(40 6% 76%);
+  --input: hsl(40 6% 68%);
+  --ring: hsl(40 8% 12%);
+  --overlay: hsl(40 10% 10% / 42%);
+  --glass: hsl(40 12% 97% / 74%);
+  --radius: 0.125rem;
+  --font-display: 'Songti SC', 'SimSun', Georgia, serif;
+  --card-shadow: 0 1px 0 hsl(40 10% 12% / 8%), 0 2px 6px -3px hsl(40 10% 12% / 10%);
+  --decor-image: repeating-linear-gradient(45deg, hsl(40 20% 20% / 6%) 0 1px, transparent 1px 4px);
+  --decor-size: 4px 4px;
+  --decor-opacity: 0.5;
+  --decor-blend: multiply;
+}
+
+:root[data-skin='newsprint'].dark,
+[data-skin='newsprint'].dark {
+  --background: hsl(40 6% 9%);
+  --foreground: hsl(40 8% 88%);
+  --card: hsl(40 6% 12%);
+  --card-solid: hsl(40 6% 12%);
+  --card-foreground: hsl(40 8% 88%);
+  --popover: hsl(40 6% 14%);
+  --popover-foreground: hsl(40 8% 88%);
+  --primary: hsl(40 10% 88%);
+  --primary-foreground: hsl(40 8% 10%);
+  --secondary: hsl(40 6% 17%);
+  --secondary-foreground: hsl(40 8% 82%);
+  --muted: hsl(40 6% 16%);
+  --muted-foreground: hsl(40 6% 70%);
+  --accent: hsl(40 6% 20%);
+  --accent-foreground: hsl(40 8% 90%);
+  --destructive: hsl(0 70% 68%);
+  --destructive-foreground: hsl(0 60% 8%);
+  --success: hsl(150 50% 62%);
+  --success-foreground: hsl(150 50% 8%);
+  --warning: hsl(36 70% 64%);
+  --warning-foreground: hsl(36 70% 10%);
+  --info: hsl(210 60% 68%);
+  --info-foreground: hsl(210 60% 8%);
+  --tier-unknown: hsl(40 4% 54%);
+  --tier-learning: hsl(210 60% 68%);
+  --tier-familiar: hsl(150 50% 58%);
+  --tier-mastered: hsl(40 10% 86%);
+  --border: hsl(40 6% 22%);
+  --input: hsl(40 6% 28%);
+  --ring: hsl(40 10% 90%);
+  --overlay: hsl(0 0% 0% / 66%);
+  --glass: hsl(40 6% 14% / 72%);
+  --radius: 0.125rem;
+  --font-display: 'Songti SC', 'SimSun', Georgia, serif;
+  --card-shadow: 0 1px 2px hsl(0 0% 0% / 45%), 0 6px 14px -6px hsl(0 0% 0% / 55%);
+  --decor-image: repeating-linear-gradient(45deg, hsl(40 20% 80% / 6%) 0 1px, transparent 1px 4px);
+  --decor-size: 4px 4px;
+  --decor-opacity: 0.40;
+  --decor-blend: screen;
+}

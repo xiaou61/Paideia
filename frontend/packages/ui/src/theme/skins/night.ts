@@ -9,4 +9,11 @@ export const NIGHT_SKINS: readonly Skin[] = [
     family: 'night',
     tags: ['暗色', '霓虹', '高饱和', '氛围'],
   },
+  {
+    id: 'midnight',
+    name: '深蓝夜',
+    summary: '深蓝底一层冷光，电光蓝主色，暗而不吵',
+    family: 'night',
+    tags: ['暗色', '蓝色', '冷静', '氛围'],
+  },
 ]
