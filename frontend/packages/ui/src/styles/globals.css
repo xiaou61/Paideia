@@ -2,6 +2,22 @@
 /* 对话框/菜单/提示的进出场动画工具类（animate-in、fade-in-0、zoom-in-95、slide-in-from-*）
    不属 Tailwind 核心，是这套组件源码里引用的，缺了它动画会静默不发生。 */
 @import 'tw-animate-css';
+/*
+ * 皮肤层（WORK-079）。
+ *
+ * 顺序上这两条必须在所有规则之前——CSS 的 `@import` 只允许出现在文件顶部。因此**皮肤不能靠
+ * 文件顺序压过 `:root` / `.dark`**：皮肤块的选择器写成 `:root[data-skin="x"]`（0,2,0）与
+ * `:root[data-skin="x"].dark`（0,3,0），靠特异性取胜，`:root`(0,1,0) 与 `.dark`(0,1,0) 都压不过它。
+ * 反过来，皮肤只覆盖某个令牌的一部分时，其余仍从 `:root` / `.dark` 继承——这是"继承而不是复制
+ * 一整套令牌"的前提，也是几十个皮肤还能维护的原因。
+ *
+ * 每个皮肤还带一个非 `:root` 的等价选择器（`[data-skin="x"]`）：外观页的预览卡把 `data-skin`
+ * 放在自己身上，卡片内部就成了一份**活的迷你主题**，不用在 TS 里复制一份色板（那会撞
+ * `tokens.test.ts` 的"颜色只能来自令牌"）。
+ */
+@import './theme/skins.css';
+/* 装饰层与打印覆盖：依赖上面皮肤块已定义，必须排在 skins.css 之后 */
+@import './theme/decor.css';
 
 /*
  * 设计系统的唯一样式入口。四个前端应用（apps/app、apps/admin、apps/public、apps/ui-kit）
@@ -153,6 +169,20 @@
   /* 可选玻璃层的填充。默认卡面不用它，见文件末尾 .glass 的说明。 */
   --glass: hsl(0 0% 100% / 70%);
   --glass-blur: 12px;
+  /*
+   * 装饰层（WORK-079）。皮肤可以用它加纸纹/噪点/氛围光，默认全部关闭：
+   * `--decor-opacity: 0` 时 `body::before` 画的是一层完全透明的东西，视觉与今天逐像素一致，
+   * 这样"加皮肤"这件事不会顺手改掉默认主题的观感。
+   */
+  --decor-image: none;
+  --decor-size: 160px 160px;
+  --decor-opacity: 0;
+  --decor-blend: normal;
+  /*
+   * 标题字体单独一个令牌（WORK-079）：纸系皮肤要"衬线标题 + 无衬线正文"，只换 `--font-sans`
+   * 会把正文也换成衬线，读正文就累了。默认与正文同栈，因此默认主题零变化。
+   */
+  --font-display: var(--font-sans);
   /* 圆角从 6px 放到 10px：6px 是"企业后台"的味道，10px 才像近几年的产品 */
   --radius: 0.625rem;
   /* 阴影一律是"1px 实线 + 多层低透明黑"，不是单层 box-shadow */
@@ -422,6 +452,7 @@
   h1,
   h2,
   h3 {
+    font-family: var(--font-display);
     font-weight: 600;
     letter-spacing: -0.02em;
   }

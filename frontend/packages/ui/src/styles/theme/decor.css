@@ -1,0 +1,79 @@
+/*
+ * 装饰层与打印覆盖（WORK-079）。
+ *
+ * ## 装饰层
+ *
+ * 皮肤除了换色，还想表达"质感"：纸纹、噪点、霓虹氛围光。这些**不能靠加组件**——几十个皮肤
+ * 各写一个包裹层会把每个页面都改一遍。所以统一用一层 `body::before`，皮肤只给四个令牌：
+ *
+ *   --decor-image    背景图（inline SVG 噪点 / CSS 渐变；不用图片文件，零额外请求）
+ *   --decor-size     background-size
+ *   --decor-opacity  0 时整层看不见（默认值就是 0，默认主题零变化）
+ *   --decor-blend    mix-blend-mode
+ *
+ * `z-index: -1` + `body { isolation: isolate }`：负 z-index 的子树画在 body 背景**之上**、
+ * 内容**之下**，所以装饰纹在文字后面，不会给正文蒙一层灰（蒙上去会实打实降低对比度，
+ * 而对比度是这套设计系统拿测试守着的）。`pointer-events: none` 保证它不抢点击。
+ *
+ * ## 打印
+ *
+ * 皮肤一多就有"深色皮肤 + 打印"这个组合：用户用 `neon` 打一份知识条目，出来是满页黑底。
+ * 这里在打印媒体下把所有令牌强制回**纸张语义**（`--paper*`，WORK-018 定的那套"纸永远白"），
+ * 并关掉装饰层。选择器要写足三种形态才能压过皮肤块（`:root[data-skin].dark` 是 0,3,0）。
+ */
+
+@layer base {
+  body {
+    /* 建栈上下文，让下面 z-index:-1 的装饰层稳定落在内容后面 */
+    isolation: isolate;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: var(--decor-image);
+    background-size: var(--decor-size);
+    background-repeat: repeat;
+    opacity: var(--decor-opacity);
+    mix-blend-mode: var(--decor-blend);
+  }
+}
+
+@media print {
+  :root,
+  :root.dark,
+  :root[data-skin],
+  :root[data-skin].dark {
+    color-scheme: light;
+    --background: var(--paper);
+    --foreground: var(--paper-ink);
+    --card: var(--paper);
+    --card-solid: var(--paper);
+    --card-foreground: var(--paper-ink);
+    --popover: var(--paper);
+    --popover-foreground: var(--paper-ink);
+    --secondary: var(--paper-rail);
+    --secondary-foreground: var(--paper-subtle);
+    --muted: var(--paper-rail);
+    --muted-foreground: var(--paper-muted);
+    --accent: var(--paper-rail);
+    --accent-foreground: var(--paper-subtle);
+    --primary: var(--paper-ink);
+    --primary-foreground: var(--paper);
+    --border: var(--paper-line);
+    --input: var(--paper-line);
+    --ring: var(--paper-ink);
+    --glass: var(--paper);
+    --card-shadow: none;
+    --popover-shadow: none;
+    --decor-opacity: 0;
+  }
+
+  /* 打印里没有"悬停/选中"，阴影只会糊成一片灰 */
+  body::before {
+    display: none;
+  }
+}

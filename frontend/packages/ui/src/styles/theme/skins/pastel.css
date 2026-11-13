@@ -1,0 +1,273 @@
+/*
+ * 粉彩族（WORK-079）：`pastel` / `sakura` / `candy`。
+ *
+ * 这一族最容易翻车的地方是"浅底浅字"：粉彩的直觉是整体调亮，但正文一旦跟着亮，
+ * 对比度立刻掉到 3:1 以下。所以这里的做法是**只把"面"调粉（背景/次面/accent），
+ * 正文与主色反而压深**——看起来柔和，读起来仍是黑字。主色一律取 38–45% 明度。
+ *
+ * 装饰层是整页两团柔和光斑（粉 + 紫 / 暖黄 + 粉），alpha 很低，不压在文字上。
+ */
+
+:root[data-skin='pastel'],
+[data-skin='pastel'] {
+  --background: hsl(280 45% 98%);
+  --foreground: hsl(270 22% 17%);
+  --card: hsl(0 0% 100%);
+  --card-solid: hsl(0 0% 100%);
+  --card-foreground: hsl(270 22% 17%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(270 22% 17%);
+  --primary: hsl(268 55% 42%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(280 30% 95%);
+  --secondary-foreground: hsl(272 22% 24%);
+  --muted: hsl(280 28% 96%);
+  --muted-foreground: hsl(272 12% 36%);
+  --accent: hsl(285 50% 95%);
+  --accent-foreground: hsl(270 22% 16%);
+  --destructive: hsl(352 60% 40%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --success: hsl(160 50% 26%);
+  --success-foreground: hsl(0 0% 100%);
+  --warning: hsl(32 80% 28%);
+  --warning-foreground: hsl(0 0% 100%);
+  --info: hsl(212 65% 34%);
+  --info-foreground: hsl(0 0% 100%);
+  --tier-unknown: hsl(272 12% 52%);
+  --tier-learning: hsl(265 60% 48%);
+  --tier-familiar: hsl(160 45% 34%);
+  --tier-mastered: hsl(268 55% 40%);
+  --border: hsl(280 25% 88%);
+  --input: hsl(280 22% 80%);
+  --ring: hsl(268 55% 42%);
+  --overlay: hsl(270 20% 10% / 38%);
+  --glass: hsl(0 0% 100% / 68%);
+  --radius: 0.875rem;
+  --card-shadow: 0 1px 2px hsl(275 40% 50% / 8%), 0 12px 28px -12px hsl(275 60% 60% / 22%);
+  --decor-image:
+    radial-gradient(1000px 520px at 10% -8%, hsl(300 90% 78% / 22%), transparent 70%),
+    radial-gradient(900px 480px at 92% 0%, hsl(210 90% 80% / 20%), transparent 70%);
+  --decor-size: 100% 100%;
+  --decor-opacity: 1;
+  --decor-blend: normal;
+}
+
+:root[data-skin='pastel'].dark,
+[data-skin='pastel'].dark {
+  --background: hsl(270 18% 10%);
+  --foreground: hsl(280 20% 90%);
+  --card: hsl(270 16% 13%);
+  --card-solid: hsl(270 16% 13%);
+  --card-foreground: hsl(280 20% 90%);
+  --popover: hsl(270 16% 15%);
+  --popover-foreground: hsl(280 20% 90%);
+  --primary: hsl(270 55% 74%);
+  --primary-foreground: hsl(270 25% 12%);
+  --secondary: hsl(270 16% 18%);
+  --secondary-foreground: hsl(280 16% 86%);
+  --muted: hsl(270 16% 16%);
+  --muted-foreground: hsl(275 12% 70%);
+  --accent: hsl(280 22% 20%);
+  --accent-foreground: hsl(280 18% 92%);
+  --destructive: hsl(352 70% 72%);
+  --destructive-foreground: hsl(352 60% 10%);
+  --success: hsl(160 45% 62%);
+  --success-foreground: hsl(160 45% 8%);
+  --warning: hsl(38 70% 64%);
+  --warning-foreground: hsl(38 70% 10%);
+  --info: hsl(212 60% 70%);
+  --info-foreground: hsl(212 60% 8%);
+  --tier-unknown: hsl(275 10% 56%);
+  --tier-learning: hsl(212 60% 70%);
+  --tier-familiar: hsl(160 45% 60%);
+  --tier-mastered: hsl(270 55% 76%);
+  --border: hsl(270 18% 23%);
+  --input: hsl(270 18% 29%);
+  --ring: hsl(270 55% 76%);
+  --overlay: hsl(0 0% 0% / 68%);
+  --glass: hsl(270 16% 15% / 70%);
+  --radius: 0.875rem;
+  --card-shadow: 0 1px 2px hsl(0 0% 0% / 40%), 0 16px 32px -12px hsl(285 60% 40% / 35%);
+  --decor-image:
+    radial-gradient(1000px 560px at 12% -10%, hsl(300 70% 55% / 20%), transparent 70%),
+    radial-gradient(900px 520px at 90% 0%, hsl(210 70% 55% / 16%), transparent 70%);
+  --decor-size: 100% 100%;
+  --decor-opacity: 1;
+  --decor-blend: normal;
+}
+
+:root[data-skin='sakura'],
+[data-skin='sakura'] {
+  --background: hsl(345 45% 97%);
+  --foreground: hsl(340 22% 17%);
+  --card: hsl(0 0% 100%);
+  --card-solid: hsl(0 0% 100%);
+  --card-foreground: hsl(340 22% 17%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(340 22% 17%);
+  --primary: hsl(345 55% 38%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(345 35% 94%);
+  --secondary-foreground: hsl(342 22% 24%);
+  --muted: hsl(345 30% 95%);
+  --muted-foreground: hsl(342 12% 36%);
+  --accent: hsl(345 60% 95%);
+  --accent-foreground: hsl(340 22% 16%);
+  --destructive: hsl(352 62% 40%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --success: hsl(158 48% 26%);
+  --success-foreground: hsl(0 0% 100%);
+  --warning: hsl(30 80% 28%);
+  --warning-foreground: hsl(0 0% 100%);
+  --info: hsl(212 62% 34%);
+  --info-foreground: hsl(0 0% 100%);
+  --tier-unknown: hsl(342 12% 52%);
+  --tier-learning: hsl(212 60% 46%);
+  --tier-familiar: hsl(158 45% 34%);
+  --tier-mastered: hsl(345 55% 38%);
+  --border: hsl(345 25% 88%);
+  --input: hsl(345 22% 80%);
+  --ring: hsl(345 55% 38%);
+  --overlay: hsl(340 20% 10% / 38%);
+  --glass: hsl(0 0% 100% / 70%);
+  --radius: 0.75rem;
+  --card-shadow: 0 1px 2px hsl(345 40% 40% / 7%), 0 12px 26px -12px hsl(345 60% 60% / 22%);
+  --decor-image:
+    radial-gradient(1000px 520px at 15% -8%, hsl(340 90% 80% / 24%), transparent 70%),
+    radial-gradient(800px 460px at 88% 2%, hsl(20 95% 82% / 18%), transparent 70%);
+  --decor-size: 100% 100%;
+  --decor-opacity: 1;
+  --decor-blend: normal;
+}
+
+:root[data-skin='sakura'].dark,
+[data-skin='sakura'].dark {
+  --background: hsl(340 14% 10%);
+  --foreground: hsl(345 22% 90%);
+  --card: hsl(340 12% 13%);
+  --card-solid: hsl(340 12% 13%);
+  --card-foreground: hsl(345 22% 90%);
+  --popover: hsl(340 12% 15%);
+  --popover-foreground: hsl(345 22% 90%);
+  --primary: hsl(345 60% 74%);
+  --primary-foreground: hsl(340 25% 12%);
+  --secondary: hsl(340 12% 18%);
+  --secondary-foreground: hsl(345 16% 86%);
+  --muted: hsl(340 12% 16%);
+  --muted-foreground: hsl(343 12% 70%);
+  --accent: hsl(345 18% 21%);
+  --accent-foreground: hsl(345 16% 92%);
+  --destructive: hsl(352 70% 72%);
+  --destructive-foreground: hsl(352 60% 10%);
+  --success: hsl(158 42% 62%);
+  --success-foreground: hsl(158 45% 8%);
+  --warning: hsl(38 70% 64%);
+  --warning-foreground: hsl(38 70% 10%);
+  --info: hsl(212 58% 70%);
+  --info-foreground: hsl(212 58% 8%);
+  --tier-unknown: hsl(343 10% 56%);
+  --tier-learning: hsl(212 58% 70%);
+  --tier-familiar: hsl(158 42% 60%);
+  --tier-mastered: hsl(345 60% 76%);
+  --border: hsl(340 14% 23%);
+  --input: hsl(340 14% 29%);
+  --ring: hsl(345 60% 76%);
+  --overlay: hsl(0 0% 0% / 68%);
+  --glass: hsl(340 12% 15% / 70%);
+  --radius: 0.75rem;
+  --card-shadow: 0 1px 2px hsl(0 0% 0% / 40%), 0 16px 30px -12px hsl(345 50% 35% / 34%);
+  --decor-image:
+    radial-gradient(1000px 560px at 18% -10%, hsl(340 70% 60% / 20%), transparent 70%),
+    radial-gradient(800px 500px at 86% 0%, hsl(20 80% 58% / 14%), transparent 70%);
+  --decor-size: 100% 100%;
+  --decor-opacity: 1;
+  --decor-blend: normal;
+}
+
+:root[data-skin='candy'],
+[data-skin='candy'] {
+  --background: hsl(48 70% 97%);
+  --foreground: hsl(28 35% 16%);
+  --card: hsl(0 0% 100%);
+  --card-solid: hsl(0 0% 100%);
+  --card-foreground: hsl(28 35% 16%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(28 35% 16%);
+  --primary: hsl(330 65% 42%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(48 50% 94%);
+  --secondary-foreground: hsl(28 30% 22%);
+  --muted: hsl(46 45% 95%);
+  --muted-foreground: hsl(30 15% 34%);
+  --accent: hsl(48 90% 90%);
+  --accent-foreground: hsl(28 35% 16%);
+  --destructive: hsl(0 65% 38%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --success: hsl(155 50% 25%);
+  --success-foreground: hsl(0 0% 100%);
+  --warning: hsl(28 85% 26%);
+  --warning-foreground: hsl(0 0% 100%);
+  --info: hsl(215 65% 34%);
+  --info-foreground: hsl(0 0% 100%);
+  --tier-unknown: hsl(30 12% 50%);
+  --tier-learning: hsl(215 65% 44%);
+  --tier-familiar: hsl(155 50% 32%);
+  --tier-mastered: hsl(330 65% 40%);
+  --border: hsl(40 30% 85%);
+  --input: hsl(40 26% 77%);
+  --ring: hsl(330 65% 42%);
+  --overlay: hsl(28 25% 10% / 38%);
+  --glass: hsl(0 0% 100% / 70%);
+  --radius: 0.875rem;
+  --card-shadow: 0 1px 2px hsl(330 40% 40% / 8%), 0 12px 28px -12px hsl(330 60% 60% / 24%);
+  --decor-image:
+    radial-gradient(900px 500px at 8% -6%, hsl(330 95% 82% / 24%), transparent 70%),
+    radial-gradient(900px 520px at 92% 0%, hsl(48 95% 72% / 26%), transparent 70%);
+  --decor-size: 100% 100%;
+  --decor-opacity: 1;
+  --decor-blend: normal;
+}
+
+:root[data-skin='candy'].dark,
+[data-skin='candy'].dark {
+  --background: hsl(275 16% 9%);
+  --foreground: hsl(48 25% 90%);
+  --card: hsl(275 14% 12%);
+  --card-solid: hsl(275 14% 12%);
+  --card-foreground: hsl(48 25% 90%);
+  --popover: hsl(275 14% 14%);
+  --popover-foreground: hsl(48 25% 90%);
+  --primary: hsl(45 85% 64%);
+  --primary-foreground: hsl(275 30% 10%);
+  --secondary: hsl(275 14% 17%);
+  --secondary-foreground: hsl(48 20% 86%);
+  --muted: hsl(275 14% 15%);
+  --muted-foreground: hsl(280 10% 68%);
+  --accent: hsl(330 40% 22%);
+  --accent-foreground: hsl(48 22% 92%);
+  --destructive: hsl(0 70% 70%);
+  --destructive-foreground: hsl(0 60% 9%);
+  --success: hsl(155 45% 62%);
+  --success-foreground: hsl(155 45% 8%);
+  --warning: hsl(38 75% 64%);
+  --warning-foreground: hsl(38 75% 10%);
+  --info: hsl(215 60% 70%);
+  --info-foreground: hsl(215 60% 8%);
+  --tier-unknown: hsl(280 8% 56%);
+  --tier-learning: hsl(215 60% 70%);
+  --tier-familiar: hsl(155 45% 58%);
+  --tier-mastered: hsl(45 85% 66%);
+  --border: hsl(275 16% 22%);
+  --input: hsl(275 16% 28%);
+  --ring: hsl(45 85% 66%);
+  --overlay: hsl(0 0% 0% / 68%);
+  --glass: hsl(275 14% 14% / 70%);
+  --radius: 0.875rem;
+  --card-shadow: 0 1px 2px hsl(0 0% 0% / 40%), 0 16px 30px -12px hsl(330 50% 35% / 34%);
+  --decor-image:
+    radial-gradient(900px 520px at 10% -8%, hsl(330 80% 55% / 20%), transparent 70%),
+    radial-gradient(900px 540px at 90% 0%, hsl(45 90% 55% / 16%), transparent 70%);
+  --decor-size: 100% 100%;
+  --decor-opacity: 1;
+  --decor-blend: normal;
+}

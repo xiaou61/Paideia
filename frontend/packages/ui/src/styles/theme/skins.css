@@ -1,0 +1,31 @@
+/*
+ * 皮肤层入口（WORK-079）。
+ *
+ * **加一个皮肤族 = 在这里加一行 @import。** 每个族一个文件，是为了让"几个风格族的皮肤"
+ * 可以并行写、互不冲突（同族内追加皮肤才是同一个文件）。
+ *
+ * 每个皮肤块写成两段、四个选择器：
+ *
+ *   :root[data-skin='paper'],
+ *   [data-skin='paper'] { ... }                      亮色值
+ *   :root[data-skin='paper'].dark,
+ *   [data-skin='paper'].dark { ... }                 暗色值
+ *
+ * 三条硬规则（由 `theme/skin-contract.test.ts` 强制，不靠人记）：
+ *   1. 亮色块里覆盖了哪个令牌，暗色块里就必须也给出值——否则暗色下会"半新半旧"，
+ *      典型症状是深底配深字。
+ *   2. 只能覆盖 `:root` / `@theme inline` 里已经存在的令牌名。拼错了不会报错、也不生效，
+ *      那是最难查的一类"皮肤像没应用"。
+ *   3. `--paper*`（简历纸张）不许覆盖：纸永远白、字永远黑，是 WORK-018 定的语义。
+ *
+ * 值一律写字面量 `hsl(h s% l%)`，不写 `var()` 间接链：对比度测试要直接解析这些值，
+ * 排查时也要能在 devtools 里一眼看到最终颜色。
+ */
+
+@import './skins/paper-tone.css';
+@import './skins/nature.css';
+@import './skins/pastel.css';
+@import './skins/night.css';
+@import './skins/terminal.css';
+@import './skins/glass.css';
+@import './skins/contrast.css';

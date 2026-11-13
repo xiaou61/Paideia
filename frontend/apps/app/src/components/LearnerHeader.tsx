@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
   Input,
 } from '@paideia/ui'
-import { ChevronDown, LogOut, Menu, Plug, Search, UserRound, UserX } from 'lucide-react'
+import { ChevronDown, LogOut, Menu, Palette, Plug, Search, UserRound, UserX } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 
@@ -391,6 +391,17 @@ export function LearnerHeader() {
           <DropdownMenuItem data-testid="account-mcp" onClick={() => { void navigate('/settings/mcp'); setNavOpen(false) }}>
             <Plug className="size-4" />
             MCP 接入
+          </DropdownMenuItem>
+          {/*
+            外观（WORK-079）：换肤 + 明暗。低频的个人设置，所以放账号菜单而不是主导航——
+            但必须有可见入口（AGENTS.md「加了页面就必须加入口」：只在首页卡片里出现不算）。
+          */}
+          <DropdownMenuItem
+            data-testid="account-appearance"
+            onClick={() => { void navigate('/settings/appearance'); setNavOpen(false) }}
+          >
+            <Palette className="size-4" />
+            外观
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           {/* 注销与登出都收进菜单：它们是低频且危险的动作，摆在页头只会天天误点 */}

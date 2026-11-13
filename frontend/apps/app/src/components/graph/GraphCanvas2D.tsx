@@ -7,7 +7,7 @@ import {
   type ConceptNode,
   type Point,
 } from '@paideia/knowledge'
-import { Spinner } from '@paideia/ui'
+import { Spinner, subscribeToThemeChange } from '@paideia/ui'
 import { useEffect, useRef, useState } from 'react'
 
 import { resolveVar, tierColor } from './tier-style'
@@ -163,7 +163,35 @@ export function GraphCanvas2D({ nodes, edges, layoutKeyValue, selectedId, onSele
         renderer.on('clickNode', ({ node }) => onSelect(Number(node)))
         renderer.on('clickStage', () => onSelect(-1))
 
+        /**
+         * 换肤 / 换明暗后重读令牌并重画（WORK-079）。
+         *
+         * <p>只改颜色、**不重跑布局**：节点坐标是用户的空间记忆，换一次皮肤就重排等于
+         * 每次换肤都"换一张图"。sigma 把颜色存在节点属性里，改属性 + `refresh()` 即可。
+         */
+        const recolor = () => {
+          nodes.forEach((node) => {
+            const key = String(node.id)
+            if (graph.hasNode(key)) {
+              graph.setNodeAttribute(key, 'color', tierColor(node.tier))
+            }
+          })
+          edges.forEach((edge, index) => {
+            const key = `${edge.type}-${index}`
+            if (graph.hasEdge(key)) {
+              graph.setEdgeAttribute(
+                key,
+                'color',
+                resolveVar(edge.type === 'prerequisite' ? '--border' : '--tier-unknown'),
+              )
+            }
+          })
+          renderer.refresh()
+        }
+        const unsubscribeTheme = subscribeToThemeChange(recolor)
+
         destroy = () => {
+          unsubscribeTheme()
           renderer.kill()
         }
       } catch {

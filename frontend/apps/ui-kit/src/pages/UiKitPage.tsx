@@ -44,6 +44,7 @@ import {
   SelectValue,
   Separator,
   Skeleton,
+  SkinPicker,
   Spinner,
   Switch,
   Table,
@@ -428,6 +429,15 @@ export function UiKitPage() {
               错误通知
             </Button>
           </Row>
+        </Section>
+
+        {/*
+          皮肤（WORK-079）。这一页是设计系统的陈列窗，皮肤属于设计系统的一部分：
+          想确认"某个皮肤在组件上还成不成立"，在这里切一下比跑四个应用快。
+          真正的入口在学习者端账号菜单（外观页）。
+        */}
+        <Section title="皮肤" description="每个皮肤的真实令牌，卡片内部就是一份迷你主题；点一下全站生效。">
+          <SkinPicker />
         </Section>
       </div>
     </AppShell>
