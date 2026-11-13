@@ -4,7 +4,8 @@ import path from 'node:path'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { THEME_KEY, THEME_STORAGE_PREFIX, type ThemeStorage } from './keys'
+import { DEFAULT_SKIN, SKIN_KEY, THEME_KEY, THEME_STORAGE_PREFIX, type ThemeStorage } from './keys'
+import { THEME_CHANGE_EVENT } from './theme-events'
 import { ThemeProvider, useTheme } from './theme-context'
 
 /** 只用来把当前主题渲染出来，好让断言看得见。 */
@@ -13,6 +14,16 @@ function ThemeProbe() {
   return (
     <button type="button" onClick={toggleTheme} data-testid="probe">
       {theme}
+    </button>
+  )
+}
+
+/** 皮肤探针：显示当前皮肤，并在点击时换到另一个（模拟外观页的动作）。 */
+function SkinProbe() {
+  const { skin, setSkin } = useTheme()
+  return (
+    <button type="button" onClick={() => setSkin('terminal')} data-testid="skin-probe">
+      {skin}
     </button>
   )
 }
@@ -65,6 +76,7 @@ function workspaceRoot(): string {
 afterEach(() => {
   cleanup()
   document.documentElement.classList.remove('dark')
+  document.documentElement.removeAttribute('data-skin')
   vi.unstubAllGlobals()
 })
 
@@ -133,6 +145,73 @@ describe('主题', () => {
     )
 
     expect(colorScheme.listenerCount()).toBe(0)
+  })
+})
+
+describe('皮肤', () => {
+  it('初始值取自 <html data-skin>，不重算一遍', () => {
+    document.documentElement.dataset['skin'] = 'paper'
+    // 存储里放另一个值：视图层必须忽略它，否则会出现"首屏脚本说是暖纸、挂载后跳回墨白"
+    const { storage } = memoryStorage({ [SKIN_KEY]: 'terminal' })
+
+    render(
+      <ThemeProvider storage={storage}>
+        <SkinProbe />
+      </ThemeProvider>,
+    )
+
+    expect(screen.getByTestId('skin-probe').textContent).toBe('paper')
+  })
+
+  it('DOM 上是没登记过的脏值时回退默认皮肤', () => {
+    document.documentElement.dataset['skin'] = 'skin-removed-last-release'
+
+    render(
+      <ThemeProvider storage={memoryStorage().storage}>
+        <SkinProbe />
+      </ThemeProvider>,
+    )
+
+    expect(screen.getByTestId('skin-probe').textContent).toBe(DEFAULT_SKIN)
+  })
+
+  it('换肤时同时改属性、写存储，并派发主题变更事件', () => {
+    const { storage, store } = memoryStorage()
+    const listener = vi.fn()
+    document.addEventListener(THEME_CHANGE_EVENT, listener)
+
+    render(
+      <ThemeProvider storage={storage}>
+        <SkinProbe />
+      </ThemeProvider>,
+    )
+    expect(screen.getByTestId('skin-probe').textContent).toBe(DEFAULT_SKIN)
+
+    fireEvent.click(screen.getByTestId('skin-probe'))
+
+    expect(screen.getByTestId('skin-probe').textContent).toBe('terminal')
+    expect(document.documentElement.dataset['skin']).toBe('terminal')
+    expect(store.get(SKIN_KEY)).toBe('terminal')
+    // 画布类组件（知识图谱）靠这个事件重读令牌，漏派发就会"页面变了、图没变"
+    expect(listener).toHaveBeenCalled()
+
+    document.removeEventListener(THEME_CHANGE_EVENT, listener)
+  })
+
+  it('明暗切换也派发同一个事件（令牌整套换了）', () => {
+    const listener = vi.fn()
+    document.addEventListener(THEME_CHANGE_EVENT, listener)
+
+    render(
+      <ThemeProvider storage={memoryStorage().storage}>
+        <ThemeProbe />
+      </ThemeProvider>,
+    )
+    fireEvent.click(screen.getByTestId('probe'))
+
+    expect(listener).toHaveBeenCalled()
+
+    document.removeEventListener(THEME_CHANGE_EVENT, listener)
   })
 })
 

@@ -131,3 +131,12 @@ export {
 export { isTheme, THEME_KEY, THEME_STORAGE_KEY, type Theme, type ThemeStorage } from './theme/keys'
 export { ThemeProvider, useTheme } from './theme/theme-context'
 export { ThemeToggle } from './theme/theme-toggle'
+export {
+  DEFAULT_SKIN,
+  SKIN_KEY,
+  SKIN_STORAGE_KEY,
+  type SkinId,
+} from './theme/keys'
+export { isSkin, skinById, SKIN_FAMILIES, SKINS, type Skin, type SkinFamily } from './theme/skins'
+export { SkinPicker } from './theme/theme-picker'
+export { subscribeToThemeChange, THEME_CHANGE_EVENT } from './theme/theme-events'

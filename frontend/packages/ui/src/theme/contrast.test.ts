@@ -1,41 +1,35 @@
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
-
 import { describe, expect, it } from 'vitest'
+
+import { SKINS } from './skins'
+import { loadThemeCss } from './theme-css'
 
 /**
  * 对比度检查。令牌是手写的感观值，改一个数字就可能把某处文字压到 AA 以下，
  * 而那种问题肉眼看不出来（尤其在半透明层上）。所以直接在测试里算 WCAG 对比度。
  *
- * 为什么算"合成后颜色"：半透明层上的文字落在合成色上，而不是落在令牌原值上；
+ * <p><b>WORK-079 起，检查对象从"浅色/深色两套"变成"每个皮肤 × 每个明暗"</b>。
+ * 这是"支持很多皮肤"能成立的唯一前提：皮肤是数据，数据的正确性只能靠逐条断言。
+ * 17 个皮肤 × 2 种模式 = 34 套令牌，人工看不过来；而失败信息里带皮肤 id，定位成本是零。
+ *
+ * <p>解析的是**级联结果**而不是单个块：亮色 = `:root` ← 皮肤亮色块；暗色 = `:root` ← `.dark`
+ * ← 皮肤亮色块 ← 皮肤暗色块（顺序即 CSS 特异性顺序，见 `theme-css.ts` 与 `skins.css` 的说明）。
+ * 只读某个块本身会漏掉"皮肤只覆盖了一部分令牌、其余继承"这件事。
+ *
+ * <p>为什么算"合成后颜色"：半透明层上的文字落在合成色上，而不是落在令牌原值上；
  * 按原值算会高估对比度。
  *
- * 已知未覆盖：静止状态的 input/border 是极细的低对比线（这是刻意的观感方向，
- * Geist 自己的 --ds-gray-400 就是 hsl(0 0% 92%)）。WCAG 1.4.11 真正要求的是**焦点指示**
+ * <p>已知未覆盖：静止状态的 input/border 是极细的低对比线（这是刻意的观感方向，
+ * Geist 自己的 `--ds-gray-400` 就是 hsl(0 0% 92%)）。WCAG 1.4.11 真正要求的是**焦点指示**
  * 可辨识，所以这里断言的是 ring 合成后的对比度；若连静止边框也提到 3:1，观感会明显变重。
  */
-
-const CSS_PATH = path.join(process.cwd(), 'src', 'styles', 'globals.css')
 
 interface Color {
   rgb: [number, number, number]
   alpha: number
 }
 
-/** 解析 :root 与 .dark 里的颜色令牌，oklch 与 hsl 两种写法都支持。 */
-function parseTokens(css: string, selector: string): Record<string, Color> {
-  // 必须按"行首的选择器 {"去匹配，不能简单 indexOf('.dark')：
-  // 文件上方 @custom-variant 那行里也有 ".dark"，否则会静默解析成 :root，
-  // 于是两个主题都拿浅色的值去比，深色永远测不出来（本文件踩过一次）。
-  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const blockStart = new RegExp(`^\\s*${escaped}\\s*\\{`, 'm').exec(css)
-  if (blockStart === null) {
-    throw new Error(`globals.css 里找不到 ${selector} 的令牌块`)
-  }
-  const open = css.indexOf('{', blockStart.index)
-  const close = css.indexOf('}', open)
-  const body = css.slice(open + 1, close)
-
+/** 解析一个声明块里的颜色令牌，oklch 与 hsl 两种写法都支持。 */
+function parseColors(body: string): Record<string, Color> {
   const tokens: Record<string, Color> = {}
   for (const line of body.split(';')) {
     const declaration = /--([a-z0-9-]+)\s*:\s*(oklch|hsl)\(([^)]*)\)/.exec(line)
@@ -129,14 +123,45 @@ function contrastRatio(a: number, b: number): number {
   return (lighter + 0.05) / (darker + 0.05)
 }
 
-const css = readFileSync(CSS_PATH, 'utf8')
+const css = loadThemeCss()
+const rootColors = parseColors(css.rootBody)
+const darkColors = parseColors(css.darkBody)
+
+/**
+ * 某个皮肤在某个明暗下的**实际生效**令牌。
+ *
+ * @param skinId 皮肤 id（`default` 没有任何皮肤块，因此结果就是基础两套之一）
+ * @param mode 明暗
+ */
+function resolveTokens(skinId: string, mode: 'light' | 'dark'): Record<string, Color> {
+  const resolved: Record<string, Color> = { ...rootColors }
+  if (mode === 'dark') {
+    Object.assign(resolved, darkColors)
+  }
+  // 亮色块的优先级高于 `.dark`（`:root[data-skin]` 是 0,2,0，`.dark` 是 0,1,0），
+  // 所以暗色下也要先叠亮色块、再叠暗色块——这正是"皮肤漏写暗色值"会露馅的地方。
+  for (const rule of css.skinRules.filter((item) => item.id === skinId && !item.dark)) {
+    Object.assign(resolved, parseColors(rule.body))
+  }
+  for (const rule of css.skinRules.filter((item) => item.id === skinId && item.dark)) {
+    Object.assign(resolved, parseColors(rule.body))
+  }
+  return resolved
+}
+
 const TEXT_MINIMUM = 4.5
 
-describe.each([
-  { name: '浅色', selector: ':root' },
-  { name: '深色', selector: '.dark' },
-])('$name 主题的对比度', ({ selector }) => {
-  const tokens = parseTokens(css, selector)
+const cases = SKINS.flatMap((skin) =>
+  (['light', 'dark'] as const).map((mode) => ({
+    skinId: skin.id,
+    skinName: skin.name,
+    mode,
+    label: mode === 'light' ? '亮色' : '暗色',
+  })),
+)
+
+describe.each(cases)('$skinName（$skinId）· $label 的对比度', ({ skinId, mode }) => {
+  const tokens = resolveTokens(skinId, mode)
   const background = relativeLuminance(tokens['background']!.rgb)
   const card = relativeLuminance(tokens['card']!.rgb)
   const solid = relativeLuminance(tokens['card-solid']!.rgb)

@@ -21,6 +21,7 @@ import { LoginPage } from './pages/LoginPage'
 import { InterviewPage } from './pages/InterviewPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { McpTokensPage } from './pages/McpTokensPage'
+import { AppearancePage } from './pages/AppearancePage'
 import { MyAssessmentsPage } from './pages/MyAssessmentsPage'
 import { NoteNewPage } from './pages/NoteNewPage'
 import { NotesPage } from './pages/NotesPage'
@@ -363,6 +364,16 @@ export const router = createHashRouter([
     element: (
       <RequireAuth>
         <McpTokensPage />
+      </RequireAuth>
+    ),
+  },
+  {
+    // 外观（WORK-079）：换肤 + 明暗。和 MCP 同属"个人设置"，所以放在同一前缀下。
+    // 入口在账号菜单（LearnerHeader）里——低频设置不该占主导航的位置。
+    path: '/settings/appearance',
+    element: (
+      <RequireAuth>
+        <AppearancePage />
       </RequireAuth>
     ),
   },

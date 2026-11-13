@@ -1,0 +1,125 @@
+/*
+ * 暖纸复古族（WORK-079）。
+ *
+ * 这一族的共同点：底色是"被日光晒过的纸"（暖色相 28–40°），正文是深棕而不是中性黑，
+ * 标题走衬线（`--font-display`），卡面比底色更白一点——纸堆叠的层次感来自亮度差而不是描边。
+ *
+ * 只覆盖需要改的令牌：`--tier-*` 跟着换是因为图谱节点色如果还是冷蓝冷绿，会在暖纸上像贴纸；
+ * `--sk-*` 跟着换是手绘图（rough.js）的线色，同理。
+ */
+
+:root[data-skin='paper'],
+[data-skin='paper'] {
+  --background: hsl(38 45% 96%);
+  --foreground: hsl(30 25% 15%);
+  --card: hsl(42 50% 99%);
+  --card-solid: hsl(42 50% 99%);
+  --card-foreground: hsl(30 25% 15%);
+  --popover: hsl(42 50% 99%);
+  --popover-foreground: hsl(30 25% 15%);
+  --primary: hsl(20 48% 28%);
+  --primary-foreground: hsl(40 55% 97%);
+  --secondary: hsl(38 28% 91%);
+  --secondary-foreground: hsl(30 25% 20%);
+  --muted: hsl(38 30% 92%);
+  --muted-foreground: hsl(32 18% 34%);
+  --accent: hsl(35 40% 89%);
+  --accent-foreground: hsl(30 25% 17%);
+  --destructive: hsl(8 60% 34%);
+  --destructive-foreground: hsl(40 55% 97%);
+  --success: hsl(148 42% 25%);
+  --success-foreground: hsl(40 55% 97%);
+  --warning: hsl(28 72% 29%);
+  --warning-foreground: hsl(40 55% 97%);
+  --info: hsl(206 55% 27%);
+  --info-foreground: hsl(40 55% 97%);
+  --tier-unknown: hsl(32 12% 52%);
+  --tier-learning: hsl(206 55% 38%);
+  --tier-familiar: hsl(150 40% 28%);
+  --tier-mastered: hsl(24 42% 20%);
+  --border: hsl(34 22% 82%);
+  --input: hsl(34 20% 74%);
+  --ring: hsl(20 48% 28%);
+  --overlay: hsl(30 30% 12% / 40%);
+  --glass: hsl(42 50% 99% / 72%);
+  --card-shadow:
+    0 1px 2px hsl(30 25% 15% / 5%), 0 2px 6px -1px hsl(30 25% 15% / 6%),
+    0 10px 20px -6px hsl(30 25% 15% / 8%);
+  --popover-shadow:
+    0 1px 2px hsl(30 25% 15% / 6%), 0 8px 20px -4px hsl(30 25% 15% / 10%),
+    0 24px 40px -8px hsl(30 25% 15% / 12%);
+  --radius: 0.5rem;
+  --font-display: 'Songti SC', 'SimSun', Georgia, 'Times New Roman', serif;
+  --decor-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23p)'/%3E%3C/svg%3E");
+  --decor-size: 140px 140px;
+  --decor-opacity: 0.05;
+  --decor-blend: multiply;
+  --sk-ink: hsl(30 25% 16%);
+  --sk-muted: hsl(32 14% 42%);
+  --sk-gray-line: hsl(32 14% 46%);
+  --sk-gray-fill: hsl(38 32% 93%);
+  --sk-blue-line: hsl(206 55% 32%);
+  --sk-blue-fill: hsl(205 45% 92%);
+  --sk-amber-line: hsl(30 70% 32%);
+  --sk-amber-fill: hsl(38 90% 91%);
+  --sk-green-line: hsl(150 40% 27%);
+  --sk-green-fill: hsl(145 35% 91%);
+  --sk-violet-line: hsl(275 35% 38%);
+  --sk-violet-fill: hsl(275 30% 93%);
+}
+
+:root[data-skin='paper'].dark,
+[data-skin='paper'].dark {
+  --background: hsl(28 12% 10%);
+  --foreground: hsl(38 30% 90%);
+  --card: hsl(28 12% 13%);
+  --card-solid: hsl(28 12% 13%);
+  --card-foreground: hsl(38 30% 90%);
+  --popover: hsl(28 12% 15%);
+  --popover-foreground: hsl(38 30% 90%);
+  --primary: hsl(36 60% 68%);
+  --primary-foreground: hsl(28 30% 12%);
+  --secondary: hsl(28 12% 18%);
+  --secondary-foreground: hsl(36 22% 84%);
+  --muted: hsl(28 12% 17%);
+  --muted-foreground: hsl(34 14% 70%);
+  --accent: hsl(28 12% 20%);
+  --accent-foreground: hsl(36 25% 90%);
+  --destructive: hsl(8 65% 68%);
+  --destructive-foreground: hsl(8 60% 10%);
+  --success: hsl(148 40% 62%);
+  --success-foreground: hsl(148 60% 10%);
+  --warning: hsl(32 75% 62%);
+  --warning-foreground: hsl(32 80% 12%);
+  --info: hsl(202 55% 66%);
+  --info-foreground: hsl(202 70% 10%);
+  --tier-unknown: hsl(34 12% 58%);
+  --tier-learning: hsl(202 55% 66%);
+  --tier-familiar: hsl(148 40% 60%);
+  --tier-mastered: hsl(36 30% 86%);
+  --border: hsl(28 12% 22%);
+  --input: hsl(28 12% 28%);
+  --ring: hsl(36 60% 72%);
+  --overlay: hsl(0 0% 0% / 62%);
+  --glass: hsl(28 12% 16% / 70%);
+  --card-shadow: 0 1px 2px hsl(0 0% 0% / 40%), 0 10px 20px -6px hsl(0 0% 0% / 50%);
+  --popover-shadow: 0 1px 2px hsl(0 0% 0% / 45%), 0 18px 36px -8px hsl(0 0% 0% / 60%);
+  --radius: 0.5rem;
+  --font-display: 'Songti SC', 'SimSun', Georgia, 'Times New Roman', serif;
+  --decor-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23p)'/%3E%3C/svg%3E");
+  --decor-size: 140px 140px;
+  --decor-opacity: 0.06;
+  --decor-blend: soft-light;
+  --sk-ink: hsl(36 28% 88%);
+  --sk-muted: hsl(34 14% 66%);
+  --sk-gray-line: hsl(34 12% 62%);
+  --sk-gray-fill: hsl(28 12% 17%);
+  --sk-blue-line: hsl(202 60% 68%);
+  --sk-blue-fill: hsl(205 40% 20%);
+  --sk-amber-line: hsl(32 80% 66%);
+  --sk-amber-fill: hsl(32 45% 18%);
+  --sk-green-line: hsl(148 42% 62%);
+  --sk-green-fill: hsl(150 30% 17%);
+  --sk-violet-line: hsl(275 45% 74%);
+  --sk-violet-fill: hsl(275 25% 21%);
+}

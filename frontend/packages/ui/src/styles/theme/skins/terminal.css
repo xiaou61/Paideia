@@ -1,0 +1,130 @@
+/*
+ * 终端像素族（WORK-079）。
+ *
+ * 这一族证明皮肤能改的**不只是颜色**：圆角归零、字体整栈换成等宽、阴影换成 1px 硬边。
+ * 亮色模式是"晒过太阳的终端"（米底深绿，Solarized Light 那一脉）——只在暗色下成立的皮肤
+ * 等于白天不可用。
+ *
+ * `--radius*` 必须逐个写成 0：`--radius-sm` 在 `@theme inline` 里是 `calc(var(--radius) - 4px)`，
+ * 直接给 `--radius: 0` 会让它算出 `-4px`（负圆角是无效值，浏览器按"未设置"处理）。
+ */
+
+:root[data-skin='terminal'],
+[data-skin='terminal'] {
+  --background: hsl(44 30% 93%);
+  --foreground: hsl(150 12% 16%);
+  --card: hsl(44 32% 97%);
+  --card-solid: hsl(44 32% 97%);
+  --card-foreground: hsl(150 12% 16%);
+  --popover: hsl(44 32% 97%);
+  --popover-foreground: hsl(150 12% 16%);
+  --primary: hsl(150 55% 22%);
+  --primary-foreground: hsl(44 40% 97%);
+  --secondary: hsl(44 20% 89%);
+  --secondary-foreground: hsl(150 12% 20%);
+  --muted: hsl(44 22% 90%);
+  --muted-foreground: hsl(150 8% 32%);
+  --accent: hsl(150 20% 86%);
+  --accent-foreground: hsl(150 14% 14%);
+  --destructive: hsl(0 60% 36%);
+  --destructive-foreground: hsl(44 40% 97%);
+  --success: hsl(150 60% 25%);
+  --success-foreground: hsl(44 40% 97%);
+  --warning: hsl(35 80% 29%);
+  --warning-foreground: hsl(44 40% 97%);
+  --info: hsl(200 60% 27%);
+  --info-foreground: hsl(44 40% 97%);
+  --tier-unknown: hsl(150 6% 50%);
+  --tier-learning: hsl(200 55% 36%);
+  --tier-familiar: hsl(150 45% 30%);
+  --tier-mastered: hsl(150 60% 18%);
+  --border: hsl(150 8% 74%);
+  --input: hsl(150 8% 66%);
+  --ring: hsl(150 55% 22%);
+  --overlay: hsl(150 20% 10% / 40%);
+  --glass: hsl(44 32% 97% / 75%);
+  --card-shadow: 0 0 0 1px hsl(150 10% 20% / 12%), 0 1px 0 hsl(150 10% 20% / 10%);
+  --popover-shadow: 0 0 0 1px hsl(150 10% 20% / 16%), 0 6px 0 -2px hsl(150 10% 20% / 8%);
+  --radius: 0rem;
+  --radius-sm: 0rem;
+  --radius-md: 0rem;
+  --radius-lg: 0rem;
+  --radius-xl: 0rem;
+  --font-sans: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Microsoft YaHei UI', monospace;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Microsoft YaHei UI', monospace;
+  --font-display: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Microsoft YaHei UI', monospace;
+  --decor-opacity: 0;
+  --decor-blend: normal;
+  --sk-ink: hsl(150 12% 18%);
+  --sk-muted: hsl(150 8% 36%);
+  --sk-gray-line: hsl(150 8% 40%);
+  --sk-gray-fill: hsl(44 28% 92%);
+  --sk-blue-line: hsl(200 60% 30%);
+  --sk-blue-fill: hsl(200 40% 92%);
+  --sk-amber-line: hsl(35 80% 30%);
+  --sk-amber-fill: hsl(44 80% 91%);
+  --sk-green-line: hsl(150 55% 25%);
+  --sk-green-fill: hsl(150 40% 91%);
+  --sk-violet-line: hsl(270 40% 36%);
+  --sk-violet-fill: hsl(270 30% 93%);
+}
+
+:root[data-skin='terminal'].dark,
+[data-skin='terminal'].dark {
+  --background: hsl(150 10% 7%);
+  --foreground: hsl(140 25% 86%);
+  --card: hsl(150 10% 10%);
+  --card-solid: hsl(150 10% 10%);
+  --card-foreground: hsl(140 25% 86%);
+  --popover: hsl(150 10% 12%);
+  --popover-foreground: hsl(140 25% 86%);
+  --primary: hsl(140 65% 58%);
+  --primary-foreground: hsl(150 12% 8%);
+  --secondary: hsl(150 10% 15%);
+  --secondary-foreground: hsl(140 18% 84%);
+  --muted: hsl(150 10% 14%);
+  --muted-foreground: hsl(140 12% 64%);
+  --accent: hsl(150 12% 18%);
+  --accent-foreground: hsl(140 20% 88%);
+  --destructive: hsl(0 70% 66%);
+  --destructive-foreground: hsl(0 60% 8%);
+  --success: hsl(140 60% 60%);
+  --success-foreground: hsl(150 40% 8%);
+  --warning: hsl(40 80% 64%);
+  --warning-foreground: hsl(40 70% 10%);
+  --info: hsl(195 60% 64%);
+  --info-foreground: hsl(195 60% 8%);
+  --tier-unknown: hsl(150 6% 52%);
+  --tier-learning: hsl(195 60% 64%);
+  --tier-familiar: hsl(140 50% 56%);
+  --tier-mastered: hsl(140 70% 62%);
+  --border: hsl(150 10% 20%);
+  --input: hsl(150 10% 26%);
+  --ring: hsl(140 65% 58%);
+  --overlay: hsl(0 0% 0% / 70%);
+  --glass: hsl(150 10% 12% / 72%);
+  --card-shadow: 0 0 0 1px hsl(140 30% 60% / 14%);
+  --popover-shadow: 0 0 0 1px hsl(140 30% 60% / 18%), 0 12px 28px -8px hsl(0 0% 0% / 70%);
+  --radius: 0rem;
+  --radius-sm: 0rem;
+  --radius-md: 0rem;
+  --radius-lg: 0rem;
+  --radius-xl: 0rem;
+  --font-sans: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Microsoft YaHei UI', monospace;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Microsoft YaHei UI', monospace;
+  --font-display: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Microsoft YaHei UI', monospace;
+  --decor-opacity: 0;
+  --decor-blend: normal;
+  --sk-ink: hsl(140 22% 88%);
+  --sk-muted: hsl(140 10% 66%);
+  --sk-gray-line: hsl(140 8% 60%);
+  --sk-gray-fill: hsl(150 10% 17%);
+  --sk-blue-line: hsl(195 55% 66%);
+  --sk-blue-fill: hsl(195 35% 18%);
+  --sk-amber-line: hsl(40 75% 66%);
+  --sk-amber-fill: hsl(40 40% 17%);
+  --sk-green-line: hsl(140 55% 62%);
+  --sk-green-fill: hsl(150 30% 16%);
+  --sk-violet-line: hsl(270 45% 72%);
+  --sk-violet-fill: hsl(270 25% 20%);
+}
