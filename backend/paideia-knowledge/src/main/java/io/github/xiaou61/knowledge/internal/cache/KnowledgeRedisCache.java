@@ -22,6 +22,12 @@ public class KnowledgeRedisCache {
     private static final Logger log = LoggerFactory.getLogger(KnowledgeRedisCache.class);
     private static final ObjectMapper JSON = new ObjectMapper();
 
+    /**
+     * 条目摘要缓存键前缀。**写入与失效必须共用这一个常量**：失效按整个前缀扫，
+     * 否则写入侧升版本（v1→v2）时失效模式还停在旧版本，新建/删除条目后缓存永远删不掉。
+     */
+    public static final String ENTRY_BRIEFS_PREFIX = "knowledge:entry-briefs:";
+
     private final StringRedisTemplate redis;
     private final boolean enabled;
 
@@ -86,6 +92,6 @@ public class KnowledgeRedisCache {
     }
 
     public void evictEntryBriefs() {
-        evictPattern("knowledge:entry-briefs:v1:*");
+        evictPattern(ENTRY_BRIEFS_PREFIX + "*");
     }
 }

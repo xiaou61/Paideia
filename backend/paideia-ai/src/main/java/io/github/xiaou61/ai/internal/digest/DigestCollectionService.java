@@ -161,6 +161,21 @@ public class DigestCollectionService {
             byFingerprint.putIfAbsent(fingerprint, item);
         }
 
+        // 兜底来源清理必须在**查重之前**：早上页面通路挂掉时入库的是「GitHub 新项目」，
+        // 现在热榜恢复了，同一个仓库会同时出现在兜底行与热榜候选里——若先查重，它被当成
+        // "已存在"跳过，再删兜底行，这一天它就彻底消失了（d1 也一起丢）。先删再查，它就只是"新的一条"。
+        // 只在**本轮确实取到热榜条目**时才删，否则（仍是兜底轮）会把当天唯一的内容删空。
+        boolean pageGithubFetched = fetched.stream().anyMatch(item ->
+                GithubTrendingSource.GROUP.equals(item.groupKey())
+                        && GithubTrendingSource.SOURCE_PAGE.equals(item.sourceName()));
+        if (pageGithubFetched) {
+            int staleFallback = mapper.deleteBySource(today, GithubTrendingSource.GROUP,
+                    GithubTrendingSource.SOURCE_FALLBACK);
+            if (staleFallback > 0) {
+                log.info("速递：热榜已恢复，先清掉当天 {} 条兜底条目再查重", staleFallback);
+            }
+        }
+
         // 4. 查库剔除：GitHub 只查当天（允许同一仓库连续在榜），其它组保持 ±1 天
         List<String> candidates = new ArrayList<>(byFingerprint.keySet());
         List<String> githubCandidates = candidates.stream()
@@ -220,7 +235,6 @@ public class DigestCollectionService {
         Instant now = Instant.now();
         int created = 0;
         int degraded = 0;
-        boolean pageGithubCreated = false;
         for (int index = 0; index < items.size(); index++) {
             FetchedItem item = items.get(index);
             String fingerprint = selected.get(index);
@@ -248,25 +262,12 @@ public class DigestCollectionService {
                         item.meta(), item.language(), item.publishedAt(),
                         ready ? STATE_READY : STATE_DEGRADED, now);
                 created++;
-                if (github && GithubTrendingSource.SOURCE_PAGE.equals(item.sourceName())) {
-                    pageGithubCreated = true;
-                }
             } catch (RuntimeException exception) {
                 // 并发两个实例同时跑时，唯一约束会挡住后来者——按"已存在"处理，不记失败
                 if (String.valueOf(exception.getMessage()).contains(DUPLICATE_KEY)) {
                     continue;
                 }
                 log.warn("速递入库失败（{}）：{}", item.url(), exception.getMessage());
-            }
-        }
-
-        // 真热榜抓到了，就把当天早上兜底来源的条目清掉：否则「热榜」与「新项目」混在一组，
-        // 而兜底条目的 d1 往往很高，会顶在真热榜前面。
-        if (pageGithubCreated) {
-            int removed = mapper.deleteBySource(today, GithubTrendingSource.GROUP,
-                    GithubTrendingSource.SOURCE_FALLBACK);
-            if (removed > 0) {
-                log.info("速递：热榜已抓到，清掉当天 {} 条兜底条目", removed);
             }
         }
 

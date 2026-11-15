@@ -50,12 +50,21 @@ $bsdtar = Join-Path $env:SystemRoot 'System32\tar.exe'
 # 上一次成功发版时的 git 提交。用来判断"前端到底改没改"——它放在 target 里，不进仓库。
 $lastReleaseMarker = Join-Path $repo 'backend\paideia-app\target\.last-release-commit'
 
-if (-not (Test-Path $QuickServerScript)) { throw "找不到 quick-server 脚本：$QuickServerScript" }
+# quick-server 只在真正部署时才需要：-ValidateOnly 是纯本地预检（不打包、不连服务器），
+# 没装这个技能的机器也必须能跑，所以检查放到 ValidateOnly 判断之后再做。
+if (-not $ValidateOnly -and -not (Test-Path $QuickServerScript)) { throw "找不到 quick-server 脚本：$QuickServerScript" }
 
 # 发布前内容校验（WORK-073 TASK-006）：打包与部署之前先跑统一内容校验，有 error 立即终止。
 # -ValidateOnly 只跑这一步就退出，便于本地验证与 CI 式预检（不会打包、不会连服务器）。
-& node (Join-Path $repo 'scripts\check-content.mjs') --scope content
-if ($LASTEXITCODE -ne 0) { throw "内容校验未通过（退出码 $LASTEXITCODE），已终止发版。" }
+# check-content.mjs 用 process.cwd() 当仓库根（ROOT），必须在 $repo 下跑，否则从别处调用会找错目录。
+Push-Location $repo
+try {
+    & node (Join-Path $repo 'scripts\check-content.mjs') --scope content
+    $contentExit = $LASTEXITCODE
+} finally {
+    Pop-Location
+}
+if ($contentExit -ne 0) { throw "内容校验未通过（退出码 $contentExit），已终止发版。" }
 if ($ValidateOnly) { Write-Host '仅校验（-ValidateOnly）：内容校验通过，退出，未打包未部署。'; return }
 
 function Step([string]$name, [scriptblock]$action) {

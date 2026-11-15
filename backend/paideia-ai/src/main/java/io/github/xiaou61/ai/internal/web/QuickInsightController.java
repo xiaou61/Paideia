@@ -143,8 +143,12 @@ class QuickInsightController {
         long reserved = credits.reserve(userId, credits.estimate());
         try {
             QuickInsightCaller.Result<T> result = work.apply(access.get());
+            // usage 可能为 null（上游没返回用量，见 SingleShotModelCaller.usageOf）——
+            // 那不是"零消耗"，按既有口径传 null，绝不能在此解引用成 NPE 把成功结果判成失败。
+            var usage = result.usage();
             credits.settle(userId, reserved, access.get().model(),
-                    result.usage().inputTokens(), result.usage().outputTokens(), null);
+                    usage == null ? null : usage.inputTokens(),
+                    usage == null ? null : usage.outputTokens(), null);
             return result.value();
         } catch (RuntimeException failure) {
             credits.refund(userId, reserved, null, "AI 调用失败");

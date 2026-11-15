@@ -199,6 +199,11 @@ export function InterviewPage() {
 
   /** 当前这轮在飞的请求；离开页面时中断它（与助手那条同一纪律：不能让上游继续烧钱）。 */
   const abortRef = useRef<AbortController | null>(null)
+  /**
+   * 这场面试的页面上下文（简历 / 求职季 / 自适应设置）。**必须每轮都带上**：
+   * 它只进当轮提示词、不落库，早先只在开场那一轮传过，结果第二问起模型就忘了简历与设置。
+   */
+  const pageContextRef = useRef<string | undefined>(undefined)
   useEffect(() => () => {
     abortRef.current?.abort()
   }, [])
@@ -216,6 +221,8 @@ export function InterviewPage() {
     if (text.trim() === '' || busy) {
       return
     }
+    // 调用方没显式给上下文时，沿用这场面试开场时拼好的那份（见 start）。
+    const context = pageContext ?? pageContextRef.current
     setError(null)
     setBusy(true)
     // 开场那一步发给上游的是一段"开始面试 + 岗位"的指令，界面上不该原样显示出来，
@@ -253,7 +260,7 @@ export function InterviewPage() {
           // thinking 事件刻意忽略：推理过程不展示（WORK-075）。
         },
         controller.signal,
-        pageContext,
+        context,
       )
     } catch (cause) {
       if (!isAbort(cause)) {
@@ -302,11 +309,10 @@ export function InterviewPage() {
     if (resumeText !== undefined && resumeText.trim() !== '') {
       parts.push(`【候选人简历】\n${resumeText}`)
     }
-    void send(
-      `开始面试。目标岗位：${profile?.targetRole ?? '未填写'}。`,
-      true,
-      parts.length === 0 ? undefined : parts.join('\n\n'),
-    )
+    // 存进 ref 供后续每一轮复用，本轮的 send 也直接带上
+    const initialContext = parts.length === 0 ? undefined : parts.join('\n\n')
+    pageContextRef.current = initialContext
+    void send(`开始面试。目标岗位：${profile?.targetRole ?? '未填写'}。`, true, initialContext)
   }
 
   /** 本页上传 PDF/Word：解析成功用抽取出的原文作本次面试上下文（不强行入库）。 */

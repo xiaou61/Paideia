@@ -85,7 +85,10 @@ export function KnowledgeEntryPage() {
   const [quizOpen, setQuizOpen] = useState(false)
   const [quizChoice, setQuizChoice] = useState<number | null>(null)
   const aiQuiz = useMutation({
-    mutationFn: () => assistantApi.quiz({ title: entry.data?.title ?? '', body }),
+    // 后端 /quiz 有 MAX_BODY=8000 硬限（QuickInsightController），整篇超长条目必定被拒。
+    // 用去掉 quiz 围栏的正文（practice.body）再按上限截断；题干与选项本来就取自其余正文。
+    mutationFn: () =>
+      assistantApi.quiz({ title: entry.data?.title ?? '', body: practice.body.slice(0, 8_000) }),
   })
 
   /**

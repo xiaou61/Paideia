@@ -315,8 +315,11 @@ public class EssayCollectionService {
         return id == null ? fallbackId : id;
     }
 
-    /** 按 slug 找分类 id；找不到返回 null。 */
+    /** 按 slug 找分类 id；找不到返回 null。slug 为 null（sources[] 漏写 category-slug）也返回 null。 */
     private Long categoryIdOf(String slug) {
+        if (slug == null) {
+            return null;
+        }
         return knowledge.listCategories().stream()
                 .filter(node -> slug.equals(node.slug()))
                 .map(KnowledgeApi.CategoryNode::id)

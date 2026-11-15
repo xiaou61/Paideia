@@ -104,7 +104,8 @@ class KnowledgeApiImplementation implements KnowledgeApi {
     public List<EntryBrief> searchPublished(String keyword, int limit) {
         int sane = saneLimit(limit);
         // v2：检索语义从自然语言模式改成 BOOLEAN 短语模式（2026-11-10），旧缓存不再复用
-        String key = "knowledge:entry-briefs:v2:" + Integer.toHexString((keyword + ":" + sane).hashCode());
+        String key = KnowledgeRedisCache.ENTRY_BRIEFS_PREFIX + "v2:"
+                + Integer.toHexString((keyword + ":" + sane).hashCode());
         List<EntryBrief> cached = cache.get(key, new TypeReference<>() {
         });
         if (cached != null) {

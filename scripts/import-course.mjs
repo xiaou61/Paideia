@@ -556,7 +556,9 @@ async function main() {
   )
 
   // 导入汇总上报给管理端（WORK-074 C3）。**best-effort**：上报失败不影响已完成的导入。
-  if (client) {
+  // dry-run 下即使带了管理凭据（登录只为读取已存在条目算 created/updated）也**不得上报**：
+  // 上报会写一条"当前内容哈希"的导入记录，破坏只读语义，还会让 check-content-drift 误判无漂移。
+  if (client && !options.dryRun) {
     try {
       await client.post('/api/v1/ops/admin/content-import', {
         source: options.dir,
