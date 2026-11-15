@@ -29,3 +29,8 @@
 @import './skins/terminal.css';
 @import './skins/glass.css';
 @import './skins/contrast.css';
+/*
+ * 图版族（WORK-080）放最后：这一族开始改**结构**（边框/圆角/阴影/排版），
+ * 而不只是令牌。族内三条纪律见该文件头部注释，白名单由 `theme/skin-structure.test.ts` 守。
+ */
+@import './skins/graphic.css';

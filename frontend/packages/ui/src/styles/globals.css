@@ -179,6 +179,17 @@
   --decor-opacity: 0;
   --decor-blend: normal;
   /*
+   * 第二装饰层（WORK-080）。和上面同理，但画在 **body::after**：纸纹/噪点这类"底噪"要压在
+   * 内容之下，而这一层用来做**版式纹路**——杂志的设计网格、终端扫描线、蓝图坐标纸。
+   * 它盖在内容**之上**且 `pointer-events: none`，所以轻度使用（透明度很低）才成立；
+   * 默认同样全关（opacity 0），默认主题逐像素不变。
+   */
+  --decor2-image: none;
+  --decor2-size: auto;
+  --decor2-repeat: repeat;
+  --decor2-opacity: 0;
+  --decor2-blend: normal;
+  /*
    * 标题字体单独一个令牌（WORK-079）：纸系皮肤要"衬线标题 + 无衬线正文"，只换 `--font-sans`
    * 会把正文也换成衬线，读正文就累了。默认与正文同栈，因此默认主题零变化。
    */

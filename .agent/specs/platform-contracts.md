@@ -63,7 +63,8 @@ updated: 2026-10-09
 | --- | --- | --- |
 | 默认令牌 | `globals.css` 的 `:root` / `.dark` | 结构亮度与默认皮肤（黑白，"墨白"）。这一层不搬家 |
 | 皮肤 | `styles/theme/skins/<族>.css` | 只覆盖需要改的令牌；选择器 `:root[data-skin='x']`（0,2,0）与 `:root[data-skin='x'].dark`（0,3,0） |
-| 装饰 | `styles/theme/decor.css` | `body::before` 一层装饰（纸纹/光斑），由 `--decor-image/size/opacity/blend` 驱动；默认 `--decor-opacity: 0`，即默认主题零变化 |
+| 装饰 | `styles/theme/decor.css` | `body::before` 底纹（纸纹/光斑，`--decor-image/size/opacity/blend`）与 `body::after` 版式纹路（设计网格/扫描线，`--decor2-*`）；两层默认 opacity 均为 0，即默认主题零变化 |
+| 结构 | 同 `styles/theme/skins/<族>.css`，以 `[data-skin='x'] [data-slot='…']` 打头 | WORK-080 起允许改**形状**（边框/圆角/阴影/内边距/字体），见下节白名单 |
 
 皮肤目录信息在 `packages/ui/src/theme/skins.ts`（`SKINS` / `SKIN_FAMILIES`），每族一个文件 `theme/skins/<族>.ts`。外观页 `/settings/appearance` 按族分组展示，卡片自带 `data-skin` 做活预览。
 
@@ -72,6 +73,16 @@ updated: 2026-10-09
 1. 在对应族的 `styles/theme/skins/<族>.css` 里写两块（亮色 + `.dark`），只写要改的令牌。
 2. 在 `theme/skins/<族>.ts` 里登记 `id` / `name` / `summary` / `family` / `tags`。
 3. 跑 `pnpm --filter @paideia/ui exec vitest run src/theme`——新皮肤自动进入对比度遍历与契约检查。
+
+### 结构层白名单（WORK-080）
+
+图版族（`skins/graphic.css`：粗野 / 铅印 / 九八）不只是换色，还换形状与排版。为了不让"顺手改布局"混进来，结构规则的属性是**白名单**（默认拒绝），由 `packages/ui/src/theme/skin-structure.test.ts` 强制：
+
+- 允许：`border-*`（含 `border-radius` 与方向变体）、`box-shadow`、`background-color/image/size/repeat`、`color`、`font-family/size/style/weight`、`letter-spacing`、`line-height`、`text-transform`、`text-decoration-*`、`padding*`、`opacity`、`mix-blend-mode`、`caret-color`。
+- 禁止：`position`/`display`/`width`/`height`/`z-index`/`overflow`/`transform`/`inset`/`margin`/`top`…——布局在所有皮肤下必须一致，否则某些皮肤下功能会消失。
+- 每条选择器必须以 `[data-skin='x']` 打头，且 `x` 必须是已登记皮肤；不许 `!important`；不许引用 `--paper*`；`var()` 只能指向 `:root`/`@theme inline` 里存在的令牌。
+- 用 `[data-slot='…']` 定位组件（82 处），**不要**写 `.rounded-lg` 这类工具类：工具类会随组件实现变。
+- 白名单只能证明"没碰布局"，证明不了"好看"。**加结构型皮肤必须人眼过一遍截图**，见 `testing/plan.md` 的抽查项。
 
 ### 四条禁止
 
@@ -85,6 +96,7 @@ updated: 2026-10-09
 - 令牌变化会派发 `paideia:themechange`（`packages/ui/src/theme/theme-events.ts`）。**读 `getComputedStyle` 取色的地方必须订阅它**，否则换肤后不会变色：知识图谱的 sigma / 3d-force-graph 画布（`apps/app/src/components/graph/*`）就是这么处理的；它们只改颜色、不重跑布局。
 - CodeMirror 主题（`packages/ui/src/code-editor/theme.ts`）与 markdown 代码块都直接用 `var(--*)`，自动跟随，不需要订阅。
 - 打印：`@media print` 下所有令牌强制回纸张语义，深色皮肤不会打出黑底。
+- 排版令牌有个坑：`@theme inline` 会把 `--text-3xl` 这类**字号**内联成字面量，皮肤改它无效；字号必须走 `[data-skin='x'] :is(h1,h2,h3) { font-size: … }`。`--radius*`、`--text-sm` 等仍是 `var()` 引用，可以直接改令牌。
 
 ## CORS 白名单
 

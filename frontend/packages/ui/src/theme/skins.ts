@@ -1,6 +1,7 @@
 import { DEFAULT_SKIN, type SkinId } from './keys'
 import { CONTRAST_SKINS } from './skins/contrast'
 import { GLASS_SKINS } from './skins/glass'
+import { GRAPHIC_SKINS } from './skins/graphic'
 import { NATURE_SKINS } from './skins/nature'
 import { NIGHT_SKINS } from './skins/night'
 import { PAPER_TONE_SKINS } from './skins/paper-tone'
@@ -53,6 +54,9 @@ export const SKIN_FAMILIES: readonly SkinFamily[] = [
   { id: 'night', label: '霓虹暗夜' },
   { id: 'terminal', label: '终端像素' },
   { id: 'glass', label: '玻璃拟态' },
+  { id: 'brutalist', label: '粗野主义' },
+  { id: 'editorial', label: '杂志排版' },
+  { id: 'retro', label: '复古系统' },
   { id: 'contrast', label: '高对比无障碍' },
 ]
 
@@ -76,6 +80,7 @@ export const SKINS: readonly Skin[] = [
   ...NIGHT_SKINS,
   ...TERMINAL_SKINS,
   ...GLASS_SKINS,
+  ...GRAPHIC_SKINS,
   ...CONTRAST_SKINS,
 ]
 

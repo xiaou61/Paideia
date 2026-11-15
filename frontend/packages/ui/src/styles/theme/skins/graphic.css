@@ -1,0 +1,563 @@
+/*
+ * 图版族（WORK-080）：这一族开始改**结构与排版**，不再只是换色板。
+ *
+ * 三个皮肤各代表一类"换骨"手法，正好覆盖三种机制：
+ *   - brutal（粗野主义）：结构层——2px 硬边 + 无模糊的实心投影 + 零圆角 + 标题大写
+ *   - editorial（杂志排版）：排版层——衬线大标题、缩小标题字距、细线分隔、设计网格（第二装饰层）
+ *   - win98（复古系统）：结构层——outset/inset 立体边、零圆角、控件面用银灰
+ *
+ * **结构规则的白名单由 `theme/skin-structure.test.ts` 强制**：只允许改
+ * 边框（宽度/样式/颜色）、圆角、阴影、内边距、背景图、字体（字号/字重/字距/大小写/行高），
+ * 而且每条选择器都必须以 `[data-skin='x']` 打头。position / display / width / height /
+ * z-index / overflow 一律禁止——那些改的是**布局**，不是皮肤。
+ */
+
+/* ── brutal：粗野主义 ─────────────────────────────────────────────── */
+
+:root[data-skin='brutal'],
+[data-skin='brutal'] {
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(0 0% 5%);
+  --card: hsl(0 0% 100%);
+  --card-solid: hsl(0 0% 100%);
+  --card-foreground: hsl(0 0% 5%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(0 0% 5%);
+  --primary: hsl(48 100% 50%);
+  --primary-foreground: hsl(0 0% 4%);
+  --secondary: hsl(0 0% 90%);
+  --secondary-foreground: hsl(0 0% 5%);
+  --muted: hsl(0 0% 93%);
+  --muted-foreground: hsl(0 0% 28%);
+  --accent: hsl(0 0% 88%);
+  --accent-foreground: hsl(0 0% 5%);
+  --destructive: hsl(0 80% 40%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --success: hsl(145 70% 26%);
+  --success-foreground: hsl(0 0% 100%);
+  --warning: hsl(35 95% 32%);
+  --warning-foreground: hsl(0 0% 100%);
+  --info: hsl(215 85% 34%);
+  --info-foreground: hsl(0 0% 100%);
+  --tier-unknown: hsl(0 0% 45%);
+  --tier-learning: hsl(215 85% 40%);
+  --tier-familiar: hsl(145 60% 30%);
+  --tier-mastered: hsl(48 100% 32%);
+  --border: hsl(0 0% 5%);
+  --input: hsl(0 0% 5%);
+  --ring: hsl(0 0% 5%);
+  --overlay: hsl(0 0% 0% / 45%);
+  --glass: hsl(0 0% 100% / 88%);
+  --card-shadow: none;
+  --popover-shadow: 6px 6px 0 hsl(0 0% 5%);
+  --radius: 0rem;
+  --radius-sm: 0rem;
+  --radius-md: 0rem;
+  --radius-lg: 0rem;
+  --radius-xl: 0rem;
+  --decor-opacity: 0;
+  --decor2-opacity: 0;
+  --sk-ink: hsl(0 0% 6%);
+  --sk-muted: hsl(0 0% 40%);
+  --sk-gray-line: hsl(0 0% 30%);
+  --sk-gray-fill: hsl(0 0% 92%);
+  --sk-blue-line: hsl(215 85% 34%);
+  --sk-blue-fill: hsl(215 70% 92%);
+  --sk-amber-line: hsl(35 95% 30%);
+  --sk-amber-fill: hsl(45 90% 90%);
+  --sk-green-line: hsl(145 70% 26%);
+  --sk-green-fill: hsl(140 50% 91%);
+  --sk-violet-line: hsl(270 60% 36%);
+  --sk-violet-fill: hsl(270 50% 93%);
+}
+
+:root[data-skin='brutal'].dark,
+[data-skin='brutal'].dark {
+  --background: hsl(0 0% 6%);
+  --foreground: hsl(0 0% 98%);
+  --card: hsl(0 0% 10%);
+  --card-solid: hsl(0 0% 10%);
+  --card-foreground: hsl(0 0% 98%);
+  --popover: hsl(0 0% 12%);
+  --popover-foreground: hsl(0 0% 98%);
+  --primary: hsl(48 100% 55%);
+  --primary-foreground: hsl(0 0% 5%);
+  --secondary: hsl(0 0% 18%);
+  --secondary-foreground: hsl(0 0% 95%);
+  --muted: hsl(0 0% 16%);
+  --muted-foreground: hsl(0 0% 74%);
+  --accent: hsl(0 0% 22%);
+  --accent-foreground: hsl(0 0% 98%);
+  --destructive: hsl(0 75% 62%);
+  --destructive-foreground: hsl(0 0% 8%);
+  --success: hsl(145 60% 60%);
+  --success-foreground: hsl(145 60% 8%);
+  --warning: hsl(40 90% 62%);
+  --warning-foreground: hsl(40 80% 8%);
+  --info: hsl(210 80% 66%);
+  --info-foreground: hsl(210 80% 8%);
+  --tier-unknown: hsl(0 0% 55%);
+  --tier-learning: hsl(210 80% 66%);
+  --tier-familiar: hsl(145 55% 58%);
+  --tier-mastered: hsl(48 100% 60%);
+  --border: hsl(0 0% 96%);
+  --input: hsl(0 0% 96%);
+  --ring: hsl(0 0% 96%);
+  --overlay: hsl(0 0% 0% / 70%);
+  --glass: hsl(0 0% 10% / 85%);
+  --card-shadow: none;
+  --popover-shadow: 6px 6px 0 hsl(0 0% 98%);
+  --radius: 0rem;
+  --radius-sm: 0rem;
+  --radius-md: 0rem;
+  --radius-lg: 0rem;
+  --radius-xl: 0rem;
+  --decor-opacity: 0;
+  --decor2-opacity: 0;
+  --sk-ink: hsl(0 0% 96%);
+  --sk-muted: hsl(0 0% 66%);
+  --sk-gray-line: hsl(0 0% 70%);
+  --sk-gray-fill: hsl(0 0% 16%);
+  --sk-blue-line: hsl(210 80% 70%);
+  --sk-blue-fill: hsl(210 50% 18%);
+  --sk-amber-line: hsl(45 90% 66%);
+  --sk-amber-fill: hsl(45 40% 16%);
+  --sk-green-line: hsl(145 60% 62%);
+  --sk-green-fill: hsl(145 30% 15%);
+  --sk-violet-line: hsl(270 60% 76%);
+  --sk-violet-fill: hsl(270 30% 20%);
+}
+
+/* ── editorial：杂志排版 ───────────────────────────────────────────── */
+
+:root[data-skin='editorial'],
+[data-skin='editorial'] {
+  --background: hsl(40 30% 98%);
+  --foreground: hsl(28 14% 12%);
+  --card: hsl(0 0% 100%);
+  --card-solid: hsl(0 0% 100%);
+  --card-foreground: hsl(28 14% 12%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(28 14% 12%);
+  --primary: hsl(355 65% 30%);
+  --primary-foreground: hsl(40 40% 98%);
+  --secondary: hsl(38 20% 93%);
+  --secondary-foreground: hsl(28 12% 20%);
+  --muted: hsl(38 18% 94%);
+  --muted-foreground: hsl(28 12% 34%);
+  --accent: hsl(36 30% 90%);
+  --accent-foreground: hsl(28 14% 14%);
+  --destructive: hsl(355 70% 34%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --success: hsl(150 45% 26%);
+  --success-foreground: hsl(0 0% 100%);
+  --warning: hsl(32 80% 30%);
+  --warning-foreground: hsl(0 0% 100%);
+  --info: hsl(210 60% 30%);
+  --info-foreground: hsl(0 0% 100%);
+  --tier-unknown: hsl(28 8% 48%);
+  --tier-learning: hsl(210 60% 36%);
+  --tier-familiar: hsl(150 45% 30%);
+  --tier-mastered: hsl(355 65% 30%);
+  --border: hsl(32 12% 80%);
+  --input: hsl(32 12% 74%);
+  --ring: hsl(355 65% 34%);
+  --overlay: hsl(28 20% 10% / 35%);
+  --glass: hsl(0 0% 100% / 85%);
+  --card-shadow: 0 0 0 1px hsl(32 12% 86%);
+  --popover-shadow: 0 12px 30px -12px hsl(28 20% 20% / 25%);
+  --radius: 0.125rem;
+  --radius-sm: 0rem;
+  --radius-md: 0.125rem;
+  --radius-lg: 0.125rem;
+  --radius-xl: 0.25rem;
+  --font-display: Georgia, 'Times New Roman', 'Songti SC', SimSun, serif;
+  /*
+   * 设计网格（第二装饰层）：每 24px 一条 1px 的极淡横线。这是印刷排版里"版心网格"的
+   * 数字化表达——它让页面看起来像被排过版，而不是"内容流下来的"。
+   *
+   * 实测调整（2026-11-13 截图）：24px 太密，格线会在正文行间反复切字；改成 32px + 6%
+   * 透明度（配合 opacity 0.5 ≈ 3% 实际可见度）后，只在整块留白里隐约可见，正文不受干扰。
+   */
+  --decor2-image: repeating-linear-gradient(
+    to bottom,
+    hsl(28 20% 40% / 6%) 0 1px,
+    transparent 1px 32px
+  );
+  --decor2-size: auto;
+  --decor2-repeat: repeat;
+  --decor2-opacity: 0.5;
+  --decor2-blend: normal;
+  --decor-opacity: 0;
+  --sk-ink: hsl(28 14% 14%);
+  --sk-muted: hsl(28 10% 40%);
+  --sk-gray-line: hsl(28 10% 34%);
+  --sk-gray-fill: hsl(38 18% 93%);
+  --sk-blue-line: hsl(210 60% 32%);
+  --sk-blue-fill: hsl(210 45% 93%);
+  --sk-amber-line: hsl(32 80% 30%);
+  --sk-amber-fill: hsl(40 70% 91%);
+  --sk-green-line: hsl(150 45% 26%);
+  --sk-green-fill: hsl(150 35% 92%);
+  --sk-violet-line: hsl(280 40% 34%);
+  --sk-violet-fill: hsl(280 30% 94%);
+}
+
+:root[data-skin='editorial'].dark,
+[data-skin='editorial'].dark {
+  --background: hsl(28 14% 9%);
+  --foreground: hsl(38 20% 92%);
+  --card: hsl(28 12% 12%);
+  --card-solid: hsl(28 12% 12%);
+  --card-foreground: hsl(38 20% 92%);
+  --popover: hsl(28 12% 14%);
+  --popover-foreground: hsl(38 20% 92%);
+  --primary: hsl(355 60% 68%);
+  --primary-foreground: hsl(28 30% 8%);
+  --secondary: hsl(28 10% 18%);
+  --secondary-foreground: hsl(38 16% 88%);
+  --muted: hsl(28 10% 16%);
+  --muted-foreground: hsl(36 12% 70%);
+  --accent: hsl(28 12% 22%);
+  --accent-foreground: hsl(38 20% 92%);
+  --destructive: hsl(355 70% 70%);
+  --destructive-foreground: hsl(0 60% 8%);
+  --success: hsl(150 45% 60%);
+  --success-foreground: hsl(150 50% 8%);
+  --warning: hsl(40 80% 64%);
+  --warning-foreground: hsl(40 80% 8%);
+  --info: hsl(205 70% 68%);
+  --info-foreground: hsl(205 70% 8%);
+  --tier-unknown: hsl(28 8% 58%);
+  --tier-learning: hsl(205 70% 68%);
+  --tier-familiar: hsl(150 45% 58%);
+  --tier-mastered: hsl(355 60% 70%);
+  --border: hsl(28 10% 24%);
+  --input: hsl(28 10% 30%);
+  --ring: hsl(355 60% 70%);
+  --overlay: hsl(0 0% 0% / 70%);
+  --glass: hsl(28 12% 12% / 80%);
+  --card-shadow: 0 0 0 1px hsl(28 10% 22%);
+  --popover-shadow: 0 16px 36px -14px hsl(0 0% 0% / 70%);
+  --radius: 0.125rem;
+  --radius-sm: 0rem;
+  --radius-md: 0.125rem;
+  --radius-lg: 0.125rem;
+  --radius-xl: 0.25rem;
+  --font-display: Georgia, 'Times New Roman', 'Songti SC', SimSun, serif;
+  --decor2-image: repeating-linear-gradient(
+    to bottom,
+    hsl(38 20% 70% / 6%) 0 1px,
+    transparent 1px 32px
+  );
+  --decor2-size: auto;
+  --decor2-repeat: repeat;
+  --decor2-opacity: 0.5;
+  --decor2-blend: normal;
+  --decor-opacity: 0;
+  --sk-ink: hsl(38 18% 90%);
+  --sk-muted: hsl(36 10% 64%);
+  --sk-gray-line: hsl(28 8% 60%);
+  --sk-gray-fill: hsl(28 10% 17%);
+  --sk-blue-line: hsl(205 60% 70%);
+  --sk-blue-fill: hsl(205 40% 18%);
+  --sk-amber-line: hsl(40 70% 66%);
+  --sk-amber-fill: hsl(40 40% 16%);
+  --sk-green-line: hsl(150 45% 62%);
+  --sk-green-fill: hsl(150 30% 15%);
+  --sk-violet-line: hsl(280 45% 74%);
+  --sk-violet-fill: hsl(280 25% 20%);
+}
+
+/* ── win98：复古系统 ──────────────────────────────────────────────── */
+
+:root[data-skin='win98'],
+[data-skin='win98'] {
+  --background: hsl(0 0% 75%);
+  --foreground: hsl(0 0% 8%);
+  --card: hsl(0 0% 75%);
+  --card-solid: hsl(0 0% 75%);
+  --card-foreground: hsl(0 0% 8%);
+  --popover: hsl(0 0% 78%);
+  --popover-foreground: hsl(0 0% 8%);
+  --primary: hsl(240 100% 25%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(0 0% 85%);
+  --secondary-foreground: hsl(0 0% 10%);
+  --muted: hsl(0 0% 70%);
+  --muted-foreground: hsl(0 0% 22%);
+  --accent: hsl(240 60% 88%);
+  --accent-foreground: hsl(240 100% 20%);
+  --destructive: hsl(0 80% 34%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --success: hsl(120 70% 22%);
+  --success-foreground: hsl(0 0% 100%);
+  --warning: hsl(30 90% 28%);
+  --warning-foreground: hsl(0 0% 100%);
+  --info: hsl(210 90% 26%);
+  --info-foreground: hsl(0 0% 100%);
+  --tier-unknown: hsl(0 0% 44%);
+  --tier-learning: hsl(210 90% 32%);
+  --tier-familiar: hsl(120 70% 26%);
+  --tier-mastered: hsl(240 100% 25%);
+  --border: hsl(0 0% 42%);
+  --input: hsl(0 0% 96%);
+  --ring: hsl(240 100% 25%);
+  --overlay: hsl(0 0% 0% / 40%);
+  --glass: hsl(0 0% 75% / 90%);
+  --card-shadow: none;
+  --popover-shadow: 2px 2px 0 hsl(0 0% 30%);
+  --radius: 0rem;
+  --radius-sm: 0rem;
+  --radius-md: 0rem;
+  --radius-lg: 0rem;
+  --radius-xl: 0rem;
+  --font-sans: Tahoma, 'MS Sans Serif', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'Courier New', 'Consolas', monospace;
+  --font-display: Tahoma, 'MS Sans Serif', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+  --decor-opacity: 0;
+  --decor2-opacity: 0;
+  --sk-ink: hsl(0 0% 8%);
+  --sk-muted: hsl(0 0% 36%);
+  --sk-gray-line: hsl(0 0% 32%);
+  --sk-gray-fill: hsl(0 0% 88%);
+  --sk-blue-line: hsl(210 90% 26%);
+  --sk-blue-fill: hsl(210 70% 90%);
+  --sk-amber-line: hsl(30 90% 28%);
+  --sk-amber-fill: hsl(40 80% 90%);
+  --sk-green-line: hsl(120 70% 22%);
+  --sk-green-fill: hsl(120 50% 90%);
+  --sk-violet-line: hsl(280 60% 30%);
+  --sk-violet-fill: hsl(280 40% 92%);
+}
+
+:root[data-skin='win98'].dark,
+[data-skin='win98'].dark {
+  --background: hsl(240 25% 12%);
+  --foreground: hsl(210 15% 90%);
+  --card: hsl(240 22% 16%);
+  --card-solid: hsl(240 22% 16%);
+  --card-foreground: hsl(210 15% 90%);
+  --popover: hsl(240 22% 18%);
+  --popover-foreground: hsl(210 15% 90%);
+  --primary: hsl(190 85% 62%);
+  --primary-foreground: hsl(240 40% 8%);
+  --secondary: hsl(240 18% 22%);
+  --secondary-foreground: hsl(210 15% 88%);
+  --muted: hsl(240 18% 20%);
+  --muted-foreground: hsl(210 12% 70%);
+  --accent: hsl(240 20% 26%);
+  --accent-foreground: hsl(210 15% 90%);
+  --destructive: hsl(0 70% 66%);
+  --destructive-foreground: hsl(0 60% 8%);
+  --success: hsl(140 55% 60%);
+  --success-foreground: hsl(140 50% 8%);
+  --warning: hsl(40 80% 62%);
+  --warning-foreground: hsl(40 80% 8%);
+  --info: hsl(200 80% 66%);
+  --info-foreground: hsl(200 70% 8%);
+  --tier-unknown: hsl(210 8% 56%);
+  --tier-learning: hsl(200 80% 66%);
+  --tier-familiar: hsl(140 55% 58%);
+  --tier-mastered: hsl(190 85% 66%);
+  --border: hsl(240 15% 30%);
+  --input: hsl(240 15% 34%);
+  --ring: hsl(190 85% 62%);
+  --overlay: hsl(0 0% 0% / 70%);
+  --glass: hsl(240 22% 18% / 80%);
+  --card-shadow: none;
+  --popover-shadow: 2px 2px 0 hsl(0 0% 0%);
+  --radius: 0rem;
+  --radius-sm: 0rem;
+  --radius-md: 0rem;
+  --radius-lg: 0rem;
+  --radius-xl: 0rem;
+  --font-sans: Tahoma, 'MS Sans Serif', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'Courier New', 'Consolas', monospace;
+  --font-display: Tahoma, 'MS Sans Serif', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+  --decor-opacity: 0;
+  --decor2-opacity: 0;
+  --sk-ink: hsl(210 15% 88%);
+  --sk-muted: hsl(210 10% 64%);
+  --sk-gray-line: hsl(210 8% 58%);
+  --sk-gray-fill: hsl(240 18% 20%);
+  --sk-blue-line: hsl(200 75% 70%);
+  --sk-blue-fill: hsl(220 40% 20%);
+  --sk-amber-line: hsl(40 75% 64%);
+  --sk-amber-fill: hsl(40 40% 18%);
+  --sk-green-line: hsl(140 55% 62%);
+  --sk-green-fill: hsl(140 30% 16%);
+  --sk-violet-line: hsl(280 50% 74%);
+  --sk-violet-fill: hsl(280 25% 22%);
+}
+
+/* ══ 结构层（WORK-080）══════════════════════════════════════════════
+ *
+ * 下面这些规则改的是"形状"，不是"配色"。三条纪律：
+ *   1. 每条选择器都以 `[data-skin='x']` 打头 —— 不许影响别的皮肤；
+ *   2. 只碰边框/圆角/阴影/内边距/背景/字体这几类属性 —— 布局属性由测试拦；
+ *   3. 用 `[data-slot]` 定位组件，不写 `.rounded-lg` 这种工具类 —— 工具类会随组件实现变。
+ */
+
+/* ── brutal 的结构 ── */
+
+[data-skin='brutal'] [data-slot='card'],
+[data-skin='brutal'] [data-slot='dialog-content'],
+[data-skin='brutal'] [data-slot='popover-content'],
+[data-skin='brutal'] [data-slot='dropdown-menu-content'] {
+  border-width: 2px;
+  border-color: var(--foreground);
+  border-radius: 0;
+  box-shadow: 4px 4px 0 var(--foreground);
+}
+
+[data-skin='brutal'] [data-slot='button'] {
+  border-width: 2px;
+  border-color: var(--foreground);
+  border-radius: 0;
+  box-shadow: 2px 2px 0 var(--foreground);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+/* 按下时把投影收回去：粗野主义的"按下去"是块面压进纸里，不是位移 */
+[data-skin='brutal'] [data-slot='button']:active {
+  box-shadow: none;
+}
+
+[data-skin='brutal'] [data-slot='input'],
+[data-skin='brutal'] [data-slot='select-trigger'],
+[data-skin='brutal'] [data-slot='textarea'] {
+  border-width: 2px;
+  border-color: var(--foreground);
+  border-radius: 0;
+  box-shadow: 2px 2px 0 var(--foreground);
+}
+
+[data-skin='brutal'] :is(h1, h2, h3) {
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+[data-skin='brutal'] [data-slot='table-head'] {
+  border-width: 2px;
+  border-color: var(--foreground);
+  background-color: var(--foreground);
+  color: var(--background);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── editorial 的排版 ── */
+
+[data-skin='editorial'] :is(h1, h2, h3) {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+[data-skin='editorial'] h1 {
+  font-size: 2.75rem;
+  line-height: 1.04;
+  font-weight: 700;
+}
+
+[data-skin='editorial'] h2 {
+  font-size: 1.875rem;
+  line-height: 1.12;
+}
+
+[data-skin='editorial'] h3 {
+  font-size: 1.25rem;
+  line-height: 1.28;
+  letter-spacing: 0.01em;
+}
+
+/* 段落之间的呼吸比默认更大：杂志的"留白"是排版语言，不是浪费 */
+[data-skin='editorial'] :is(p, li) {
+  line-height: 1.85;
+}
+
+[data-skin='editorial'] [data-slot='card'] {
+  border-radius: 0.125rem;
+  box-shadow: none;
+  border-color: var(--border);
+}
+
+[data-skin='editorial'] [data-slot='card-title'] {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+[data-skin='editorial'] [data-slot='table-head'] {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-bottom-width: 2px;
+  border-bottom-color: var(--foreground);
+  text-transform: uppercase;
+}
+
+[data-skin='editorial'] hr {
+  border-top-width: 1px;
+  border-top-color: var(--foreground);
+}
+
+/* ── win98 的结构 ── */
+
+[data-skin='win98'] [data-slot='card'],
+[data-skin='win98'] [data-slot='dialog-content'],
+[data-skin='win98'] [data-slot='popover-content'],
+[data-skin='win98'] [data-slot='dropdown-menu-content'],
+[data-skin='win98'] [data-slot='table-container'] {
+  border-width: 2px;
+  border-style: outset;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+[data-skin='win98'] [data-slot='button'],
+[data-skin='win98'] [data-slot='select-trigger'] {
+  border-width: 2px;
+  border-style: outset;
+  border-radius: 0;
+  box-shadow: none;
+  font-weight: 500;
+}
+
+[data-skin='win98'] [data-slot='button']:active {
+  border-style: inset;
+}
+
+[data-skin='win98'] [data-slot='input'],
+[data-skin='win98'] [data-slot='textarea'] {
+  border-width: 2px;
+  border-style: inset;
+  border-radius: 0;
+  box-shadow: none;
+  background-color: var(--input);
+}
+
+/* 标题栏：90 年代对话框那条深蓝 —— 用 primary 的深蓝底 + 白字 */
+[data-skin='win98'] [data-slot='dialog-title'] {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  padding: 4px 8px;
+  border-radius: 0;
+  font-weight: 700;
+}
+
+[data-skin='win98'] [data-slot='table-head'] {
+  border-width: 1px;
+  border-style: outset;
+  border-radius: 0;
+  background-color: var(--secondary);
+  font-weight: 500;
+}
+
+[data-skin='win98'] :is(h1, h2, h3) {
+  font-weight: 700;
+  letter-spacing: 0;
+}

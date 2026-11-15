@@ -15,6 +15,13 @@
  * 内容**之下**，所以装饰纹在文字后面，不会给正文蒙一层灰（蒙上去会实打实降低对比度，
  * 而对比度是这套设计系统拿测试守着的）。`pointer-events: none` 保证它不抢点击。
  *
+ * ## 第二装饰层（WORK-080）
+ *
+ * `body::after` 画的是**版式纹路**：杂志设计网格、终端扫描线、蓝图坐标纸。它必须落在内容
+ * **之上**（网格要横穿卡片和文字才像"排过版"），所以 `z-index: 1`；因此它只适合极低透明度，
+ * 而且 `pointer-events: none` 是硬要求——否则整站点击全废。同样由 `--decor2-opacity: 0`
+ * 默认关闭，默认主题零变化。
+ *
  * ## 打印
  *
  * 皮肤一多就有"深色皮肤 + 打印"这个组合：用户用 `neon` 打一份知识条目，出来是满页黑底。
@@ -39,6 +46,19 @@
     background-repeat: repeat;
     opacity: var(--decor-opacity);
     mix-blend-mode: var(--decor-blend);
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background-image: var(--decor2-image);
+    background-size: var(--decor2-size);
+    background-repeat: var(--decor2-repeat);
+    opacity: var(--decor2-opacity);
+    mix-blend-mode: var(--decor2-blend);
   }
 }
 
@@ -70,10 +90,12 @@
     --card-shadow: none;
     --popover-shadow: none;
     --decor-opacity: 0;
+    --decor2-opacity: 0;
   }
 
   /* 打印里没有"悬停/选中"，阴影只会糊成一片灰 */
-  body::before {
+  body::before,
+  body::after {
     display: none;
   }
 }
