@@ -1,0 +1,470 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Paideia 项目总览",
+    "subtitle": "一个 jar、十二个模块：请求怎么进来、代码跑在哪、外部依赖有谁",
+    "locale": "zh-CN",
+    "visual_preset": "classic",
+    "output": "docs/architecture/paideia-architecture.html",
+    "legend": {
+      "mode": "auto"
+    },
+    "repository": {
+      "url": "https://github.com/xiaou61/Paideia",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "8c54e6607e82be26f11cf0c8ea2e5fd64f33f97b"
+    },
+    "views": [
+      {
+        "id": "main-path",
+        "label": "请求主路径",
+        "focus": [
+          "web",
+          "desktop",
+          "filter",
+          "account",
+          "knowledge",
+          "persistence",
+          "mysql"
+        ],
+        "note": "TraceIdFilter 先于安全链，规则按声明顺序取第一个匹配"
+      },
+      {
+        "id": "ai-flow",
+        "label": "AI 与代码执行",
+        "focus": [
+          "ai",
+          "upstream",
+          "sandbox",
+          "docker",
+          "persistence"
+        ],
+        "note": "全仓唯一不按请求-响应收尾的链路：SseEmitter 持有连接"
+      },
+      {
+        "id": "mcp-surface",
+        "label": "MCP 工具接入",
+        "focus": [
+          "mcpclient",
+          "mcp",
+          "filter",
+          "knowledge"
+        ],
+        "note": "REST 与工具目录是同一份能力的两副皮，加减工具要两边一起改"
+      },
+      {
+        "id": "ops-data",
+        "label": "运维与数据",
+        "focus": [
+          "prometheus",
+          "ops",
+          "mysql",
+          "obj"
+        ],
+        "note": "运维面全部绑回环，不开新公网端口；对象存储走 302 预签名直读"
+      },
+      {
+        "id": "core-kernel",
+        "label": "模块内核",
+        "focus": [
+          "web_fw",
+          "security_cfg",
+          "platform",
+          "persistence"
+        ],
+        "note": "跨模块只许走 API 端口，spring-modulith 在构建期挡循环依赖"
+      }
+    ]
+  },
+  "layout": {
+    "mode": "grid",
+    "cols": 9,
+    "cellW": 156,
+    "cellH": 94,
+    "gapX": 22,
+    "gapY": 62
+  },
+  "components": [
+    {
+      "id": "web",
+      "type": "external",
+      "label": "浏览器",
+      "sublabel": "浏览器 · 管理端",
+      "tag": "客户端",
+      "row": 0,
+      "col": 1
+    },
+    {
+      "id": "desktop",
+      "type": "external",
+      "label": "Tauri 2 桌面壳",
+      "sublabel": "复用同一套前端代码",
+      "tag": "客户端",
+      "row": 0,
+      "col": 2
+    },
+    {
+      "id": "mcpclient",
+      "type": "external",
+      "label": "MCP 客户端",
+      "sublabel": "外部 AI 工具接入",
+      "tag": "外部调用者",
+      "row": 0,
+      "col": 5
+    },
+    {
+      "id": "prometheus",
+      "type": "external",
+      "label": "Prometheus",
+      "sublabel": "抓 /actuator/prometheus",
+      "tag": "运维面",
+      "row": 0,
+      "col": 7
+    },
+    {
+      "id": "filter",
+      "type": "security",
+      "label": "过滤链",
+      "sublabel": "TraceIdFilter → Security",
+      "tag": "HIGHEST_PRECEDENCE",
+      "row": 1,
+      "col": 2,
+      "sources": [
+        {
+          "path": "backend/paideia-web/src/main/java/io/github/xiaou61/web/TraceIdFilter.java",
+          "label": "TraceIdFilter"
+        },
+        {
+          "path": "backend/paideia-security/src/main/java/io/github/xiaou61/security/SecurityConfiguration.java",
+          "label": "SecurityConfiguration"
+        }
+      ]
+    },
+    {
+      "id": "account",
+      "type": "backend",
+      "label": "paideia-account",
+      "sublabel": "登录 / 第三方绑定",
+      "tag": "模块",
+      "row": 2,
+      "col": 1
+    },
+    {
+      "id": "knowledge",
+      "type": "backend",
+      "label": "paideia-knowledge",
+      "sublabel": "知识库 / 八股文",
+      "tag": "主业务",
+      "row": 2,
+      "col": 2
+    },
+    {
+      "id": "note",
+      "type": "backend",
+      "label": "paideia-note",
+      "sublabel": "个人笔记",
+      "tag": "模块",
+      "row": 2,
+      "col": 3
+    },
+    {
+      "id": "ai",
+      "type": "backend",
+      "label": "paideia-ai",
+      "sublabel": "对话 / 积分 / 工具循环",
+      "tag": "唯一流式",
+      "row": 2,
+      "col": 4,
+      "sources": [
+        {
+          "path": "backend/paideia-ai/src/main/java/io/github/xiaou61/ai/internal/conversation/ConversationService.java",
+          "label": "ConversationService"
+        },
+        {
+          "path": "backend/paideia-ai/src/main/java/io/github/xiaou61/ai/internal/web/AssistantConversationController.java",
+          "label": "AssistantConversationController"
+        }
+      ]
+    },
+    {
+      "id": "sandbox",
+      "type": "backend",
+      "label": "paideia-sandbox",
+      "sublabel": "代码执行 / SQL 实训",
+      "tag": "隔离执行",
+      "row": 2,
+      "col": 5,
+      "sources": [
+        {
+          "path": "backend/paideia-sandbox/src/main/java/io/github/xiaou61/sandbox/internal/run/DockerCodeRunner.java",
+          "label": "DockerCodeRunner"
+        }
+      ]
+    },
+    {
+      "id": "mcp",
+      "type": "backend",
+      "label": "paideia-mcp",
+      "sublabel": "REST ↔ 工具",
+      "tag": "工具面",
+      "row": 2,
+      "col": 6
+    },
+    {
+      "id": "ops",
+      "type": "backend",
+      "label": "paideia-ops",
+      "sublabel": "指标 / 运营统计",
+      "tag": "观测",
+      "row": 2,
+      "col": 7
+    },
+    {
+      "id": "web_fw",
+      "type": "backend",
+      "label": "paideia-web",
+      "sublabel": "统一响应包装",
+      "tag": "共享内核",
+      "row": 3,
+      "col": 0
+    },
+    {
+      "id": "security_cfg",
+      "type": "security",
+      "label": "paideia-security",
+      "sublabel": "JWT / 规则顺序 / 本机限制",
+      "tag": "共享内核",
+      "row": 3,
+      "col": 1,
+      "sources": [
+        {
+          "path": "backend/paideia-security/src/main/java/io/github/xiaou61/security/LocalOnlyAuthorizationManager.java",
+          "label": "LocalOnlyAuthorizationManager"
+        }
+      ]
+    },
+    {
+      "id": "platform",
+      "type": "backend",
+      "label": "paideia-platform",
+      "sublabel": "公共基础设施",
+      "tag": "共享内核",
+      "row": 3,
+      "col": 4
+    },
+    {
+      "id": "persistence",
+      "type": "database",
+      "label": "paideia-persistence",
+      "sublabel": "手写 MyBatis",
+      "tag": "共享内核",
+      "row": 3,
+      "col": 3
+    },
+    {
+      "id": "obj",
+      "type": "cloud",
+      "label": "对象存储",
+      "sublabel": "S3 · 预签名直读",
+      "tag": "数据",
+      "row": 4,
+      "col": 2
+    },
+    {
+      "id": "mysql",
+      "type": "database",
+      "label": "MySQL 8",
+      "sublabel": "paideia / paideia_test",
+      "tag": "数据",
+      "row": 4,
+      "col": 3
+    },
+    {
+      "id": "upstream",
+      "type": "external",
+      "label": "上游模型 API",
+      "sublabel": "平台持凭据 · 积分计费",
+      "tag": "外部依赖",
+      "row": 4,
+      "col": 5
+    },
+    {
+      "id": "docker",
+      "type": "external",
+      "label": "Docker 沙箱宿主",
+      "sublabel": "容器内执行用户代码",
+      "tag": "隔离边界",
+      "row": 4,
+      "col": 6
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "paideia 单体 jar · 一个进程、一个端口（systemd 单元）",
+      "wraps": [
+        "filter",
+        "account",
+        "knowledge",
+        "note",
+        "ai",
+        "sandbox",
+        "mcp",
+        "ops",
+        "web_fw",
+        "security_cfg",
+        "platform",
+        "persistence"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "security-group",
+      "label": "业务模块 · 十二模块单向分层，只经 API 端口互调",
+      "wraps": [
+        "account",
+        "knowledge",
+        "note",
+        "ai",
+        "sandbox",
+        "mcp",
+        "ops"
+      ],
+      "pad": 16
+    },
+    {
+      "kind": "security-group",
+      "label": "共享内核 · 谁都在用，谁都不许反向依赖",
+      "wraps": [
+        "web_fw",
+        "security_cfg",
+        "platform",
+        "persistence"
+      ],
+      "pad": 16
+    }
+  ],
+  "connections": [
+    {
+      "from": "web",
+      "to": "filter",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "from": "desktop",
+      "to": "filter",
+      "label": "同一套前端",
+      "labelDy": 24
+    },
+    {
+      "from": "mcpclient",
+      "to": "mcp",
+      "label": "/mcp/* JSON-RPC",
+      "labelDy": 24
+    },
+    {
+      "from": "prometheus",
+      "to": "ops",
+      "label": "拉指标",
+      "variant": "dashed",
+      "labelDy": 24
+    },
+    {
+      "from": "filter",
+      "to": "account",
+      "label": "凭据交换"
+    },
+    {
+      "from": "filter",
+      "to": "knowledge"
+    },
+    {
+      "from": "filter",
+      "to": "ai"
+    },
+    {
+      "from": "ai",
+      "to": "upstream",
+      "label": "流式请求",
+      "variant": "emphasis",
+      "labelDy": 24
+    },
+    {
+      "from": "ai",
+      "to": "sandbox",
+      "label": "工具调用"
+    },
+    {
+      "from": "sandbox",
+      "to": "docker",
+      "label": "容器内运行",
+      "labelDy": 24
+    },
+    {
+      "from": "knowledge",
+      "to": "obj",
+      "label": "预签名直读",
+      "variant": "dashed",
+      "labelDy": 24
+    },
+    {
+      "from": "knowledge",
+      "to": "persistence",
+      "label": "MyBatis"
+    },
+    {
+      "from": "ai",
+      "to": "persistence",
+      "label": "积分流水",
+      "labelDy": 24
+    },
+    {
+      "from": "persistence",
+      "to": "mysql",
+      "label": "手写 SQL",
+      "variant": "emphasis",
+      "labelDy": 24
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "读图先看这三条边界",
+      "items": [
+        "公网只有一个应用端口：静态资源、REST API、管理端 /admin/ 全在同一个 jar 里。",
+        "安全规则按声明顺序取第一个匹配项，/admin/** 必须排在任何更宽的 /api/** 之前——写反不报错，只会在某天表现为“任何登录用户都能改知识库”。",
+        "免鉴权读端点只有两个：附件读取与公开分享，安全性靠 UUID 不可枚举，不靠认证。"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "AI 链路为什么特殊",
+      "items": [
+        "SseEmitter 持有连接，上游增量逐个推下去，不按请求-响应收尾。",
+        "预留积分必须在写用户消息之后，且 prepare 刻意不带事务；否则被 402 拦下时用户消息会随事务回滚消失。",
+        "工具循环每轮都是真实上游调用，但账只结一次——只上报最后一轮用量会对不上账。"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "模块与内核",
+      "items": [
+        "十二个模块单向分层，spring-modulith 在构建期挡循环依赖与跨模块 internal 访问。",
+        "paideia-app 是唯一组装根，它依赖全部模块，模块之间不许互连。",
+        "paideia-web 是 JSON 与响应包装的基座，paideia-persistence 是唯一碰 SQL 的地方。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "运维面与常见误判",
+      "items": [
+        "Prometheus / Grafana / exporter 全绑回环，不开新公网端口；Grafana 只能经应用反代进管理端 iframe。",
+        "Redis 跑着、被探活着，但应用没有一行 Redis 代码——看到它别以为要配。",
+        "RabbitMQ 已被裁决引入（outbox 中继），但代码里既无 amqp 依赖也无 outbox 表：已裁决 ≠ 已实现。"
+      ]
+    }
+  ]
+}

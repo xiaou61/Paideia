@@ -197,7 +197,7 @@ content/           内容源文件（markdown + front matter，导入成条目�
   reading/           按主题的内容，含书籍详解
   source/            源码精读（按项目、按关）
 scripts/           测试库、内容导入与校验、架构图生成、发版
-docs/architecture/ 架构图（mermaid；四张结构图由脚本从代码生成）
+docs/architecture/ 架构图（六张 mermaid：四张结构图由脚本从代码生成；一份全景交互图 paideia-architecture.html）
 ```
 
 两条硬约束：业务代码不得直接依赖模型客户端的类型（收在 `paideia-ai` 的端口之后）；前端不得直接引用桌面壳专有 API（收在 `@paideia/platform-*` 适配器之后）。越界访问别的模块的 `internal` 包、或出现循环依赖，`ModularityTest` 直接判构建失败；前端越界由 `workspace-boundaries` 测试拦下。
