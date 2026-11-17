@@ -106,6 +106,18 @@ public interface KnowledgeApi {
         return false;
     }
 
+    /**
+     * 同一分类里是否已有一条「意思相同」的题目（2026-11-17 面经跨帖去重）。
+     *
+     * <p>只靠帖子指纹挡不住「同一道题被不同帖子 / 不同合集问到」：指纹是帖子级的，两篇帖
+     * 就是两个指纹。抓取侧在入库前问一次，命中就不再写一条。
+     *
+     * <p>判重口径由实现决定（归一化标题相等或高相似）。默认空：不支持自动采集的实现保持原行为。
+     */
+    default Optional<Long> findSimilarQuestion(Long categoryId, String rawTitle) {
+        return Optional.empty();
+    }
+
     // ── 文档入库（WORK-076） ───────────────────────────────────────────
 
     /**

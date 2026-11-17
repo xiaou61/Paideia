@@ -189,6 +189,12 @@ public class EssayCollectionService {
                             break;
                         }
                         extracted++;
+                        // 跨帖去重（2026-11-17）：同一道题可能被不同帖子 / 不同合集问到，
+                        // 帖子指纹挡不住。入库前按分类里的归一化标题/相似度判一次，命中就不重复写。
+                        if (knowledge.findSimilarQuestion(categoryId, question.title()).isPresent()) {
+                            duplicated++;
+                            continue;
+                        }
                         KnowledgeApi.CreateOutcome outcome = knowledge.createCollected(
                                 new KnowledgeApi.CollectedEntry(
                                         question.title(),

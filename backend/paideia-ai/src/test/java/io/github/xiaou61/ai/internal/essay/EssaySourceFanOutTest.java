@@ -206,6 +206,24 @@ class EssaySourceFanOutTest {
         assertThat(knowledge.categoryIds).containsExactly(1L, 3L, 4L);
     }
 
+    @Test
+    @DisplayName("跨帖同名的题在入库前被跳过（不同帖子、不同指纹也算重复）")
+    void crossPostDuplicateQuestionIsSkippedBeforeInsert() {
+        RecordingKnowledge knowledge = new RecordingKnowledge(List.of(node(1, "essay-java")));
+        knowledge.markSimilar("HashMap 为什么线程不安全");
+
+        EssayCollectionService.RunResult result = run(
+                properties(List.of(new EssayProperties.SourceSpec(JAVA_JOB, "essay-java"))),
+                knowledge,
+                postingSource(TECH_BODY),
+                List.of(
+                        new EssayExtractionPrompt.ExtractedQuestion("HashMap 为什么线程不安全", "并发扩容会成环"),
+                        new EssayExtractionPrompt.ExtractedQuestion("ConcurrentHashMap 分段锁去哪儿了", "改成了 CAS 加桶头锁")));
+
+        assertThat(result.created()).isEqualTo(1);
+        assertThat(knowledge.titles).containsExactly("ConcurrentHashMap 分段锁去哪儿了");
+    }
+
     private static EssayProperties properties(List<EssayProperties.SourceSpec> sources) {
         EssayProperties properties = new EssayProperties();
         properties.setEnabled(true);
@@ -266,6 +284,7 @@ class EssaySourceFanOutTest {
         private final List<Long> categoryIds = new ArrayList<>();
         private final List<String> titles = new ArrayList<>();
         private final Set<String> collected = new HashSet<>();
+        private final Set<String> similarTitles = new HashSet<>();
 
         private RecordingKnowledge(List<CategoryNode> categories) {
             this.categories = categories;
@@ -273,6 +292,10 @@ class EssaySourceFanOutTest {
 
         private void markCollected(String fingerprint) {
             collected.add(fingerprint);
+        }
+
+        private void markSimilar(String title) {
+            similarTitles.add(title);
         }
 
         @Override
@@ -305,6 +328,11 @@ class EssaySourceFanOutTest {
         @Override
         public boolean hasCollected(String fingerprint) {
             return collected.contains(fingerprint);
+        }
+
+        @Override
+        public Optional<Long> findSimilarQuestion(Long categoryId, String rawTitle) {
+            return similarTitles.contains(rawTitle) ? Optional.of(99L) : Optional.empty();
         }
     }
 }

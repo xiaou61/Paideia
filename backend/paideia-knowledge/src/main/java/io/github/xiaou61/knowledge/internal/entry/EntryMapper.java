@@ -326,6 +326,18 @@ public interface EntryMapper {
             """)
     List<Entry> findAllByFingerprint(@Param("fingerprint") String fingerprint);
 
+    /**
+     * 某分类下全部条目的 id 与标题（**含草稿**，2026-11-17 面经跨帖去重用）。
+     *
+     * <p>面经默认进草稿，只查已发布会把草稿漏掉、让同一道题重复入库。只取两列：
+     * 判重不需要正文，而正文可能有几十 KB。
+     */
+    @Select("""
+            SELECT id, title FROM knowledge_entries
+            WHERE category_id = #{categoryId}
+            """)
+    List<Entry> findTitlesByCategory(@Param("categoryId") Long categoryId);
+
     @Update("""
             UPDATE knowledge_entries
             SET category_id = #{categoryId}, sort_order = #{sortOrder}, title = #{title}, body = #{body},

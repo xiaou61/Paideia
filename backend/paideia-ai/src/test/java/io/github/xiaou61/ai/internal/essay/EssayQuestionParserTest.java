@@ -82,6 +82,32 @@ class EssayQuestionParserTest {
     }
 
     @Test
+    void dropsRefusalAnswer() {
+        // 模型没从帖子里拿到信息时的退化输出，应当挡在入库之前。
+        String json = """
+                {"questions":[{"title":"Spring 循环依赖怎么解决","answer":"抱歉，我无法从这篇帖子回答这个问题，信息不足。"}]}
+                """;
+        assertThat(parser.parse(json).questions()).isEmpty();
+    }
+
+    @Test
+    void dropsAnswerThatMerelyRepeatsTitle() {
+        // 解析只是把题目重述一遍 = 没补任何信息。
+        String title = "ConcurrentHashMap 的分段锁去哪了";
+        String json = "{\"questions\":[{\"title\":\"" + title + "\",\"answer\":\"" + title + "\"}]}";
+        assertThat(parser.parse(json).questions()).isEmpty();
+    }
+
+    @Test
+    void keepsLongAnswerThatIncidentallyContainsRefusalWord() {
+        // 长解析里偶然出现"不知道"不该被误杀——拒答判定只看短输出。
+        String json = """
+                {"questions":[{"title":"HashMap 并发扩容会出什么问题","answer":"并发扩容时如果不加锁，线程就不知道会读到哪个桶，可能读到正在迁移的旧值从而出错，所以要用同步机制保证可见性。"}]}
+                """;
+        assertThat(parser.parse(json).questions()).hasSize(1);
+    }
+
+    @Test
     void missingQuestionsArrayIsAFailure() {
         assertThatThrownBy(() -> parser.parse("{\"data\":[]}")).isInstanceOf(BizException.class);
     }

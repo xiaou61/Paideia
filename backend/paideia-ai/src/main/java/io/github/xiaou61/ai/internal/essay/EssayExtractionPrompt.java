@@ -18,7 +18,7 @@ import java.util.List;
  */
 final class EssayExtractionPrompt {
 
-    static final String VERSION = "essay-extract-v2";
+    static final String VERSION = "essay-extract-v3";
 
     private EssayExtractionPrompt() {
     }
@@ -38,6 +38,9 @@ final class EssayExtractionPrompt {
                    题目本身要脱离这篇帖子也能看懂。
                 3. **解析是你自己写的**，不是从帖子里抄的答案（帖子里通常也没有答案）。
                    **120~200 字**，先给结论，再说原因；有对比就列出来；能举例就举例。
+
+                4. **解析必须对上题目**：讲的就是题目问的那件事，**不要用复述题目充数**；
+                   原帖里没有能支撑这道题的信息就不要硬编，宁可少出一题。拿不准的，少出错比多出错好。
 
                 只输出一个 JSON 对象，不要解释、不要用 markdown 代码块包裹：
                 {"questions":[{"title":"题目本身，一句话，不超过 60 字","answer":"解析，120~200 字，可用 markdown"}]}

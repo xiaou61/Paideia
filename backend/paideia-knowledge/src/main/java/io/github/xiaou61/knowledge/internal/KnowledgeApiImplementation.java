@@ -27,12 +27,14 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
@@ -51,6 +53,10 @@ class KnowledgeApiImplementation implements KnowledgeApi {
 
     /** 助手问"有哪些内容"时一次给多少条：够它接着追问，又不至于把上下文塞满。 */
     private static final int DEFAULT_LIMIT = 10;
+
+    /** 面经跨帖去重：归一化标题的 bigram Jaccard 相似度达到这个值即视为同一道题。
+     *  0.85 偏保守——宁可漏判多存一条，也别误杀一道真新题。 */
+    private static final double TITLE_DUPLICATE_THRESHOLD = 0.85;
 
     private final EntryMapper entryMapper;
     private final ConceptMapper conceptMapper;
@@ -188,6 +194,49 @@ class KnowledgeApiImplementation implements KnowledgeApi {
     public boolean hasCollected(String fingerprint) {
         // 复用同一个查询：一帖最多 5 道题，候选行就那么几条，没必要为它单开一个 COUNT。
         return !entryMapper.findAllByFingerprint(fingerprint).isEmpty();
+    }
+
+    @Override
+    public Optional<Long> findSimilarQuestion(Long categoryId, String rawTitle) {
+        String title = normalizeTitle(rawTitle);
+        if (title.isEmpty()) {
+            return Optional.empty();
+        }
+        for (Entry existing : entryMapper.findTitlesByCategory(categoryId)) {
+            String other = normalizeTitle(existing.getTitle());
+            if (!other.isEmpty() && sameQuestion(title, other)) {
+                return Optional.of(existing.getId());
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** 归一化后完全相等，或 bigram Jaccard 相似度够高，就当作同一道题。 */
+    private static boolean sameQuestion(String normalized, String other) {
+        return normalized.equals(other)
+                || jaccardBigrams(normalized, other) >= TITLE_DUPLICATE_THRESHOLD;
+    }
+
+    /** 字符二元组 Jaccard：中文不切词也能挡住「HashMap 为什么线程不安全 / 为什么线程不安全」。 */
+    private static double jaccardBigrams(String left, String right) {
+        Set<String> a = bigrams(left);
+        Set<String> b = bigrams(right);
+        if (a.isEmpty() || b.isEmpty()) {
+            return 0.0;
+        }
+        Set<String> intersection = new HashSet<>(a);
+        intersection.retainAll(b);
+        Set<String> union = new HashSet<>(a);
+        union.addAll(b);
+        return (double) intersection.size() / union.size();
+    }
+
+    private static Set<String> bigrams(String value) {
+        Set<String> result = new HashSet<>();
+        for (int i = 0; i + 1 < value.length(); i++) {
+            result.add(value.substring(i, i + 2));
+        }
+        return result;
     }
 
     // ── 文档入库（WORK-076） ───────────────────────────────────────────

@@ -165,4 +165,19 @@ class EssayCollectionIntegrationTest {
             assertThat(node.id()).isEqualTo(categoryId);
         });
     }
+
+    @Test
+    @DisplayName("跨帖同题：不同指纹、同一道题能被 findSimilarQuestion 认出（2026-11-17）")
+    void findsSimilarQuestionAcrossPostsInSameCategory() {
+        KnowledgeApi.CreateOutcome saved = knowledge.createCollected(new KnowledgeApi.CollectedEntry(
+                "HashMap 为什么线程不安全", "解析", categoryId, "draft", FINGERPRINT, null));
+        assertThat(saved.created()).isTrue();
+
+        // 另一篇帖子（不同指纹）问了同一道题，只是标点不同 → 应当命中
+        assertThat(knowledge.findSimilarQuestion(categoryId, "HashMap为什么线程不安全？"))
+                .contains(saved.entryId());
+        // 真·新题不该被误判
+        assertThat(knowledge.findSimilarQuestion(categoryId, "Redis AOF 重写是怎么做的"))
+                .isEmpty();
+    }
 }

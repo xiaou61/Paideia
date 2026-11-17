@@ -29,6 +29,17 @@ class EssayQuestionParser {
     /** 解析长度下限：低于这个数基本是"略"或一句废话。 */
     private static final int MIN_ANSWER_CHARS = 20;
 
+    /** 拒答/空话只在这么短的解析里判，免得误杀长解析里偶然出现的词。 */
+    private static final int REFUSAL_MAX_CHARS = 40;
+
+    /** 明显的拒答/占位话术。 */
+    private static final List<String> REFUSAL_MARKERS = List.of(
+            "无法回答", "无法确定", "不能回答", "作为AI", "作为 AI",
+            "抱歉", "不知道", "不清楚", "无可奉告", "文中未提及", "没有相关信息", "未提及");
+
+    /** 复述题目判定的最小题目长度：太短的题目跟答案撞在一起是巧合，不算重复。 */
+    private static final int TITLE_ECHO_MIN_TITLE_CHARS = 6;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     EssayExtractionPrompt.Extraction parse(String raw) {
@@ -56,6 +67,9 @@ class EssayQuestionParser {
             if (answer.length() < MIN_ANSWER_CHARS || answer.length() > MAX_ANSWER_CHARS) {
                 continue;
             }
+            if (looksLikeJunk(title, answer)) {
+                continue;
+            }
             questions.add(new EssayExtractionPrompt.ExtractedQuestion(title, answer));
         }
         return new EssayExtractionPrompt.Extraction(questions);
@@ -74,6 +88,41 @@ class EssayQuestionParser {
         String body = trimmed.substring(firstNewline + 1);
         int closing = body.lastIndexOf("```");
         return closing < 0 ? body : body.substring(0, closing);
+    }
+
+    /**
+     * 「答案自检」质检门（2026-11-17）：把明显没信息量的解析挡在入库之前。
+     *
+     * <p>纯程序化、零额外模型调用。挡两类：
+     * <ul>
+     *   <li>拒答 / 空话——模型没从帖子里拿到信息时的退化输出（"无法回答""略""不清楚"）。</li>
+     *   <li>复述题目——解析归一化后几乎就是题目本身，说明没补任何内容。</li>
+     * </ul>
+     * 挡不住的（答案和题目细微对不上）需要模型自评，属另一层。
+     */
+    static boolean looksLikeJunk(String title, String answer) {
+        String plain = answer == null ? "" : answer.strip();
+        if (plain.length() <= REFUSAL_MAX_CHARS) {
+            for (String marker : REFUSAL_MARKERS) {
+                if (plain.contains(marker)) {
+                    return true;
+                }
+            }
+        }
+        String normalizedTitle = normalize(title);
+        String normalizedAnswer = normalize(answer);
+        return normalizedTitle.length() >= TITLE_ECHO_MIN_TITLE_CHARS
+                && !normalizedAnswer.isEmpty()
+                && normalizedTitle.contains(normalizedAnswer);
+    }
+
+    /** 与判重同口径的归一化：去空白与中英文标点、统一小写。 */
+    private static String normalize(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replaceAll("[\\s\\p{Punct}，。；：！？、“”‘’「」『』（）【】《》〈〉·…—～]+", "")
+                .toLowerCase(java.util.Locale.ROOT);
     }
 
     private static BizException failure(String message) {
