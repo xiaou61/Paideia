@@ -3,14 +3,7 @@ import {
   Button,
   Card,
   CardContent,
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
   Input,
-  ListPagination,
-  PageHeader,
   Select,
   SelectContent,
   SelectItem,
@@ -28,6 +21,8 @@ import { useQuery } from '@tanstack/react-query'
 import { formatDurationMs, formatLocalDateTime } from '@paideia/core'
 import { ListOrdered } from 'lucide-react'
 import { useState } from 'react'
+
+import { ListPage, type ListPageColumn } from '@paideia/patterns'
 
 import { api } from '../api'
 
@@ -169,6 +164,19 @@ function windowParams(hour?: string | null): string {
 
 const PAGE_SIZE = 50
 
+/** 列表表头（WORK-081 试点：行渲染交给 `renderRow`，这里只声明列名）。 */
+const COLUMNS: ListPageColumn<RunSummary>[] = [
+  { key: 'time', header: '时间' },
+  { key: 'kind', header: '场景' },
+  { key: 'status', header: '状态' },
+  { key: 'duration', header: '耗时', align: 'right' },
+  { key: 'ttft', header: '首字', align: 'right' },
+  { key: 'rounds', header: '轮次/工具', align: 'right' },
+  { key: 'tokens', header: 'tokens', align: 'right' },
+  { key: 'credits', header: '扣分', align: 'right' },
+  { key: 'user', header: '用户' },
+]
+
 export function AiRunsListPage() {
   const [kind, setKind] = useState('')
   const [status, setStatus] = useState('')
@@ -205,12 +213,36 @@ export function AiRunsListPage() {
   const totalPages = Math.max(1, Math.ceil((list.data?.total ?? 0) / PAGE_SIZE))
 
   return (
-    <div className="space-y-4">
-      <PageHeader
-        title="调用明细"
-        description="每一行是一轮调用。点开可看该轮的步骤耗时——「慢在上游还是慢在工具」只能在这里看出来。"
-      />
-
+    <ListPage<RunSummary>
+      title="调用明细"
+      description="每一行是一轮调用。点开可看该轮的步骤耗时——「慢在上游还是慢在工具」只能在这里看出来。"
+      columns={COLUMNS}
+      rows={rows}
+      getRowKey={(row) => row.traceId}
+      loading={list.isLoading}
+      loadingNode={<Spinner />}
+      error={list.error}
+      onRetry={() => { void list.refetch() }}
+      tableTestId="runs-table"
+      emptyTestId="runs-list-empty"
+      emptyIcon={<ListOrdered />}
+      emptyTitle="没有符合条件的调用"
+      emptyDescription="放宽筛选条件，或等有人用过 AI 之后再来看。"
+      renderRow={(row) => (
+        <Row
+          row={row}
+          expanded={expanded === row.traceId}
+          onToggle={() => { setExpanded(expanded === row.traceId ? null : row.traceId) }}
+        />
+      )}
+      pagination={{
+        total: list.data?.total ?? 0,
+        page,
+        totalPages,
+        onPage: setPage,
+        testIdPrefix: 'runs',
+      }}
+      filters={
       <Card>
         <CardContent className="flex flex-wrap items-end gap-3 py-3">
           <label className="space-y-1 text-xs">
@@ -332,58 +364,8 @@ export function AiRunsListPage() {
           ) : null}
         </CardContent>
       </Card>
-
-      {list.isLoading ? <Spinner /> : null}
-
-      {list.isSuccess && rows.length === 0 ? (
-        <Card>
-          <Empty data-testid="runs-list-empty">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <ListOrdered />
-              </EmptyMedia>
-              <EmptyTitle>没有符合条件的调用</EmptyTitle>
-              <EmptyDescription>放宽筛选条件，或等有人用过 AI 之后再来看。</EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        </Card>
-      ) : null}
-
-      {rows.length > 0 ? (
-        <Card>
-          <CardContent className="px-0">
-            <Table data-testid="runs-table">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>时间</TableHead>
-                  <TableHead>场景</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead className="text-right">耗时</TableHead>
-                  <TableHead className="text-right">首字</TableHead>
-                  <TableHead className="text-right">轮次/工具</TableHead>
-                  <TableHead className="text-right">tokens</TableHead>
-                  <TableHead className="text-right">扣分</TableHead>
-                  <TableHead>用户</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row) => (
-                  <Row key={row.traceId} row={row} expanded={expanded === row.traceId}
-                    onToggle={() => { setExpanded(expanded === row.traceId ? null : row.traceId) }} />
-                ))}
-              </TableBody>
-            </Table>
-            <ListPagination
-              total={list.data?.total ?? 0}
-              page={page}
-              totalPages={totalPages}
-              onPage={setPage}
-              testIdPrefix="runs"
-            />
-          </CardContent>
-        </Card>
-      ) : null}
-    </div>
+      }
+    />
   )
 }
 

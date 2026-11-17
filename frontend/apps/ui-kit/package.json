@@ -12,6 +12,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@paideia/patterns": "workspace:*",
     "@paideia/platform-web": "workspace:*",
     "@paideia/ui": "workspace:*",
     "lucide-react": "1.54.0",

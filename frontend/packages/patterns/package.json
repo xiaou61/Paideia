@@ -1,0 +1,30 @@
+{
+  "name": "@paideia/patterns",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "页面级模板层：列表页 / 详情页 / 表单向导。只吃 props、只组合 @paideia/ui 基元，不引 core 与路由，保持纯展示。",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "react": "^19.3.0"
+  },
+  "dependencies": {
+    "@paideia/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@testing-library/react": "16.3.3",
+    "@types/node": "26.6.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "happy-dom": "^21.0.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "vitest": "5.0.3"
+  }
+}

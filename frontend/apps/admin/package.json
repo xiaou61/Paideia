@@ -15,6 +15,7 @@
     "@paideia/auth": "workspace:*",
     "@paideia/core": "workspace:*",
     "@paideia/knowledge": "workspace:*",
+    "@paideia/patterns": "workspace:*",
     "@paideia/platform-web": "workspace:*",
     "@paideia/ui": "workspace:*",
     "@tanstack/react-query": "5.104.1",

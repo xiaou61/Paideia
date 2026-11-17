@@ -190,6 +190,9 @@ importers:
       '@paideia/knowledge':
         specifier: workspace:*
         version: link:../../packages/knowledge
+      '@paideia/patterns':
+        specifier: workspace:*
+        version: link:../../packages/patterns
       '@paideia/platform-web':
         specifier: workspace:*
         version: link:../../packages/platform-web
@@ -358,6 +361,9 @@ importers:
 
   apps/ui-kit:
     dependencies:
+      '@paideia/patterns':
+        specifier: workspace:*
+        version: link:../../packages/patterns
       '@paideia/platform-web':
         specifier: workspace:*
         version: link:../../packages/platform-web
@@ -538,6 +544,37 @@ importers:
       '@types/react':
         specifier: 19.3.0
         version: 19.3.0
+      happy-dom:
+        specifier: ^21.0.3
+        version: 21.0.3
+      react:
+        specifier: 19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: 19.3.0
+        version: 19.3.0(react@19.3.0)
+      vitest:
+        specifier: 5.0.3
+        version: 5.0.3(@types/node@26.6.4)(happy-dom@21.0.3)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.4)(jiti@2.7.0)(terser@5.51.2))
+
+  packages/patterns:
+    dependencies:
+      '@paideia/ui':
+        specifier: workspace:*
+        version: link:../ui
+    devDependencies:
+      '@testing-library/react':
+        specifier: 16.3.3
+        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@types/node':
+        specifier: 26.6.4
+        version: 26.6.4
+      '@types/react':
+        specifier: 19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: 19.3.0
+        version: 19.3.0(@types/react@19.3.0)
       happy-dom:
         specifier: ^21.0.3
         version: 21.0.3

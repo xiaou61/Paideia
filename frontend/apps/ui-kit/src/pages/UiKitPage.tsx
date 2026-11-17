@@ -66,6 +66,8 @@ import {
   useTheme,
   type Theme,
 } from '@paideia/ui'
+import uiManifest from '@paideia/ui/ui-manifest.json'
+import { DetailPage, FormWizard, ListPage } from '@paideia/patterns'
 import { InboxIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -102,6 +104,97 @@ export function UiKitPage() {
           title="组件展览"
           description="令牌取值来自 Vercel Geist 设计系统的公开事实：纯白底、近黑正文、一条极细的浅灰分隔线、6px 圆角、标题 semibold 带负字距。层次由字号、留白与那条线建立。具体数值只写在 globals.css 一处。"
         />
+
+        <Section
+          title="组件索引"
+          description={`共 ${uiManifest.moduleCount} 个模块、${uiManifest.exportCount} 个导出；由 pnpm ui:manifest 从 index.ts 与 component-meta.json 自动生成，完整清单见 frontend/docs/ui-manifest.md。下方分区仍手工维护变体展览。`}
+        >
+          <Card>
+            <CardContent className="pt-6">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-24">分类</TableHead>
+                    <TableHead className="w-52">导出</TableHead>
+                    <TableHead>用途</TableHead>
+                    <TableHead className="w-56">源文件</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {uiManifest.exports.map((row) => (
+                    <TableRow key={`${row.source}:${row.name}`}>
+                      <TableCell>
+                        <Badge variant="outline">{row.category}</Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{row.name}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">{row.description}</TableCell>
+                      <TableCell className="text-muted-foreground font-mono text-xs">{row.source}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </Section>
+
+        <Section
+          title="页面模板（@paideia/patterns）"
+          description="页面级组合模板：列表页 / 详情页 / 表单向导。只组合 @paideia/ui 基元、不碰数据层，展示的是结构与状态，不是具体业务。"
+        >
+          <div className="space-y-8">
+            <div>
+              <h3 className="mb-3 text-sm font-medium">ListPage · 加载/错误/空三态与分页</h3>
+              <ListPage
+                title="示例：数据集"
+                description="三态由模板统一处理，筛选与取数留在调用方。"
+                columns={[
+                  { key: 'name', header: '名称', render: (r: { key: string; name: string }) => r.name },
+                  { key: 'owner', header: '上传者', render: () => '示例用户' },
+                ]}
+                rows={[
+                  { key: 'a', name: '一年级口算' },
+                  { key: 'b', name: '几何入门' },
+                ]}
+                getRowKey={(r) => r.key}
+                pagination={{ total: 2, page: 1, totalPages: 1, onPage: () => {} }}
+              />
+            </div>
+
+            <div>
+              <h3 className="mb-3 text-sm font-medium">DetailPage · 页头 + 信息分块</h3>
+              <DetailPage
+                title="示例：调用详情"
+                description="分块由调用方渲染内容。"
+                sections={[
+                  {
+                    key: 'basic',
+                    title: '基本信息',
+                    content: <p className="text-sm">模型 gpt-x，耗时 1.2s。</p>,
+                  },
+                  {
+                    key: 'meta',
+                    title: '元数据',
+                    content: <p className="text-sm">用户 #42，场景 chat。</p>,
+                  },
+                ]}
+              />
+            </div>
+
+            <div>
+              <h3 className="mb-3 text-sm font-medium">FormWizard · 步骤指示 + 上下步</h3>
+              <FormWizard
+                title="示例：新建数据集"
+                steps={[
+                  { key: 'one', title: '填基本信息' },
+                  { key: 'two', title: '上传数据' },
+                  { key: 'three', title: '确认发布' },
+                ]}
+                current={0}
+                renderStep={(step) => <p className="text-sm">当前步骤：{step.title}</p>}
+              />
+            </div>
+          </div>
+        </Section>
 
         <Section
           title="字号阶梯"

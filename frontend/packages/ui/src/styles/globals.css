@@ -45,6 +45,8 @@
 @source '../../../../packages/resume/src';
 /* WORK-035 的 SQL 工作台：不进这一行，它独有的类名会静默不生成（界面看着"样式丢了"） */
 @source '../../../../packages/sql-workbench/src';
+/* WORK-081 的页面模板层：同样必须显式登记，否则 patterns 独有的类名静默不生成 */
+@source '../../../../packages/patterns/src';
 /**
  * `streamdown` 的类在它的 `dist` 里，Tailwind 默认扫不到。不给这一行，markdown 呈现会**缺样式**
  * （标题没间距、代码块没底色、行号没有内容），而且**不报错**——只是"看起来怪"。（WORK-012）
