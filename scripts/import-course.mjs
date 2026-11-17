@@ -263,17 +263,29 @@ async function ensureParent(client, tree, spec, options) {
 }
 
 /**
- * 已经建过的分类要和 frontmatter 对齐：改线名不用再去后台点一遍。
+ * 已经建过的分类要和 frontmatter 对齐：改线名 / 补 line_kind 不用再去后台点一遍。
  *
- * <p>只比 `name`——管理端返回的分类树里没有 sortOrder / parentId，比不了别的，
+ * <p>比 `name` 和 `lineKind` 两项——管理端返回的分类树里没有 sortOrder / parentId，
  * 拿不准的字段一律原样带回去（PUT 是整体替换，parentId 传错会把子分类挪出去）。
+ *
+ * <p>`lineKind` 以前写死 `existing.lineKind ?? null`，导致早先建过、当时漏写 line_kind 的
+ * 分类永远补不上（实测操作系统/算法/人工智能/开源项目简讲 4 条轨道在库里 line_kind 为 NULL，
+ * 前端只能靠 /learn/tracks 兜底）。这里改成按 frontmatter 的期望值对齐：简讲（--no-track
+ * 或 books 这类父分类下的线）仍写 null，其余写 spec.kind（course / reading）。
  */
 async function syncCategoryName(client, existing, spec, parentId, options) {
-  if (existing.name === spec.name) {
+  const desiredLineKind = options.track === false ? null : spec.kind
+  const currentLineKind = existing.lineKind ?? null
+  const nameChanged = existing.name !== spec.name
+  const lineKindChanged = currentLineKind !== desiredLineKind
+  if (!nameChanged && !lineKindChanged) {
     return
   }
   if (options.dryRun) {
-    console.log(`  [dry-run] 将改分类名 ${existing.name} → ${spec.name}`)
+    if (nameChanged) console.log(`  [dry-run] 将改分类名 ${existing.name} → ${spec.name}`)
+    if (lineKindChanged) {
+      console.log(`  [dry-run] 将改 ${spec.slug} 的 line_kind ${currentLineKind} → ${desiredLineKind}`)
+    }
     return
   }
   await client.put(`/api/v1/knowledge/admin/categories/${existing.id}`, {
@@ -281,9 +293,10 @@ async function syncCategoryName(client, existing, spec, parentId, options) {
     name: spec.name,
     slug: existing.slug,
     sortOrder: spec.sortOrder,
-    lineKind: existing.lineKind ?? null,
+    lineKind: desiredLineKind,
   })
-  console.log(`  ~ 分类名 ${existing.name} → ${spec.name}`)
+  if (nameChanged) console.log(`  ~ 分类名 ${existing.name} → ${spec.name}`)
+  if (lineKindChanged) console.log(`  ~ ${spec.slug} 的 line_kind ${currentLineKind} → ${desiredLineKind}`)
 }
 
 async function ensureCategory(client, language, lessons, options) {

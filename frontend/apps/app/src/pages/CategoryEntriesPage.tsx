@@ -337,7 +337,7 @@ export function CategoryEntriesPage() {
       },
       {
         key: 'reading',
-        label: '精读 · 书籍 · 其他',
+        label: '精读 · 书籍',
         hint: '书籍精读与独立长文',
         items: readingItems,
         groups: readingGroups,
