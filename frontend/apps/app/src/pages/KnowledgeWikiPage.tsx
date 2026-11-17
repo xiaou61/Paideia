@@ -43,7 +43,12 @@ export function KnowledgeWikiPage() {
       {categories.isPending ? <LoadingRow label="加载目录…" testId="wiki-state" /> : null}
 
       <div className="grid gap-6 lg:grid-cols-[16rem_18rem_minmax(0,1fr)]">
-        <nav className="border-border bg-card h-fit rounded-xl border p-2" data-testid="wiki-categories">
+        {/* 三栏各自封顶滚动：分类有 53 个、某分类（含「全部条目」）的条目能到几百条，
+            不封顶整页就会被这两栏撑到没有尽头（2026-11-18） */}
+        <nav
+          className="border-border bg-card h-fit max-h-[calc(100vh-8rem)] overflow-y-auto rounded-xl border p-2"
+          data-testid="wiki-categories"
+        >
           <button
             type="button"
             onClick={() => {
@@ -78,7 +83,10 @@ export function KnowledgeWikiPage() {
           ))}
         </nav>
 
-        <div className="border-border bg-card h-fit rounded-xl border p-2" data-testid="wiki-entries">
+        <div
+          className="border-border bg-card h-fit max-h-[calc(100vh-8rem)] overflow-y-auto rounded-xl border p-2"
+          data-testid="wiki-entries"
+        >
           {(entries.data ?? []).map((item) => (
             <EntryRow key={item.id} item={item} active={entryId === item.id} onSelect={() => setEntryId(item.id)} />
           ))}

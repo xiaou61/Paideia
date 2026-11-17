@@ -126,7 +126,11 @@ export function MyAssessmentsPage() {
       ) : null}
 
       {mine.isSuccess && mine.data.length > 0 ? (
-        <div className="border-border divide-border divide-y overflow-hidden rounded-xl border" data-testid="my-assessment-list">
+        // 标记可能越攒越多：给列表一个高度上限、自己滚，别把整页拉成一条没有尽头的长条
+        <div
+          className="border-border divide-border divide-y max-h-[min(70vh,40rem)] overflow-y-auto overscroll-contain rounded-xl border"
+          data-testid="my-assessment-list"
+        >
           {mine.data.map((item) => (
             <Link
               key={item.entryId}

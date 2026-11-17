@@ -174,17 +174,19 @@ export function CategoryEntriesPage() {
   }, [categories.data, allEntries.data, viewedIds])
 
   /**
-   * 分页（2026-11-10）：原来固定 `size: 50`、也没有翻页入口——"共 567 条"却只能靠搜索摸到其余。
-   * 现在每点一次多要 24 条。两栏里右侧是一列行，24 条约一屏半，给"加载更多"留出意义。
+   * 分页（2026-11-18）：原来"加载更多"每点一次就把列表拉长 24 条——滚得越长越找不到头，
+   * 用户说的"界面无限"就是它。改成真正的翻页：每页固定条数，上一页 / 下一页 + 页码，
+   * 换分类或换搜索词都回到第 1 页。翻页时保留上一页内容（placeholderData），避免闪一下骨架。
    */
-  const PAGE_SIZE = 24
-  const [size, setSize] = useState(PAGE_SIZE)
+  const PAGE_SIZE = 12
+  const [page, setPage] = useState(1)
   useEffect(() => {
-    setSize(PAGE_SIZE)
+    setPage(1)
   }, [scopedId, keyword])
   const entries = useQuery({
-    queryKey: ['knowledge-entries', scopedId, keyword, size],
-    queryFn: () => knowledge.entries({ categoryId: scopedId, q: keyword, size }),
+    queryKey: ['knowledge-entries', scopedId, keyword, page],
+    queryFn: () => knowledge.entries({ categoryId: scopedId, q: keyword, page, size: PAGE_SIZE }),
+    placeholderData: (previousData) => previousData,
   })
 
   const path = useMemo(
@@ -348,10 +350,42 @@ export function CategoryEntriesPage() {
 
   const items = entries.data?.items ?? []
   const total = entries.data?.total ?? 0
-  const truncated = entries.isSuccess && items.length < total
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   // 全库条数先取聚合结果，没到就退回列表接口的 total（两者同源，避免左栏先显示 0 再跳数）
   const totalAll = allEntries.data?.length ?? entries.data?.total ?? 0
   const countsReady = allEntries.isSuccess
+
+  // 页码越界时（例如数据变少）收回到最后一页，避免停在一个空页
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
+
+  /** 翻页：夹在 [1, totalPages] 内，翻完把列表滚回顶部，否则停在页脚看不到新一页。 */
+  const goPage = (next: number) => {
+    const clamped = Math.min(Math.max(1, next), totalPages)
+    if (clamped === page) return
+    setPage(clamped)
+    if (typeof document !== 'undefined') {
+      document
+        .querySelector('[data-testid="entry-list"]')
+        ?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    }
+  }
+
+  /** 页码按钮窗口：页数少就全列，多则「1 … 当前±1 … 末页」。 */
+  const pageNumbers = useMemo<(number | '…')[]>(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1)
+    }
+    const out: (number | '…')[] = [1]
+    const start = Math.max(2, page - 1)
+    const end = Math.min(totalPages - 1, page + 1)
+    if (start > 2) out.push('…')
+    for (let value = start; value <= end; value += 1) out.push(value)
+    if (end < totalPages - 1) out.push('…')
+    out.push(totalPages)
+    return out
+  }, [page, totalPages])
 
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
@@ -571,18 +605,49 @@ export function CategoryEntriesPage() {
             </ul>
           )}
 
-          {truncated ? (
-            <div className="mt-6 flex flex-col items-center gap-2">
-              <Button
-                variant="outline"
-                data-testid="entry-load-more"
-                disabled={entries.isFetching}
-                onClick={() => setSize((value) => value + PAGE_SIZE)}
-              >
-                {entries.isFetching ? '加载中…' : `加载更多（还有 ${total - items.length} 条）`}
-              </Button>
-              <span className="text-muted-foreground text-xs" data-testid="entry-shown-count">
-                已显示 {items.length} / {total}
+          {entries.isSuccess && totalPages > 1 ? (
+            <div className="mt-6 flex flex-col items-center gap-3" data-testid="entry-pagination">
+              <div className="flex flex-wrap items-center justify-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => goPage(page - 1)}
+                  data-testid="entry-page-prev"
+                >
+                  上一页
+                </Button>
+                {pageNumbers.map((value, index) =>
+                  value === '…' ? (
+                    <span key={`gap-${index}`} className="text-muted-foreground px-1 text-xs">
+                      …
+                    </span>
+                  ) : (
+                    <Button
+                      key={value}
+                      variant={value === page ? 'default' : 'outline'}
+                      size="sm"
+                      aria-current={value === page ? 'page' : undefined}
+                      onClick={() => goPage(value)}
+                      data-testid={`entry-page-${value}`}
+                      className="min-w-9 tabular-nums"
+                    >
+                      {value}
+                    </Button>
+                  ),
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= totalPages}
+                  onClick={() => goPage(page + 1)}
+                  data-testid="entry-page-next"
+                >
+                  下一页
+                </Button>
+              </div>
+              <span className="text-muted-foreground text-xs" data-testid="entry-page-info">
+                第 {page} / {totalPages} 页 · 共 {total} 条
               </span>
             </div>
           ) : null}
@@ -670,7 +735,8 @@ function CategoryRail({
 
   return (
     <aside className={className}>
-      <div className="md:sticky md:top-20">
+      {/* 目录比一屏还长时不再把整页撑高：高度封顶、目录自己滚，页面整体长度交给右栏分页决定 */}
+      <div className="md:sticky md:top-20 md:max-h-[calc(100vh-6rem)] md:overflow-y-auto md:pb-6 md:pr-1">
         <div className="relative mb-2">
           <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
           <Input
