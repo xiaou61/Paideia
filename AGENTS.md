@@ -24,7 +24,8 @@
   - `playwright test --last-failed` —— 修完失败后只重跑失败的
   - 全量只在**改共享包**（`@paideia/ui` / `core` / `auth` / `knowledge`）或**发版前**跑
   - 对应关系：`HomePage`→`home`；知识库→`knowledge`；笔记→`notes`；图谱→`graph`；助手→`assistant`；markdown 渲染→`markdown-render`；简历→`resume`；身份与导航→`identity`；MCP→`mcp-tokens`；源码解读→`source-reading`；移动端布局→`layout.mobile`；课程关卡→`learn`；PWA→`pwa`
-- **测试库是唯一入口**：任何碰数据库的验证都走 `scripts/test-db.sh`（或它包的 e2e），**不要直接 `mvn -B test` / `pnpm test:e2e` 连共用的 `paideia_test`**。这台机器上可能有别的会话同时在跑，共用库会让两轮测试互相删数据——单类跑全绿、全量跑红那种红**不是产品缺陷**，也不能当证据。脚本每次分配独占的 `paideia_run_<时间>_<pid>` 库，成功后自动删；失败时保留库名并打印出来。
+- **测试库是唯一入口**：任何碰数据库的验证都走 `scripts/test-db.sh`（或它包的 e2e），**不要直接 `mvn -B test` / `pnpm test:e2e`**。这台机器上可能有别的会话同时在跑，共用库会让两轮测试互相删数据——单类跑全绿、全量跑红那种红**不是产品缺陷**，也不能当证据。
+  - 库的位置有两套：**本机库**（URL 指 127.0.0.1）由脚本派生独占的 `paideia_run_<时间>_<pid>`，成功后自动删、失败保留库名；**服务器上的远程测试库**（2026-11-11 起默认，地址/库名/口令只在被忽略的 `backend/config/remote-db.local.env` 里）账号只被授权那一个库，建不了新库，脚本**不派生**、直接共用，所以**两轮测试不能同时跑**。
 - **后端内环不要跑全量**：全量（667 条 / 上次干净实测 3 分 30 秒 `-T 1C`）里 `paideia-app`（集成测试模块，257 条）独占 2 分 15 秒。**切片提交不跑全量**，跑下面两条就够（合计约 **2 分 30 秒**；两条都必须在 `backend/` 目录下跑——`test-db.sh` 带命令参数时不会自己切目录）：
   - `scripts/test-db.sh mvn -B -T 1C -pl '!paideia-app' test` —— **88 秒 / 410 条**，除集成套件外的全部单测
   - `scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=ModularityTest,MigrationVersionFormatTest,MigrationChecksumTest,MigrationSeedOverlapTest,ApiSurfaceTest,ApiContractTest,AuthorizationIsolationTest -Dsurefire.failIfNoSpecifiedTests=false test` —— **66 秒 / 35 条**（守卫三件占大头：ApiContractTest 单类约 31 秒），跨模块边界、迁移三件（命名/校验和/种子隔离）与守卫三件（每个端点必须声明访问级别、401/403 矩阵、非回环来源对照与令牌隔离）
@@ -34,7 +35,8 @@
 - **迁移与种子的分工**：生产迁移只建结构（可以插配置类常量行，但**插业务数据时要显式写 id 且 ≥ 900**）；测试/开发数据一律放 `db/devdata`，绝不放 `db/migration`。`MigrationSeedOverlapTest` 会把"生产迁移往种子表插行却不给 id"变成构建失败——这类 bug 只在零数据新库上出现，生产库和开发库永远看不出来。
 - **迁移文件名用 14 位时间戳**：`V20261021103045__描述.sql`，不要用 `V25__` 这种递增号。多个会话并行时递增号是**被争抢的共享命名空间**：实测两个分支都写 `V25` 会让应用直接起不来（`Found more than one migration with version 25`），不是某个迁移失败而是整个上下文中止。时间戳把这个概率降到"同一秒"，`MigrationVersionFormatTest` 会同时挡住纯数字号与同秒重复。**它治不了**"两个会话改同一张表的不同列、版本号不冲突但语义冲突"——那只能靠合并前协调：**动 schema 前先 `git log --all --oneline -- <迁移目录>` 看有没有人在改同一张表**。
 - **部署**：一条命令 `powershell -File scripts/release.ps1`（纯后端改动约 75 秒）。前端**按需重建**：`frontend/` 自上次发版以来没改动就自动跳过那 80 秒，要强制重建用 `-WithWeb`、强制只发后端用 `-SkipWeb`。部署形态、端口与服务器约定见 `.agent/rules/always.md` 的「部署」，耗时的实测拆解见 `.agent/notes/dev-workflow.md` 的「发版耗时」。本项目没有"发布"这个节点，改完随手部署即可，不需要攒批次。
-- **架构图存 `docs/architecture/`，一律 mermaid**：判据是**能不能从代码抽取**——能（模块依赖、表关系）写脚本生成、不许手画，因为模型凭印象复述一定会漏会错且错得很像真的；不能（请求链路、时序、状态机）才由 AI 写。改了模块边界、外部依赖、表结构或部署拓扑的，**在同一个提交里改对应的图**。改完跑 `node scripts/check-diagrams.mjs`（语法校验，6 秒扫全仓）与 `node scripts/gen-arch-diagram.mjs --check`（四张结构图与声明是否漂移）。`docs/architecture/README.md` 里写明了这份存档**不**包含什么（接口字段、路由、组件图），别以为它完整。规则与已知限制见该目录的 `README.md`。
+- **架构图存 `docs/architecture/`，默认 mermaid**：判据是**能不能从代码抽取**——能（模块依赖、表关系）写脚本生成、不许手画，因为模型凭印象复述一定会漏会错且错得很像真的；不能（请求链路、时序、状态机）才由 AI 写。改了模块边界、外部依赖、表结构或部署拓扑的，**在同一个提交里改对应的图**。改完跑 `node scripts/check-diagrams.mjs`（语法校验，6 秒扫全仓）与 `node scripts/gen-arch-diagram.mjs --check`（四张结构图与声明是否漂移）。`docs/architecture/README.md` 里写明了这份存档**不**包含什么（接口字段、路由、组件图），别以为它完整。规则与已知限制见该目录的 `README.md`。
+- **唯一例外是全景图 `paideia-architecture`**：mermaid 在 20 节点以上自动布局就糊成一团，而"系统长什么样"本来就要一份图讲完。它用 Archify 的 `.archify.json` 作**权威文本源**（可 diff、可校验）、HTML 只是构建产物。它仍受同一条纪律约束：**改了模块边界、外部依赖或部署拓扑的，在同一提交里改 `.archify.json` 并重新生成 HTML**；`meta.repository.revision` 也要跟着钉到新提交，否则图上的源码跳转会指向旧代码。生成命令见 `docs/architecture/README.md`。
 - **加了页面就必须加入口，否则等于没上线**：`router.tsx` 里每一条用户可见的路由，都必须在**导航栏**（`LearnerHeader` 的 `NAV`）或**账号菜单**里有对应入口；只在首页快捷卡里出现**不算**——首页那排卡片要往下滚才看得见，用户不会猜。2026-10-22 就是这条漏了：`/learn`（从零开始，54 篇文章）、`/graph`（知识图谱）、`/practice/sql`（SQL 自由练习）三个页面都能直达 URL、内容齐全，但导航栏里一个都没有，用户以为"线上内容少了一大半"。自查方法：把 `rg "path: '" frontend/apps/app/src/router.tsx` 的结果与 `NAV` + 账号菜单逐条对一遍；新增功能时同步给 `@paideia/identity` 的 `preferredNav` 补 key（该类型是联合字面量，不加会编译不过）。
 
 ## 保密规则（公开仓库，最重要）

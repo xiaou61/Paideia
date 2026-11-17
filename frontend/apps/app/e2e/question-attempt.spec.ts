@@ -25,6 +25,9 @@ test.describe('逐题作答上报', () => {
     await expect(page.getByTestId('quiz')).toHaveCount(0)
     await page.getByTestId('practice-open').click()
     await expect(page.getByTestId('practice-dialog')).toBeVisible()
+    // 库是长期共用的一个（paideia_e2e），上一次跑的作答还在：选项答过即锁定，
+    // 不先「重做」清掉本地作答，后面那一下点击就是个空操作，永远等不到 POST。
+    await page.getByTestId('practice-dialog').getByTestId('practice-reset').click()
 
     const responsePromise = page.waitForResponse(
       (response) =>

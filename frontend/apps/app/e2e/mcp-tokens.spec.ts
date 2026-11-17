@@ -174,12 +174,18 @@ test('MCP 凭据：不填上限时显示不限', async ({ page }) => {
   await expect(row.getByTestId('mcp-token-usage')).toContainText('今日 0 次（不限）')
 })
 
-/** 四个新域的工具组要能在界面上勾到——勾不到等于没上线。 */
-test('MCP 凭据：四个新域的工具组可选', async ({ page }) => {
+/**
+ * 三个新域的工具组要能在界面上勾到——勾不到等于没上线。
+ *
+ * <p>原本是四个（还有 `memory`）。2026-11-06 的 05269393「移除记忆功能」把 MCP 的 memory
+ * 工具组连同后端 MemoryTools 一起删了，这里跟着改成三个：留着一个后端没有任何工具的工具组，
+ * 勾中只会得到"看起来能调、其实什么都不能调"的凭据。
+ */
+test('MCP 凭据：三个新域的工具组可选', async ({ page }) => {
   await signIn(page)
   await page.goto('/#/settings/mcp')
 
-  for (const key of ['resume', 'interview', 'review', 'memory']) {
+  for (const key of ['resume', 'interview', 'review']) {
     await expect(page.getByTestId(`mcp-toolset-${key}`)).toBeVisible()
   }
 })

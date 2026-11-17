@@ -1,4 +1,9 @@
 import { defineConfig, devices } from '@playwright/test'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const CONFIG_DIR = dirname(fileURLToPath(import.meta.url))
 
 const BACKEND_DIR = '../../../backend'
 const BACKEND_JAR = 'paideia-app/target/paideia-app-0.0.1-SNAPSHOT.jar'
@@ -9,6 +14,31 @@ const BACKEND_JAR = 'paideia-app/target/paideia-app-0.0.1-SNAPSHOT.jar'
  * （见 `e2e/accounts.ts`）。
  */
 const REMOTE_BASE_URL = process.env.E2E_BASE_URL
+
+/**
+ * 测试库连接与应用端同款：优先环境变量，其次被忽略的 `backend/config/remote-db.local.env`。
+ * 服务器地址、库名、账号与口令都只写在那份文件里（公开仓库不放凭据），代码里不留默认值。
+ */
+function localDbEnv(): Record<string, string> {
+  try {
+    const path = join(CONFIG_DIR, '../../../backend/config/remote-db.local.env')
+    const entries: Array<[string, string]> = []
+    for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
+      const matched = /^export\s+([A-Z0-9_]+)=['"]?([^'"]*)['"]?$/.exec(line.trim())
+      if (matched !== null) {
+        entries.push([matched[1] ?? '', matched[2] ?? ''])
+      }
+    }
+    return Object.fromEntries(entries)
+  } catch {
+    return {}
+  }
+}
+
+const LOCAL_DB_ENV = localDbEnv()
+const DB_URL = process.env.PAIDEIA_TEST_DB_URL ?? LOCAL_DB_ENV.PAIDEIA_TEST_DB_URL ?? ''
+const DB_USER = process.env.PAIDEIA_TEST_DB_USER ?? LOCAL_DB_ENV.PAIDEIA_TEST_DB_USER ?? ''
+const DB_PASSWORD = process.env.PAIDEIA_TEST_DB_PASSWORD ?? LOCAL_DB_ENV.PAIDEIA_TEST_DB_PASSWORD ?? ''
 
 /** 端口可覆写，理由同学习者端：并发会话各用一组端口，避免静默复用别人的服务。 */
 const BACKEND_PORT = process.env.PAIDEIA_BACKEND_PORT ?? '8080'
@@ -57,25 +87,19 @@ export default defineConfig({
         {
           command: `java -jar ${BACKEND_JAR} --spring.profiles.active=local --server.port=${BACKEND_PORT}`,
           cwd: BACKEND_DIR,
-          // 与管理端的说明一致：数据源指向 paideia_test，并额外加载 db/devdata 里的种子账号
           env: {
+            /**
+             * 数据源一律从环境变量来：`source backend/config/remote-db.local.env` 后就有。
+             * 服务器地址、库名与口令都只写在那份被 .gitignore 忽略的文件里（公开仓库不放凭据），
+             * 这里不写死任何一项——没配就会在启动时直接报错，而不是悄悄连到别的库。
+             */
+            SPRING_DATASOURCE_URL: DB_URL,
             // forceConnectionTimeZoneToSession 与 connectionTimeZone 必须成对（服务器 MySQL 会话是 +08:00）：
             // 少了它，建表默认值写进去的是本地钟点，而驱动按 UTC 解释，时间整体快 8 小时。
-            /**
-                 * 数据库优先取环境变量（`source backend/config/remote-db.local.env` 后就有）：
-                 * 本机 MySQL 与服务器测试库都写在这一个文件里，切换时不必改代码。
-                 * 没设时才退回到下面写死的默认值。
-              */
-            SPRING_DATASOURCE_URL:
-              process.env.PAIDEIA_TEST_DB_URL ??
-              'jdbc:mysql://36.212.5.130:3306/paideia_test?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=utf8',
-            // 直连服务器 MySQL（2026-10-16 起）：3306 已对外开放，**不再需要本地 3307 隧道**。
-            // 账号只授权 paideia_test.*（生产库 paideia 没有任何可远程登录的账号）；
-            // 口令只从环境变量来：先 `source backend/config/remote-db.local.env` 再跑 e2e。
-            SPRING_DATASOURCE_USERNAME: process.env.PAIDEIA_TEST_DB_USER ?? 'paideia_test',
-            SPRING_DATASOURCE_PASSWORD: process.env.PAIDEIA_TEST_DB_PASSWORD ?? '',
+            SPRING_DATASOURCE_USERNAME: DB_USER,
+            SPRING_DATASOURCE_PASSWORD: DB_PASSWORD,
             SPRING_FLYWAY_LOCATIONS: 'classpath:db/migration,classpath:db/devdata',
-            // 与管理端说明一致：paideia_test 被三种迁移配置共用，夹具的 V900 需要被忽略
+            // 与应用端说明一致：测试库被多种迁移配置共用，夹具的 V900 需要被忽略
             SPRING_FLYWAY_IGNORE_MIGRATION_PATTERNS: '*:future,*:missing',
             SPRING_FLYWAY_OUT_OF_ORDER: 'true',
             // 管理端的来源必须在后端白名单里。**即使走 Vite 代理也一样**：
@@ -87,7 +111,8 @@ export default defineConfig({
           url: `http://127.0.0.1:${BACKEND_PORT}/actuator/health`,
           // 同学习者端：复用已有后端会静默打到别人的库，端口被占就让它报错。
           reuseExistingServer: false,
-          timeout: 120_000,
+          // 与端到端一致：空库首启要跑完 migration + devdata，公网库更慢，给足上限。
+          timeout: 300_000,
         },
         {
           // 端口由 vite.config.ts 读 PAIDEIA_ADMIN_PORT 决定，这里不必再传 --port

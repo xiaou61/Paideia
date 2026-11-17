@@ -17,7 +17,18 @@ const ENTRY = '/#/knowledge/entries/10'
 async function openEntry(page: Page): Promise<void> {
   await signIn(page)
   await page.goto(ENTRY)
-  await expect(page.getByTestId('code-tour')).toBeVisible()
+  /**
+ * 服务器上的测试库（单条查询 ~36ms）下，深链落地后要拉条目 + 计划 + 进度三份数据，
+   * 默认 5 秒不够，会红在"页面没内容"上而不是"功能坏了"。这里放宽到 20 秒，并且失败时
+   * 重新进一次：深链偶发被 App 启动时的 `navigate('/')` 覆盖（见 `session.ts` 同名说明）。
+   */
+  const tour = page.getByTestId('code-tour')
+  try {
+    await expect(tour).toBeVisible({ timeout: 20_000 })
+  } catch {
+    await page.goto(ENTRY)
+    await expect(tour).toBeVisible({ timeout: 20_000 })
+  }
 }
 
 test.beforeEach(() => {
@@ -75,6 +86,9 @@ test('练习与测验：判定与得分都给出明确反馈', async ({ page }) 
   await page.getByTestId('practice-open').click()
   const dialog = page.getByTestId('practice-dialog')
   await expect(dialog).toBeVisible()
+  // 长期共用同一个库：上一次跑的作答仍在服务端，选项答过即锁定。
+  // 先「重做」把本地作答清空，否则下面的点击是空操作，等不到 attempts 的 POST。
+  await dialog.getByTestId('practice-reset').click()
   for (const index of [0, 1]) {
     // 选中即锁定（按钮变 disabled）。普通 click 在锁定瞬间重试会一直等到超时，
     // 所以跳过可操作性检查：锁定后这一下是无害空操作，答错仍由下面的 quiz-score 断言兜住。

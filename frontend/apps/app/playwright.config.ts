@@ -1,4 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 import { AUTH_FILE } from './e2e/global-setup'
 
@@ -19,6 +21,44 @@ const REMOTE_BASE_URL = process.env.E2E_BASE_URL
 const BACKEND_PORT = process.env.PAIDEIA_BACKEND_PORT ?? '8080'
 const APP_PORT = process.env.PAIDEIA_APP_PORT ?? '5173'
 const APP_ORIGINS = `http://127.0.0.1:${APP_PORT},http://localhost:${APP_PORT}`
+
+/** 配置文件所在目录（`import.meta.dirname` 在 Node 20.11+ 才有，取不到就退回 cwd）。 */
+const CONFIG_DIR = typeof import.meta.dirname === 'string' ? import.meta.dirname : process.cwd()
+
+/**
+ * 测试库连接的来源：`backend/config/remote-db.local.env`（在 `.gitignore` 里，口令不入库）。
+ *
+ * <p>以前要先 `source` 这个文件；忘了就得到一个 MySQL 认证失败的后端启动错误，而原因埋在
+ * 二十行 Spring 日志里。这里直接解析同一份文件，于是"先 source"与"直接跑"等价；环境变量
+ * 仍然优先，临时指向别的库时不必改文件。
+ */
+function localDbEnv(): Record<string, string> {
+  try {
+    const path = join(CONFIG_DIR, '../../../backend/config/remote-db.local.env')
+    const entries: Array<[string, string]> = []
+    for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
+      const matched = /^export\s+([A-Z0-9_]+)=['"]?([^'"]*)['"]?$/.exec(line.trim())
+      if (matched !== null) {
+        entries.push([matched[1] ?? '', matched[2] ?? ''])
+      }
+    }
+    return Object.fromEntries(entries)
+  } catch {
+    return {}
+  }
+}
+
+const LOCAL_DB_ENV = localDbEnv()
+const DB_URL = process.env.PAIDEIA_TEST_DB_URL ?? LOCAL_DB_ENV.PAIDEIA_TEST_DB_URL ?? ''
+const DB_USER = process.env.PAIDEIA_TEST_DB_USER ?? LOCAL_DB_ENV.PAIDEIA_TEST_DB_USER ?? 'paideia_e2e'
+const DB_PASSWORD = process.env.PAIDEIA_TEST_DB_PASSWORD ?? LOCAL_DB_ENV.PAIDEIA_TEST_DB_PASSWORD ?? ''
+
+// 要起本地后端却拿不到库连接时，在**读配置**这一步就说清楚，别等 Spring 起不来再猜。
+if (REMOTE_BASE_URL === undefined && process.env.PWA_BASE_URL === undefined && DB_URL === '') {
+  throw new Error(
+    '缺少测试库连接：backend/config/remote-db.local.env 不存在。请找回该文件，或先 `source` 它再跑。',
+  )
+}
 
 export default defineConfig({
   /**
@@ -80,16 +120,16 @@ export default defineConfig({
       : [
     {
       /**
-       * 用 local profile 启动后端：应用现在必须有数据源才能起来，
-       * 而数据源连接信息在被 gitignore 的 backend/config/application-local.yml 里（指向本机 3307 隧道）。
-       * 因此 e2e 的前置条件是那条 SSH 隧道是通的。
+       * 用 local profile 启动后端：应用必须有数据源才能起来，而数据源**由下面的 env 覆盖**，
+       * 不读 `application-local.yml`（那份是本地开发用的）。2026-11-11 起测试库在服务器上、
+       * 公网 3306 可直连，再也没有本机 3307 隧道这个前置条件（地址只在被忽略的 env 文件里）。
        */
       command: `java -jar ${BACKEND_JAR} --spring.profiles.active=local --server.port=${BACKEND_PORT}`,
       // 必须在 backend 目录启动：Spring Boot 从工作目录读 ./config/ 下的本地配置
       cwd: BACKEND_DIR,
       /**
        * 两处覆盖，环境变量优先级高于 ./config/application-local.yml 里的配置：
-       * ① 数据源指向 paideia_test —— 端到端测试会注册账号、造登录记录，
+       * ① 数据源指向专用的 paideia_e2e —— 端到端测试会注册账号、造登录记录，
        *    不该写进开发用的 paideia 库；
        * ② 额外加载 db/devdata —— 种子账号（seed-learner / seed-admin）在那里，
        *    它**不在**任何 profile 的默认迁移目录里，只有这里显式加上才会执行。
@@ -98,20 +138,16 @@ export default defineConfig({
         // forceConnectionTimeZoneToSession 与 connectionTimeZone 必须成对（服务器 MySQL 会话是 +08:00）：
         // 少了它，建表默认值写进去的是本地钟点，而驱动按 UTC 解释，时间整体快 8 小时。
         /**
-         * 数据库优先取环境变量（`source backend/config/remote-db.local.env` 后就有）：
-         * 本机 MySQL 与服务器测试库都写在这一个文件里，切换时不必改代码。
-         * 没设时才退回到下面写死的默认值。
+         * 连接信息优先取环境变量，其次取 `backend/config/remote-db.local.env`（见文件顶部
+         * `localDbEnv`）：那份文件是"测试库在哪"的唯一来源，改库只改它。
          */
-        SPRING_DATASOURCE_URL:
-          process.env.PAIDEIA_TEST_DB_URL ??
-          'jdbc:mysql://36.212.5.130:3306/paideia_test?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=utf8',
-          // 直连服务器 MySQL（2026-10-16 起）：3306 已对外开放，**不再需要本地 3307 隧道**。
-          // 账号只授权 paideia_test.*（生产库 paideia 没有任何可远程登录的账号）；
-          // 口令只从环境变量来：先 `source backend/config/remote-db.local.env` 再跑 e2e。
-          SPRING_DATASOURCE_USERNAME: process.env.PAIDEIA_TEST_DB_USER ?? 'paideia_test',
-          SPRING_DATASOURCE_PASSWORD: process.env.PAIDEIA_TEST_DB_PASSWORD ?? '',
+        // 全仓库只用一个专用测试库 `paideia_e2e`（账号只授权该库；生产库 paideia
+        // 没有任何可远程登录的账号），口令只存在于被 gitignore 的那份 env 文件里。
+        SPRING_DATASOURCE_URL: DB_URL,
+        SPRING_DATASOURCE_USERNAME: DB_USER,
+        SPRING_DATASOURCE_PASSWORD: DB_PASSWORD,
         SPRING_FLYWAY_LOCATIONS: 'classpath:db/migration,classpath:db/devdata',
-        // paideia_test 被三种迁移配置共用（见 backend 的 application-test.yml 注释）：
+        // paideia_e2e 被三种迁移配置共用（见 backend 的 application-test.yml 注释）：
         // 夹具用的 V900 会出现在这个库里，而本次 locations 不含 db/testdata，
         // 不忽略它就会被判成"已应用但本地找不到"而起不来。
         SPRING_FLYWAY_IGNORE_MIGRATION_PATTERNS: '*:future,*:missing',
@@ -126,7 +162,9 @@ export default defineConfig({
       // java 子进程漏在 8080，本轮复用它、连的是已删库，表现为"登录后停在登录页"）。
       // 端口被占就让 Playwright 直接报错——跑之前先 `netstat -ano | grep :8080`。
       reuseExistingServer: false,
-      timeout: 120_000,
+      // 空库首启要跑完 migration + devdata，而库在公网（单条查询 ~36ms），实测建库那一次
+      // 120 秒不够。之后库已迁移好，启动只需几秒——这里给的是上限，不是常态等待。
+      timeout: 300_000,
     },
     {
       // 端口由 vite.config.ts 读 PAIDEIA_APP_PORT 决定，这里不必再传 --port

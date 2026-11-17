@@ -13,8 +13,8 @@
 #   scripts/test-db.sh --keep mvn -B test               # 跑完保留库（排查失败时用）
 #   scripts/test-db.sh --drop paideia_run_1018194500_65184
 #
-# 前置：凭据在被忽略的 backend/config/remote-db.local.env 里（默认指本机 MySQL）。
-# 只支持本机库：远程账号只被授权 paideia_test.*，建不了新库。
+# 前置：凭据在被忽略的 backend/config/remote-db.local.env 里（默认指服务器上的 paideia_e2e）。
+# 本机库会派生独占库；远程库不会（账号只被授权一个库），因此**两轮测试不能同时跑**。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -62,23 +62,24 @@ if [[ "${1:-}" == "--keep" ]]; then KEEP=1; shift; fi
 load_env
 : "${PAIDEIA_TEST_DB_URL:?还没配置 PAIDEIA_TEST_DB_URL（source backend/config/remote-db.local.env）}"
 
-# 只在本机派生新库名：远程账号的授权范围就是 paideia_test 一个库。
+# 本机库才派生独占库名；远程测试库（2026-11-11 起的默认）账号只有 paideia_e2e 一个库的
+# 权限，建不了新库，所以直接共用库上跑，并把"必须串行"这件事说清楚。
+RUN_DB=""
 case "$PAIDEIA_TEST_DB_URL" in
-  *//127.0.0.1:*|*//localhost:*) ;;
-  *) echo "拒绝：PAIDEIA_TEST_DB_URL 指向的不是本机（$(echo "$PAIDEIA_TEST_DB_URL" | sed -E 's#(jdbc:mysql://[^/]+).*#\1#')）。" >&2
-     echo "远程测试账号只被授权 paideia_test.*，建不了新库；请改用本机库再跑。" >&2
-     exit 2 ;;
+  *//127.0.0.1:*|*//localhost:*)
+    RUN_DB="paideia_run_$(date +%m%d%H%M%S)_$$"
+    URL_NO_QUERY="${PAIDEIA_TEST_DB_URL%%\?*}"
+    QUERY="${PAIDEIA_TEST_DB_URL#*\?}"
+    [[ "$QUERY" == "$PAIDEIA_TEST_DB_URL" ]] && QUERY=""   # 原 URL 没有查询串
+    PREFIX="${URL_NO_QUERY%/*}"
+    export PAIDEIA_TEST_DB_URL="${PREFIX}/${RUN_DB}?${QUERY:+$QUERY&}createDatabaseIfNotExist=true"
+    echo "[test-db] 本次独占库：$RUN_DB"
+    ;;
+  *)
+    echo "[test-db] 远程库 $(echo "$PAIDEIA_TEST_DB_URL" | sed -E 's#(//[^/]+/)[^?]+#\1<db>#')：不派生独占库，直接在共用库上跑。"
+    echo "[test-db] 同一时刻只跑一轮：共用库会被彼此的测试删数据，单类全绿、全量跑红那种红不算证据。"
+    ;;
 esac
-
-DB="paideia_run_$(date +%m%d%H%M%S)_$$"
-URL_NO_QUERY="${PAIDEIA_TEST_DB_URL%%\?*}"
-QUERY="${PAIDEIA_TEST_DB_URL#*\?}"
-[[ "$QUERY" == "$PAIDEIA_TEST_DB_URL" ]] && QUERY=""   # 原 URL 没有查询串
-PREFIX="${URL_NO_QUERY%/*}"
-export PAIDEIA_TEST_DB_URL="${PREFIX}/${DB}?${QUERY:+$QUERY&}createDatabaseIfNotExist=true"
-
-echo "[test-db] 本次独占库：$DB"
-echo "[test-db] URL：$(echo "$PAIDEIA_TEST_DB_URL" | sed -E 's#(//[^/]+/)[^?]+#\1<db>#')"
 
 if [[ $# -eq 0 ]]; then
   cd "$ROOT/backend"
@@ -88,9 +89,11 @@ fi
 status=0
 "$@" || status=$?
 
-if [[ $status -eq 0 && $KEEP -eq 0 ]]; then
-  "$0" --drop "$DB" || true
-else
-  echo "[test-db] 库保留，排查用：$0 --drop $DB"
+if [[ -n "$RUN_DB" ]]; then
+  if [[ $status -eq 0 && $KEEP -eq 0 ]]; then
+    "$0" --drop "$RUN_DB" || true
+  else
+    echo "[test-db] 库保留，排查用：$0 --drop $RUN_DB"
+  fi
 fi
 exit $status

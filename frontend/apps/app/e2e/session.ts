@@ -28,7 +28,12 @@ export async function signIn(page: Page): Promise<void> {
   await identifier.fill(LEARNER.identifier)
   await page.getByTestId('login-password').fill(LEARNER.password)
   await page.getByTestId('login-submit').click()
-  await expect(page.getByTestId('login-submit')).toHaveCount(0)
+  /**
+   * 等表单卸载（登录成功即卸载）。默认 5 秒留给**本机库**是够的，而现在的测试库在公网
+ * （服务器上的测试库，单条查询 ~36ms），冷启动那一次 bcrypt 校验 + 首轮查询实测会超过 5 秒——
+   * 2026-11-11 换成公网库后就在这里偶发红。这里等的是"条件达成"，放宽上限不降低判定强度。
+   */
+  await expect(page.getByTestId('login-submit')).toHaveCount(0, { timeout: 30_000 })
   // 登录成功后 `LoginPage` 还会 `navigate('/')` 一次。等它落地再返回，否则调用方紧接着的
   // 深链 `goto` 会被这次跳转覆盖回首页——2026-10-17 整套跑里偶发落到首页、单跑不复现。
   await expect(page).toHaveURL(/#\/$/)

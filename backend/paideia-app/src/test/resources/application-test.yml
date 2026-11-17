@@ -1,6 +1,8 @@
 spring:
   datasource:
-    # 默认指向本机 3307 的 SSH 隧道（服务器上的 paideia_test）。凭据只从环境变量读取。
+    # 测试库连接**只从环境变量读**（跑测试前 `source backend/config/remote-db.local.env`）：
+    # 2026-11-11 起全仓库的后端测试与 e2e 共用服务器上那一个专用库，地址/库名/账号/口令都只写在
+    # 那份被忽略的文件里，源码里不写死。下面只是本机 MySQL 的兜底值，没配环境变量时会连它。
     #
     # **`forceConnectionTimeZoneToSession=true` 不能删**（2026-10-10 实测补上）：服务器 MySQL 的
     # 会话时区是 `SYSTEM`（+08:00）且没有装载时区表（`SET time_zone='UTC'` 直接报 1298），
@@ -8,8 +10,8 @@ spring:
     # 于是建表默认值 `CURRENT_TIMESTAMP(3)` 写进去的是**本地钟点**，驱动又按 UTC 转成 `Instant`，
     # 接口返回的时间就比真实时刻快 8 小时。加上它之后驱动会把会话也设成 UTC（它会自己折算成
     # `+00:00` 的偏移形式，所以没有时区表也能用）。
-    url: ${PAIDEIA_TEST_DB_URL:jdbc:mysql://127.0.0.1:3307/paideia_test?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=utf8}
-    username: ${PAIDEIA_TEST_DB_USER:paideia}
+    url: ${PAIDEIA_TEST_DB_URL:jdbc:mysql://127.0.0.1:3306/paideia_test?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=utf8}
+    username: ${PAIDEIA_TEST_DB_USER:paideia_e2e}
     password: ${PAIDEIA_TEST_DB_PASSWORD:}
     hikari:
       # **每个 Spring 上下文各有一个连接池**，而 Spring 的测试上下文缓存会同时保留多个
@@ -36,7 +38,7 @@ spring:
     # validateOnMigrate 会直接拒绝并让整个测试上下文起不来——**每加一个生产迁移都会复发**。
     # 只在测试 profile 放开；生产迁移自身仍按版本顺序演进，不因此变得随意。
     out-of-order: true
-    # paideia_test 这个库被**三种迁移配置**共用：
+    # paideia_e2e 这个库被**三种迁移配置**共用：
     #   ① 本 profile：db/migration + db/testdata
     #   ② 端到端测试的后端：db/migration + db/devdata
     #   ③ paideia-persistence 的集成测试：只有 db/testdata

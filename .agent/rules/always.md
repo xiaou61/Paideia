@@ -34,7 +34,7 @@ Paideia 是「千人千面的 AI 个性化学习平台」。目标不是把同�
 - **中间件与部署自托管在自有服务器**（2026-10-09 用户决定）：RabbitMQ 等中间件与后续部署都放在自有服务器上；部署细节本期不考虑。服务器地址与凭据属敏感信息，一律不进仓库。
 - **数据库端口的实际状态（2026-10-16 更新：已对公网开放）**：用户要求去掉隧道，于是按本条原有的路径做了——改 `bind-address = 0.0.0.0`（重启 mysql）**并同步账号的 host 限制**：
   - **只新建了一个 `paideia_test@'%'`，且只授权 `paideia_test.*`**。生产/开发库 `paideia` **没有任何可远程登录的账号**（原先只有 `paideia@127.0.0.1` 与 `paideia@localhost`，这次一个都没改）——所以开了端口也没有能连上生产库的凭据路径。
-  - 走公网的只有**测试**：`source backend/config/remote-db.local.env`（匹配 `.gitignore` 的 `*.local.*`，不入库）后再跑 `mvn -B test` 与 e2e；两个 playwright 配置的默认 JDBC 也已改成 `36.212.5.130:3306`。
+  - 走公网的只有**测试**：`source backend/config/remote-db.local.env`（匹配 `.gitignore` 的 `*.local.*`，不入库）后再跑 `mvn -B test` 与 e2e；两个 playwright 配置都从那份文件读 JDBC（源码里不留地址）。
   - **仍然要求**：凭据只存在于被忽略的本地文件；口令不进命令行（用 stdin 传 SQL）；MySQL 的 X 协议端口 33060 保持只监听 127.0.0.1。
   - **关闭 / 回滚**：`bind-address` 改回 `127.0.0.1` + `systemctl restart mysql`；配置备份在服务器 `/etc/mysql/mysql.conf.d/mysqld.cnf.bak-2026-10-16`。若要收窄，把 `paideia_test@'%'` 换成 `@'<固定出口IP>'`。
   - **已知风险**：3306 现在公网可达，扫描器会持续戳它。当前唯一能连的是那个**只碰得到 `paideia_test`** 的账号（密码 32 位随机），但"测试库被写坏"是可能的——那正是它被写坏的用途。若将来要让**本地跑应用连开发库**（`paideia`），那等于把生产库账号暴露到公网，**先单独确认**。
@@ -78,7 +78,6 @@ Paideia 是「千人千面的 AI 个性化学习平台」。目标不是把同�
   - 桌面端：`cd frontend && pnpm -w build:desktop`。**必须同时设置两个镜像**，否则 electron-builder 会去 GitHub 拉二进制并超时（本网络下实测）：
     `ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/" ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder-binaries" pnpm -w build:desktop`
     只设 `ELECTRON_BUILDER_BINARIES_MIRROR` 不够：Electron 运行时走的是 `ELECTRON_MIRROR`。
-  - 新增源码后如创建了新的跨文件引用，需重建 `.codegraph` 索引再依赖调用关系结论。
   - **本机网络**：git 访问 github.com 必须走本机 Clash 代理（mixed-port `7897`，TUN 关闭）。未配置时代码直连 GitHub，表现为推送时通时不通；已用 `git config --global http.https://github.com/.proxy` 固化。推送失败时先确认代理端口是否变化，不要反复重试。
 - **本地开发直连自有服务器上的 MySQL 实例**（2026-10-09 用户决定），不用本地容器起实例；连接信息放被忽略的本地配置文件，不进仓库。
 - 涉及学习者个人数据的功能，必须先明确数据隔离、留存与隐私要求，再进入设计（待决定项见 WORK-001 需求文档）。

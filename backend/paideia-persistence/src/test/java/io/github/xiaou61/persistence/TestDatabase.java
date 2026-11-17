@@ -9,7 +9,9 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
  *
  * <p>连接信息只从环境变量读取，仓库里不放任何凭据：
  * {@code PAIDEIA_TEST_DB_URL}、{@code PAIDEIA_TEST_DB_USER}、{@code PAIDEIA_TEST_DB_PASSWORD}。
- * 默认 URL 指向本机 {@code 127.0.0.1:3307} 的 SSH 隧道（服务器上的 {@code paideia_test}）。
+ * 默认 URL 指向本机 MySQL 的 {@code paideia_test}；服务器上的测试库（地址、库名、账号与
+ * 口令都只在被忽略的 {@code backend/config/remote-db.local.env} 里）通过
+ * {@code PAIDEIA_TEST_DB_URL} 传进来，源码里不写死任何一项。
  *
  * <p>没有配置口令时调用方应跳过测试并如实报告为未运行，而不是让整个构建红掉。
  *
@@ -24,7 +26,7 @@ final class TestDatabase {
     static final String PASSWORD_ENV = "PAIDEIA_TEST_DB_PASSWORD";
 
     private static final String DEFAULT_URL =
-            "jdbc:mysql://127.0.0.1:3307/paideia_test"
+            "jdbc:mysql://127.0.0.1:3306/paideia_test"
                     + "?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC"
                     + "&forceConnectionTimeZoneToSession=true&characterEncoding=utf8";
     private static final String DEFAULT_USER = "paideia";
