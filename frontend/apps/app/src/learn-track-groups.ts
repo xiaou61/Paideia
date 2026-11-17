@@ -78,7 +78,7 @@ export const TRACK_GROUPS: TrackGroupDef[] = [
     key: 'ai',
     label: 'AI 与智能体',
     hint: '大模型原理、智能体设计，以及 DSH 的插件化底盘。',
-    slugs: ['ai', 'agents'],
+    slugs: ['ai', 'agents', 'agent-memory'],
   },
   {
     key: 'source',

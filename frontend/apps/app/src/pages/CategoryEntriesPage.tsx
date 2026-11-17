@@ -1,7 +1,13 @@
-import { createKnowledgeApi, fetchAllEntries, findCategoryPath, plainText, type CategoryNode } from '@paideia/knowledge'
+import {
+  createKnowledgeApi,
+  createLearningApi,
+  fetchAllEntries,
+  findCategoryPath,
+  plainText,
+  type CategoryNode,
+} from '@paideia/knowledge'
 import {
   AppShell,
-  Badge,
   Button,
   Empty,
   EmptyContent,
@@ -22,8 +28,10 @@ import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
 import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { EntryListSkeleton } from '../components/skeletons'
+import { OTHER_GROUP, TRACK_GROUPS, groupKeyOf } from '../learn-track-groups'
 
 const knowledge = createKnowledgeApi(api)
+const learning = createLearningApi(api)
 
 /**
  * 卡片/列表摘要（2026-11-11）。
@@ -47,6 +55,23 @@ function cardExcerpt(excerpt: string | null, title: string): string {
 interface FlatCategory {
   node: CategoryNode
   depth: number
+}
+
+/** 左栏某一段里的小分组（学习轨道按主题分、精读按书/源码分）。 */
+interface RailGroup {
+  key: string
+  label: string
+  items: CategoryNode[]
+}
+
+/** 左栏的三段：学习轨道 / 求职面经 / 精读·书籍·其他。 */
+interface RailSection {
+  key: string
+  label: string
+  hint: string
+  items: CategoryNode[]
+  groups: RailGroup[]
+  defaultOpen: boolean
 }
 
 /**
@@ -199,6 +224,128 @@ export function CategoryEntriesPage() {
     return out
   }, [categories.data])
 
+  /**
+   * 学习轨道的真实集合（2026-11-17）。
+   *
+   * <p>分类表里的 `line_kind` 有历史漏标（操作系统 / 算法 / 人工智能 / 开源项目简讲 4 条明明是轨道
+   * 却是 null），所以「是不是轨道」以 `/learn/tracks` 的 slug 为准，不依赖 `line_kind`。
+   * 拿不到时退回 `line_kind`，只是短暂过渡，不会把行弄丢。
+   */
+  const tracks = useQuery({
+    queryKey: ['learn-tracks'],
+    queryFn: () => learning.tracks(),
+    staleTime: 5 * 60 * 1000,
+  })
+
+  /**
+   * 左栏的三段式结构（2026-11-17）：学习轨道 / 求职面经 / 精读·书籍·其他。
+   *
+   * <p>原来左栏把 53 个分类按树一口气平铺，轨道、面经、书籍、源码、遗留重复全混在一起，
+   * 用户看不出"哪些是能按关卡学的、哪些只是长文"。这里只做**呈现层**的重新归类，不动任何数据：
+   *
+   * <ul>
+   *   <li><b>学习轨道</b>：真轨道（40 条）按主题分组，默认折叠——它是「从零开始」的镜像入口，不是主浏览目标；</li>
+   *   <li><b>求职面经</b>：名里带面经 / 面试 / 八股 的分类；</li>
+   *   <li><b>精读·书籍·其他</b>：书籍详解、源码精读，以及剩下独立成篇的分类。</li>
+   * </ul>
+   *
+   * <p>纯容器（有子分类、自身没有独立条目）不再占一行——它们的子项已经各自出现在对应段里。
+   */
+  const railSections = useMemo<RailSection[]>(() => {
+    const trackSlugs = new Set((tracks.data ?? []).map((track) => track.slug))
+    const isTrack = (node: CategoryNode): boolean =>
+      trackSlugs.size > 0 ? trackSlugs.has(node.slug) : Boolean(node.lineKind)
+
+    const trackItems: CategoryNode[] = []
+    const interviewItems: CategoryNode[] = []
+    const readingByParent = new Map<string, CategoryNode[]>()
+
+    const walk = (nodes: CategoryNode[], parentLabel: string | null) => {
+      for (const node of nodes) {
+        if (isTrack(node)) {
+          trackItems.push(node)
+          continue
+        }
+        // 纯容器：不占行，直接展开子项（子项会按各自属性落到对应段）
+        if (node.children.length > 0) {
+          walk(node.children, node.name)
+          continue
+        }
+        if (/面经|面试|八股/.test(node.name)) {
+          interviewItems.push(node)
+        } else {
+          const key = parentLabel ?? '其他'
+          const bucket = readingByParent.get(key) ?? []
+          bucket.push(node)
+          readingByParent.set(key, bucket)
+        }
+      }
+    }
+    walk(categories.data ?? [], null)
+
+    const trackByGroup = new Map<string, CategoryNode[]>()
+    for (const node of trackItems) {
+      const key = groupKeyOf(node.slug)
+      const bucket = trackByGroup.get(key) ?? []
+      bucket.push(node)
+      trackByGroup.set(key, bucket)
+    }
+    const trackGroups: RailGroup[] = []
+    for (const def of TRACK_GROUPS) {
+      const items = trackByGroup.get(def.key)
+      if (items && items.length > 0) {
+        // 主题内按编辑顺序（def.slugs）排，避免服务端返回顺序带来的忽前忽后
+        items.sort((a, b) => def.slugs.indexOf(a.slug) - def.slugs.indexOf(b.slug))
+        trackGroups.push({ key: def.key, label: def.label, items })
+      }
+    }
+    const otherTracks = trackByGroup.get(OTHER_GROUP.key)
+    if (otherTracks && otherTracks.length > 0) {
+      trackGroups.push({ key: OTHER_GROUP.key, label: OTHER_GROUP.label, items: otherTracks })
+    }
+
+    const readingItems = Array.from(readingByParent.values()).flat()
+    const preferredParents = ['书籍详解', '源码精读']
+    const readingGroups: RailGroup[] = []
+    for (const label of preferredParents) {
+      const items = readingByParent.get(label)
+      if (items && items.length > 0) readingGroups.push({ key: label, label, items })
+    }
+    // 其余非轨道叶子统一收进「其他」——不把它们的父容器名（如「计算机基础」）搬过来，
+    // 免得和上面「学习轨道」里的同名主题混淆（例如遗留的重复分类「计算机网络」）。
+    const restReading = Array.from(readingByParent.entries())
+      .filter(([label]) => !preferredParents.includes(label))
+      .flatMap(([, items]) => items)
+    if (restReading.length > 0) readingGroups.push({ key: 'other-reading', label: '其他', items: restReading })
+
+    return [
+      {
+        key: 'track',
+        label: '学习轨道',
+        hint: '带导读与关卡，可在「从零开始」按顺序学',
+        items: trackItems,
+        groups: trackGroups,
+        defaultOpen: false,
+      },
+      {
+        key: 'interview',
+        label: '求职面经',
+        hint: '八股与面试真题',
+        items: interviewItems,
+        groups: interviewItems.length > 0 ? [{ key: 'interview', label: '', items: interviewItems }] : [],
+        defaultOpen: true,
+      },
+      {
+        key: 'reading',
+        label: '精读 · 书籍 · 其他',
+        hint: '书籍精读与独立长文',
+        items: readingItems,
+        groups: readingGroups,
+        defaultOpen: true,
+      },
+    ]
+  }, [categories.data, tracks.data])
+
   const items = entries.data?.items ?? []
   const total = entries.data?.total ?? 0
   const truncated = entries.isSuccess && items.length < total
@@ -243,7 +390,7 @@ export function CategoryEntriesPage() {
       <div className="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
         {/* ── 左栏：分类目录（桌面常驻；窄屏换成下面的横向标签） ───────────────── */}
         <CategoryRail
-          flat={flat}
+          sections={railSections}
           counts={categoryCounts}
           readCounts={categoryReadCounts}
           totalRead={viewed.data?.length ?? 0}
@@ -451,11 +598,15 @@ export function CategoryEntriesPage() {
  * <p>做成链接而不是按钮，是为了保住深链接与后退：`/knowledge/categories/12` 可以发给别人，
  * 刷新、后退都落到同一页。前端切换看着快，但地址栏不动，用户"回到上一个分类"只能靠记忆。
  *
+ * <p>2026-11-17 起左栏分三段（学习轨道 / 求职面经 / 精读·书籍·其他），不再把 53 个分类
+ * 一口气平铺。段标题是可折叠按钮（非链接），所以 `category-grid` 里的第一个 `<a>` 仍是真实分类，
+ * 保住既有 e2e「点第一个分类」的语义。
+ *
  * <p>窄屏不渲染（父组件用 `hidden md:block` 藏掉），换成顶部横向标签——240px 的侧栏在手机上
  * 会把正文挤没。
  */
 function CategoryRail({
-  flat,
+  sections,
   counts,
   readCounts,
   totalRead,
@@ -465,7 +616,7 @@ function CategoryRail({
   loading,
   className,
 }: {
-  flat: FlatCategory[]
+  sections: RailSection[]
   counts: Map<number, number>
   readCounts: Map<number, number>
   totalRead: number
@@ -476,7 +627,47 @@ function CategoryRail({
   className?: string
 }) {
   const [filter, setFilter] = useState('')
-  const shown = filter.trim() === '' ? flat : flat.filter(({ node }) => node.name.includes(filter.trim()))
+  const [closed, setClosed] = useState<Record<string, boolean>>({})
+  const isOpen = (section: RailSection) =>
+    closed[section.key] === undefined ? section.defaultOpen : !closed[section.key]
+  const toggle = (section: RailSection) =>
+    setClosed((prev) => ({ ...prev, [section.key]: isOpen(section) }))
+
+  const keyword = filter.trim()
+  const flatAll = useMemo(() => sections.flatMap((section) => section.items), [sections])
+  const matched = useMemo(
+    () => (keyword === '' ? [] : flatAll.filter((node) => node.name.includes(keyword))),
+    [flatAll, keyword],
+  )
+
+  const renderRow = (node: CategoryNode) => {
+    const active = node.id === scopedId
+    const total = counts.get(node.id) ?? 0
+    const read = readCounts.get(node.id) ?? 0
+    return (
+      <li key={node.id}>
+        <Link
+          to={`/knowledge/categories/${node.id}`}
+          data-testid={`category-card-${node.id}`}
+          title={node.name}
+          className={
+            'flex items-center justify-between gap-2 rounded-lg py-2 pr-3 pl-3 text-sm transition-colors ' +
+            (active ? 'bg-primary/10 text-primary font-medium' : 'text-foreground hover:bg-accent/50')
+          }
+        >
+          <span className="min-w-0 truncate">{node.name}</span>
+          <span
+            className="text-muted-foreground shrink-0 text-xs tabular-nums"
+            title={countsReady ? `已读 ${read} / 共 ${total}` : undefined}
+          >
+            {/* 只显示「已读/总数」；空分类写一个 0 —— 「0/0」是噪音 */}
+            {countsReady ? (total === 0 ? '0' : `${read}/${total}`) : ''}
+          </span>
+        </Link>
+      </li>
+    )
+  }
+
   return (
     <aside className={className}>
       <div className="md:sticky md:top-20">
@@ -523,55 +714,50 @@ function CategoryRail({
               </span>
             </Link>
             <ul className="space-y-0.5" data-testid="category-grid">
-            {shown.map(({ node, depth }) => {
-              const active = node.id === scopedId
-              return (
-                <li key={node.id}>
-                  <Link
-                    to={`/knowledge/categories/${node.id}`}
-                    data-testid={`category-card-${node.id}`}
-                    title={node.name}
-                    className={
-                      'flex items-center justify-between gap-2 rounded-lg py-2 pr-3 text-sm transition-colors ' +
-                      (active
-                        ? 'bg-primary/10 text-primary font-medium'
-                        : 'text-foreground hover:bg-accent/50')
-                    }
-                    style={{ paddingLeft: `${12 + depth * 12}px` }}
-                  >
-                    <span className="min-w-0 truncate">{node.name}</span>
-                    <span className="flex shrink-0 items-center gap-1">
-                      {node.lineKind ? (
-                        <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
-                          轨道
-                        </Badge>
-                      ) : null}
-                      <span
-                        className="text-muted-foreground text-xs tabular-nums"
-                        title={
-                          countsReady
-                            ? `已读 ${readCounts.get(node.id) ?? 0} / 共 ${counts.get(node.id) ?? 0}`
-                            : undefined
-                        }
+              {keyword !== '' ? (
+                <>
+                  {matched.map(renderRow)}
+                  {matched.length === 0 ? (
+                    <li className="text-muted-foreground px-3 py-2 text-xs">没有匹配的分类</li>
+                  ) : null}
+                </>
+              ) : (
+                sections.map((section) => {
+                  const open = isOpen(section)
+                  return (
+                    <li key={section.key} className={section.key === 'track' ? '' : 'mt-2'}>
+                      <button
+                        type="button"
+                        onClick={() => toggle(section)}
+                        aria-expanded={open}
+                        title={section.hint}
+                        data-testid={`rail-section-${section.key}`}
+                        className="text-muted-foreground hover:text-foreground focus-ring flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium"
                       >
-                        {/*
-                          只显示「已读/总数」；分类为空时写一个 0 —— 「0/0」是噪音，
-                          读者要的是"这个分类里有多少还没看"。
-                        */}
-                        {countsReady
-                          ? (counts.get(node.id) ?? 0) === 0
-                            ? '0'
-                            : `${readCounts.get(node.id) ?? 0}/${counts.get(node.id) ?? 0}`
-                          : ''}
-                      </span>
-                    </span>
-                  </Link>
-                </li>
-              )
-            })}
-            {shown.length === 0 ? (
-              <li className="text-muted-foreground px-3 py-2 text-xs">没有匹配的分类</li>
-            ) : null}
+                        <ChevronRight
+                          className={
+                            'size-3.5 shrink-0 transition-transform ' + (open ? 'rotate-90' : '')
+                          }
+                        />
+                        <span className="truncate">{section.label}</span>
+                        <span className="ml-auto tabular-nums opacity-70">{section.items.length}</span>
+                      </button>
+                      {open
+                        ? section.groups.map((group) => (
+                            <div key={group.key} className="mt-0.5">
+                              {group.label === '' ? null : (
+                                <p className="text-muted-foreground/80 px-3 pt-1 pb-0.5 text-[11px]">
+                                  {group.label}
+                                </p>
+                              )}
+                              <ul className="space-y-0.5">{group.items.map(renderRow)}</ul>
+                            </div>
+                          ))
+                        : null}
+                    </li>
+                  )
+                })
+              )}
             </ul>
           </>
         )}
