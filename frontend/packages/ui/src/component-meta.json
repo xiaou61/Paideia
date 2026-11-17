@@ -4,6 +4,11 @@
     "description": "应用外壳、页头与区块容器",
     "source": "layout/app-shell.tsx"
   },
+  "./brand/brand-mark": {
+    "category": "品牌",
+    "description": "品牌字标（圆角砖 + 几何 P，跟随主题反相）",
+    "source": "brand/brand-mark.tsx"
+  },
   "./components/alert": {
     "category": "反馈",
     "description": "内联提示条（信息 / 成功 / 警告 / 错误）",

@@ -3,13 +3,14 @@
 > 由 `pnpm ui:manifest` 从 `packages/ui/src/index.ts` 与 `packages/ui/src/component-meta.json` 生成。
 > 需改组件用途请编辑 `component-meta.json` 后重跑；CI 用 `pnpm ui:manifest:check` 防漂移。
 
-共 32 个模块、123 个组件/导出。
+共 33 个模块、124 个组件/导出。
 
 | 分类 | 导出 | 用途 | 源文件 |
 | --- | --- | --- | --- |
 | 布局 | `AppShell` | 应用外壳、页头与区块容器 | `layout/app-shell.tsx` |
 | 布局 | `PageHeader` | 应用外壳、页头与区块容器 | `layout/app-shell.tsx` |
 | 布局 | `Section` | 应用外壳、页头与区块容器 | `layout/app-shell.tsx` |
+| 品牌 | `BrandMark` | 品牌字标（圆角砖 + 几何 P，跟随主题反相） | `brand/brand-mark.tsx` |
 | 反馈 | `Alert` | 内联提示条（信息 / 成功 / 警告 / 错误） | `components/alert.tsx` |
 | 反馈 | `AlertAction` | 内联提示条（信息 / 成功 / 警告 / 错误） | `components/alert.tsx` |
 | 反馈 | `AlertDescription` | 内联提示条（信息 / 成功 / 警告 / 错误） | `components/alert.tsx` |

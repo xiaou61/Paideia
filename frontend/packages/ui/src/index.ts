@@ -11,6 +11,8 @@ export { COMPONENT_META, type ComponentMeta } from './component-meta'
 
 export { AppShell, PageHeader, Section } from './layout/app-shell'
 
+export { BrandMark } from './brand/brand-mark'
+
 export { Alert, AlertAction, AlertDescription, AlertTitle } from './components/alert'
 export { Badge, badgeVariants } from './components/badge'
 export { Button, buttonVariants } from './components/button'

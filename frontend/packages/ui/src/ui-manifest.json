@@ -1,6 +1,6 @@
 {
-  "moduleCount": 32,
-  "exportCount": 123,
+  "moduleCount": 33,
+  "exportCount": 124,
   "exports": [
     {
       "category": "布局",
@@ -19,6 +19,12 @@
       "name": "Section",
       "description": "应用外壳、页头与区块容器",
       "source": "layout/app-shell.tsx"
+    },
+    {
+      "category": "品牌",
+      "name": "BrandMark",
+      "description": "品牌字标（圆角砖 + 几何 P，跟随主题反相）",
+      "source": "brand/brand-mark.tsx"
     },
     {
       "category": "反馈",

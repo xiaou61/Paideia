@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 
 import { cn } from 'cn'
 
+import { BrandMark } from '../brand/brand-mark'
 import { ThemeToggle } from '../theme/theme-toggle'
 
 /**
@@ -49,12 +50,7 @@ export function AppShell({
 }) {
   const brand = (
     <>
-      <span
-        aria-hidden
-        className="from-primary to-primary/75 text-primary-foreground flex size-8 items-center justify-center rounded-lg bg-gradient-to-br text-sm font-bold"
-      >
-        {title.slice(0, 1).toUpperCase()}
-      </span>
+      <BrandMark size={32} />
       <span className="text-[0.9375rem] font-semibold tracking-tight">{title}</span>
       {subtitle === undefined ? null : (
         <span className="border-border text-muted-foreground hidden rounded-full border px-2 py-0.5 text-xs sm:inline-block">
@@ -119,9 +115,7 @@ export function AppShell({
 
       <footer className="border-border mt-8 border-t px-6 py-6">
         <div className="text-muted-foreground mx-auto flex w-full max-w-[86rem] flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-          <span className="bg-primary/10 text-primary flex size-5 items-center justify-center rounded text-[0.625rem] font-bold">
-            {title.slice(0, 1).toUpperCase()}
-          </span>
+          <BrandMark size={20} />
           <span>Paideia · 千人千面的 AI 个性化学习平台</span>
         </div>
       </footer>

@@ -1,4 +1,4 @@
-import { ThemeToggle } from '@paideia/ui'
+import { BrandMark, ThemeToggle } from '@paideia/ui'
 import {
   BarChart3,
   Boxes,
@@ -176,9 +176,7 @@ export function AdminShell({ actions, children }: { actions?: ReactNode; childre
           title="回到管理端首页"
           className="border-border hover:bg-accent/60 focus-visible:ring-ring/50 flex h-14 items-center gap-2.5 border-b px-3 transition-colors outline-none focus-visible:ring-3"
         >
-          <span className="bg-primary text-primary-foreground grid size-7 shrink-0 place-items-center rounded-md text-xs font-bold">
-            P
-          </span>
+          <BrandMark size={28} />
           <div className={`min-w-0 ${collapsed ? 'md:hidden' : ''}`}>
             <div className="truncate text-sm leading-tight font-semibold">Paideia</div>
             <div className="text-muted-foreground truncate text-[11px] leading-tight">管理端</div>
