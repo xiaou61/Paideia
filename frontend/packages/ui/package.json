@@ -7,7 +7,8 @@
     ".": "./src/index.ts",
     "./styles.css": "./src/styles/globals.css",
     "./vite": "./src/theme/vite-plugin.ts",
-    "./code-editor-theme": "./src/code-editor/theme.ts"
+    "./code-editor-theme": "./src/code-editor/theme.ts",
+    "./ui-manifest.json": "./src/ui-manifest.json"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

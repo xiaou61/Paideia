@@ -1,0 +1,744 @@
+{
+  "moduleCount": 32,
+  "exportCount": 123,
+  "exports": [
+    {
+      "category": "布局",
+      "name": "AppShell",
+      "description": "应用外壳、页头与区块容器",
+      "source": "layout/app-shell.tsx"
+    },
+    {
+      "category": "布局",
+      "name": "PageHeader",
+      "description": "应用外壳、页头与区块容器",
+      "source": "layout/app-shell.tsx"
+    },
+    {
+      "category": "布局",
+      "name": "Section",
+      "description": "应用外壳、页头与区块容器",
+      "source": "layout/app-shell.tsx"
+    },
+    {
+      "category": "反馈",
+      "name": "Alert",
+      "description": "内联提示条（信息 / 成功 / 警告 / 错误）",
+      "source": "components/alert.tsx"
+    },
+    {
+      "category": "反馈",
+      "name": "AlertAction",
+      "description": "内联提示条（信息 / 成功 / 警告 / 错误）",
+      "source": "components/alert.tsx"
+    },
+    {
+      "category": "反馈",
+      "name": "AlertDescription",
+      "description": "内联提示条（信息 / 成功 / 警告 / 错误）",
+      "source": "components/alert.tsx"
+    },
+    {
+      "category": "反馈",
+      "name": "AlertTitle",
+      "description": "内联提示条（信息 / 成功 / 警告 / 错误）",
+      "source": "components/alert.tsx"
+    },
+    {
+      "category": "基元",
+      "name": "Badge",
+      "description": "状态徽标",
+      "source": "components/badge.tsx"
+    },
+    {
+      "category": "基元",
+      "name": "badgeVariants",
+      "description": "状态徽标",
+      "source": "components/badge.tsx"
+    },
+    {
+      "category": "基元",
+      "name": "Button",
+      "description": "按钮",
+      "source": "components/button.tsx"
+    },
+    {
+      "category": "基元",
+      "name": "buttonVariants",
+      "description": "按钮",
+      "source": "components/button.tsx"
+    },
+    {
+      "category": "基元",
+      "name": "Card",
+      "description": "卡片容器与各分区",
+      "source": "components/card.tsx"
+    },
+    {
+      "category": "基元",
+      "name": "CardAction",
+      "description": "卡片容器与各分区",
+      "source": "components/card.tsx"
+    },
+    {
+      "category": "基元",
+      "name": "CardContent",
+      "description": "卡片容器与各分区",
+      "source": "components/card.tsx"
+    },
+    {
+      "category": "基元",
+      "name": "CardDescription",
+      "description": "卡片容器与各分区",
+      "source": "components/card.tsx"
+    },
+    {
+      "category": "基元",
+      "name": "CardFooter",
+      "description": "卡片容器与各分区",
+      "source": "components/card.tsx"
+    },
+    {
+      "category": "基元",
+      "name": "CardHeader",
+      "description": "卡片容器与各分区",
+      "source": "components/card.tsx"
+    },
+    {
+      "category": "基元",
+      "name": "CardTitle",
+      "description": "卡片容器与各分区",
+      "source": "components/card.tsx"
+    },
+    {
+      "category": "表单",
+      "name": "Checkbox",
+      "description": "复选框",
+      "source": "components/checkbox.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "Dialog",
+      "description": "模态对话框及其子部件",
+      "source": "components/dialog.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DialogClose",
+      "description": "模态对话框及其子部件",
+      "source": "components/dialog.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DialogContent",
+      "description": "模态对话框及其子部件",
+      "source": "components/dialog.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DialogDescription",
+      "description": "模态对话框及其子部件",
+      "source": "components/dialog.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DialogFooter",
+      "description": "模态对话框及其子部件",
+      "source": "components/dialog.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DialogHeader",
+      "description": "模态对话框及其子部件",
+      "source": "components/dialog.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DialogOverlay",
+      "description": "模态对话框及其子部件",
+      "source": "components/dialog.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DialogPortal",
+      "description": "模态对话框及其子部件",
+      "source": "components/dialog.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DialogTitle",
+      "description": "模态对话框及其子部件",
+      "source": "components/dialog.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DialogTrigger",
+      "description": "模态对话框及其子部件",
+      "source": "components/dialog.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DropdownMenu",
+      "description": "下拉菜单及其子部件",
+      "source": "components/dropdown-menu.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DropdownMenuCheckboxItem",
+      "description": "下拉菜单及其子部件",
+      "source": "components/dropdown-menu.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DropdownMenuContent",
+      "description": "下拉菜单及其子部件",
+      "source": "components/dropdown-menu.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DropdownMenuGroup",
+      "description": "下拉菜单及其子部件",
+      "source": "components/dropdown-menu.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DropdownMenuItem",
+      "description": "下拉菜单及其子部件",
+      "source": "components/dropdown-menu.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DropdownMenuLabel",
+      "description": "下拉菜单及其子部件",
+      "source": "components/dropdown-menu.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DropdownMenuPortal",
+      "description": "下拉菜单及其子部件",
+      "source": "components/dropdown-menu.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DropdownMenuRadioGroup",
+      "description": "下拉菜单及其子部件",
+      "source": "components/dropdown-menu.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DropdownMenuRadioItem",
+      "description": "下拉菜单及其子部件",
+      "source": "components/dropdown-menu.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DropdownMenuSeparator",
+      "description": "下拉菜单及其子部件",
+      "source": "components/dropdown-menu.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DropdownMenuShortcut",
+      "description": "下拉菜单及其子部件",
+      "source": "components/dropdown-menu.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DropdownMenuSub",
+      "description": "下拉菜单及其子部件",
+      "source": "components/dropdown-menu.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DropdownMenuSubContent",
+      "description": "下拉菜单及其子部件",
+      "source": "components/dropdown-menu.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DropdownMenuSubTrigger",
+      "description": "下拉菜单及其子部件",
+      "source": "components/dropdown-menu.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "DropdownMenuTrigger",
+      "description": "下拉菜单及其子部件",
+      "source": "components/dropdown-menu.tsx"
+    },
+    {
+      "category": "数据态",
+      "name": "Empty",
+      "description": "空状态占位",
+      "source": "components/empty.tsx"
+    },
+    {
+      "category": "数据态",
+      "name": "EmptyContent",
+      "description": "空状态占位",
+      "source": "components/empty.tsx"
+    },
+    {
+      "category": "数据态",
+      "name": "EmptyDescription",
+      "description": "空状态占位",
+      "source": "components/empty.tsx"
+    },
+    {
+      "category": "数据态",
+      "name": "EmptyHeader",
+      "description": "空状态占位",
+      "source": "components/empty.tsx"
+    },
+    {
+      "category": "数据态",
+      "name": "EmptyMedia",
+      "description": "空状态占位",
+      "source": "components/empty.tsx"
+    },
+    {
+      "category": "数据态",
+      "name": "EmptyTitle",
+      "description": "空状态占位",
+      "source": "components/empty.tsx"
+    },
+    {
+      "category": "表单",
+      "name": "Input",
+      "description": "单行文本输入",
+      "source": "components/input.tsx"
+    },
+    {
+      "category": "导航",
+      "name": "ListPagination",
+      "description": "列表分页控件",
+      "source": "components/pagination.tsx"
+    },
+    {
+      "category": "数据态",
+      "name": "ErrorAlert",
+      "description": "查询错误提示与加载行",
+      "source": "components/query-state.tsx"
+    },
+    {
+      "category": "数据态",
+      "name": "LoadingRow",
+      "description": "查询错误提示与加载行",
+      "source": "components/query-state.tsx"
+    },
+    {
+      "category": "表单",
+      "name": "Label",
+      "description": "表单标签",
+      "source": "components/label.tsx"
+    },
+    {
+      "category": "表单",
+      "name": "Select",
+      "description": "下拉选择及其子部件",
+      "source": "components/select.tsx"
+    },
+    {
+      "category": "表单",
+      "name": "SelectContent",
+      "description": "下拉选择及其子部件",
+      "source": "components/select.tsx"
+    },
+    {
+      "category": "表单",
+      "name": "SelectGroup",
+      "description": "下拉选择及其子部件",
+      "source": "components/select.tsx"
+    },
+    {
+      "category": "表单",
+      "name": "SelectItem",
+      "description": "下拉选择及其子部件",
+      "source": "components/select.tsx"
+    },
+    {
+      "category": "表单",
+      "name": "SelectLabel",
+      "description": "下拉选择及其子部件",
+      "source": "components/select.tsx"
+    },
+    {
+      "category": "表单",
+      "name": "SelectScrollDownButton",
+      "description": "下拉选择及其子部件",
+      "source": "components/select.tsx"
+    },
+    {
+      "category": "表单",
+      "name": "SelectScrollUpButton",
+      "description": "下拉选择及其子部件",
+      "source": "components/select.tsx"
+    },
+    {
+      "category": "表单",
+      "name": "SelectSeparator",
+      "description": "下拉选择及其子部件",
+      "source": "components/select.tsx"
+    },
+    {
+      "category": "表单",
+      "name": "SelectTrigger",
+      "description": "下拉选择及其子部件",
+      "source": "components/select.tsx"
+    },
+    {
+      "category": "表单",
+      "name": "SelectValue",
+      "description": "下拉选择及其子部件",
+      "source": "components/select.tsx"
+    },
+    {
+      "category": "基元",
+      "name": "Separator",
+      "description": "分隔线",
+      "source": "components/separator.tsx"
+    },
+    {
+      "category": "数据态",
+      "name": "Skeleton",
+      "description": "骨架屏占位",
+      "source": "components/skeleton.tsx"
+    },
+    {
+      "category": "反馈",
+      "name": "Toaster",
+      "description": "全局 Toast 通知容器",
+      "source": "components/sonner.tsx"
+    },
+    {
+      "category": "反馈",
+      "name": "toast",
+      "description": "toast() 能力，从 sonner 转出（应用无需自行依赖 sonner）",
+      "source": "sonner（外部包）"
+    },
+    {
+      "category": "反馈",
+      "name": "Spinner",
+      "description": "加载指示器",
+      "source": "components/spinner.tsx"
+    },
+    {
+      "category": "表单",
+      "name": "Switch",
+      "description": "开关",
+      "source": "components/switch.tsx"
+    },
+    {
+      "category": "数据展示",
+      "name": "Table",
+      "description": "表格及其子部件",
+      "source": "components/table.tsx"
+    },
+    {
+      "category": "数据展示",
+      "name": "TableBody",
+      "description": "表格及其子部件",
+      "source": "components/table.tsx"
+    },
+    {
+      "category": "数据展示",
+      "name": "TableCaption",
+      "description": "表格及其子部件",
+      "source": "components/table.tsx"
+    },
+    {
+      "category": "数据展示",
+      "name": "TableCell",
+      "description": "表格及其子部件",
+      "source": "components/table.tsx"
+    },
+    {
+      "category": "数据展示",
+      "name": "TableFooter",
+      "description": "表格及其子部件",
+      "source": "components/table.tsx"
+    },
+    {
+      "category": "数据展示",
+      "name": "TableHead",
+      "description": "表格及其子部件",
+      "source": "components/table.tsx"
+    },
+    {
+      "category": "数据展示",
+      "name": "TableHeader",
+      "description": "表格及其子部件",
+      "source": "components/table.tsx"
+    },
+    {
+      "category": "数据展示",
+      "name": "TableRow",
+      "description": "表格及其子部件",
+      "source": "components/table.tsx"
+    },
+    {
+      "category": "导航",
+      "name": "Tabs",
+      "description": "标签页切换",
+      "source": "components/tabs.tsx"
+    },
+    {
+      "category": "导航",
+      "name": "TabsContent",
+      "description": "标签页切换",
+      "source": "components/tabs.tsx"
+    },
+    {
+      "category": "导航",
+      "name": "TabsList",
+      "description": "标签页切换",
+      "source": "components/tabs.tsx"
+    },
+    {
+      "category": "导航",
+      "name": "TabsTrigger",
+      "description": "标签页切换",
+      "source": "components/tabs.tsx"
+    },
+    {
+      "category": "导航",
+      "name": "tabsListVariants",
+      "description": "标签页切换",
+      "source": "components/tabs.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "Tooltip",
+      "description": "工具提示",
+      "source": "components/tooltip.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "TooltipContent",
+      "description": "工具提示",
+      "source": "components/tooltip.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "TooltipProvider",
+      "description": "工具提示",
+      "source": "components/tooltip.tsx"
+    },
+    {
+      "category": "浮层",
+      "name": "TooltipTrigger",
+      "description": "工具提示",
+      "source": "components/tooltip.tsx"
+    },
+    {
+      "category": "Markdown",
+      "name": "Markdown",
+      "description": "Markdown 渲染的唯一实现（含预加载）",
+      "source": "markdown/markdown.tsx"
+    },
+    {
+      "category": "Markdown",
+      "name": "MarkdownLoading",
+      "description": "Markdown 渲染的唯一实现（含预加载）",
+      "source": "markdown/markdown.tsx"
+    },
+    {
+      "category": "Markdown",
+      "name": "preloadMarkdown",
+      "description": "Markdown 渲染的唯一实现（含预加载）",
+      "source": "markdown/markdown.tsx"
+    },
+    {
+      "category": "Markdown",
+      "name": "extractQuizzes",
+      "description": "从正文抽取 quiz 练习",
+      "source": "markdown/practice.ts"
+    },
+    {
+      "category": "Markdown",
+      "name": "documentRenderers",
+      "description": "源码解读 / 练习 / 图版等专用块与页级上下文",
+      "source": "markdown/renderers/index.ts"
+    },
+    {
+      "category": "Markdown",
+      "name": "QuizQuestionView",
+      "description": "源码解读 / 练习 / 图版等专用块与页级上下文",
+      "source": "markdown/renderers/index.ts"
+    },
+    {
+      "category": "Markdown",
+      "name": "SourceReadingProvider",
+      "description": "源码解读 / 练习 / 图版等专用块与页级上下文",
+      "source": "markdown/renderers/index.ts"
+    },
+    {
+      "category": "Markdown",
+      "name": "useSourceReading",
+      "description": "源码解读 / 练习 / 图版等专用块与页级上下文",
+      "source": "markdown/renderers/index.ts"
+    },
+    {
+      "category": "Markdown",
+      "name": "parseCodeTour",
+      "description": "源码解读 / 练习 / 图版等专用块与页级上下文",
+      "source": "markdown/renderers/index.ts"
+    },
+    {
+      "category": "Markdown",
+      "name": "parseCodeMap",
+      "description": "源码解读 / 练习 / 图版等专用块与页级上下文",
+      "source": "markdown/renderers/index.ts"
+    },
+    {
+      "category": "Markdown",
+      "name": "parseLearningPath",
+      "description": "源码解读 / 练习 / 图版等专用块与页级上下文",
+      "source": "markdown/renderers/index.ts"
+    },
+    {
+      "category": "Markdown",
+      "name": "parseCodeChallenge",
+      "description": "源码解读 / 练习 / 图版等专用块与页级上下文",
+      "source": "markdown/renderers/index.ts"
+    },
+    {
+      "category": "Markdown",
+      "name": "parseQuiz",
+      "description": "源码解读 / 练习 / 图版等专用块与页级上下文",
+      "source": "markdown/renderers/index.ts"
+    },
+    {
+      "category": "Markdown",
+      "name": "parseSourceWalk",
+      "description": "源码解读 / 练习 / 图版等专用块与页级上下文",
+      "source": "markdown/renderers/index.ts"
+    },
+    {
+      "category": "Markdown",
+      "name": "scoreQuiz",
+      "description": "源码解读 / 练习 / 图版等专用块与页级上下文",
+      "source": "markdown/renderers/index.ts"
+    },
+    {
+      "category": "Markdown",
+      "name": "visibleSteps",
+      "description": "源码解读 / 练习 / 图版等专用块与页级上下文",
+      "source": "markdown/renderers/index.ts"
+    },
+    {
+      "category": "Markdown",
+      "name": "walkDefaults",
+      "description": "源码解读 / 练习 / 图版等专用块与页级上下文",
+      "source": "markdown/renderers/index.ts"
+    },
+    {
+      "category": "Markdown",
+      "name": "walkPermalink",
+      "description": "源码解读 / 练习 / 图版等专用块与页级上下文",
+      "source": "markdown/renderers/index.ts"
+    },
+    {
+      "category": "Markdown",
+      "name": "permalinkOf",
+      "description": "源码解读 / 练习 / 图版等专用块与页级上下文",
+      "source": "markdown/renderers/index.ts"
+    },
+    {
+      "category": "主题",
+      "name": "isTheme",
+      "description": "主题键、存储键与类型",
+      "source": "theme/keys.ts"
+    },
+    {
+      "category": "主题",
+      "name": "THEME_KEY",
+      "description": "主题键、存储键与类型",
+      "source": "theme/keys.ts"
+    },
+    {
+      "category": "主题",
+      "name": "THEME_STORAGE_KEY",
+      "description": "主题键、存储键与类型",
+      "source": "theme/keys.ts"
+    },
+    {
+      "category": "主题",
+      "name": "DEFAULT_SKIN",
+      "description": "主题键、存储键与类型",
+      "source": "theme/keys.ts"
+    },
+    {
+      "category": "主题",
+      "name": "SKIN_KEY",
+      "description": "主题键、存储键与类型",
+      "source": "theme/keys.ts"
+    },
+    {
+      "category": "主题",
+      "name": "SKIN_STORAGE_KEY",
+      "description": "主题键、存储键与类型",
+      "source": "theme/keys.ts"
+    },
+    {
+      "category": "主题",
+      "name": "ThemeProvider",
+      "description": "ThemeProvider 与 useTheme（同时管明暗与皮肤）",
+      "source": "theme/theme-context.tsx"
+    },
+    {
+      "category": "主题",
+      "name": "useTheme",
+      "description": "ThemeProvider 与 useTheme（同时管明暗与皮肤）",
+      "source": "theme/theme-context.tsx"
+    },
+    {
+      "category": "主题",
+      "name": "ThemeToggle",
+      "description": "明暗切换按钮",
+      "source": "theme/theme-toggle.tsx"
+    },
+    {
+      "category": "主题",
+      "name": "isSkin",
+      "description": "皮肤注册表与查询",
+      "source": "theme/skins.ts"
+    },
+    {
+      "category": "主题",
+      "name": "skinById",
+      "description": "皮肤注册表与查询",
+      "source": "theme/skins.ts"
+    },
+    {
+      "category": "主题",
+      "name": "SKIN_FAMILIES",
+      "description": "皮肤注册表与查询",
+      "source": "theme/skins.ts"
+    },
+    {
+      "category": "主题",
+      "name": "SKINS",
+      "description": "皮肤注册表与查询",
+      "source": "theme/skins.ts"
+    },
+    {
+      "category": "主题",
+      "name": "SkinPicker",
+      "description": "皮肤选择器",
+      "source": "theme/theme-picker.tsx"
+    },
+    {
+      "category": "主题",
+      "name": "subscribeToThemeChange",
+      "description": "主题变更事件订阅",
+      "source": "theme/theme-events.ts"
+    },
+    {
+      "category": "主题",
+      "name": "THEME_CHANGE_EVENT",
+      "description": "主题变更事件订阅",
+      "source": "theme/theme-events.ts"
+    }
+  ]
+}

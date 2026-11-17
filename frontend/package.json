@@ -12,6 +12,8 @@
     "preview": "pnpm --filter @paideia/app preview",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
+    "ui:manifest": "node scripts/gen-ui-manifest.mjs",
+    "ui:manifest:check": "node scripts/gen-ui-manifest.mjs --check",
     "test:e2e": "pnpm --filter @paideia/app test:e2e",
     "test:e2e:admin": "pnpm --filter @paideia/admin test:e2e",
     "test:e2e:ui-kit": "pnpm --filter @paideia/ui-kit test:e2e",

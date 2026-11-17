@@ -1,0 +1,162 @@
+{
+  "./layout/app-shell": {
+    "category": "布局",
+    "description": "应用外壳、页头与区块容器",
+    "source": "layout/app-shell.tsx"
+  },
+  "./components/alert": {
+    "category": "反馈",
+    "description": "内联提示条（信息 / 成功 / 警告 / 错误）",
+    "source": "components/alert.tsx"
+  },
+  "./components/badge": {
+    "category": "基元",
+    "description": "状态徽标",
+    "source": "components/badge.tsx"
+  },
+  "./components/button": {
+    "category": "基元",
+    "description": "按钮",
+    "source": "components/button.tsx"
+  },
+  "./components/card": {
+    "category": "基元",
+    "description": "卡片容器与各分区",
+    "source": "components/card.tsx"
+  },
+  "./components/checkbox": {
+    "category": "表单",
+    "description": "复选框",
+    "source": "components/checkbox.tsx"
+  },
+  "./components/dialog": {
+    "category": "浮层",
+    "description": "模态对话框及其子部件",
+    "source": "components/dialog.tsx"
+  },
+  "./components/dropdown-menu": {
+    "category": "浮层",
+    "description": "下拉菜单及其子部件",
+    "source": "components/dropdown-menu.tsx"
+  },
+  "./components/empty": {
+    "category": "数据态",
+    "description": "空状态占位",
+    "source": "components/empty.tsx"
+  },
+  "./components/input": {
+    "category": "表单",
+    "description": "单行文本输入",
+    "source": "components/input.tsx"
+  },
+  "./components/pagination": {
+    "category": "导航",
+    "description": "列表分页控件",
+    "source": "components/pagination.tsx"
+  },
+  "./components/query-state": {
+    "category": "数据态",
+    "description": "查询错误提示与加载行",
+    "source": "components/query-state.tsx"
+  },
+  "./components/label": {
+    "category": "表单",
+    "description": "表单标签",
+    "source": "components/label.tsx"
+  },
+  "./components/select": {
+    "category": "表单",
+    "description": "下拉选择及其子部件",
+    "source": "components/select.tsx"
+  },
+  "./components/separator": {
+    "category": "基元",
+    "description": "分隔线",
+    "source": "components/separator.tsx"
+  },
+  "./components/skeleton": {
+    "category": "数据态",
+    "description": "骨架屏占位",
+    "source": "components/skeleton.tsx"
+  },
+  "./components/sonner": {
+    "category": "反馈",
+    "description": "全局 Toast 通知容器",
+    "source": "components/sonner.tsx"
+  },
+  "sonner": {
+    "category": "反馈",
+    "description": "toast() 能力，从 sonner 转出（应用无需自行依赖 sonner）",
+    "source": "sonner（外部包）"
+  },
+  "./components/spinner": {
+    "category": "反馈",
+    "description": "加载指示器",
+    "source": "components/spinner.tsx"
+  },
+  "./components/switch": {
+    "category": "表单",
+    "description": "开关",
+    "source": "components/switch.tsx"
+  },
+  "./components/table": {
+    "category": "数据展示",
+    "description": "表格及其子部件",
+    "source": "components/table.tsx"
+  },
+  "./components/tabs": {
+    "category": "导航",
+    "description": "标签页切换",
+    "source": "components/tabs.tsx"
+  },
+  "./components/tooltip": {
+    "category": "浮层",
+    "description": "工具提示",
+    "source": "components/tooltip.tsx"
+  },
+  "./markdown/markdown": {
+    "category": "Markdown",
+    "description": "Markdown 渲染的唯一实现（含预加载）",
+    "source": "markdown/markdown.tsx"
+  },
+  "./markdown/practice": {
+    "category": "Markdown",
+    "description": "从正文抽取 quiz 练习",
+    "source": "markdown/practice.ts"
+  },
+  "./markdown/renderers": {
+    "category": "Markdown",
+    "description": "源码解读 / 练习 / 图版等专用块与页级上下文",
+    "source": "markdown/renderers/index.ts"
+  },
+  "./theme/keys": {
+    "category": "主题",
+    "description": "主题键、存储键与类型",
+    "source": "theme/keys.ts"
+  },
+  "./theme/theme-context": {
+    "category": "主题",
+    "description": "ThemeProvider 与 useTheme（同时管明暗与皮肤）",
+    "source": "theme/theme-context.tsx"
+  },
+  "./theme/theme-toggle": {
+    "category": "主题",
+    "description": "明暗切换按钮",
+    "source": "theme/theme-toggle.tsx"
+  },
+  "./theme/skins": {
+    "category": "主题",
+    "description": "皮肤注册表与查询",
+    "source": "theme/skins.ts"
+  },
+  "./theme/theme-picker": {
+    "category": "主题",
+    "description": "皮肤选择器",
+    "source": "theme/theme-picker.tsx"
+  },
+  "./theme/theme-events": {
+    "category": "主题",
+    "description": "主题变更事件订阅",
+    "source": "theme/theme-events.ts"
+  }
+}

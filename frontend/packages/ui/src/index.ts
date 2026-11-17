@@ -6,6 +6,9 @@
  * 样式入口是单独的 `@paideia/ui/styles.css`，vite 插件在 `@paideia/ui/vite`。
  */
 
+// 组件目录元数据（分类 / 一句话用途 / 源文件）：ui-kit 与生成脚本共用同一份，见 component-meta.ts
+export { COMPONENT_META, type ComponentMeta } from './component-meta'
+
 export { AppShell, PageHeader, Section } from './layout/app-shell'
 
 export { Alert, AlertAction, AlertDescription, AlertTitle } from './components/alert'
