@@ -48,11 +48,15 @@ frontend/apps/desktop/renderer/
 logs/
 *.pid
 *.hprof
+# Redis 本地快照（跑本机 e2e 时 redis 落盘的 dump.rdb，不是本项目内容）
+*.rdb
 
 # ---- 测试产物 ----
 test-results/
 playwright-report/
 blob-report/
+# 本地手工跑 e2e 时攒下的日志、探针脚本与截图（不是台账产物）
+.tmp-e2e/
 # ego 点击测试的失败截图（WORK-059）；报告入台账，截图不入库。
 .agent/testing/.artifacts/
 # ego runner 的当次参数（cli.mjs 生成，含模块名与模式，不含凭据）。
@@ -66,6 +70,17 @@ coverage/
 # 与上面 .playwright-cli/ 同一理由：留着会把工作区判定弄脏，验证报告被判 drift。
 docs/design/
 output/
+
+# ---- 本地原型草稿与一次性构建收据 ----
+# .agent/prototypes 下是设计原型草稿、本地排查脚本与截图（figcraft / archify 的产物），
+# 不是需要入库的项目内容；留着会让 project-lifecycle 的"工作区是否干净"判定变脏。
+# work076 的报告截图此前已入库，gitignore 不影响已跟踪文件。
+.agent/prototypes/
+# Archify 全景图 finalize 的四道闸收据：含本机绝对路径、可重新生成，权威源是 .archify.json。
+docs/architecture/paideia-architecture.browser-check.json
+docs/architecture/paideia-architecture.delivery.json
+docs/architecture/paideia-architecture.finalize.json
+docs/architecture/paideia-architecture.finalize-summary.json
 
 # ---- IDE 与操作系统 ----
 .idea/
