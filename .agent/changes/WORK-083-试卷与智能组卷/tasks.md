@@ -146,7 +146,7 @@ approver_role: CTO
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=WrongBookIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test` → 期望只返回最新一错、过滤正确、隔离 404。
 - 结果记录（2026-11-18）：`WrongBookIntegrationTest` 3 条绿（只返回最新一错、最新答对即移出、按概念过滤、按用户隔离、响应无 answerIndex）。实现：`QuestionAttemptMapper.findWrongLatest` 用 `la.id = MAX(qa2.id)` 取每身份最新一次且 `correct=0`；`WrongBookService` 取 `QuestionIndexService.snapshot` 出题面、`mapper.findLinks`+`findAllConcepts` 出概念名；`WrongBookController` `GET /api/v1/learning/wrong-questions?categoryId&conceptId&limit`。
 
-### TASK-006 | pending | 前端刷题页与入口
+### TASK-006 | done | 前端刷题页与入口
 
 - 对应：`REQ-010`、`REQ-009`、`AC-007`、`AC-008`
 - 依赖：TASK-004
@@ -161,8 +161,9 @@ approver_role: CTO
   2. 接标签筛选与逐题作答反馈（解析仅在作答后显示）。
   3. 加路由、NAV、`preferredNav`。
 - 验证：`cd frontend/apps/app && pnpm exec playwright test e2e/practice.spec.ts` → 期望通过；`rg "path: '/practice'" frontend/apps/app/src/router.tsx` 与 NAV 均命中。
+- 结果记录（2026-11-18）：前端封装落为 `frontend/packages/knowledge/src/exam-types.ts` + `exam-client.ts`（`createExamApi`），页面 `PracticePage.tsx`；路由 `/practice`；`LearnerHeader` 的 `NAV` 增「刷题」。`cd frontend && pnpm --filter @paideia/app typecheck` 通过；`e2e/practice.spec.ts` 4 条绿（含 390px 无横向滚动）。偏差：`NAV` 数组 key 未被 `NavKey` 约束（`NAV_PREFERENCE as readonly string[]` 后 `indexOf` 接受 string），故未改 `@paideia/identity` 联合字面量，入口照常出现。
 
-### TASK-007 | pending | 前端试卷/成绩/错题页与入口
+### TASK-007 | done | 前端试卷/成绩/错题页与入口
 
 - 对应：`REQ-006`、`REQ-007`、`AC-004`（结果视图）、`AC-005`
 - 依赖：TASK-003、TASK-005
@@ -176,6 +177,7 @@ approver_role: CTO
   2. 结果页按概念/难度聚合（不显示百分制总分），窄屏堆叠。
   3. 错题本页；路由/NAV/`preferredNav`。
 - 验证：`cd frontend/apps/app && pnpm exec playwright test e2e/papers.spec.ts` → 期望通过；路由↔NAV 自查一致。
+- 结果记录（2026-11-18）：同套 `exam-client.ts` 封装 + 页面 `PaperListPage/PaperPage/PaperResultPage/WrongBookPage`；路由 `/papers`、`/papers/:id`、`/papers/:id/result`、`/wrong-book`；`NAV` 增「试卷」「错题本」。typecheck 通过；`e2e/papers.spec.ts` 3 条绿（组卷→作答页、390px 无横向滚动）。
 
 ### TASK-008 | done | 难度 AI 标注与回退
 
@@ -194,7 +196,7 @@ approver_role: CTO
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=QuestionIndexIntegrationTest,DifficultyLabelTest -Dsurefire.failIfNoSpecifiedTests=false test` → 期望无端口时落 `medium` 不报错、有端口时写入给定标签。
 - 结果记录（2026-11-18）：`DifficultyLabelTest` 4 条绿（含 `portAbsentFallsBackMedium`）；`QuestionLabelingIntegrationTest` 2 条绿（`@MockitoBean QuestionLabelingPort`：端口给 "hard" 则写入；端口抛错回退 medium）。实现：`QuestionLabelingPort`（`record Question` / `record Result(Map<String,String> difficultyByQuestionKey)` / `Result tag(List<Question>)`）；`QuestionIndexService` 用 `ObjectProvider<QuestionLabelingPort>` 取端口，无端口/异常/非法标签一律回退 `DifficultyLabel.estimate`；ai 侧 `QuestionLabelingAdapter` v1 占位返回空（未接模型、不产生计费），后续接模型时补 `RunKind`。
 
-### TASK-009 | pending | 收尾：注销级联、窄屏、契约与部署验证
+### TASK-009 | done | 收尾：注销级联、窄屏、契约与部署验证
 
 - 对应：`REQ-008`、`AC-006`（注销级联）
 - 依赖：TASK-001…TASK-008
@@ -210,6 +212,7 @@ approver_role: CTO
   3. 跑两 e2e 的 390px 用例。
   4. 执行 `powershell -File scripts/release.ps1`（纯后端约 75 秒；前端有改动才 `-WithWeb`），核对部署后接口可访问、无答案泄露。
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=AccountDeletionCascadeIntegrationTest,ApiContractTest,AuthorizationIsolationTest,MigrationVersionFormatTest,MigrationChecksumTest,MigrationSeedOverlapTest -Dsurefire.failIfNoSpecifiedTests=false test` → 期望全绿；部署后 `GET /api/v1/learning/papers` 需登录、他人 id 404。
+- 结果记录（2026-11-18）：注销级联补 `papers/paper_items/paper_answers`（`KnowledgeUserDeletionListener` + `AccountDeletionCascadeIntegrationTest`）；守卫切片 `mvn ... -Dtest=AccountDeletionCascadeIntegrationTest,ApiContractTest,ApiSurfaceTest,AuthorizationIsolationTest,ModularityTest,MigrationVersionFormatTest,MigrationChecksumTest,MigrationSeedOverlapTest` → **39 条全绿 BUILD SUCCESS（03:32）**；迁移两条校验和已登记；两 e2e 7 条全绿。`scripts/release.ps1 -WithWeb` 部署成功（168.6s，健康检查通过）；线上 `GET /api/v1/learning/papers` → 401（需登录）、`/actuator/health` → 200 UP。
 
 ## 完成条件
 
