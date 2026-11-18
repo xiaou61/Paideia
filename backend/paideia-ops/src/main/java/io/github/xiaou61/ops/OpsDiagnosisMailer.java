@@ -3,6 +3,7 @@ package io.github.xiaou61.ops;
 import jakarta.mail.MessagingException;
 import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.mail.MailException;
@@ -59,13 +60,19 @@ class OpsDiagnosisMailer {
         return configured;
     }
 
+    /** 不带 traceId 的简版。 */
+    void sendDiagnosis(String alertName, String reportMd) {
+        sendDiagnosis(alertName, reportMd, List.of());
+    }
+
     /**
      * 诊断完成后调用。只在配置了收件人且 SMTP 可用的前提下真正发信。
      *
      * @param alertName 告警名（主题与正文抬头用）
      * @param reportMd  AI 生成的诊断报告原文
+     * @param traceIds  本次采集到的 traceId（用于邮件里做全链路串联；可为空）
      */
-    void sendDiagnosis(String alertName, String reportMd) {
+    void sendDiagnosis(String alertName, String reportMd, List<String> traceIds) {
         OpsProperties.Notify notify = ops.getNotify();
         if (sender == null || !notify.isEnabled()) {
             return;
@@ -82,7 +89,9 @@ class OpsDiagnosisMailer {
             helper.setFrom(mail.fromAddress(), mail.fromName());
             helper.setTo(recipients);
             helper.setSubject(OpsDiagnosisEmail.subject(alertName));
-            helper.setText(OpsDiagnosisEmail.body(alertName, reportMd, incidentLink(notify.getBaseUrl())), false);
+            helper.setText(OpsDiagnosisEmail.body(alertName, reportMd,
+                    incidentLink(notify.getBaseUrl()), traceIds,
+                    grafanaExploreBase(notify.getBaseUrl())), false);
             sender.send(message);
             log.info("ops.mail.sent alert={} recipients={}", alertName, recipients.length);
         } catch (MessagingException | UnsupportedEncodingException | MailException failure) {
@@ -111,5 +120,17 @@ class OpsDiagnosisMailer {
             base = base.substring(0, base.length() - 1);
         }
         return base + "/admin/#/ops/incidents";
+    }
+
+    /** Grafana 的公网入口（走应用反代的子路径）；用于拼 Explore 深链接。 */
+    private static String grafanaExploreBase(String baseUrl) {
+        if (baseUrl == null || baseUrl.isBlank()) {
+            return "";
+        }
+        String base = baseUrl.strip();
+        while (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        return base + "/api/v1/ops/grafana";
     }
 }

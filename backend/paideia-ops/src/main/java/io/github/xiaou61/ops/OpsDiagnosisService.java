@@ -6,11 +6,14 @@ import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -262,7 +265,8 @@ class OpsDiagnosisService {
             if (incidentId != null) {
                 incidents.markDone(incidentId, id, diagnosis.model());
                 // 把"答案"送出去：报告只落库等于没送达运维（见 OpsDiagnosisMailer 说明）。
-                mailer.sendDiagnosis(alertName, diagnosis.report());
+                // 顺带带上 traceId，让邮件成为「告警 → 日志 → 调用链」的全链路入口。
+                mailer.sendDiagnosis(alertName, diagnosis.report(), traceIds(collected.traces()));
             }
             log.info("ops.diagnosis.done id={} trigger={} model={}", id, trigger, diagnosis.model());
         } catch (RuntimeException failure) {
@@ -293,6 +297,21 @@ class OpsDiagnosisService {
         }
         long ttl = Math.max(3600, properties.getDiagnosis().getCooldownSeconds() * 6);
         alertCooldowns.entrySet().removeIf(entry -> entry.getValue().plusSeconds(ttl).isBefore(now));
+    }
+
+    /** 从证据的 traces 段里抽出 traceId（形如 `trace=<id>`），去重、最多 3 条。 */
+    private static final Pattern TRACE_ID = Pattern.compile("trace=([0-9a-fA-F]{16,64})");
+
+    static List<String> traceIds(String tracesText) {
+        if (tracesText == null || tracesText.isBlank()) {
+            return List.of();
+        }
+        LinkedHashSet<String> ids = new LinkedHashSet<>();
+        Matcher matcher = TRACE_ID.matcher(tracesText);
+        while (matcher.find() && ids.size() < 3) {
+            ids.add(matcher.group(1));
+        }
+        return List.copyOf(ids);
     }
 
     private static String messageOf(RuntimeException failure) {

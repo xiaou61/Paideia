@@ -34,6 +34,17 @@ class OpsDiagnosisEmailTest {
     }
 
     @Test
+    void bodyCarriesTraceIdsAndGrafanaLink() {
+        String body = OpsDiagnosisEmail.body("X", "## 结论", "",
+                java.util.List.of("abc123abc123abc123abc123abc12345"),
+                "http://h:8081/api/v1/ops/grafana");
+        assertThat(body)
+                .contains("链路追踪")
+                .contains("traceId = abc123abc123abc123abc123abc12345")
+                .contains("http://h:8081/api/v1/ops/grafana/explore");
+    }
+
+    @Test
     void markdownHeadingDegradesToPlainText() {
         assertThat(OpsDiagnosisEmail.toPlainText("### 证据\n- a"))
                 .contains("■ 证据")

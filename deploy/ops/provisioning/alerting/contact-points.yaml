@@ -4,10 +4,11 @@
 # **webhook 令牌也不在这里**：仓库里只有占位符，install-ops.sh 用服务器上的
 # /etc/paideia-ops/hook.token（600）替换后再安装。
 #
-# 六条规则不分组（group_by 为空即每条独立通知），因为它们的处置动作完全不同：
-# 目标下线看面板、磁盘低了清镜像、备份过期看 journal、Laya 内存考虑重启、5xx/ERROR 看诊断。
+# 通知按 alertname + severity 分组；处置动作不同的告警仍各自独立。
 #
-# 邮件模板用 Grafana 内置的，不自定义——内容已足够（标题 + 摘要 + 面板链接）。
+# 邮件正文**自定义成人话**（不再用 Grafana 内置模板）：一句话说清「发生了什么 + 该看哪」。
+# 邮件里的链接取自 root_url；部署时由 /etc/grafana/grafana.env 的 GF_SERVER_ROOT_URL
+# 指到公网反代子路径，否则链接会指回 127.0.0.1 打不开（主机名不进仓库）。
 apiVersion: 1
 
 contactPoints:
@@ -16,7 +17,8 @@ contactPoints:
     receivers:
       - uid: paideia-ops-mail
         type: email
-        disableResolveMessage: false
+        # 恢复通知不单独发信：一次故障的总账由诊断邮件与事件时间线承载，别让"恢复"再刷一封
+        disableResolveMessage: true
         settings:
           # 收件地址按用户 2026-10-20 的裁决：用线上 SMTP 发件人自己给自己发
           addresses: 3153566913@qq.com
@@ -24,6 +26,19 @@ contactPoints:
           # 这三个值来自 /etc/grafana/grafana.env，写在 provisioning 里会被 GF_ 环境变量覆盖
           fromAddress: 3153566913@qq.com
           fromName: Paideia 运维
+          # ---- 人话模板：Grafana 会把 message 当 Go 模板渲染 ----
+          message: |
+            {{ if eq .Status "firing" }}这条告警正在发生，系统已自动开始诊断，「结论+建议」稍后单独发到本邮箱。{{ else }}这条告警已恢复，无需处理。{{ end }}
+
+            告警：{{ .CommonLabels.alertname }}
+            级别：{{ .CommonLabels.severity }}
+            说明：{{ .CommonAnnotations.summary }}
+            建议：{{ .CommonAnnotations.description }}
+            {{ if eq .Status "firing" }}触发时间：{{ (index .Alerts 0).StartsAt }}{{ end }}
+
+            打开告警列表：{{ .ExternalURL }}alerting/list
+
+            （Paideia 运维自动发送。完整诊断以随后那封「已自动诊断」邮件为准。）
 
       # WORK-042：把 firing 的告警交给应用的诊断编排。
       # 端点只接受回环来源，并且要求 X-Paideia-Ops-Token。
@@ -46,5 +61,6 @@ policies:
     # 跨告警抑制（critical 抑制同通知的 warning）在事件层做，见 OpsHookController。
     group_by: ['alertname', 'severity']
     group_wait: 30s
-    group_interval: 5m
+    # 降噪：同一告警组的重复通知从 5 分钟放宽到 30 分钟，避免机器抖一下就连刷十几封
+    group_interval: 30m
     repeat_interval: 12h
