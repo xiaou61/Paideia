@@ -43,6 +43,7 @@ class OpsDiagnosisService {
     private final OpsIncidentService incidents;
     private final OpsIncidentContext contexts;
     private final OpsProperties properties;
+    private final OpsDiagnosisMailer mailer;
     private final TaskExecutor executor;
     private final AtomicBoolean running = new AtomicBoolean();
     private final Map<String, Instant> alertCooldowns = new ConcurrentHashMap<>();
@@ -53,6 +54,7 @@ class OpsDiagnosisService {
                         OpsIncidentService incidents,
                         OpsIncidentContext contexts,
                         OpsProperties properties,
+                        OpsDiagnosisMailer mailer,
                         @Qualifier("applicationTaskExecutor") TaskExecutor executor) {
         this.mapper = mapper;
         this.evidence = evidence;
@@ -60,6 +62,7 @@ class OpsDiagnosisService {
         this.incidents = incidents;
         this.contexts = contexts;
         this.properties = properties;
+        this.mailer = mailer;
         this.executor = executor;
     }
 
@@ -258,6 +261,8 @@ class OpsDiagnosisService {
                     diagnosis.report(), Instant.now());
             if (incidentId != null) {
                 incidents.markDone(incidentId, id, diagnosis.model());
+                // 把"答案"送出去：报告只落库等于没送达运维（见 OpsDiagnosisMailer 说明）。
+                mailer.sendDiagnosis(alertName, diagnosis.report());
             }
             log.info("ops.diagnosis.done id={} trigger={} model={}", id, trigger, diagnosis.model());
         } catch (RuntimeException failure) {

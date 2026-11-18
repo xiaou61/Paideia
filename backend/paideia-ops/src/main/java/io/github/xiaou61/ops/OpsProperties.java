@@ -39,6 +39,8 @@ public class OpsProperties {
 
     private final Incidents incidents = new Incidents();
 
+    private final Notify notify = new Notify();
+
     public String getPrometheusUrl() {
         return prometheusUrl;
     }
@@ -93,6 +95,10 @@ public class OpsProperties {
 
     public Incidents getIncidents() {
         return incidents;
+    }
+
+    public Notify getNotify() {
+        return notify;
     }
 
     public Thresholds getThresholds() {
@@ -284,6 +290,48 @@ public class OpsProperties {
 
         public void setSuppressWarningWhenCritical(boolean suppressWarningWhenCritical) {
             this.suppressWarningWhenCritical = suppressWarningWhenCritical;
+        }
+    }
+
+    /**
+     * 诊断完成后的邮件通知（把"答案"送到运维眼前）。
+     *
+     * <p>默认 {@code enabled=true} 但 {@code to} 为空——空收件人视为未启用，不会误发。
+     * {@code base-url} 用于把邮件里的"完整报告"链接指到管理端公网地址：Grafana 邮件里的
+     * 链接拼的是回环 root_url，外部打不开，所以这里必须单独配置一个可访问的基址。
+     */
+    public static class Notify {
+
+        private boolean enabled = true;
+
+        /** 收件人，逗号分隔；为空则不发。 */
+        private String to = "";
+
+        /** 管理端公网基址，如 http://36.212.5.130:8081；为空则邮件不带链接。 */
+        private String baseUrl = "";
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getTo() {
+            return to;
+        }
+
+        public void setTo(String to) {
+            this.to = to == null ? "" : to;
+        }
+
+        public String getBaseUrl() {
+            return baseUrl;
+        }
+
+        public void setBaseUrl(String baseUrl) {
+            this.baseUrl = baseUrl == null ? "" : baseUrl;
         }
     }
 }

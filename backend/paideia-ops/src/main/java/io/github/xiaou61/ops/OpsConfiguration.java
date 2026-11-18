@@ -5,6 +5,6 @@ import org.springframework.context.annotation.Configuration;
 
 /** 运维面板的配置绑定（WORK-028）。 */
 @Configuration
-@EnableConfigurationProperties(OpsProperties.class)
+@EnableConfigurationProperties({OpsProperties.class, OpsMailProperties.class})
 class OpsConfiguration {
 }

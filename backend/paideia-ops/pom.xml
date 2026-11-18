@@ -58,6 +58,13 @@
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
 
+    <!-- 运维诊断邮件：把 AI 诊断结论直接发给运维，而不是只躺在 ops_diagnoses 表里。
+         传输参数复用 paideia.mail.*（与 account 模块同一套 SMTP 配置，不重复维护）。 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-mail</artifactId>
+    </dependency>
+
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>

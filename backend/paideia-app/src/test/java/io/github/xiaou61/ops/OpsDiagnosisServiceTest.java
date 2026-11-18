@@ -40,6 +40,7 @@ class OpsDiagnosisServiceTest {
     private OpsIncidentService incidents;
     private OpsIncidentContext contexts;
     private OpsProperties properties;
+    private OpsDiagnosisMailer mailer;
     private AtomicReference<Runnable> pending;
     private TaskExecutor executor;
     private OpsDiagnosisService service;
@@ -53,10 +54,11 @@ class OpsDiagnosisServiceTest {
         contexts = mock(OpsIncidentContext.class);
         properties = new OpsProperties();
         properties.getDiagnosis().setCooldownSeconds(600);
+        mailer = mock(OpsDiagnosisMailer.class);
         pending = new AtomicReference<>();
         executor = pending::set;
         service = new OpsDiagnosisService(mapper, evidence, diagnoser, incidents, contexts,
-                properties, executor);
+                properties, mailer, executor);
         when(contexts.build(any(), any(), any())).thenReturn("无历史同类事件\n无同期事件\n");
 
         org.mockito.Mockito.doAnswer(invocation -> {
