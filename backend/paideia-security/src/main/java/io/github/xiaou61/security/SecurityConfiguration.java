@@ -119,7 +119,33 @@ public class SecurityConfiguration {
                 // 改成 SAMEORIGIN：仍然禁止**任何第三方站点**嵌入本服务（这才是点击劫持的威胁），
                 // 只是允许我们自己同源嵌入。DENY 额外多挡的"本站自嵌"没有防护价值——
                 // 能控制本站页面的人已经不需要靠 iframe 来做事了。
-                .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
+                // 缓存头（2026-11-18）：Spring Security 默认的 CacheControlHeadersWriter 会给
+                // **每一个**响应加 `Cache-Control: no-store`，连文件名带内容哈希的 /assets/** 也不例外。
+                // 后果实测：每次刷新都重新下载约 500 KB 的 JS/CSS（reload 传输 519 KB、11 个请求，
+                // 与首次访问几乎相同），这是"感觉还是很慢"的主因——线上的 /assets/** 永远不会变内容，
+                // 却因为 no-store 一次也不让浏览器留存。
+                // 这里关掉默认写入器，改按路径下发：
+                //   · /assets/**              文件名含哈希、内容永不变 → 一年 public + immutable，刷新直接本地命中
+                //   · 入口 HTML / manifest / SW  必须能拿到新版本 → no-cache（配 Last-Modified 走 304）
+                //   · 其余（尤其 /api/**）      含用户数据 → 保持不缓存
+                .headers(headers -> headers
+                        .frameOptions(frame -> frame.sameOrigin())
+                        .cacheControl(cache -> cache.disable())
+                        .addHeaderWriter((request, response) -> {
+                            String path = request.getRequestURI();
+                            if (path != null && path.startsWith("/assets/")) {
+                                response.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+                            } else if (path != null
+                                    && (path.equals("/") || path.endsWith(".html")
+                                            || path.equals("/manifest.webmanifest")
+                                            || path.equals("/sw.js") || path.equals("/registerSW.js"))) {
+                                response.setHeader("Cache-Control", "no-cache");
+                            } else {
+                                response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+                                response.setHeader("Pragma", "no-cache");
+                                response.setHeader("Expires", "0");
+                            }
+                        }))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
