@@ -83,12 +83,12 @@ class QuestionLabelingIntegrationTest {
     }
 
     @Test
-    @DisplayName("端口抛错则回退 medium，不中断索引")
+    @DisplayName("端口抛错则回退规则兜底（2 选项判易），不中断索引")
     void portFailureFallsBackToRule() {
         when(labelingPort.tag(any())).thenThrow(new RuntimeException("boom"));
 
         indexService.reconcile(entryId);
 
-        assertThat(storedLabel()).isEqualTo("medium");
+        assertThat(storedLabel()).isEqualTo("easy");
     }
 }

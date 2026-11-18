@@ -5,7 +5,7 @@ package io.github.xiaou61.knowledge.internal.question;
  *
  * <p>纯函数：Elo 校准够次数（{@value #CALIBRATED_ATTEMPTS}）才按评分分桶，
  * 否则一律 {@code medium}——宁可说"没校准"，也不拿一次作答当难度。
- * AI 预标注在 TASK-008 接进来，本类仍作兜底。
+ * 未校准新题的初始难度由 {@link DifficultyHeuristic} 规则兜底；AI 标注优先于本类。
  */
 public final class DifficultyLabel {
 

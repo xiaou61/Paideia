@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
  * 难度 AI 标注端口的 ai 侧实现（WORK-083 TASK-008）。
  *
  * <p>v1 占位：未接入模型调用（无凭据/未开启时不产生额外计费），统一返回空结果，
- * 让索引按规则回退到 {@code DifficultyLabel.estimate}。后续接入模型时在此实现
+ * 让索引回退到规则兜底 {@code DifficultyHeuristic}（未校准新题）。后续接入模型时在此实现
  * {@link #tag} 并用 {@code RunKind} 记录消耗，端口契约不变。
  */
 @Component

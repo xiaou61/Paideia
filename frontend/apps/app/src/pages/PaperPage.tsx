@@ -1,18 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { errorMessage } from '@paideia/core'
-import { createExamApi, type PaperView } from '@paideia/knowledge'
+import { createExamApi, difficultyText, type PaperView } from '@paideia/knowledge'
 import { Button } from '@paideia/ui'
 import { useNavigate, useParams } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
-
-function difficultyText(label: string | null): string {
-  if (label === 'EASY') return '易'
-  if (label === 'MEDIUM') return '中'
-  if (label === 'HARD') return '难'
-  return ''
-}
 
 /** 作答页（WORK-083 TASK-007）。 */
 export function PaperPage() {

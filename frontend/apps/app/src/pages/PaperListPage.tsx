@@ -14,7 +14,7 @@ export function PaperListPage() {
   const [papers, setPapers] = useState<PaperSummary[]>([])
   const [title, setTitle] = useState('我的试卷')
   const [count, setCount] = useState(10)
-  const [difficulty, setDifficulty] = useState('MEDIUM')
+  const [difficulty, setDifficulty] = useState('medium')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -92,9 +92,9 @@ export function PaperListPage() {
                 value={difficulty}
                 onChange={(e) => setDifficulty(e.target.value)}
               >
-                <option value="EASY">易</option>
-                <option value="MEDIUM">中</option>
-                <option value="HARD">难</option>
+                <option value="easy">易</option>
+                <option value="medium">中</option>
+                <option value="hard">难</option>
               </select>
             </label>
             <Button size="sm" onClick={() => void create()} disabled={loading} data-testid="papers-create">

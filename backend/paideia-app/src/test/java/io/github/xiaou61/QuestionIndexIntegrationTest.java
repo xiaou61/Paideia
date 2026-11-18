@@ -70,7 +70,7 @@ class QuestionIndexIntegrationTest {
     }
 
     @Test
-    @DisplayName("重建只索引正文里合法的题，坏块跳过，未校准默认 medium")
+    @DisplayName("重建只索引正文里合法的题，坏块跳过，未校准按规则给初始难度")
     void reconcileIndexesValidQuestionsOnly() {
         indexService.reconcile(entryId);
 
@@ -78,10 +78,15 @@ class QuestionIndexIntegrationTest {
         assertThat(jdbcTemplate.queryForList(
                 "SELECT question_key FROM question_index WHERE entry_id = ? ORDER BY question_key",
                 String.class, entryId)).containsExactly(BLOCK + "#0", BLOCK + "#1");
+        // #0 只有 2 个选项 → 规则判易；#1 有 3 个选项 → 规则保持 medium
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM question_index
+                WHERE entry_id = ? AND difficulty_label = 'easy'
+                """, Integer.class, entryId)).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM question_index
                 WHERE entry_id = ? AND difficulty_label = 'medium'
-                """, Integer.class, entryId)).isEqualTo(2);
+                """, Integer.class, entryId)).isEqualTo(1);
     }
 
     @Test

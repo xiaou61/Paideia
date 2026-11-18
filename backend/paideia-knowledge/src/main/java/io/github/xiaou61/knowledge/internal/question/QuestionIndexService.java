@@ -94,7 +94,7 @@ public class QuestionIndexService {
                     ? null : difficulty.rating().doubleValue();
             int attempts = difficulty == null || difficulty.attempts() == null ? 0 : difficulty.attempts();
             String aiLabel = aiLabels.get(question.questionKey());
-            String label = isValidLabel(aiLabel) ? aiLabel : DifficultyLabel.estimate(rating, attempts);
+            String label = resolveLabel(aiLabel, rating, attempts, question);
             mapper.upsert(entry.getId(), entry.getCategoryId(), question.blockKey(), question.questionKey(),
                     question.fingerprint(), question.options().size(), label, now);
             QuestionIndexMapper.IndexRow previous = existing.get(question.questionKey());
@@ -133,6 +133,23 @@ public class QuestionIndexService {
             // 端口是可选增强；失败即回退规则估算
         }
         return Map.of();
+    }
+
+    /**
+     * 难度来源优先级：AI 标注 &gt; Elo 校准（够次数）&gt; 规则兜底（新题）&gt; medium。
+     *
+     * <p>规则兜底只在「既无 AI 标签、又未校准」时生效，不覆盖已有的真实作答信号。
+     */
+    private static String resolveLabel(String aiLabel, Double rating, int attempts,
+                                       QuestionCatalog.Question question) {
+        if (isValidLabel(aiLabel)) {
+            return aiLabel;
+        }
+        if (rating != null && attempts >= DifficultyLabel.CALIBRATED_ATTEMPTS) {
+            return DifficultyLabel.estimate(rating, attempts);
+        }
+        String rule = DifficultyHeuristic.estimate(question.stem(), question.options());
+        return isValidLabel(rule) ? rule : DifficultyLabel.MEDIUM;
     }
 
     private static boolean isValidLabel(String label) {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { errorMessage } from '@paideia/core'
-import { createExamApi, type PaperResult } from '@paideia/knowledge'
+import { createExamApi, difficultyText, type PaperResult } from '@paideia/knowledge'
 import { Link, useParams } from 'react-router'
 
 import { api } from '../api'
@@ -71,7 +71,7 @@ export function PaperResultPage() {
               <ul className="mt-2 divide-y divide-border text-sm">
                 {result.difficulties.map((item) => (
                   <li key={item.label} className="flex items-center justify-between py-2">
-                    <span className="text-foreground">{item.label === 'EASY' ? '易' : item.label === 'HARD' ? '难' : '中'}</span>
+                    <span className="text-foreground">{difficultyText(item.label) || item.label}</span>
                     <span className="text-muted-foreground">
                       对 {item.correct} / {item.total}
                     </span>

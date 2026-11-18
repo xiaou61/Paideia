@@ -1,17 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { errorMessage } from '@paideia/core'
-import { createExamApi, type WrongQuestion } from '@paideia/knowledge'
+import { createExamApi, difficultyText, type WrongQuestion } from '@paideia/knowledge'
 import { Link } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
-
-function difficultyText(label: string | null): string {
-  if (label === 'EASY') return '易'
-  if (label === 'MEDIUM') return '中'
-  if (label === 'HARD') return '难'
-  return ''
-}
 
 /** 错题本（WORK-083 TASK-007）：每道身份最近一次作答为错的题。 */
 export function WrongBookPage() {

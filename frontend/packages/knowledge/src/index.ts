@@ -57,6 +57,7 @@ export {
 export { createEntryProgressPort, recentReading, type RecentReading } from './source-reading-progress'
 export { createLearningApi, type LearningApi } from './learning-client'
 export { createExamApi, type ExamApi } from './exam-client'
+export { difficultyText } from './exam-display'
 export type {
   AttemptResult,
   ConceptStat,

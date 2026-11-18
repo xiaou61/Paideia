@@ -1,17 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { errorMessage } from '@paideia/core'
-import { createExamApi, type PracticeQuestion } from '@paideia/knowledge'
+import { createExamApi, difficultyText, type PracticeQuestion } from '@paideia/knowledge'
 import { Button } from '@paideia/ui'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
-
-function difficultyText(label: string | null): string {
-  if (label === 'EASY') return '易'
-  if (label === 'MEDIUM') return '中'
-  if (label === 'HARD') return '难'
-  return ''
-}
 
 /** 刷题页（WORK-083 TASK-006）：按标签筛题、逐题作答即时反馈，不生成试卷。 */
 export function PracticePage() {
@@ -94,9 +87,9 @@ export function PracticePage() {
               onChange={(e) => setDifficulty(e.target.value)}
             >
               <option value="">全部</option>
-              <option value="EASY">易</option>
-              <option value="MEDIUM">中</option>
-              <option value="HARD">难</option>
+              <option value="easy">易</option>
+              <option value="medium">中</option>
+              <option value="hard">难</option>
             </select>
           </label>
           <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
