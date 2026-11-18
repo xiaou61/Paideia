@@ -65,18 +65,38 @@ public class QuestionAttemptService {
         Integer latency = request.latencyMs() == null ? null
                 : Math.max(0, Math.min(MAX_LATENCY_MS, request.latencyMs()));
         Instant now = Instant.now();
-
-        mapper.insertAttempt(userId, entry.getId(), question.blockKey(), question.questionKey(),
-                question.fingerprint(), request.choice(), correct, latency, "server", now);
-        if (!correct) {
-            // 答错即回到复习队列：明天再来（REQ-009）。只影响已有学习记录的条目。
-            mapper.scheduleReview(userId, entry.getId(), now.plus(1, java.time.temporal.ChronoUnit.DAYS));
-        }
-
         List<QuestionAttemptMapper.LinkRow> links = mapper.findLinks(entry.getId(),
                 question.blockKey(), question.questionKey());
+        return judge(userId, entry.getId(), question, request.choice(), correct, latency, links, now);
+    }
 
-        updateDifficulty(userId, entry.getId(), question, links, correct, now);
+    /**
+     * 试卷交卷复用：给定身份与对错直接落作答 + Elo + BKT，不解析正文。
+     * 行为与 record() 的判定内核一致；choice 不入 question_attempts（答卷另存在 paper_answers）。
+     */
+    @Transactional
+    public void recordJudged(long userId, long entryId, String blockKey, String questionKey,
+                             String fingerprint, int optionCount, boolean correct,
+                             List<Long> conceptIds, Integer latencyMs, Instant now) {
+        QuestionCatalog.Question question = new QuestionCatalog.Question(blockKey, questionKey,
+                fingerprint, "", java.util.Collections.nCopies(Math.max(1, optionCount), ""), 0);
+        List<QuestionAttemptMapper.LinkRow> links = conceptIds == null ? List.of()
+                : conceptIds.stream().map(id -> new QuestionAttemptMapper.LinkRow(id, 1.0)).toList();
+        Integer latency = latencyMs == null ? null
+                : Math.max(0, Math.min(MAX_LATENCY_MS, latencyMs));
+        judge(userId, entryId, question, null, correct, latency, links, now);
+    }
+
+    private AttemptResult judge(long userId, long entryId, QuestionCatalog.Question question,
+                                Integer choice, boolean correct, Integer latency,
+                                List<QuestionAttemptMapper.LinkRow> links, Instant now) {
+        mapper.insertAttempt(userId, entryId, question.blockKey(), question.questionKey(),
+                question.fingerprint(), choice, correct, latency, "server", now);
+        if (!correct) {
+            // 答错即回到复习队列：明天再来（REQ-009）。只影响已有学习记录的条目。
+            mapper.scheduleReview(userId, entryId, now.plus(1, java.time.temporal.ChronoUnit.DAYS));
+        }
+        updateDifficulty(userId, entryId, question, links, correct, now);
         Map<Long, String> names = new HashMap<>();
         for (QuestionAttemptMapper.ConceptRow row : mapper.findAllConcepts()) {
             names.put(row.id(), row.name());

@@ -5,6 +5,7 @@ import io.github.xiaou61.knowledge.internal.category.Category;
 import io.github.xiaou61.knowledge.internal.category.CategoryMapper;
 import io.github.xiaou61.knowledge.internal.entry.Entry;
 import io.github.xiaou61.knowledge.internal.entry.EntryMapper;
+import io.github.xiaou61.knowledge.internal.question.QuestionIndexService;
 import io.github.xiaou61.knowledge.internal.relation.RelationMapper;
 import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
@@ -38,13 +39,15 @@ public class EntryAdminService {
     private final CategoryMapper categoryMapper;
     private final RelationMapper relationMapper;
     private final KnowledgeRedisCache cache;
+    private final QuestionIndexService questionIndexService;
 
     EntryAdminService(EntryMapper entryMapper, CategoryMapper categoryMapper, RelationMapper relationMapper,
-                      KnowledgeRedisCache cache) {
+                      KnowledgeRedisCache cache, QuestionIndexService questionIndexService) {
         this.entryMapper = entryMapper;
         this.categoryMapper = categoryMapper;
         this.relationMapper = relationMapper;
         this.cache = cache;
+        this.questionIndexService = questionIndexService;
     }
 
     public record AdminEntrySummary(
@@ -84,6 +87,7 @@ public class EntryAdminService {
         entry.setPublishedAt(STATUS_PUBLISHED.equals(normalized) ? Instant.now() : null);
         entryMapper.insert(entry);
         cache.evictEntryBriefs();
+        questionIndexService.reconcile(entry.getId());
         return entry.getId();
     }
 
@@ -114,6 +118,7 @@ public class EntryAdminService {
 
         entryMapper.update(existing);
         cache.evictEntryBriefs();
+        questionIndexService.reconcile(id);
     }
 
     /** 删条目：关系由外键 {@code ON DELETE CASCADE} 一起清掉（悬空的关系没有意义）。 */
@@ -123,6 +128,7 @@ public class EntryAdminService {
             throw notFound("条目不存在");
         }
         cache.evictEntryBriefs();
+        questionIndexService.reconcile(id);
     }
 
     public PageResult<AdminEntrySummary> page(String status, PageQuery page) {

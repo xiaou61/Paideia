@@ -3,6 +3,7 @@ package io.github.xiaou61.knowledge.internal.tools;
 import io.github.xiaou61.knowledge.internal.question.QuestionAttemptMapper;
 import io.github.xiaou61.knowledge.internal.question.QuestionConceptAdminService;
 import io.github.xiaou61.knowledge.internal.question.QuestionConceptSuggester;
+import io.github.xiaou61.knowledge.internal.question.QuestionIndexService;
 import io.github.xiaou61.platform.PaideiaTool;
 import io.github.xiaou61.platform.ToolArgs;
 import io.github.xiaou61.platform.ToolContext;
@@ -26,6 +27,38 @@ public final class LearningAdminTools {
     private static final int MAX_EXPORT = 500;
 
     private LearningAdminTools() {
+    }
+
+    /** 全量重建题库索引（WORK-083 TASK-001）。内容一改跑一次即可，幂等。 */
+    @Component
+    public static class ReindexQuestions implements PaideiaTool {
+
+        private final QuestionIndexService service;
+
+        ReindexQuestions(QuestionIndexService service) {
+            this.service = service;
+        }
+
+        @Override
+        public ToolDescriptor descriptor() {
+            return new ToolDescriptor(
+                    "admin_learning_reindex_questions", GROUP, "重建题库索引",
+                    "扫描全部已发布条目的正文，重建 question_index（题目身份 + 难度标签）。"
+                            + "内容改动后跑一次即可，幂等；返回新增/更新/删除条数。",
+                    schema(Map.of()),
+                    null, false, false, true, ToolScope.ADMIN, false);
+        }
+
+        @Override
+        public ToolResult call(ToolContext context, Map<String, Object> arguments) {
+            try {
+                QuestionIndexService.RebuildResult result = service.refreshAll();
+                return ToolResult.ok("索引重建完成：新增 " + result.created()
+                        + "，更新 " + result.updated() + "，删除 " + result.removed());
+            } catch (RuntimeException failure) {
+                return ToolResult.fail("重建索引失败：" + messageOf(failure));
+            }
+        }
     }
 
     /** 某条目下的题目与已确认概念。 */

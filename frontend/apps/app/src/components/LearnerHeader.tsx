@@ -76,6 +76,11 @@ const NAV = [
   { key: 'notes' as const, group: 'knowledge' as const, to: '/notes', label: '我的笔记', testId: 'learner-nav-notes' },
   { key: 'sql-practice' as const, group: 'practice' as const, to: '/practice/sql', label: 'SQL 练习', testId: 'learner-nav-sql-practice' },
   { key: 'my-assessments' as const, group: 'practice' as const, to: '/my-assessments', label: '我的自评', testId: 'learner-nav-my-assessments' },
+  // 试卷与智能组卷（WORK-083）：刷题 / 试卷 / 错题本三个入口，同属「练习」组。
+  // 不进 NAV_PREFERENCE —— 与 books / source 同理，靠组内排位，新入口固定排后。
+  { key: 'practice' as const, group: 'practice' as const, to: '/practice', label: '刷题', testId: 'learner-nav-practice' },
+  { key: 'papers' as const, group: 'practice' as const, to: '/papers', label: '试卷', testId: 'learner-nav-papers' },
+  { key: 'wrong-book' as const, group: 'practice' as const, to: '/wrong-book', label: '错题本', testId: 'learner-nav-wrong-book' },
   // 面经题库（2026-11-10）：每天抓的牛客面经按岗位分四个方向。
   // 放进「求职」组而不是「知识」组——读者是在准备面试时才来刷它，和模拟面试、简历是同一趟事。
   // 不进 NAV_PREFERENCE —— 与 books / source 同理，靠组内排位。

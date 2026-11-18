@@ -94,6 +94,10 @@ class AccountDeletionCascadeIntegrationTest {
             {"question_attempts", "user_id"},
             {"concept_mastery_state", "user_id"},
             {"review_sessions", "user_id"},
+            // 试卷（WORK-083）：卷面 / 题项 / 作答，子表在前
+            {"paper_answers", "user_id"},
+            {"paper_items", "user_id"},
+            {"papers", "user_id"},
             // 学习计划项（WORK-053）与搜索关键词（WORK-045）：两处都带用户原文，且都没有跨模块外键
             {"learning_plan_items", "user_id"},
             {"knowledge_search_log", "user_id"},
@@ -365,6 +369,27 @@ class AccountDeletionCascadeIntegrationTest {
                         (user_id, concept_ids_json, items_json, created_at, expires_at)
                     VALUES (?, '[]', '[]', UTC_TIMESTAMP(3), DATE_ADD(UTC_TIMESTAMP(3), INTERVAL 1 DAY))
                     """, owner);
+            // 试卷（WORK-083）：卷面 + 题项 + 作答三张表都真种一行
+            jdbcTemplate.update("""
+                    INSERT INTO papers (user_id, title, rule_json, status, created_at)
+                    VALUES (?, '注销用卷', '{}', 'submitted', UTC_TIMESTAMP(3))
+                    """, owner);
+            long paperId = jdbcTemplate.queryForObject(
+                    "SELECT MAX(id) FROM papers WHERE user_id = ?", Long.class, owner);
+            jdbcTemplate.update("""
+                    INSERT INTO paper_items
+                        (paper_id, user_id, seq, entry_id, block_key, question_key, fingerprint,
+                         concept_id, difficulty_label, stem_snapshot, options_json,
+                         answer_index_snapshot, explanation_snapshot)
+                    VALUES (?, ?, 1, ?, 'quiz-1', 'quiz-1#0', REPEAT('e', 64),
+                            NULL, 'MEDIUM', '这道题用来验证注销级联', '["A项","B项"]', 0, '解析')
+                    """, paperId, owner, entryId);
+            long paperItemId = jdbcTemplate.queryForObject(
+                    "SELECT MAX(id) FROM paper_items WHERE paper_id = ?", Long.class, paperId);
+            jdbcTemplate.update("""
+                    INSERT INTO paper_answers (paper_id, user_id, item_id, choice_index, correct, created_at)
+                    VALUES (?, ?, ?, 0, 1, UTC_TIMESTAMP(3))
+                    """, paperId, owner, paperItemId);
             // WORK-053 / WORK-045：同样必须真种一条，否则新加的两行断言只会命中空表
             jdbcTemplate.update("""
                     INSERT INTO learning_plan_items

@@ -30,6 +30,10 @@ class KnowledgeUserDeletionListener {
             {"concept_mastery_state", "user_id"},
             // 复习会话（WORK-034）：含出题与作答，注销必须一并删
             {"review_sessions", "user_id"},
+            // 试卷与智能组卷（WORK-083）：卷面、题项、作答三张表都带 user_id，子表在前
+            {"paper_answers", "user_id"},
+            {"paper_items", "user_id"},
+            {"papers", "user_id"},
             // 学习计划项（WORK-053）：`goal`/`reason` 是用户原文，没有跨模块外键，必须显式删
             {"learning_plan_items", "user_id"},
             // 搜索关键词（WORK-045）：`keyword` 可能含邮箱/手机号；它是数据大屏的输入，

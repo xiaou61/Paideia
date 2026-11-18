@@ -56,6 +56,20 @@ export {
 } from './concept-graph-layout'
 export { createEntryProgressPort, recentReading, type RecentReading } from './source-reading-progress'
 export { createLearningApi, type LearningApi } from './learning-client'
+export { createExamApi, type ExamApi } from './exam-client'
+export type {
+  AttemptResult,
+  ConceptStat,
+  DifficultyStat,
+  PaperItemView,
+  PaperResult,
+  PaperRuleInput,
+  PaperSummary,
+  PaperView,
+  PracticeFilter,
+  PracticeQuestion,
+  WrongQuestion,
+} from './exam-types'
 export { createDigestApi, type DigestApi } from './digest-client'
 export {
   DIGEST_GROUPS,

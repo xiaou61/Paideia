@@ -37,6 +37,11 @@ import { SharedNotePage } from './pages/SharedNotePage'
 import { SourceChapterPage } from './pages/SourceChapterPage'
 import { SourceProjectPage } from './pages/SourceProjectPage'
 import { SourceProjectsPage } from './pages/SourceProjectsPage'
+import { PracticePage } from './pages/PracticePage'
+import { PaperListPage } from './pages/PaperListPage'
+import { PaperPage } from './pages/PaperPage'
+import { PaperResultPage } from './pages/PaperResultPage'
+import { WrongBookPage } from './pages/WrongBookPage'
 
 /**
  * 使用 Hash 路由：桌面壳从自定义协议加载页面，基于浏览器历史的路径路由在那种来源下会失效。
@@ -98,6 +103,47 @@ export const router = createHashRouter([
     element: (
       <RequireAuth>
         <ReviewPage />
+      </RequireAuth>
+    ),
+  },
+  // 试卷与智能组卷（WORK-083）：刷题 / 试卷 / 成绩 / 错题本。
+  {
+    path: '/practice',
+    element: (
+      <RequireAuth>
+        <PracticePage />
+      </RequireAuth>
+    ),
+  },
+  {
+    path: '/papers',
+    element: (
+      <RequireAuth>
+        <PaperListPage />
+      </RequireAuth>
+    ),
+  },
+  {
+    path: '/papers/:id',
+    element: (
+      <RequireAuth>
+        <PaperPage />
+      </RequireAuth>
+    ),
+  },
+  {
+    path: '/papers/:id/result',
+    element: (
+      <RequireAuth>
+        <PaperResultPage />
+      </RequireAuth>
+    ),
+  },
+  {
+    path: '/wrong-book',
+    element: (
+      <RequireAuth>
+        <WrongBookPage />
       </RequireAuth>
     ),
   },
