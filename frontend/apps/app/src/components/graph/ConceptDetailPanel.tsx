@@ -26,16 +26,19 @@ export function ConceptDetailPanel({ concept }: Props) {
     return (
       <aside className="text-muted-foreground border-border/60 rounded-xl border p-5 text-sm">
         点一个节点看详情。
-        <div className="mt-4 space-y-1.5 text-xs">
+        <div className="mt-4 space-y-2 text-xs">
           {(['unknown', 'learning', 'familiar', 'mastered'] as const).map((tier) => (
-            <p key={tier} className="flex items-center gap-2">
+            <div key={tier} className="flex items-start gap-2">
               <span
-                className="inline-block size-2.5 rounded-full"
+                className="mt-1 inline-block size-2.5 shrink-0 rounded-full"
                 style={{ backgroundColor: tierColor(tier) }}
               />
-              {tierStyle(tier).label}
-              <span className="opacity-70">— {tierStyle(tier).hint}</span>
-            </p>
+              {/* 标签列定宽 + nowrap：窄右栏里「了解/熟悉」曾被 flex 压成两行 */}
+              <span className="text-foreground/80 w-12 shrink-0 whitespace-nowrap font-medium">
+                {tierStyle(tier).label}
+              </span>
+              <span className="text-muted-foreground leading-5">{tierStyle(tier).hint}</span>
+            </div>
           ))}
         </div>
       </aside>

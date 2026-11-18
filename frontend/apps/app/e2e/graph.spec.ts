@@ -111,11 +111,10 @@ test.describe('知识图谱', () => {
     }
   })
 
-  test('没有 WebGL 时给出可读提示，不白屏', async ({ page, request }) => {
+  test('没有 WebGL 时 2D 图谱仍能正常渲染（纯 SVG，不白屏）', async ({ page, request }) => {
     const fixture = await createConceptFixture(request)
     try {
-      // 先打掉 WebGL：sigma 拿不到上下文就会抛，组件应降级成一句人话。
-      // **必须在导航之前注入**——渲染器一挂载就会申请上下文。
+      // 打掉 WebGL。**必须在导航之前注入**——渲染器一挂载就会申请上下文。
       await page.addInitScript(() => {
         const original = HTMLCanvasElement.prototype.getContext
         HTMLCanvasElement.prototype.getContext = function (
@@ -137,9 +136,28 @@ test.describe('知识图谱', () => {
       await openGraph(page)
 
       // **必须整页重载**：`goto('/#/graph')` 只是改 hash，不会重新执行文档脚本，
-      // 注入的 init script 也就不会生效（第一次写这条用例时它就红在这里）。
+      // 注入的 init script 也就不会生效。
       await page.reload()
-      await expect(page.getByTestId('graph-fallback')).toBeVisible({ timeout: 20_000 })
+
+      // 2D 已改为纯 SVG 渲染（WORK-082），不依赖 WebGL：应画出节点，而不是给降级提示。
+      await expect(page.getByTestId('graph-canvas-2d')).toBeVisible({ timeout: 20_000 })
+      await expect(page.getByTestId('graph-node').first()).toBeVisible({ timeout: 20_000 })
+      await expect(page.getByTestId('graph-fallback')).toHaveCount(0)
+    } finally {
+      await fixture.cleanup()
+    }
+  })
+
+  test('点节点即选中并在右栏显示详情', async ({ page, request }) => {
+    const fixture = await createConceptFixture(request)
+    try {
+      await openGraph(page)
+      const node = page.getByTestId('graph-node').first()
+      await expect(node).toBeVisible({ timeout: 15_000 })
+      // 用键盘触发选中：SVG 节点是 role=button + tabIndex=0，比按像素点更稳
+      await node.focus()
+      await node.press('Enter')
+      await expect(page.getByTestId('concept-detail')).toBeVisible({ timeout: 5_000 })
     } finally {
       await fixture.cleanup()
     }

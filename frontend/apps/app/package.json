@@ -31,8 +31,7 @@
     "lucide-react": "1.54.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "react-router": "8.4.0",
-    "sigma": "4.0.3"
+    "react-router": "8.4.0"
   },
   "devDependencies": {
     "@playwright/test": "1.64.0",
