@@ -3,6 +3,7 @@ package io.github.xiaou61.account.internal.web;
 import io.github.xiaou61.account.internal.credential.CaptchaService;
 import io.github.xiaou61.account.internal.credential.EmailCodeService;
 import io.github.xiaou61.account.internal.login.LoginService;
+import io.github.xiaou61.account.internal.passwordreset.PasswordResetService;
 import io.github.xiaou61.account.internal.registration.RegistrationService;
 import io.github.xiaou61.account.internal.token.AuthTokens;
 import io.github.xiaou61.account.internal.token.TokenService;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
  * 凭据交换端点。
@@ -42,17 +44,20 @@ class AuthController {
     private final RegistrationService registrationService;
     private final LoginService loginService;
     private final TokenService tokenService;
+    private final PasswordResetService passwordResetService;
 
     AuthController(CaptchaService captchaService,
                    EmailCodeService emailCodeService,
                    RegistrationService registrationService,
                    LoginService loginService,
-                   TokenService tokenService) {
+                   TokenService tokenService,
+                   PasswordResetService passwordResetService) {
         this.captchaService = captchaService;
         this.emailCodeService = emailCodeService;
         this.registrationService = registrationService;
         this.loginService = loginService;
         this.tokenService = tokenService;
+        this.passwordResetService = passwordResetService;
     }
 
     /** 下发一张图形验证码。它是"发邮箱验证码"的前置，不保护登录。 */
@@ -94,6 +99,34 @@ class AuthController {
         return ApiResponse.ok(null);
     }
 
+    /**
+     * 忘记密码：把一条一次性重置链接发到邮箱。
+     *
+     * <p>邮箱不存在时同样返回成功——这个端点的返回值不该能回答"这个邮箱有没有账号"。
+     */
+    @PostMapping("/password-reset/request")
+    ApiResponse<Void> requestPasswordReset(@Valid @RequestBody PasswordResetRequest body,
+                                           HttpServletRequest request) {
+        passwordResetService.request(body.email(), body.captchaId(), body.captchaAnswer(),
+                request.getRemoteAddr(), baseUrl(request));
+        return ApiResponse.ok(null);
+    }
+
+    /** 用邮件链接里的令牌设置新口令。成功即吊销该账号全部旧会话。 */
+    @PostMapping("/password-reset/confirm")
+    ApiResponse<Void> confirmPasswordReset(@Valid @RequestBody PasswordResetConfirmRequest body) {
+        passwordResetService.confirm(body.token(), body.password());
+        return ApiResponse.ok(null);
+    }
+
+    /**
+     * 当前请求的对外基地址，仅在没配 {@code paideia.account.web.base-url} 时作为链接兜底。
+     * 取自请求的 Host 头，因此它在可以被伪造的前提下一律不该被采用。
+     */
+    private static String baseUrl(HttpServletRequest request) {
+        return ServletUriComponentsBuilder.fromContextPath(request).build().toUriString();
+    }
+
     record CaptchaResponse(String captchaId, String imageBase64, String expiresAt) {
     }
 
@@ -119,5 +152,18 @@ class AuthController {
     }
 
     record RefreshRequest(@NotBlank @Size(max = 256) String refreshToken) {
+    }
+
+    record PasswordResetRequest(
+            @NotBlank @Email @Size(max = 254) String email,
+            @NotBlank @Size(max = 64) String captchaId,
+            @NotBlank @Size(max = 16) String captchaAnswer) {
+    }
+
+    record PasswordResetConfirmRequest(
+            // 32 字节的 base64url 是 43 个字符；上限放到 128 只为了不因为编码变化而误拒
+            @NotBlank @Size(max = 128) String token,
+            // 与注册同一套约束：上限 72 是 BCrypt 的输入上限
+            @NotBlank @Size(min = 8, max = 72) String password) {
     }
 }

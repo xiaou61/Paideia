@@ -15,10 +15,16 @@ import java.util.concurrent.ConcurrentHashMap;
 public class InMemoryMailPort implements MailPort {
 
     private final Map<String, String> codesByRecipient = new ConcurrentHashMap<>();
+    private final Map<String, String> resetLinksByRecipient = new ConcurrentHashMap<>();
 
     @Override
     public void sendVerificationCode(String to, String code, Duration validFor) {
         codesByRecipient.put(to, code);
+    }
+
+    @Override
+    public void sendPasswordReset(String to, String resetUrl, Duration validFor) {
+        resetLinksByRecipient.put(to, resetUrl);
     }
 
     /** 读取最近一次发给该收件人的验证码明文（生产代码里没有任何路径能拿到它）。 */
@@ -26,7 +32,13 @@ public class InMemoryMailPort implements MailPort {
         return Optional.ofNullable(codesByRecipient.get(to));
     }
 
+    /** 读取最近一次发给该收件人的重置链接（含令牌明文，只在测试里拿得到）。 */
+    public Optional<String> latestPasswordResetFor(String to) {
+        return Optional.ofNullable(resetLinksByRecipient.get(to));
+    }
+
     public void clear() {
         codesByRecipient.clear();
+        resetLinksByRecipient.clear();
     }
 }

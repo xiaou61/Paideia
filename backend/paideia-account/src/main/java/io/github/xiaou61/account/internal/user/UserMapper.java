@@ -145,6 +145,15 @@ public interface UserMapper {
     int updateRole(@Param("id") long id, @Param("role") String role);
 
     /**
+     * 改口令摘要（忘记密码重置）。
+     *
+     * <p>调用方传进来的**必须是已经哈希过的值**：这条 SQL 不做任何转换，
+     * 直接写进去的就是库里那一列。明文口令绝不能经过这里。
+     */
+    @Update("UPDATE users SET password_hash = #{passwordHash}, updated_at = CURRENT_TIMESTAMP(3) WHERE id = #{id}")
+    int updatePasswordHash(@Param("id") long id, @Param("passwordHash") String passwordHash);
+
+    /**
      * 批量读用户名（WORK-060，社区内容展示用）。
      *
      * <p>**只选 id 与 username**：邮箱、角色、口令摘要从查询层面就不存在，避免调用方

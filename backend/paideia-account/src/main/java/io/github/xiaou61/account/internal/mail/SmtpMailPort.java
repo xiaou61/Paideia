@@ -74,4 +74,35 @@ public final class SmtpMailPort implements MailPort {
 
                 如果这不是你本人的操作，忽略此邮件即可。""".formatted(code, validFor.toMinutes());
     }
+
+    @Override
+    public void sendPasswordReset(String to, String resetUrl, Duration validFor) {
+        try {
+            var message = sender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
+            helper.setFrom(properties.fromAddress(), properties.fromName());
+            helper.setTo(to);
+            helper.setSubject("Paideia 重置密码");
+            helper.setText(resetBody(resetUrl, validFor), false);
+            sender.send(message);
+        } catch (jakarta.mail.MessagingException | java.io.UnsupportedEncodingException
+                | org.springframework.mail.MailException exception) {
+            throw new IllegalStateException(
+                    "通过 %s:%d 发送重置密码邮件失败：%s".formatted(
+                            properties.host(), properties.port(), exception.getMessage()),
+                    exception);
+        }
+    }
+
+    private static String resetBody(String resetUrl, Duration validFor) {
+        return """
+                有人（希望是你）申请重置 Paideia 账号的密码。
+
+                请打开下面的链接设置新密码，链接 %d 分钟内有效，且只能用一次：
+
+                %s
+
+                如果这不是你本人的操作，忽略此邮件即可——你的密码不会被改动，
+                但建议你登录后检查一下账号。""".formatted(validFor.toMinutes(), resetUrl);
+    }
 }

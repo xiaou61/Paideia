@@ -29,6 +29,14 @@ export function LoginPage() {
         description="登录以继续你的学习。"
         footer={
           <>
+            <a
+              href="#/forgot-password"
+              className="text-foreground underline underline-offset-4"
+              data-testid="login-forgot-password"
+            >
+              忘记密码？
+            </a>
+            <span className="mx-2">·</span>
             还没有账号？
             <a href="#/register" className="text-foreground ml-1 underline underline-offset-4">
               立即注册

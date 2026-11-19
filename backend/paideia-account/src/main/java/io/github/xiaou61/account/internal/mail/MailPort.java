@@ -19,4 +19,13 @@ public interface MailPort {
      * @param validFor 有效期，用于文案
      */
     void sendVerificationCode(String to, String code, Duration validFor);
+
+    /**
+     * 发送"重置口令"的邮件，正文里是一条一次性链接。
+     *
+     * @param to       收件地址
+     * @param resetUrl 完整链接（**含令牌明文，只出现在这里，不得写日志**）
+     * @param validFor 生效期，用于文案
+     */
+    void sendPasswordReset(String to, String resetUrl, Duration validFor);
 }

@@ -53,6 +53,7 @@ src/main/resources/db/migration/V20261118161000__create_papers.sql -932725491
 src/main/resources/db/migration/V20261119103000__create_ai_essay_verifications.sql -1939296036
 src/main/resources/db/migration/V20261119110000__create_ops_log_patterns.sql -1743972308
 src/main/resources/db/migration/V20261119111000__ops_diagnoses_fulltext.sql 151243315
+src/main/resources/db/migration/V20261119150000__create_password_reset_tokens.sql 85289341
 src/main/resources/db/migration/V20__add_entry_read_indexes.sql -1148086735
 src/main/resources/db/migration/V21__create_ai_telemetry_tables.sql -891669932
 src/main/resources/db/migration/V22__create_learning_tracks.sql -976007377

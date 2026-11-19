@@ -18,6 +18,7 @@ import { LearnPage } from './pages/LearnPage'
 import { TrackMapPage } from './pages/TrackMapPage'
 import { SqlPracticePage } from './pages/SqlPracticePage'
 import { LoginPage } from './pages/LoginPage'
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { InterviewPage } from './pages/InterviewPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { McpTokensPage } from './pages/McpTokensPage'
@@ -27,6 +28,7 @@ import { NoteNewPage } from './pages/NoteNewPage'
 import { NotesPage } from './pages/NotesPage'
 import { OAuthCallbackPage } from './pages/OAuthCallbackPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { ResumeEditorPage } from './pages/ResumeEditorPage'
 import { ResumeImportReviewPage } from './pages/ResumeImportReviewPage'
 import { ResumeListPage, ResumeCreatePage } from './pages/ResumeListPage'
@@ -67,6 +69,10 @@ export const router = createHashRouter([
   },
   { path: '/login', element: <LoginPage /> },
   { path: '/register', element: <RegisterPage /> },
+  // 忘记密码两步（重置链接）：第一步发信、第二步用邮件里的令牌换新口令。
+  // 第二步**不包 RequireGuest**——它的凭据是令牌而不是当前会话，详情见 ResetPasswordPage。
+  { path: '/forgot-password', element: <ForgotPasswordPage /> },
+  { path: '/reset-password', element: <ResetPasswordPage /> },
   // 第三方登录回调（WORK-037）。它**不包 RequireAuth**——此刻还没登录，
   // 正是这个页面把用户变成已登录的。也不包 RequireGuest：已登录时从回调页进来
   // 是正常的（比如在另一个标签页里刚登录过），不该被弹回首页。

@@ -76,6 +76,15 @@ export interface AuthApi {
   oauthBindStart(provider: string): Promise<{ authorizeUrl: string }>
   oauthUnbind(provider: string): Promise<void>
   sendEmailCode(email: string, captchaId: string, captchaAnswer: string): Promise<void>
+  /**
+   * 申请重置密码链接。
+   *
+   * <p>邮箱没注册时后端也返回成功（否则这个端点就成了"查账号是否存在"的探测工具），
+   * 所以界面不能用它判断账号是否存在，只能说"如果该邮箱已注册"。
+   */
+  requestPasswordReset(email: string, captchaId: string, captchaAnswer: string): Promise<void>
+  /** 用邮件里的一次性链接换新密码。令牌一次性且 30 分钟过期，成功后该账号所有登录失效。 */
+  confirmPasswordReset(token: string, password: string): Promise<void>
   register(input: {
     username: string
     email: string
@@ -119,6 +128,18 @@ export function createAuthApi(client: ApiClient): AuthApi {
       client.requestEnvelope<void>(
         '/api/v1/auth/email-code',
         post({ email, captchaId, captchaAnswer }),
+      ),
+
+    requestPasswordReset: (email, captchaId, captchaAnswer) =>
+      client.requestEnvelope<void>(
+        '/api/v1/auth/password-reset/request',
+        post({ email, captchaId, captchaAnswer }),
+      ),
+
+    confirmPasswordReset: (token, password) =>
+      client.requestEnvelope<void>(
+        '/api/v1/auth/password-reset/confirm',
+        post({ token, password }),
       ),
 
     register: (input) => client.requestEnvelope<AuthTokens>('/api/v1/auth/register', post(input)),

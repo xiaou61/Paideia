@@ -39,6 +39,18 @@ public interface RefreshTokenMapper {
             """)
     int revokeFamily(@Param("familyId") String familyId, @Param("revokedAt") Instant revokedAt);
 
+    /**
+     * 吊销这个人**全部**会话（所有链）。用于改口令：口令都换了，旧会话不该还能续期。
+     *
+     * <p>只置 {@code revoked_at}、不删行：留着才能让重用检测认出"这把钥匙已经被收回了"。
+     * 过期的行由 {@code deleteExpiredBefore} 定期清掉。
+     */
+    @Update("""
+            UPDATE refresh_tokens SET revoked_at = #{revokedAt}
+            WHERE user_id = #{userId} AND revoked_at IS NULL
+            """)
+    int revokeAllForUser(@Param("userId") long userId, @Param("revokedAt") Instant revokedAt);
+
     @Select("SELECT COUNT(*) FROM refresh_tokens WHERE family_id = #{familyId} AND revoked_at IS NULL")
     int countAliveInFamily(@Param("familyId") String familyId);
 

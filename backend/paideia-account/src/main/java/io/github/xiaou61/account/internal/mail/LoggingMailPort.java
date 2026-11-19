@@ -25,4 +25,12 @@ public final class LoggingMailPort implements MailPort {
                 这只适用于本地开发；部署到任何他人可访问的环境前必须关闭该开关并配置真实 SMTP。""",
                 to, code, validFor.toMinutes());
     }
+
+    @Override
+    public void sendPasswordReset(String to, String resetUrl, Duration validFor) {
+        log.warn("""
+                paideia.mail.allow-log-fallback=true 已显式开启，重置链接改为写日志：收件人={}，链接={}，有效期={} 分钟。
+                这只适用于本地开发；部署到任何他人可访问的环境前必须关闭该开关并配置真实 SMTP。""",
+                to, resetUrl, validFor.toMinutes());
+    }
 }
