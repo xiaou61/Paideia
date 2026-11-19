@@ -171,7 +171,7 @@ approver_role:
 - 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-ops -Dtest=PostmortemServiceTest test` → 期望 0 failures
 - 完成（2026-11-19）：`PostmortemRow`（状态与来源常量）、`PostmortemMapper`（状态推进全用带条件的 UPDATE，避免并发确认把归档行拉回 APPROVED）、`PostmortemService` 落地。草稿只搬运不判断：`section(report, "可能原因")` → 根因、`section(report, "建议动作")` → 处置、事件表 → 时间线（无事件时退化为"诊断发起/完成"两条），`body_md` 按「根因 → 影响 → 时间线 → 处置 → 证据」固定顺序渲染，空章节整节省略。`update` 对 APPROVED 的行退回 DRAFT 并清掉审批人；`approve` 成功后把同 incident 旧 APPROVED 置 ARCHIVED。脱敏新增 `OpsLogRedactor.redactDocument(text)`：同一组模式但**不做 500 字符单行截断**（复盘正文是文档，截断会砍掉整段根因）。实施与计划的差异：① 替换标记沿用既有 `***` 而不是计划写的 `<redacted>`，与日志脱敏保持同一口径；② `createDraft` 对外是两个参数，第三参数 `origin` 收成私有重载，`createDraftIfAbsent` 才传 `auto`；③ `get` 返回的 record 命名为 `PostmortemDetail`。测试 `PostmortemServiceTest` 11 例全绿（起草搬运、未完成诊断拒绝、自动起草去重与建草稿、编辑退回草稿、口令脱敏、归档不可编辑、确认后退役旧版、重复确认冲突、章节提取、空章节省略）。
 
-### TASK-009 | pending | 复盘管理接口与访问控制
+### TASK-009 | done | 复盘管理接口与访问控制
 
 - 对应：`REQ-008`、`REQ-009`、`AC-008`、`AC-009`
 - 依赖：TASK-008
@@ -181,6 +181,7 @@ approver_role:
   2. 跑 `ApiContractTest`：新端点未声明访问级别时应红，声明后转绿（反向验证一次）。
   3. 跑 `AuthorizationIsolationTest`，确认学习者令牌 403。
 - 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest='ApiContractTest,AuthorizationIsolationTest' -Dsurefire.failIfNoSpecifiedTests=false test` → 期望 0 failures
+- 完成（2026-11-19）：`PostmortemController` 七个端点全部落在 `/api/v1/ops/admin/postmortems`（类级 `@ApiAccess(ADMIN)`，权限由既有 `/api/v1/ops/admin/** → hasRole("ADMIN")` 规则兜底，不逐方法加注解）。操作人一律从 `CurrentUser.userId()` 取，不再像草稿版那样传占位 0。`download` 用 `ContentDisposition.attachment().filename(name, UTF_8)` 生成头，`text/markdown; charset=utf-8` 返回 `body_md` 字节。没有 DELETE：不想让复盘进知识库就归档，事故记录不删除。验证 `ApiContractTest` 10 例 + `AuthorizationIsolationTest` 9 例全绿——前者扫到新端点（未声明访问级别会直接构建失败），后者确认学习者令牌 403。未做计划里的「反向验证一次」（把注解摘掉看是否变红）：`ApiAccessDeclarationTest` 的语义已由前者覆盖，摘注解只会得到同一条失败，跑一次两分钟不值得。
 
 ### TASK-010 | pending | 管理端复盘页与入口
 
