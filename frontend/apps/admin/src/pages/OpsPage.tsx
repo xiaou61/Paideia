@@ -446,6 +446,20 @@ function DiagnosisItem({
 
   const label = item.triggerType === 'alert' ? `告警：${item.alertName ?? '未知'}` : '手动诊断'
 
+  // 起草复盘（WORK-086）：只起草、不确认——闸门在复盘页，免得一键把模型产出变成"经验"。
+  const draft = useMutation({
+    mutationFn: () =>
+      api.requestEnvelope<{ id: number }>('/api/v1/ops/admin/postmortems', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ diagnosisId: item.id }),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['ops', 'postmortems'] })
+      window.location.hash = '#/ops/postmortems'
+    },
+  })
+
   return (
     <li className="border-border border-t py-3 first:border-t-0">
       <button
@@ -526,7 +540,22 @@ function DiagnosisItem({
                     已评：{RATINGS.find((option) => option.value === item.rating)?.label ?? item.rating}
                   </span>
                 ) : null}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => draft.mutate()}
+                  disabled={draft.isPending}
+                  data-testid={`ops-postmortem-${item.id}`}
+                  title="起草一份复盘草稿；确认后才进入知识召回"
+                >
+                  生成复盘
+                </Button>
               </div>
+              {draft.isError ? (
+                <p className="text-destructive mt-2 text-xs" role="alert">
+                  起草复盘失败：{errorMessage(draft.error, '未知错误')}
+                </p>
+              ) : null}
               {rate.isError ? (
                 <p className="text-destructive mt-2 text-xs" role="alert">
                   评分失败：{errorMessage(rate.error, '未知错误')}
@@ -657,4 +686,3 @@ function PatternSection() {
 function formatTime(value: string): string {
   return formatLocalDateTime(value)
 }
-

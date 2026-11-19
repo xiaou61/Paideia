@@ -183,7 +183,7 @@ approver_role:
 - 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest='ApiContractTest,AuthorizationIsolationTest' -Dsurefire.failIfNoSpecifiedTests=false test` → 期望 0 failures
 - 完成（2026-11-19）：`PostmortemController` 七个端点全部落在 `/api/v1/ops/admin/postmortems`（类级 `@ApiAccess(ADMIN)`，权限由既有 `/api/v1/ops/admin/** → hasRole("ADMIN")` 规则兜底，不逐方法加注解）。操作人一律从 `CurrentUser.userId()` 取，不再像草稿版那样传占位 0。`download` 用 `ContentDisposition.attachment().filename(name, UTF_8)` 生成头，`text/markdown; charset=utf-8` 返回 `body_md` 字节。没有 DELETE：不想让复盘进知识库就归档，事故记录不删除。验证 `ApiContractTest` 10 例 + `AuthorizationIsolationTest` 9 例全绿——前者扫到新端点（未声明访问级别会直接构建失败），后者确认学习者令牌 403。未做计划里的「反向验证一次」（把注解摘掉看是否变红）：`ApiAccessDeclarationTest` 的语义已由前者覆盖，摘注解只会得到同一条失败，跑一次两分钟不值得。
 
-### TASK-010 | pending | 管理端复盘页与入口
+### TASK-010 | done | 管理端复盘页与入口
 
 - 对应：`REQ-008`、`AC-008`
 - 依赖：TASK-009
@@ -195,6 +195,22 @@ approver_role:
   3. 写 `frontend/apps/admin/e2e/postmortems.spec.ts`：断言导航可见、打开列表、创建草稿后出现 DRAFT 徽标、`origin=auto` 草稿带「自动起草」标记。
   4. 跑 typecheck 与单 spec。
 - 验证：`pnpm -C frontend --filter @paideia/admin typecheck` → 0 errors；`pnpm -C frontend --filter @paideia/admin exec playwright test e2e/postmortems.spec.ts` → 期望 passed
+
+完成（2026-11-19）：
+
+- 页面 `PostmortemsPage.tsx` 落地：左侧列表（状态筛选、`origin=auto` 标「自动起草」、分页），右侧详情三页签
+  （编辑 / 预览 / 正文 Markdown），动作按钮 `postmortem-save|approve|archive|download`。
+- 贴图走知识附件通道（不新增存储）：粘贴或选文件 ⇒ `POST /api/v1/knowledge/admin/files` ⇒ 光标处插入
+  `![文件名](url)`，旁边固定写「截图请遮盖口令与连接串」；上传失败只提示、不改正文。
+- **下载不能用 `<a href>`**：令牌在内存里、不在 Cookie 里，直链会 401 ⇒ 改 `api.stream()` 取 blob 再触发
+  临时 `<a download>`。
+- 入口三处齐：`router.tsx` 的 `/ops/postmortems`（`RequireAdmin`）、`AdminShell` 菜单「复盘」+ 面包屑
+  「运维复盘」、诊断详情里的「生成复盘」按钮（`POST /postmortems` 后跳转）。符合 AGENTS「新页面必须有入口」。
+- e2e 只证明「进得去、空状态/列表文案明确、筛选可切换」；**创建草稿后出现 DRAFT 徽标没有放进 e2e**——
+  那需要一条真实的 DONE 诊断，假造会绕过「复盘必须来自真实诊断」这条约束，改由 TASK-014 的生产重放覆盖。
+- 实测：`pnpm --filter @paideia/admin typecheck` 0 error；`playwright test e2e/postmortems.spec.ts` **2 passed**。
+  踩坑记录：Playwright 的 `webServer` 探活写的是 `127.0.0.1`，而 Windows 上 Vite 只监听 `[::1]:5174`，
+  于是 webServer 60s 超时——本次用 `E2E_BASE_URL=http://localhost:5174` 直接打已起的 dev server 绕过。
 
 ### TASK-011 | done | 知识召回（只认已确认复盘）
 

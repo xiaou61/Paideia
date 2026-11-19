@@ -16,6 +16,7 @@ import { SqlDatasetReportsPage } from './pages/SqlDatasetReportsPage'
 import { SqlDatasetsPage } from './pages/SqlDatasetsPage'
 import { OpsPage } from './pages/OpsPage'
 import { IncidentsPage } from './pages/IncidentsPage'
+import { PostmortemsPage } from './pages/PostmortemsPage'
 import { RequireAdmin } from './require-admin'
 
 /**
@@ -157,6 +158,15 @@ export const router = createHashRouter([
     element: (
       <RequireAdmin>
         <IncidentsPage />
+      </RequireAdmin>
+    ),
+  },
+  {
+    // 运维复盘（WORK-086）：诊断 → 复盘 → 知识召回这条闭环的人工闸门在这里。
+    path: '/ops/postmortems',
+    element: (
+      <RequireAdmin>
+        <PostmortemsPage />
       </RequireAdmin>
     ),
   },
