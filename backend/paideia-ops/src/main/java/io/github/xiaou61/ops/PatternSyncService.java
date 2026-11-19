@@ -7,7 +7,9 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +21,10 @@ import org.springframework.stereotype.Service;
  *
  * <p>幂等：桶按窗口对齐，同步每轮都会用「该窗口的重算值」覆盖同名桶（upsert count = VALUES），
  * 所以几分钟一次的重复同步不会把频次刷成两倍。
+ *
+ * <p>查询窗口用 {@code lookback-minutes}（默认 60），比检测窗口宽：Loki 的模板查询硬编码
+ * 「窗口内累计不足 30 条就剪掉」（{@code minClusterSize = 30}），窗口开太窄本项目根本查不到模板。
+ * 窗口内的**每条采样点**按自己的时间戳落桶，所以长窗口不会污染单个桶。
  */
 @Service
 class PatternSyncService {
@@ -53,37 +59,70 @@ class PatternSyncService {
             return 0; // 上一轮还没跑完：直接跳过，避免并发重复写同一窗口的桶
         }
         try {
-            Instant bucketStart = bucketStart(now, cfg.getWindowMinutes());
-        Instant bucketEnd = bucketStart.plusSeconds(cfg.getWindowMinutes() * 60L);
-        ZonedDateTime local = bucketStart.atZone(ZoneId.systemDefault());
-        int dow = local.getDayOfWeek().getValue() % 7; // 0=周日，与 buckets.dow 约定一致
-        int hour = local.getHour();
+            int windowMinutes = Math.max(1, cfg.getWindowMinutes());
+            long lookbackMinutes = Math.max(windowMinutes, cfg.getLookbackMinutes());
+            Instant from = now.minusSeconds(lookbackMinutes * 60L);
 
-        int written = 0;
-        for (String unit : cfg.getUnits()) {
-            if (unit == null || unit.isBlank()) {
-                continue;
+            int written = 0;
+            for (String unit : cfg.getUnits()) {
+                if (unit == null || unit.isBlank()) {
+                    continue;
+                }
+                String selector = "{unit=\"" + unit + ".service\"}";
+                List<LokiClient.PatternSeries> series =
+                        loki.patterns(selector, from, now, cfg.getMaxTemplates());
+                for (LokiClient.PatternSeries one : series) {
+                    if (writeSeries(unit, one, windowMinutes, now)) {
+                        written++;
+                    }
+                }
             }
-            String selector = "{unit=\"" + unit + ".service\"}";
-            List<LokiClient.PatternSample> samples =
-                    loki.patterns(selector, bucketStart, bucketEnd, cfg.getMaxTemplates());
-            for (LokiClient.PatternSample sample : samples) {
-                String hash = sha256(sample.pattern());
-                String pattern = truncate(sample.pattern(), PATTERN_COLUMN_MAX);
-                String sampleLine = truncate(sample.pattern(), SAMPLE_COLUMN_MAX);
-                Instant seenAt = sample.at() == null ? now : sample.at();
-                int count = (int) Math.min(Integer.MAX_VALUE, Math.max(0, sample.count()));
-                mapper.upsertTemplate(hash, unit, pattern, sampleLine, seenAt, seenAt,
-                        count, count, now, now);
-                mapper.upsertBucket(hash, unit, bucketStart, dow, hour, count, now);
-                written++;
-            }
-        }
             purge(now, cfg.getRetentionDays());
             return written;
         } finally {
             running.set(false);
         }
+    }
+
+    /** 把一个模板的采样点按窗口折算成桶并落库；返回是否写入。 */
+    private boolean writeSeries(String unit, LokiClient.PatternSeries series,
+                                int windowMinutes, Instant now) {
+        Map<Instant, Long> perBucket = new LinkedHashMap<>();
+        Instant first = null;
+        Instant last = null;
+        long lastCount = 0;
+        long total = 0;
+        for (LokiClient.PatternSample sample : series.samples()) {
+            Instant at = sample.at();
+            if (at == null) {
+                continue;
+            }
+            int count = (int) Math.min(Integer.MAX_VALUE, Math.max(0, sample.count()));
+            perBucket.merge(bucketStart(at, windowMinutes), (long) count, Long::sum);
+            if (first == null || at.isBefore(first)) {
+                first = at;
+            }
+            if (last == null || !at.isBefore(last)) {
+                last = at;
+                lastCount = count;
+            }
+            total += count;
+        }
+        if (perBucket.isEmpty()) {
+            return false;
+        }
+        String hash = sha256(series.pattern());
+        String pattern = truncate(series.pattern(), PATTERN_COLUMN_MAX);
+        String sampleLine = truncate(series.pattern(), SAMPLE_COLUMN_MAX);
+        mapper.upsertTemplate(hash, unit, pattern, sampleLine, first, last,
+                (int) Math.min(Integer.MAX_VALUE, lastCount), total, now, now);
+        for (Map.Entry<Instant, Long> entry : perBucket.entrySet()) {
+            ZonedDateTime local = entry.getKey().atZone(ZoneId.systemDefault());
+            int dow = local.getDayOfWeek().getValue() % 7; // 0=周日，与 buckets.dow 约定一致
+            mapper.upsertBucket(hash, unit, entry.getKey(), dow, local.getHour(),
+                    (int) Math.min(Integer.MAX_VALUE, entry.getValue()), now);
+        }
+        return true;
     }
 
     private void purge(Instant now, int retentionDays) {

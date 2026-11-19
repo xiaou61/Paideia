@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -23,25 +24,25 @@ class PatternSyncServiceTest {
 
     private final Instant now = Instant.parse("2026-11-19T10:22:00Z");
 
-    /** 假 Loki：返回固定模板样本；可选在第一轮加一个闩，用于测单飞。 */
+    /** 假 Loki：返回固定模板序列；可选在第一轮加一个闩，用于测单飞。 */
     private static final class FakeLoki extends LokiClient {
-        private final List<PatternSample> samples;
+        private final List<LokiClient.PatternSeries> series;
         private final CountDownLatch entered;
         private final CountDownLatch release;
 
-        FakeLoki(List<PatternSample> samples) {
-            this(samples, null, null);
+        FakeLoki(List<LokiClient.PatternSeries> series) {
+            this(series, null, null);
         }
 
-        FakeLoki(List<PatternSample> samples, CountDownLatch entered, CountDownLatch release) {
+        FakeLoki(List<LokiClient.PatternSeries> series, CountDownLatch entered, CountDownLatch release) {
             super("http://127.0.0.1:3100", 1000);
-            this.samples = samples;
+            this.series = series;
             this.entered = entered;
             this.release = release;
         }
 
         @Override
-        List<PatternSample> patterns(String query, Instant from, Instant to, int maxSamples) {
+        List<LokiClient.PatternSeries> patterns(String query, Instant from, Instant to, int maxSeries) {
             if (entered != null) {
                 entered.countDown();
                 try {
@@ -50,8 +51,19 @@ class PatternSyncServiceTest {
                     Thread.currentThread().interrupt();
                 }
             }
-            return samples;
+            return series;
         }
+    }
+
+    /** 一个模板 + 若干采样点；`at` 是采样时间，`count` 是该 10 秒格的条数。 */
+    private static LokiClient.PatternSeries series(String pattern, Instant from, int... counts) {
+        List<LokiClient.PatternSample> samples = new java.util.ArrayList<>();
+        Instant at = from;
+        for (int count : counts) {
+            samples.add(new LokiClient.PatternSample(at, count));
+            at = at.plusSeconds(10);
+        }
+        return new LokiClient.PatternSeries(pattern, samples);
     }
 
     private OpsProperties props() {
@@ -89,7 +101,7 @@ class PatternSyncServiceTest {
     @DisplayName("正常一轮把模板与桶写库")
     void syncUpsertsTemplatesAndBuckets() {
         PatternMapper mapper = mock(PatternMapper.class);
-        FakeLoki loki = new FakeLoki(List.of(new LokiClient.PatternSample("boom at {{id}}", 42, now)));
+        FakeLoki loki = new FakeLoki(List.of(series("boom at {{id}}", now, 42)));
         PatternSyncService service = new PatternSyncService(props(), mapper, loki);
 
         int written = service.syncOnce(now);
@@ -97,10 +109,30 @@ class PatternSyncServiceTest {
         assertThat(written).isEqualTo(1);
         verify(mapper).upsertTemplate(anyString(), anyString(), anyString(), anyString(), any(), any(),
                 anyInt(), anyLong(), any(), any());
-        verify(mapper).upsertBucket(anyString(), anyString(), any(), anyInt(), anyInt(), anyInt(), any());
+        // 单个采样点落一个桶：桶边界就是它所在的 15 分钟窗口。
+        verify(mapper).upsertBucket(anyString(), anyString(),
+                eq(PatternSyncService.bucketStart(now, 15)), anyInt(), anyInt(), eq(42), any());
         verify(mapper).purgeBuckets(any());
         verify(mapper).purgeTemplates(any());
         verify(mapper).purgeAnomalies(any());
+    }
+
+    @Test
+    @DisplayName("长回看窗口内跨桶的采样点各落各的桶，不合并成一个")
+    void syncSplitsSamplesAcrossBuckets() {
+        PatternMapper mapper = mock(PatternMapper.class);
+        // 两个采样点相隔 20 分钟，必然落在两个不同的 15 分钟桶里。
+        Instant at = now.minusSeconds(30 * 60L);
+        FakeLoki loki = new FakeLoki(List.of(new LokiClient.PatternSeries("timeout", List.of(
+                new LokiClient.PatternSample(at, 5),
+                new LokiClient.PatternSample(at.plusSeconds(20 * 60L), 7)))));
+        PatternSyncService service = new PatternSyncService(props(), mapper, loki);
+
+        assertThat(service.syncOnce(now)).isEqualTo(1);
+        verify(mapper).upsertBucket(anyString(), anyString(),
+                eq(PatternSyncService.bucketStart(at, 15)), anyInt(), anyInt(), eq(5), any());
+        verify(mapper).upsertBucket(anyString(), anyString(),
+                eq(PatternSyncService.bucketStart(at.plusSeconds(20 * 60L), 15)), anyInt(), anyInt(), eq(7), any());
     }
 
     @Test
@@ -120,7 +152,7 @@ class PatternSyncServiceTest {
         PatternMapper mapper = mock(PatternMapper.class);
         CountDownLatch entered = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
-        FakeLoki slow = new FakeLoki(List.of(new LokiClient.PatternSample("p", 1, now)), entered, release);
+        FakeLoki slow = new FakeLoki(List.of(series("p", now, 1)), entered, release);
         PatternSyncService service = new PatternSyncService(props(), mapper, slow);
 
         AtomicReference<Integer> first = new AtomicReference<>();

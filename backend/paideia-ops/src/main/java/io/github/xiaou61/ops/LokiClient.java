@@ -66,20 +66,41 @@ class LokiClient {
     record LogLine(Instant at, String line) {
     }
 
-    record PatternSample(String pattern, long count, Instant at) {
+    /** 一个日志模板及其原始采样点。 */
+    record PatternSeries(String pattern, List<PatternSample> samples) {
+
+        /** 采样点计数之和（该模板在查询窗口内的总条数）。 */
+        long total() {
+            long sum = 0;
+            for (PatternSample sample : samples) {
+                sum += sample.count();
+            }
+            return sum;
+        }
+    }
+
+    /** 单个采样点：Loki 按 10 秒一格给 [epoch 秒, 条数]。 */
+    record PatternSample(Instant at, long count) {
     }
 
     /**
      * 读取 Loki pattern ingester 的模板频次（WORK-085）。
      *
-     * <p>端点 {@code /loki/api/v1/patterns} 属 Loki 较新的实验接口（由 pattern_ingester 提供），
-     * 返回每个模板在一段时间内的采样点。这里把采样点的 count 求和当作窗口内的条数：同步每轮
-     * 都会重算同一窗口并覆盖桶，所以求和是「重算」而不是「累加」。
+     * <p>端点 {@code /loki/api/v1/patterns} 属 Loki 较新的实验接口（由 pattern_ingester 提供）。
+     * 实测返回形如
+     * {@code {"status":"success","data":[{"pattern":"...","level":"info","samples":[[epoch秒,条数],...]}]}}，
+     * 采样点是 10 秒一格。**每条的采样时间必须保留**：同步要按采样点时间落检测窗口的桶，
+     * 把整段窗口求和成一条会把几小时的数据塞进同一个桶（2026-11-19 实测修正）。
+     *
+     * <p>另一个实测约束：Loki 在 {@code pkg/pattern/ingester_querier.go} 里硬编码
+     * {@code minClusterSize = 30}，查询窗口内累计不足 30 条的模板会被直接剪掉、根本不会返回。
+     * 所以调用方必须用足够长的窗口查询（见 {@code paideia.ops.patterns.lookback-minutes}），
+     * 并且不能把「查不到」当成「模板不存在」。
      *
      * <p>接口不存在、返回体不认识、或 Loki 不可达 —— 一律返回空列表，调用方据此按「不可用」
      * 降级，不要当成「没有模板」。
      */
-    List<PatternSample> patterns(String query, Instant from, Instant to, int maxSamples) {
+    List<PatternSeries> patterns(String query, Instant from, Instant to, int maxSeries) {
         String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
         String url = baseUrl + "/loki/api/v1/patterns?query=" + encoded
                 + "&start=" + from.getEpochSecond() + "000000000"
@@ -92,28 +113,31 @@ class LokiClient {
         if (!data.isArray()) {
             return List.of();
         }
-        List<PatternSample> out = new ArrayList<>();
+        List<PatternSeries> out = new ArrayList<>();
         for (JsonNode item : data) {
             String pattern = item.path("pattern").asText("");
             if (pattern.isBlank()) {
                 continue;
             }
-            long sum = 0;
-            Instant last = null;
+            List<PatternSample> samples = new ArrayList<>();
             for (JsonNode sample : item.path("samples")) {
                 if (!sample.isArray() || sample.size() < 2) {
                     continue;
                 }
                 Double count = OpsHttp.parseDouble(sample.get(1).asText());
-                if (count != null) {
-                    sum += count.longValue();
+                Instant at = parseSampleTime(sample.get(0).asText());
+                if (count == null || at == null) {
+                    continue;
                 }
-                last = parseSampleTime(sample.get(0).asText());
+                samples.add(new PatternSample(at, count.longValue()));
             }
-            out.add(new PatternSample(pattern, sum, last));
+            if (samples.isEmpty()) {
+                continue;
+            }
+            out.add(new PatternSeries(pattern, samples));
         }
-        out.sort(Comparator.comparingLong(PatternSample::count).reversed());
-        return out.size() > maxSamples ? out.subList(0, maxSamples) : out;
+        out.sort(Comparator.comparingLong(PatternSeries::total).reversed());
+        return out.size() > maxSeries ? out.subList(0, maxSeries) : out;
     }
 
     private static Instant parseSampleTime(String raw) {

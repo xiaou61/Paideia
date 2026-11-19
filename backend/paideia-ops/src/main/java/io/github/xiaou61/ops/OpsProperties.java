@@ -358,6 +358,15 @@ public class OpsProperties {
         /** 检测窗口宽度（分钟），桶按此宽度对齐。 */
         private int windowMinutes = 15;
 
+        /**
+         * 每轮同步向 Loki 查询的历史长度（分钟），要显著大于窗口宽度。
+         *
+         * <p>原因（2026-11-19 实测）：Loki pattern 查询硬编码 {@code minClusterSize = 30}，窗口内
+         * 累计不足 30 条模板的 series 会被剪掉。本项目日志量小（约 7 行/分钟），只有拉长窗口
+         * 才能让同一模板凑到 30 条。上限受 Loki {@code retain_for}（默认 3h）约束，别超过 180。
+         */
+        private int lookbackMinutes = 60;
+
         /** 基线回看周数；同 dow+hour 的历史窗口在这段范围内取样。 */
         private int baselineWeeks = 4;
 
@@ -419,6 +428,14 @@ public class OpsProperties {
 
         public void setWindowMinutes(int windowMinutes) {
             this.windowMinutes = windowMinutes;
+        }
+
+        public int getLookbackMinutes() {
+            return lookbackMinutes;
+        }
+
+        public void setLookbackMinutes(int lookbackMinutes) {
+            this.lookbackMinutes = lookbackMinutes;
         }
 
         public int getBaselineWeeks() {

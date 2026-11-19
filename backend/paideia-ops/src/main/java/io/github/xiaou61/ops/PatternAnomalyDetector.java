@@ -33,8 +33,10 @@ class PatternAnomalyDetector {
         if (!cfg.isEnabled()) {
             return List.of();
         }
-        Instant windowStart = PatternSyncService.bucketStart(now, cfg.getWindowMinutes());
-        Instant windowEnd = windowStart.plusSeconds(cfg.getWindowMinutes() * 60L);
+        // 只看最近一个「完整」窗口：桶刚开几分钟时当前桶是半截的，拿去和完整基线比会把
+        // 正常的低计数误判成 DISAPPEARED（2026-11-19 实测修正）。
+        Instant windowEnd = PatternSyncService.bucketStart(now, cfg.getWindowMinutes());
+        Instant windowStart = windowEnd.minusSeconds(cfg.getWindowMinutes() * 60L);
         Instant prevStart = windowStart.minusSeconds(cfg.getWindowMinutes() * 60L);
         ZonedDateTime local = windowStart.atZone(ZoneId.systemDefault());
         int dow = local.getDayOfWeek().getValue() % 7;

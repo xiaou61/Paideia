@@ -59,3 +59,31 @@ evidence: required
 
 - 若线上 Loki 版本的 `/loki/api/v1/patterns` 结构与预期不同，`PatternSyncService` 会降级为「本轮 0 条」，不误报但也不产出模板——按笔记的降级路径处理。
 - `Gauge` 抓取时读 DB（3 次 countOpen）；DB 抖动时返回 0，不影响 `/metrics`，但会让告警短暂「无异常」。
+
+## 上线实测修正（2026-11-19，部署后追加）
+
+首次部署到 codenest-online 后在服务器上实测，发现并修掉 4 个真实问题。**这些修正未经设计稿签署流程变更，属实测驱动的实现纠偏**，逐条记录如下。
+
+| # | 问题 | 证据 | 修正 |
+| --- | --- | --- | --- |
+| 1 | `loki-config.yaml` 的 `pattern_ingester.metric_aggregation.enabled` / `downsample_period` 是**不存在的字段**，Loki 会拒绝启动 | `loki -verify-config`：`field enabled not found in type aggregation.Config`、`field downsample_period not found` | 改为在 `limits_config` 里开 `metric_aggregation_enabled: true` / `pattern_persistence_enabled: true`；`metric_aggregation` 只留 `loki_address`。`-verify-config` exit 0、重启后 `/config` 与 journal 正常 |
+| 2 | `LokiClient.patterns()` 把窗口内所有采样点**求和成一条**，长窗口数据会全塞进同一个检测桶 | 真实返回是 `data:[{pattern,level,samples:[[epoch秒,条数],...]}]`，10 秒一格 | 改为返回 `PatternSeries(pattern, List<PatternSample(at,count)>)`，保留每条采样时间；`PatternSyncService` 按采样点时间折算桶 |
+| 3 | 查询窗口太窄 → 永远查不到模板 | Loki `pkg/pattern/ingester_querier.go` 硬编码 `minClusterSize = 30`，窗口内累计不足 30 条的模板被剪掉（`loki_pattern_ingester_query_pruned_total` 涨）；实测 40 行相同日志能查到，`paideia.service` 60 分钟窗口为空 | 新增 `paideia.ops.patterns.lookback-minutes`（默认 60，必须显著大于检测窗口）；上线 60 分钟窗口可覆盖 15m 桶 |
+| 4 | 检测用「当前（半截）桶」与完整基线比，桶刚开始时会把正常低计数误判成 `DISAPPEARED` | 代码走查 + 桶按 15m 对齐的语义 | `PatternAnomalyDetector` 改为只看**最近一个完整窗口**：`windowEnd = bucketStart(now)`、`windowStart = windowEnd - window` |
+
+顺带修掉一处数据放大：`ops_log_templates.total_count` 原为累加（`total_count + VALUES(...)`），每几分钟重算同一段历史会越刷越大，改为 `GREATEST(total_count, VALUES(...))`（= 最近一轮回看窗口内的条数）。
+
+新增回归测试（补测，均通过）：
+
+| 检查项 | 命令 | 退出码 | 结果 |
+| --- | --- | --- | --- |
+| ops 单测（含新增 `LokiClientPatternsTest` 3 条、`syncSplitsSamplesAcrossBuckets` 1 条） | `mvn -B -pl paideia-ops -am -Dtest=LokiClientPatternsTest,PatternSyncServiceTest,PatternAnomalyDetectorTest,PatternQueryServiceTest,PatternTriggerServiceTest,PatternControllerTest -Dsurefire.failIfNoSpecifiedTests=false test` | 0 | 21 条全绿（ops 相关 21 = sync 7 + detector 4 + query 3 + trigger 2 + controller 2 + loki 3） |
+| 配置可解析 | 服务器 `loki -config.file=/etc/loki/loki-config.yaml -verify-config` | 0 | 通过（旧配置此项直接失败） |
+| Grafana 规则加载 | `grep -c "uid: paideia-" /etc/grafana/provisioning/alerting/paideia-rules.yaml` | 0 | 18 条（原 17 + `paideia-pattern-anomaly`），`grafana-server` active |
+| Grafana 面板加载 | 覆盖 `provisioning/dashboards/paideia-ops.json` + restart | 0 | 最后一个 panel =「日志模板异常（未处理）」 |
+
+### 已知限制（写进运维认知，不是缺陷）
+
+- `minClusterSize = 30` 是 Loki 写死的：本项目约 7 行/分钟的日志量，单模板在短窗口内凑不到 30 条就查不到。
+  因此模板表可能长时间为空/很少，这是**正常现象**，不代表同步故障。要更多模板只能拉长 `lookback-minutes`（上限受 Loki `retain_for` 3h 约束）。
+- 检测窗口锚定「上一个完整桶」，所以异常从发生到入库最多延迟一个窗口（15m）+ 一个同步周期（5m）。
