@@ -4,175 +4,149 @@ category: mysql-from-zero
 order: 9
 chapter: 事务与并发
 level: advanced
-minutes: 24
+minutes: 18
 prerequisite: 08 · 范式与表设计
 status: published
 ---
 
 # 09 · 事务与 ACID
 
-## 这一课你要会
+## 两个请求都"成功"了，库存变成了 -1
 
-- 用 `BEGIN` / `COMMIT` / `ROLLBACK` 控制边界；
-- 说清原子性、一致性、隔离性、持久性各自防的是什么；
-- 知道事务边界该划在哪，以及为什么"操作完立刻提交"经常是错的。
-
-## 为什么
-
-转账要扣一个人、加一个人。如果扣完钱、加钱之前服务崩了，钱就消失了。
-
-事务就是让这一组操作"要么全做、要么全不做"。听起来是个很基础的工具，但真正难的是**边界划在哪**——划小了中间状态会被别人看到，划大了锁住的东西太多，并发全被卡死。
-
-## 讲解
-
-### 三个命令
+这段可以直接自己复现。建一张只有一件商品的库存表，然后开两个会话：
 
 ```sql
-START TRANSACTION;   -- 或 BEGIN，开始
-...                  -- 一组操作
+-- 会话 A
+SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+BEGIN;
+SELECT qty FROM stock WHERE id = 1;   -- 看到 1
+-- （先不提交，停在这里）
+
+-- 会话 B（另开一个窗口）
+BEGIN;
+SELECT qty FROM stock WHERE id = 1;   -- 也看到 1，因为 A 还没提交
+UPDATE stock SET qty = qty - 1 WHERE id = 1;
+COMMIT;
+
+-- 回到会话 A
+UPDATE stock SET qty = qty - 1 WHERE id = 1;
+COMMIT;
+```
+
+```text
+mysql> SELECT qty FROM stock WHERE id = 1;
++------+
+| qty  |
++------+
+|   -1 |
++------+
+```
+
+一件商品卖出了两件，库存 -1。两条 `UPDATE` 都返回"成功"，日志里一条错误都没有。
+
+问题不在事务不够长——两个请求各自的事务都完整、都提交了。问题在于**"查库存"和"扣库存"是两个动作，中间那段窗口没有任何东西守着**，而且扣的那句不带条件。
+
+这一课要解决的就是这类事：事务能保证什么、保证不了什么，以及边界该划在哪。
+
+## 事务：一组操作要么全做、要么全不做
+
+```sql
+START TRANSACTION;   -- 或 BEGIN
+-- 一组操作
 COMMIT;              -- 全部生效
 ROLLBACK;            -- 全部撤销
 ```
 
-在 `COMMIT` 之前，这些改动**只有你自己能看到**；别人读到的还是旧值。这就是隔离性。
+MySQL 默认 **自动提交**（`autocommit = 1`）：不写 `BEGIN` 时，每条语句自己就是一个事务，执行完立刻生效。
 
-注意 MySQL 默认是**自动提交**（`autocommit = 1`）：不写 `BEGIN` 时，每一条语句自己就是一个事务，执行完立刻生效。所以"忘了写 BEGIN"不会有任何提示，只是你的三条语句变成了三个独立事务。
+所以"忘了写 `BEGIN`"不会有任何提示——只是你的三条语句变成了三个独立事务。前两条成功了、第三条失败，前两条照样在库里。
 
-```sketch
-{
-  "title": "不写 BEGIN，每条语句自己就是一个事务",
-  "rows": [
-    [
-      { "id": "s1", "title": "第一条语句", "sub": "自动提交，立刻生效", "tone": "amber" },
-      { "id": "s2", "title": "第二条失败了", "sub": "第一条已经改完了", "tone": "amber" },
-      { "id": "begin", "title": "用 BEGIN 包起来", "sub": "这时才谈得上回滚", "tone": "green" }
-    ]
-  ],
-  "arrows": [
-    { "from": "s1", "to": "s2" },
-    { "from": "s2", "to": "begin" }
-  ]
-}
+更隐蔽的是**隐式提交**：`CREATE TABLE`、`ALTER TABLE`、`DROP`、`TRUNCATE` 这类 DDL 在执行前会把当前事务提交掉。你在 `BEGIN` 里做了一堆改，插一条 `CREATE TEMPORARY TABLE`（临时表不算），前面那些改动就提前落盘了，后面再 `ROLLBACK` 撤不回它们。
+
+## ACID 四个字母，各自防哪一类故障
+
+| 字母 | 名字 | 它到底承诺了什么 | 破坏它会长什么样 |
+| --- | --- | --- | --- |
+| A | 原子性 | 一组改动要么整体生效、要么整体不存在 | 转账扣了钱没加钱，钱消失 |
+| C | 一致性 | 事务把数据从一个**满足已声明约束**的状态带到另一个 | 唯一索引被绕过；但"总额守恒"这种业务规则**它不管** |
+| I | 隔离性 | 并发事务之间的可见性按隔离级别约定 | 读到别人还没提交的脏值；或者同一事务里两次读不一样 |
+| D | 持久性 | `COMMIT` 返回成功即已落盘（redo log） | 提交成功、断电后数据没了 |
+
+四个词里最容易误解的是 **C**。
+
+教科书常写"一致性：数据满足约束"，但业务代码里真正关心的是"库存不能为负""转账前后总额不变"这类**不变量**——数据库不知道你的不变量是什么，除非你把它写成约束（`CHECK`、唯一索引、外键）或者写进语句条件（`WHERE qty > 0`）。
+
+一笔订单扣了库存、另一笔没扣成，但从"每行都满足约束"的角度看数据完全合法。**C 要你自己守。**
+
+## 隔离性是针对"别人"的
+
+在同一个事务里，`COMMIT` 之前你查询**能看到自己刚改的值**。这不是 bug——隔离性约束的是别的事务能看见什么，不是你自己。
+
+<!-- run -->
+```sql
+BEGIN;
+UPDATE accounts SET balance = balance - 500 WHERE id = 1;
+SELECT name, balance AS after_debit_inside_tx FROM accounts WHERE id = 1;
+ROLLBACK;
+SELECT name, balance AS after_rollback FROM accounts WHERE id = 1;
 ```
 
-### ACID 各自防什么
+```text
+name=ann | after_debit_inside_tx=300.00
+name=ann | after_rollback=800.00
+```
 
-| 字母 | 名字 | 一句话 | 破坏它会怎样 |
-| --- | --- | --- | --- |
-| A | 原子性 | 要么全做、要么全不做 | 转账扣了钱没加钱 |
-| C | 一致性 | 事务前后数据都满足约束 | 库存变成 -1、余额对不上总额 |
-| I | 隔离性 | 并发事务互不看到中间状态 | 读到别人还没提交的脏数据 |
-| D | 持久性 | 提交了就一定在磁盘上 | 提交成功但断电后数据不见了 |
+同一会话里刚扣完就查到 300，`ROLLBACK` 之后回到 800。
 
-这四个词经常被当成口号背，但每一个都对应一类真实故障。**写业务代码时最常踩的是 C 和 I**：
+那"别人看不到未提交的改动"这句话什么时候成立？**取决于隔离级别**：
 
-- **C** 不是数据库能自动保证的。它保证的是"约束不被违反"（唯一索引、非空、类型），但"转账前后总额相等"这种业务规则数据库不知道。所以要么在事务里用条件更新守住（比如 `WHERE qty > 0`），要么写校验。
-- **I** 与隔离级别直接相关，下一关专门讲。
+| 隔离级别 | 别人能读到未提交的改动吗 | 同一事务内两次读结果 |
+| --- | --- | --- |
+| READ UNCOMMITTED | **能**（脏读） | 可能不同 |
+| READ COMMITTED | 不能 | 可能不同（不可重复读） |
+| REPEATABLE READ（MySQL 默认） | 不能 | 相同（快照） |
+| SERIALIZABLE | 不能 | 相同，但读写互相阻塞 |
 
-### 原子性靠什么实现
+所以"提交前只有我自己看得到"这句，要限定在 READ COMMITTED 及以上。第四课那个 `-1` 的例子之所以能复现，正是利用了 REPEATABLE READ 的快照读：B 的 `SELECT` 从快照里读，永远看不到 A 后来的提交。
 
-改数据时，MySQL 先把**原值**写进 undo log，再改。回滚就是按 undo log 反着做回去。所以 `ROLLBACK` 撤销的是"数据改动"，**不撤销磁盘上的其他副作用**。
+## 回滚撤不掉的三种东西
 
-这条推论很实用：**事务里不要做不可撤销的外部动作**——发邮件、调第三方接口、写文件、发消息。因为那些操作回滚不了。
+改数据时，InnoDB 先把**原值**写进 undo log，改的是页面；回滚就按 undo log 反着做回去。所以 `ROLLBACK` 撤销的是**数据库里的数据改动**。
 
-正确做法是"事务只包数据库操作，外部动作放到事务提交之后做"，或者用"事务性发件箱"模式（把要发的消息写进表，由另一个进程读表发送）。
+它撤不掉：
 
-### 边界该划在哪
+1. **已经发出去的邮件、微信通知**——收件人不会因为你的回滚而忘掉；
+2. **第三方接口的调用**——下单成功、支付成功的回调已经打到别人系统了；
+3. **自增主键的消耗**——`AUTO_INCREMENT` 不回退，回滚了 id 也不会还给你。
 
-这是本关的实战核心。三条原则：
+所以规则很硬：**事务里只做数据库操作，外部动作放到提交之后。**
 
-**原则一：一个事务 = 一个业务动作**
+需要"提交成功就必须发出去"的场合，用**事务性发件箱**：在同一个事务里往 `outbox` 表插一行"待发消息"，提交后再由独立的发送进程读表、发送、标记已发。这样"数据改了但消息没发"和"消息发了但数据没改"都不会出现——最坏情况是消息发两次，用幂等键兜住。
 
-"下单"这个动作包含：扣库存、建订单、建订单明细、扣积分。这四件事必须一起成功，所以在一个事务里。
+## 边界划在哪
 
-但"下单"之后**发一条通知**不是业务动作的一部分，它应该放在事务外。
+**一个事务 = 一个业务动作。** "下单"包含扣库存、建订单、建订单明细、扣积分——这四件事必须一起成功。下单之后"发一条通知"不是这个业务动作的一部分，放事务外。
 
-**原则二：事务内不要做网络调用**
+**事务里不做网络调用。** 外部接口可能超时几十秒，这段时间事务占着行锁和连接。并发上来，连接池先耗尽——看起来像"数据库慢"，其实是把网络延迟搬进了事务。
 
-外部接口可能超时几十秒。在这段时间里，事务占着锁、占着连接。并发一上来，连接池先耗尽——这不是数据库慢，是你把网络延迟搬进了事务。
+**事务尽量短。** 不要在事务中间做大量计算、循环处理上千行。锁的持有时长和事务长度成正比。
 
-**原则三：事务尽量短**
+## 那句 UPDATE 应该怎么写
 
-即使是纯数据库操作，也要注意不要在事务中间做大量计算、或者循环处理上千行。锁的持有时间与事务长度成正比。
+回到开头的 `-1`。修法不是"把事务拉长"，而是两件事：
 
-### 一个必须知道的坑：条件更新要检查影响行数
-
-库存扣减最常见的写法：
+**第一，把判断放进 `UPDATE` 自己的 `WHERE` 里。**
 
 ```sql
 UPDATE stock SET qty = qty - 1 WHERE id = 1 AND qty > 0;
 ```
 
-这句本身是原子的——`WHERE` 的判断与更新在同一个语句里，不会被别的语句插进来。但**它扣没扣成功，看的是影响行数**：
+这一句的执行是原子的：`WHERE` 的判断和更新在同一个语句里，中间不会有别的语句插进来。InnoDB 在拿到行锁之后读的是**最新已提交的值**（当前读，不走快照），所以第二个请求会看到 `qty = 0`，`WHERE` 不匹配，改 0 行。
 
-- 返回 1：扣成功了；
-- 返回 0：库存不足，什么都没改。
-
-如果代码不检查返回值，就会在库存不足时也认为"下单成功"。这就是超卖的经典成因。
-
-**所以：条件更新的返回值必须检查。** 应用层拿到 0 应该回滚并返回"库存不足"。
-
-这比"先 `SELECT` 查库存、再 `UPDATE`"可靠得多——后者在两个请求之间会有窗口期，两个都查到"有库存"，然后都扣。
-
-## 跑一遍
+**第二，检查影响行数。**
 
 <!-- run -->
 ```sql
-CREATE TABLE accounts (
-  id      INT PRIMARY KEY,
-  name    VARCHAR(20) NOT NULL,
-  balance DECIMAL(10,2) NOT NULL
-);
-INSERT INTO accounts VALUES (1,'ann',1000.00), (2,'bob',500.00);
-
-SELECT SUM(balance) AS total_before FROM accounts;
-
-BEGIN;
-UPDATE accounts SET balance = balance - 200 WHERE id = 1;
-UPDATE accounts SET balance = balance + 200 WHERE id = 2;
-SELECT name, balance FROM accounts ORDER BY id;
-COMMIT;
-
-SELECT name, balance FROM accounts ORDER BY id;
-SELECT SUM(balance) AS total_after FROM accounts;
-
-BEGIN;
-UPDATE accounts SET balance = balance - 500 WHERE id = 1;
-SELECT name, balance AS after_debit_inside_tx FROM accounts WHERE id = 1;
-ROLLBACK;
-
-SELECT name, balance AS after_rollback FROM accounts WHERE id = 1;
-SELECT SUM(balance) AS total_final FROM accounts;
-```
-```text
-total_before=1500.00
-name=ann | balance=800.00
-name=bob | balance=700.00
-name=ann | balance=800.00
-name=bob | balance=700.00
-total_after=1500.00
-name=ann | after_debit_inside_tx=300.00
-name=ann | after_rollback=800.00
-total_final=1500.00
-```
-
-看三件事：
-
-1. 事务内查询已经能看到自己改的值（`800` 与 `700`）——隔离性是针对**别人**的，自己的改动自己立刻可见。
-2. `total_before = total_after = total_final = 1500.00`：转账与回滚都没有改变总额。
-3. `after_rollback=800.00`：`ROLLBACK` 把 500 那次扣款完整撤销了。
-
-### 条件更新与影响行数
-
-<!-- run -->
-```sql
-CREATE TABLE stock (
-  id   INT PRIMARY KEY,
-  name VARCHAR(20) NOT NULL,
-  qty  INT NOT NULL
-);
-INSERT INTO stock VALUES (1, '手机', 1);
-
 BEGIN;
 UPDATE stock SET qty = qty - 1 WHERE id = 1 AND qty > 0;
 SELECT ROW_COUNT() AS first_buyer_affected;
@@ -185,44 +159,34 @@ COMMIT;
 
 SELECT qty AS final_qty FROM stock WHERE id = 1;
 ```
+
 ```text
 first_buyer_affected=1
 second_buyer_affected=0
 final_qty=0
 ```
 
-`second_buyer_affected=0` 就是超卖被挡住了的证据。**如果代码不检查这个 0，就会卖出第二台。** 库存没有变成 -1，是因为 `WHERE qty > 0` 守住了，而不是因为数据库帮你判断了业务。
+- 返回 1：扣成功了；
+- 返回 0：条件不满足，什么都没改。
 
+**这个 0 是应用必须处理的信号。** 如果代码不看返回值，就会在库存不足时照样"下单成功"——那是另一种超卖。
 
-## 动手
+库存没有变成 -1，是因为 `WHERE qty > 0` 守住了，**不是因为数据库帮你判断了业务**。
 
-这道题会在真实的 MySQL 里跑。写错不会扣分，可以反复试——
-但**结果对不上会明确告诉你哪个数据集不一致**。
+## 动手：找出这段扣库存代码的 bug
+
+这段 JDBC 代码在"库存不足"时会静默成功，把订单记成已支付。找出有问题的那一行。
 
 ```code-challenge
 {
-  "id": "my-09-fix",
-  "kind": "sql-fix",
-  "title": "让扣库存真正扣得动",
-  "goal": "能识别「条件更新不检查影响行数」与「事务边界写错」两种坑",
-  "trap": "数据库保证了业务的一致性",
-  "dataset": [
-    "orders-public",
-    "orders-hidden-a"
-  ],
-  "normalize": {
-    "rowOrder": "ignore",
-    "columnOrder": "ignore",
-    "types": {
-      "remaining": "int"
-    }
-  },
-  "expectHash": {
-    "orders-public": "cd92fcbf32d17b7a4e1ed63ae562d348e90a4b4c4cb7477ca6a870813a6002d7",
-    "orders-hidden-a": "cd92fcbf32d17b7a4e1ed63ae562d348e90a4b4c4cb7477ca6a870813a6002d7"
-  },
-  "explain": "本题演示的是「条件更新必须检查影响行数」：`UPDATE … WHERE id > 0` 在条件不满足时返回 0 行，但语句本身不报错。应用若把这当成成功，就会记一笔没有库存支撑的订单。数据库只保证约束不被违反，保证不了你的业务规则。",
-  "starter": "BEGIN; UPDATE customers SET id = id - 1 WHERE id = 1 AND id > 0; COMMIT; SELECT id AS remaining FROM customers WHERE id = 1;"
+  "id": "my-09-bug",
+  "kind": "bug",
+  "title": "库存不足却下单成功",
+  "goal": "认出「条件更新的影响行数没被检查」",
+  "trap": "SQL 没报错就说明改成功了",
+  "code": "public boolean buy(Connection conn, int sku, int qty) throws SQLException {\n    try (PreparedStatement ps = conn.prepareStatement(\n            \"UPDATE stock SET qty = qty - ? WHERE id = ? AND qty >= ?\")) {\n        ps.setInt(1, qty);\n        ps.setInt(2, sku);\n        ps.setInt(3, qty);\n        ps.executeUpdate();\n        return true;\n    }\n}",
+  "bugLine": 7,
+  "explain": "第 7 行 `executeUpdate()` 的返回值被丢掉了。SQL 的 WHERE 不匹配时不会报错，只是改 0 行——方法仍然 `return true`，调用方以为扣库存成功，接着就把订单写成已支付。正确做法是接收返回值：`int affected = ps.executeUpdate(); if (affected == 0) { conn.rollback(); throw new OutOfStockException(sku); }`。注意这里必须回滚，否则同一事务里已经做过的其他改动会一起提交。"
 }
 ```
 
@@ -230,36 +194,12 @@ final_qty=0
 
 ```quiz
 {"id":"my-09-quiz","title":"事务三问","questions":[
- {"question":"UPDATE ... WHERE id=1 AND qty>0 返回影响行数 0，说明什么？","options":["语句出错了","条件不满足（库存不足），什么都没改","已经扣成功","连接断了"],"answer":1,"explain":"条件更新在条件不满足时不匹配任何行，影响行数为 0，必须由应用判断并回滚。"},
- {"question":"为什么事务里不该调第三方接口？","options":["因为接口不支持事务语法","因为网络延迟会拉长事务、长时间占着锁与连接","因为接口会回滚数据库","因为会影响统计"],"answer":1,"explain":"外部调用不可回滚，且耗时不可控，会让锁与连接被占用更久。"},
- {"question":"回滚能撤销下面哪一项？","options":["事务里发出的一封邮件","事务里的一条 INSERT","事务里写的一个本地文件","事务里调用的一次外部接口"],"answer":1,"explain":"undo log 只能撤销数据库改动，外部副作用不可回滚。"}
+ {"question":"`UPDATE stock SET qty = qty - 1 WHERE id = 1 AND qty > 0` 返回影响行数 0，说明什么？","options":["语句出错了，要重试","id=1 这行的 qty 已经不满足 `> 0`（或该行不存在），什么都没改","已经扣成功，但统计延迟","连接断了，需要重连"],"answer":1,"explain":"条件更新在条件不满足时匹配 0 行，语句本身不报错。应用必须检查这个 0 并回滚——这正是防超卖的关键一步。"},
+ {"question":"为什么事务里不该调第三方接口？","options":["因为接口不支持事务语法","因为网络延迟会拉长事务、长时间占着锁与连接，而接口调用本身又回滚不了","因为接口会跟着回滚数据库","因为会影响调用统计"],"answer":1,"explain":"两头都不对：耗时不可控，把网络延迟搬进了锁持有时间；并且外部副作用不在 undo log 里，回滚撤不掉。"},
+ {"question":"回滚能撤销下面哪一项？","options":["事务里发出的一封通知邮件","事务里的一条 INSERT","事务里写的一个本地文件","事务里调用的一次外部接口"],"answer":1,"explain":"undo log 只记录数据页的原值，能撤销的只有数据库改动。外部副作用（邮件、文件、接口调用）都不在 undo log 里。"}
 ]}
 ```
 
-## 常见误区
+## 一句话
 
-### 误区：写了 `BEGIN` 就一定有事务范围
-
-**你以为**：语句会自动被包起来。
-**其实**：MySQL 默认自动提交，不写 `BEGIN` 时每条语句各自成事务。而且某些语句（如 DDL）会**隐式提交**当前事务，把前面的操作提前落盘。
-**怎么验证**：在 `BEGIN` 之后执行一条 `CREATE TABLE`，再 `ROLLBACK`，看前面的改动是否被撤销。
-
-### 误区：事务越长越安全
-
-**你以为**：把所有操作包进一个大事务最保险。
-**其实**：事务越长，锁持有越久、并发越差、回滚代价越大，冲突也越多。
-**怎么验证**：观察长事务期间其他会话对同一行的写入是否被阻塞。
-
-### 误区：数据库保证了业务的一致性
-
-**你以为**：有事务就不用管业务规则。
-**其实**：数据库只保证约束（唯一、非空、类型）不被违反。"总额守恒""库存不为负"这类规则得靠条件更新或应用校验。
-**怎么验证**：不加 `AND qty > 0`，并发扣两次库存，看是否变成 -1。
-
-## 小结
-
-事务让一组操作要么全做要么全不做。ACID 各自对应一类故障，其中一致性与隔离性最需要业务自己配合。事务内只做数据库操作，外部动作放到提交之后。条件更新必须检查影响行数——这是防超卖的关键。
-
-下一关：两个人同时读写同一批行时，各自能看到什么。这就是隔离级别。
-
-**延伸阅读**：[MySQL 8.0 参考手册 · InnoDB 事务模型](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-model.html)（undo log、隔离级别与锁的完整说明）。
+事务保证的是**原子、隔离、持久**，以及"声明的约束不被人从中间插一脚破坏"；它不保证你的业务不变量。"查再改"中间永远有窗口，所以判断要写进 `UPDATE` 的条件里，并且**必须检查影响行数**——那个 0，就是库存不足在代码里的唯一回声。
