@@ -5,267 +5,353 @@ chapter: 泛型与函数式
 level: intermediate
 prerequisite: 19 · 日期时间：LocalDate、Instant 与跨时区
 category: java-from-zero
-minutes: 30
+minutes: 20
 status: published
 ---
 
 # 20 · Stream：把循环压成一条链
 
-## 这一课你要会
-
-- 把"遍历 → 判断 → 收集"三段循环改写成一条 Stream 链；
-- 分清**中间操作**（`map` / `filter` / `sorted`）与**终结操作**（`collect` / `sum` / `forEach`）；
-- 知道 `Collectors` 里最常用的几个人；
-- 判断什么时候**不该**用 Stream。
-
-## 为什么
-
-处理集合时有大量"筛选 + 变换 + 汇总"的重复动作。用循环写要维护一个临时变量、一个 `if`、一个 `add`，代码量不小，而且意图藏在细节里。
-
-Stream 把这些动作变成一串具名操作，读的时候像读句子：
-
 ```java
-// 循环版：读完才知道在干什么
-List<String> result = new ArrayList<>();
-for (User user : users) {
-    if (user.age() >= 18) {
-        result.add(user.name().toUpperCase());
+import java.util.stream.Stream;
+
+public class Main {
+    public static void main(String[] args) {
+        Stream<String> s = Stream.of("a", "b");
+        s.toList();
+        s.toList();
     }
 }
-Collections.sort(result);
+```
 
-// Stream 版：一眼看出"取成年人 → 转大写 → 排序"
-List<String> result = users.stream()
+```text
+Exception in thread "main" java.lang.IllegalStateException: stream has already been operated upon or closed
+```
+
+我原来以为 `toList()` 只是把元素倒出来，倒两次最多得到两个一样的列表；实际第一次终结操作就把流标记成已消费，第二次直接抛错。本机 Temurin 25.0.4，`javac --release 21`，下面所有输出都是这台机器上跑出来的；报错块只贴第一行，栈从略，`run` 块的输出是完整 stdout。
+
+代码里的 `x -> x.age() >= 18` 是 lambda，`User::age` 是方法引用（`x -> x.age()` 的简写）。这两样第 21 课细讲，现在先照抄。`record User(...)` 这里只当带 `name()`、`age()` 访问器的数据类用，第 35 课细讲。
+
+## 一条流只能消费一次
+
+`Stream` 不是集合，它更像一次性的管道。`s.toList()` 之后，`s` 已经结束；再调 `s.toList()` 就是上面那个异常。要对同一批数据做两次，重新开流：
+
+```java
+List<String> source = List.of("a", "b");
+List<String> first = source.stream().toList();
+List<String> second = source.stream().toList();
+```
+
+或者先把结果落成 `List`，再对列表操作：
+
+```java
+List<String> allNames = users.stream().map(User::name).toList();
+long count = allNames.stream().filter(name -> name.startsWith("a")).count();
+```
+
+对同一个 `List` 每次调 `stream()` 都是一条新流。这里的 `users` 在下一节定义，完整版本在「动手」。
+
+## 先把这组数据放好
+
+```java
+record User(long id, String name, int age, String city, List<String> tags) { }
+
+List<User> users = List.of(
+        new User(1, "alice", 30, "杭州", List.of("java", "db")),
+        new User(2, "bob", 17, "北京", List.of("java")),
+        new User(3, "carol", 25, "杭州", List.of("ops")),
+        new User(4, "dave", 42, "北京", List.of("db", "ops")));
+```
+
+`record` 生成的是 `id()`、`name()`、`age()`、`city()`、`tags()` 这些访问器，不是 `getId()` 那一套。下面统一用 `User::age`、`user.name()` 这种写法；record 的构造器、`equals`、`toString` 第 35 课细讲。这段不是完整类，完整可运行版本在「动手」。
+
+## 终结操作里没有 `sum`
+
+先把最容易记错的一条拿出来：
+
+```java
+import java.util.stream.Stream;
+
+public class Main {
+    public static void main(String[] args) {
+        Stream.of(1, 2, 3).sum();
+    }
+}
+```
+
+```text
+Main.java:5: error: cannot find symbol
+        Stream.of(1, 2, 3).sum();
+                          ^
+  symbol:   method sum()
+  location: interface Stream<Integer>
+1 error
+```
+
+`Stream<T>` 的终结操作包括 `collect`、`toList`、`count`、`forEach`、`reduce`、`findFirst`、`findAny`、`anyMatch`、`allMatch`、`noneMatch`，以及要传 `Comparator` 的 `max`/`min`。`sum` 和 `average` 只在 `IntStream`/`LongStream`/`DoubleStream` 上。要求年龄和，先把 `User` 映射成 `int`：
+
+```java
+int totalAge = users.stream().mapToInt(User::age).sum();
+```
+
+不想映射，也可以用 `reduce`：
+
+```java
+int totalAgeByReduce = users.stream().map(User::age).reduce(0, Integer::sum);
+```
+
+`Stream<T>.max()` 不带参数也编译不过，报 `required: Comparator<? super T>`；正确写法是 `users.stream().max(Comparator.comparing(User::age))`。
+
+## 惰性：不遍历源，不等于一句都没执行
+
+```java
+users.stream()
+        .filter(user -> {
+            System.out.println("检查 " + user.name());
+            return user.age() >= 18;
+        });
+System.out.println("链结束");
+```
+
+```text
+链结束
+```
+
+`users.stream()` 这一行执行了，返回了一个 Stream 对象；但没有终结操作，所以没有遍历 `users`，`filter` 里的 `println` 一次也没跑。源如果在创建流时就有副作用（比如自己实现的 Spliterator），那部分照常发生；惰性省掉的是遍历源和执行中间操作的 lambda。
+
+加上终结操作才会真的走：
+
+```java
+long adults = users.stream()
+        .filter(user -> user.age() >= 18)
+        .count();
+```
+
+这时 `filter` 里的 `println` 会按元素执行，`count` 返回 `long`。
+
+## `filter` 与 `map`
+
+`filter` 只做减法：留下或丢掉，不新增元素；`map` 是一对一变形，数量不变。
+
+```java
+List<String> adultNames = users.stream()
         .filter(user -> user.age() >= 18)
         .map(user -> user.name().toUpperCase())
+        .toList();
+```
+
+`filter` 的 lambda 必须返回 `boolean`。`map` 的 lambda 返回什么，流里就变成什么；上面这一步把 `User` 变成了 `String`。
+
+方法引用是同样的意思：
+
+```java
+List<String> names = users.stream()
+        .map(User::name)
+        .toList();
+```
+
+`User::name` 等价于 `user -> user.name()`。record 没有 `getName()`，写 `User::getName` 会直接编译失败。
+
+`flatMap` 把每个元素换成一个流再摊平，可以是零个、一个或多个；适合元素本身带集合的情况：
+
+```java
+List<String> allTags = users.stream()
+        .flatMap(user -> user.tags().stream())
+        .distinct()
         .sorted()
         .toList();
 ```
 
-两种写法性能接近，但第二种**意图更清楚**。
+这段的结果是 `[db, java, ops]`。如果这里用 `map`，得到的是 `List<List<String>>`，还要再摊平一次。
 
-## 讲解
+## `sorted` 要给它比较规则
 
-### 两类操作
-
-**中间操作**（返回新 Stream，可以链下去）：`filter`、`map`、`flatMap`、`sorted`、`distinct`、`limit`、`skip`、`peek`。
-
-**终结操作**（返回结果，链到此结束）：`collect`、`toList`、`count`、`sum`、`max`、`min`、`findFirst`、`anyMatch`、`allMatch`、`forEach`、`reduce`。
-
-**关键点：没有终结操作，整条链一行都不会执行。** Stream 是惰性的。
+`record` 不会自动实现 `Comparable`。直接自然排序：
 
 ```java
-users.stream().filter(u -> u.age() >= 18);      // 什么都不会发生
-users.stream().filter(u -> u.age() >= 18).count();  // 这时才真的遍历
+users.stream().sorted().toList();
 ```
 
-```sketch
-{
-  "title": "数据从源头流过每一站，最后被收成结果",
-  "rows": [
-    [
-      { "id": "src", "title": "List<User>", "sub": "数据源", "tone": "gray" },
-      { "id": "filter", "title": "filter 年龄 ≥ 18", "sub": "留下满足条件的", "tone": "blue" },
-      { "id": "map", "title": "map 取名字", "sub": "一个换一个", "tone": "blue" },
-      { "id": "end", "title": "collect 收成 List", "sub": "终结操作，这时才执行", "tone": "green" }
-    ]
-  ],
-  "arrows": [
-    { "from": "src", "to": "filter" },
-    { "from": "filter", "to": "map" },
-    { "from": "map", "to": "end" }
-  ]
-}
+运行期会抛：
+
+```text
+Exception in thread "main" java.lang.ClassCastException: class User cannot be cast to class java.lang.Comparable (User is in unnamed module of loader 'app'; java.lang.Comparable is in module java.base of loader 'bootstrap')
 ```
 
-### `filter`：留下满足条件的
+按年龄排要显式给比较器：
 
 ```java
-List<User> adults = users.stream()
+List<User> byAge = users.stream()
+        .sorted(Comparator.comparing(User::age))
+        .toList();
+```
+
+多级排序可以接着写：
+
+```java
+List<String> byAgeDesc = users.stream()
+        .sorted(Comparator.comparing(User::age).reversed()
+                .thenComparing(User::name))
+        .map(User::name)
+        .toList();
+```
+
+结果是 `[dave, alice, carol, bob]`。`Comparator.comparing(...)` 比手写 `(a, b) -> a.age() - b.age()` 安全，后者在 `int` 溢出时会排错。
+
+## `toList()` 与 `collect(Collectors.toList())`
+
+```java
+List<String> a = users.stream().map(User::name).collect(Collectors.toList());
+List<String> b = users.stream().map(User::name).toList();
+System.out.println(a.getClass().getName());
+System.out.println(b.getClass().getName());
+b.add("eve");
+```
+
+```text
+java.util.ArrayList
+java.util.ImmutableCollections$ListN
+Exception in thread "main" java.lang.UnsupportedOperationException
+```
+
+`Collectors.toList()` 在 JDK 21 的当前实现是 `ArrayList`，但规范不保证返回类型、可变性、序列化或线程安全；不要把它当成契约。`Stream.toList()` 返回不可修改列表。要可变副本，显式写：
+
+```java
+List<String> mutable = new ArrayList<>(users.stream().map(User::name).toList());
+mutable.add("eve");
+```
+
+## `Collectors` 常用几个
+
+分组用 `TreeMap::new` 固定顺序：
+
+```java
+Map<String, List<String>> byCity = users.stream()
+        .collect(Collectors.groupingBy(User::city,
+                TreeMap::new,
+                Collectors.mapping(User::name, Collectors.toList())));
+System.out.println(byCity);
+
+Map<String, Long> cityCount = users.stream()
+        .collect(Collectors.groupingBy(User::city,
+                TreeMap::new,
+                Collectors.counting()));
+System.out.println(cityCount);
+```
+
+```text
+{北京=[bob, dave], 杭州=[alice, carol]}
+{北京=2, 杭州=2}
+```
+
+不传 `TreeMap::new` 时，JDK 21 的当前实现用 `HashMap`；规范不保证 Map 类型，也不保证迭代顺序，所以不要写死打印结果。`TreeMap` 按 key 的自然顺序排，输出才稳定。
+
+拼字符串和转 Map 也常用：
+
+```java
+String joined = users.stream()
+        .map(User::name)
+        .collect(Collectors.joining(", ", "[", "]"));
+System.out.println(joined);
+
+Map<Long, String> nameById = users.stream()
+        .collect(Collectors.toMap(User::id, User::name));
+```
+
+`joined` 是 `[alice, bob, carol, dave]`。上面四个 id 唯一，所以 `nameById` 能正常建出来；把 `carol` 的 id 也改成 1，再跑同一句才会抛（只留第一行）：
+
+```text
+Exception in thread "main" java.lang.IllegalStateException: Duplicate key 1 (attempted merging values alice and carol)
+```
+
+要保留其中一个，给第三个参数：
+
+```java
+Map<Long, User> userById = users.stream()
+        .collect(Collectors.toMap(User::id, user -> user, (first, second) -> second));
+```
+
+## `mapToInt` 才有 `sum` 和 `average`
+
+```java
+int sumOfAges = users.stream().mapToInt(User::age).sum();
+double averageAge = users.stream().mapToInt(User::age).average().orElse(0);
+System.out.println("总年龄：" + sumOfAges + "，平均：" + averageAge);
+```
+
+```text
+总年龄：114，平均：28.5
+```
+
+`average()` 返回 `OptionalDouble`，空流时没有平均值，`orElse(0)` 给默认值；Optional 在第 18 课讲过。`IntStream.max()` 返回 `OptionalInt`，不是 `int`。`sum`、`average` 以及不带参数的 `max`/`min` 在基本类型流上；`Stream<T>` 的 `max`/`min` 仍要传 `Comparator`。要拿数值结果，先用 `mapToInt`/`mapToLong`/`mapToDouble` 转过去。
+
+## 短路：`findFirst` 与 `findAny`
+
+```java
+boolean hasAdult = users.stream().anyMatch(user -> user.age() >= 18);
+String firstAdult = users.stream()
+        .filter(user -> user.age() >= 18)
+        .findFirst()
+        .map(User::name)
+        .orElse("无");
+```
+
+`anyMatch` 找到一个满足的就停；`filter(...).count() > 0` 不是短路，要数完才知道总数大不大于 0。`findFirst` 在有序流上尊重 encounter order，返回遇到顺序里的第一个；`findAny` 允许返回任意一个元素，并行流里少了保序协调，所以更快（具体差多少看数据量和线程数）。
+
+`findAny` 在顺序流里也可能返回第一个，但规范没有这条保证。要稳定的第一个就用 `findFirst`，只关心有没有、不在乎哪个才用 `findAny`。
+
+## `reduce`：把一串值压成一个
+
+```java
+int sum = users.stream().map(User::age).reduce(0, Integer::sum);
+Optional<Integer> maxAge = users.stream().map(User::age).reduce(Integer::max);
+```
+
+有初始值时返回 `int`；没有初始值时返回 `Optional<Integer>`，因为空流没有结果。日常求和用 `mapToInt().sum()` 更直白，`reduce` 留给自定义的折叠逻辑。
+
+## 什么时候别用 Stream
+
+这四种情况，普通循环更直接：
+
+1. 一行循环能写完的。`for (User user : users) System.out.println(user.name());` 比 `users.stream().forEach(user -> System.out.println(user.name()));` 更短，也更直白。
+2. 要在循环里 `break`、`continue`，或者修改外部变量。Stream 没有 `break`；`forEach` 里的 `return` 只是结束当前 lambda，不是跳出循环。
+3. lambda 里要抛受检异常。`Function`、`Predicate` 的抽象方法没有声明 `throws`，受检异常塞不进去；包 try-catch 或写包装方法都比 Stream 链更啰嗦。
+4. 调用频率高的热路径。本例数据量太小，差异可忽略；选型看可读性，热路径要基准测试。不要凭感觉给 Stream 判死刑，也不要凭感觉说它更快。
+
+## `peek` 不是给业务用的
+
+```java
+users.stream()
+        .peek(user -> System.out.println(user.name()))
         .filter(user -> user.age() >= 18)
         .toList();
 ```
 
-写成 lambda 的条件，等价于 `if` 里的判断。**返回 `boolean`**。
-
-### `map`：一个换一个
-
-```java
-List<String> names = users.stream()
-        .map(User::getName)       // 方法引用，等价于 user -> user.getName()
-        .toList();
-```
-
-`map` 是"一对一"。**注意它和 `filter` 的区别**：`filter` 不改变元素数量（只减少），`map` 也不改变数量（只变形）。
-
-### `flatMap`：一个换多个
-
-```java
-// 每个用户有多个标签，要拿到全部标签的扁平列表
-List<String> allTags = users.stream()
-        .flatMap(user -> user.getTags().stream())
-        .distinct()
-        .toList();
-```
-
-`flatMap` 用于"元素本身是集合"的场合。如果这里用 `map`，得到的是 `List<List<String>>`，还要再摊平一次。
-
-### `sorted`：排序
-
-```java
-// 自然顺序（元素要 Comparable）
-users.stream().sorted().toList();
-
-// 自定义比较器
-users.stream()
-        .sorted(Comparator.comparing(User::getAge).reversed())
-        .toList();
-
-// 多级排序：先按年龄，年龄相同按名字
-users.stream()
-        .sorted(Comparator.comparing(User::getAge).thenComparing(User::getName))
-        .toList();
-```
-
-`Comparator.comparing(...)` 是"取字段比较"的简写，比手写 `(a, b) -> a.getAge() - b.getAge()` 安全（后者在 `int` 溢出时会排错）。
-
-### `toList()` 与 `collect(Collectors.toList())`
-
-```java
-List<String> a = stream.toList();                          // Java 16+
-List<String> b = stream.collect(Collectors.toList());       // 传统写法
-```
-
-两者有个**重要区别**：
-
-- `toList()` 返回**不可变**列表（往里 `add` 会抛 `UnsupportedOperationException`）；
-- `Collectors.toList()` 返回通常可变的 `ArrayList`。
-
-**新代码用 `toList()`**——不可变是更好的默认值。需要可变时显式写 `new ArrayList<>(stream.toList())`。
-
-### 常用 `Collectors`
-
-```java
-// 1) 计数
-long count = users.stream().filter(u -> u.getAge() >= 18).count();
-
-// 2) 分组：按年龄分组 → Map<Integer, List<User>>
-Map<Integer, List<User>> byAge = users.stream()
-        .collect(Collectors.groupingBy(User::getAge));
-
-// 3) 分组后计数
-Map<String, Long> byCity = users.stream()
-        .collect(Collectors.groupingBy(User::getCity, Collectors.counting()));
-
-// 4) 拼字符串
-String joined = users.stream()
-        .map(User::getName)
-        .collect(Collectors.joining(", ", "[", "]"));     // [a, b, c]
-
-// 5) 转 Map（注意 key 重复会抛异常）
-Map<Long, User> byId = users.stream()
-        .collect(Collectors.toMap(User::getId, user -> user));
-
-// 6) 求和
-int totalAge = users.stream().mapToInt(User::getAge).sum();
-```
-
-`toMap` 那个"key 重复抛异常"值得记：两个用户 id 相同会让 `Collectors.toMap` 抛 `IllegalStateException`。要容忍重复，得给第三个参数：
-
-```java
-Map<Long, User> byId = users.stream()
-        .collect(Collectors.toMap(User::getId, user -> user, (first, second) -> second));
-```
-
-### `mapToInt` / `mapToLong` / `mapToDouble`
-
-这三个返回**基本类型流**（`IntStream` 等），好处是能直接 `sum()` / `average()`，且不用装箱：
-
-```java
-int total = users.stream().mapToInt(User::getAge).sum();
-double average = users.stream().mapToInt(User::getAge).average().orElse(0);
-OptionalInt max = users.stream().mapToInt(User::getAge).max();
-```
-
-注意 `average()` 返回 `OptionalDouble`（空集合没有平均值），`max()` 返回 `OptionalInt`——上一课讲过为什么用 `Optional` 表达"可能没有"。
-
-### 短路操作
-
-`anyMatch` / `allMatch` / `findFirst` 会**提前结束**，不需要遍历完：
-
-```java
-boolean hasAdult = users.stream().anyMatch(u -> u.getAge() >= 18);   // 找到一个就停
-Optional<User> first = users.stream().filter(u -> u.getAge() >= 18).findFirst();
-```
-
-对大数据集，`anyMatch` 比 `filter(...).count() > 0` 快得多——后者要把全部元素过一遍。
-
-### `reduce`：把一串值压成一个
-
-```java
-int sum = numbers.stream().reduce(0, Integer::sum);           // 有初始值
-Optional<Integer> max = numbers.stream().reduce(Integer::max); // 没有初始值，可能为空
-```
-
-日常用 `mapToInt().sum()` 更直观；`reduce` 适合自定义的折叠逻辑。
-
-### 什么时候不该用 Stream
-
-**一、简单到一行能写完的循环。**
-
-```java
-// 为了 Stream 而 Stream
-for (String name : names) System.out.println(name);
-
-// 这个更啰嗦
-names.stream().forEach(System.out::println);
-```
-
-**二、需要在循环里 `break` / `continue` / 修改外部变量。**
-
-Stream 不支持 `break`，`forEach` 里的 `return` 只是跳过当前元素。这类逻辑用普通循环更直接。
-
-**三、有受检异常要处理。**
-
-lambda 里不能直接抛受检异常，要么包 try-catch（难看），要么写个包装方法。这种时候循环更好。
-
-**四、热路径上极高频调用。**
-
-Stream 每步都有函数调用开销，在每秒百万次的路径上，普通循环更快。**先测量再优化**——大部分业务代码用 Stream 完全没问题。
-
-### 一个容易写错的点：`peek` 不是给业务用的
-
-```java
-users.stream()
-        .peek(user -> System.out.println(user))   // 只该用于调试
-        .filter(...)
-        .toList();
-```
-
-`peek` 是给"看数据流经过"用的。**不要用它做有副作用的业务操作**——没有终结操作时它不会执行，这个"不执行"的行为会让排查很痛苦。
+`peek` 是中间操作，只适合观察数据流经过；没有终结操作时它不会执行。不要把业务副作用放在 `peek` 里，调试完就删。
 
 ## 动手
 
-这段代码把一段循环改写为 Stream，并演示分组、求和与短路。
+下面这段把筛选、扁平化、分组、求和、排序、短路和 `reduce` 放在一个 `main` 里。`record` 先照抄，第 35 课细讲。
 
 <!-- run -->
 ```java
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class Main {
-    record User(String name, int age, String city) { }
+    record User(long id, String name, int age, String city, List<String> tags) { }
 
     public static void main(String[] args) {
         List<User> users = List.of(
-                new User("alice", 30, "杭州"),
-                new User("bob", 17, "北京"),
-                new User("carol", 25, "杭州"),
-                new User("dave", 42, "北京"));
+                new User(1, "alice", 30, "杭州", List.of("java", "db")),
+                new User(2, "bob", 17, "北京", List.of("java")),
+                new User(3, "carol", 25, "杭州", List.of("ops")),
+                new User(4, "dave", 42, "北京", List.of("db", "ops")));
 
-        // 1) 筛选 + 变形 + 排序：成年人名字大写后按名字排
         List<String> adults = users.stream()
                 .filter(user -> user.age() >= 18)
                 .map(user -> user.name().toUpperCase())
@@ -273,23 +359,23 @@ public class Main {
                 .toList();
         System.out.println("成年用户：" + adults);
 
-        // 2) 分组：按城市
+        List<String> allTags = users.stream()
+                .flatMap(user -> user.tags().stream())
+                .distinct()
+                .sorted()
+                .toList();
+        System.out.println("全部标签：" + allTags);
+
         Map<String, List<String>> byCity = users.stream()
                 .collect(Collectors.groupingBy(User::city,
+                        TreeMap::new,
                         Collectors.mapping(User::name, Collectors.toList())));
         System.out.println("按城市：" + byCity);
 
-        // 3) 分组后计数
-        Map<String, Long> cityCount = users.stream()
-                .collect(Collectors.groupingBy(User::city, Collectors.counting()));
-        System.out.println("城市人数：" + cityCount);
-
-        // 4) 基本类型流：求和与平均
         int totalAge = users.stream().mapToInt(User::age).sum();
         double averageAge = users.stream().mapToInt(User::age).average().orElse(0);
         System.out.println("总年龄：" + totalAge + "，平均：" + averageAge);
 
-        // 5) 排序：年龄倒序，年龄相同按名字
         List<String> byAgeDesc = users.stream()
                 .sorted(Comparator.comparing(User::age).reversed()
                         .thenComparing(User::name))
@@ -297,35 +383,54 @@ public class Main {
                 .toList();
         System.out.println("按年龄倒序：" + byAgeDesc);
 
-        // 6) 短路：找到一个就停
-        boolean hasAdult = users.stream().anyMatch(user -> user.age() >= 18);
-        System.out.println("有成年人：" + hasAdult);
+        String firstAdult = users.stream()
+                .filter(user -> user.age() >= 18)
+                .findFirst()
+                .map(User::name)
+                .orElse("无");
+        System.out.println("第一个成年人：" + firstAdult);
+
+        int sumByReduce = users.stream().map(User::age).reduce(0, Integer::sum);
+        System.out.println("reduce 求和：" + sumByReduce);
+
+        List<String> mutable = new ArrayList<>(users.stream().map(User::name).toList());
+        mutable.add("eve");
+        System.out.println("可修改副本：" + mutable);
+
+        Stream<String> once = Stream.of("a", "b");
+        once.toList();
+        try {
+            once.toList();
+        } catch (IllegalStateException e) {
+            System.out.println("第二次消费：" + e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
     }
 }
 ```
 
 ```text
 成年用户：[ALICE, CAROL, DAVE]
-按城市：{杭州=[alice, carol], 北京=[bob, dave]}
-城市人数：{杭州=2, 北京=2}
+全部标签：[db, java, ops]
+按城市：{北京=[bob, dave], 杭州=[alice, carol]}
 总年龄：114，平均：28.5
 按年龄倒序：[dave, alice, carol, bob]
-有成年人：true
+第一个成年人：alice
+reduce 求和：114
+可修改副本：[alice, bob, carol, dave, eve]
+第二次消费：IllegalStateException: stream has already been operated upon or closed
 ```
 
-注意第 4 行「平均 28.5」：`mapToInt().average()` 返回的是 `OptionalDouble`，用 `orElse(0)` 处理空集合。这正是上一课 `Optional` 的用法。
-
-### 你的练习
+## 练习：这条链的最后少了什么
 
 ```code-challenge
 {
   "id": "java-15-bug",
   "kind": "bug",
-  "title": "找出没有终结操作的那条链",
+  "title": "这条链的最后少了什么",
   "language": "java",
-  "code": "import java.util.List;\n\npublic class Main {\n    public static void main(String[] args) {\n        List<Integer> numbers = List.of(1, 2, 3, 4, 5);\n        numbers.stream()\n                .filter(n -> n % 2 == 0)\n                .map(n -> n * 10);\n        System.out.println(\"没有任何输出\");\n    }\n}",
+  "code": "import java.util.List;\n\npublic class Main {\n    public static void main(String[] args) {\n        List<Integer> numbers = List.of(1, 2, 3, 4, 5);\n        numbers.stream()\n                .filter(n -> n % 2 == 0)\n                .map(n -> n * 10);\n        System.out.println(\"done\");\n    }\n}",
   "bugLine": 8,
-  "explain": "filter 和 map 都是中间操作，返回新的 Stream，但没有终结操作（如 toList/count/forEach），整条链一行都不会执行。要拿到结果必须接一个终结操作。"
+  "explain": "第 8 行是链尾：filter 和 map 都返回 Stream，但没有 toList/count/forEach 之类的终结操作消费它。运行时不会遍历 numbers，也不会执行这两个 lambda；程序只会打印 done。补一个终结操作，例如 .toList() 或 .count()。"
 }
 ```
 
@@ -337,60 +442,39 @@ public class Main {
   "title": "Stream 三问",
   "questions": [
     {
-      "question": "stream().filter(...) 之后不接终结操作会发生什么？",
-      "options": ["正常执行筛选", "什么都不执行", "编译错误"],
-      "answer": 1,
-      "explain": "Stream 是惰性的：中间操作只是记下要做什么，只有终结操作触发时才会真正遍历。"
-    },
-    {
-      "question": "toList() 与 collect(Collectors.toList()) 的区别是？",
+      "question": "只写 users.stream().filter(u -> u.age() >= 18); 而不接终结操作，会发生什么？",
       "options": [
-        "完全一样",
-        "toList() 返回不可变列表，往里面 add 会抛异常",
-        "toList() 更慢"
+        "users 被遍历一遍，filter 的 lambda 也执行了",
+        "users 不被遍历，filter 的 lambda 也不执行",
+        "编译错误"
       ],
       "answer": 1,
-      "explain": "toList()（Java 16+）返回不可变列表，是更安全的默认值。需要可变时用 new ArrayList<>(stream.toList())。"
+      "explain": "中间操作只搭管道。没有终结操作时不会遍历源，也不会执行 filter 里的 lambda；但 users.stream() 这一句本身已经执行。"
     },
     {
-      "question": "想判断「是否有成年人」，哪种写法在大数据集合上更快？",
+      "question": "在 Stream<User> 上求年龄总和，哪个写法能通过编译？",
       "options": [
-        "filter(u -> u.age() >= 18).count() > 0",
-        "anyMatch(u -> u.age() >= 18)",
-        "两种一样快"
+        "users.stream().sum()",
+        "users.stream().mapToInt(User::age).sum()",
+        "users.stream().max()"
       ],
       "answer": 1,
-      "explain": "anyMatch 是短路操作，找到一个就停止；count() 要把全部元素都过一遍。"
+      "explain": "Stream<T> 没有 sum()；sum 和 average 在 IntStream/LongStream/DoubleStream 上。Stream<T> 的 max/min 还要传 Comparator。"
+    },
+    {
+      "question": "关于 toList() 与 collect(Collectors.toList())，哪句准确？",
+      "options": [
+        "两者都保证返回可修改的 ArrayList",
+        "Collectors.toList() 在 JDK 21 当前实现是 ArrayList，但规范不保证；Stream.toList() 返回不可修改列表",
+        "Stream.toList() 返回 LinkedList"
+      ],
+      "answer": 1,
+      "explain": "规范对 Collectors.toList() 返回的 List 只承诺是 List，类型和可变性都不保证；JDK 21 当前实现是 ArrayList。要可变就显式 new ArrayList<>(...)。"
     }
   ]
 }
 ```
 
-## 常见误区
+## 还差的
 
-### 误区：Stream 比循环快
-
-通常**不会**。Stream 有函数调用与装箱开销，简单场景普通循环往往更快。用 Stream 的理由是**可读性**，不是性能。
-
-### 误区：一条链越长越"函数式"
-
-三步以内通常更好读；五六步串起来后，调试困难（不好打断点看中间结果）。这时候拆成几个具名方法，或者改回局部变量。
-
-### 误区：`forEach` 里能用 `return` 跳过元素
-
-`return` 只是从当前 lambda 返回，不是从循环跳出。要"跳过某些元素"用 `filter`，要"提前结束"用 `findFirst` / `anyMatch`。
-
-### 误区：Stream 可以重复用
-
-**一个 Stream 只能消费一次**，第二次调终结操作会抛 `IllegalStateException`。需要多次处理要么重新 `stream()`，要么先 `toList()` 落成列表。
-
-## 小结
-
-- 中间操作（`filter` / `map` / `sorted`）可链式，终结操作（`toList` / `count` / `sum`）触发执行。
-- **没有终结操作，整条链一行都不跑**。
-- `map` 一对一、`flatMap` 一对多；`mapToInt` 返回基本类型流，避免装箱。
-- `toList()` 返回不可变列表，是新代码的默认选择。
-- `anyMatch` / `findFirst` 会短路；`Collectors.toMap` 遇重复 key 会抛异常。
-- 简单循环、需要 `break`、有受检异常、极热路径——这四种情况用普通循环更好。
-
-下一课讲 **Lambda 与函数式接口**：`->` 到底编译成了什么，以及为什么方法引用比 lambda 更清楚。
+并行流没讲：`parallelStream()` 用哪个线程池、`findAny` 与 `findFirst` 在并行下到底差多少、什么情况下并行反而更慢，这一课只留了 `findAny` 的一句。`Collectors` 也只到 `groupingBy`、`mapping`、`counting`、`joining`、`toMap`；`partitioningBy`、`teeing` 和自定义 `Collector` 都没展开。受检异常怎么包进 lambda，这里只说了「不顺手」，没给可复用的包装方法。性能没有 JMH 数据，只有选型原则。
