@@ -49,16 +49,17 @@ python scripts/verify_course.py --no-run --dir content/courses/mysql   # mysql �
 
 | 档位 | 整改前 | 现在 |
 | --- | --- | --- |
-| 10 分（最模板化） | 64 篇 | 8 篇 |
-| ≥9 分 | — | 8 篇 |
-| 6–8 分 | — | 209 篇 |
-| 3–5 分 | — | 101 篇 |
-| 0–2 分 | — | 89 篇 |
-| 负分（人味与硬证据都在） | 33 篇 | 71 篇 |
+| 10 分（最模板化） | 64 篇 | 0 篇 |
+| ≥8 分 | — | 110 篇 |
+| ≥6 分 | — | 207 篇 |
+| 负分（人味与硬证据都在） | 33 篇 | 76 篇 |
+| 平均分 | — | 3.66 |
 
-- 已整线过一遍（reader 全审 + 逐篇改）：java 01/03/10/20/28/31/32/33/35/36、python 03/04/05/12/13/14/16/17/18、mysql 01/02/03/04/05/07/08/09/10/11/12/13/14、spring 01/02/03/09/10/11/16、reading 的 agents 01/03、docker 01/02/03/13/14/17/18/19/20、ops 01/02/03/04/05/06/07/08、linux-from-zero 01/02/03/04、network 01、algorithms 01、books-ddia 02。
+- 已整线过一遍（reader 全审 + 逐篇改）：java 01/03/10/11/20/28/30/31/32/33/35/36、python 02/03/04/05/07/08/10/11/12/13/14/16/17/18、mysql 01/02/03/04/05/07/08/09/10/11/12/13/14、spring 01/02/03/09/10/11/16、reading 的 agents 01/03/04/05/12、docker 01/02/03/13/14/17/18/19/20、ops 01/02/03/04/05/06/07/08、linux-from-zero 01/02/03/04、linux 06/07、os 01/02/07、git 06、network 01、algorithms 01、books-ddia 02。
+- 进行中（已派 agent，等回传）：git 01/03/04、agents 02/06/07/13、spring 12/13/17、network 02/03/04。
 
-- 下一步：6–8 分档还有 209 篇，优先 `content/courses/python`（02/07/08/10/11 仍是最高档）与 `content/reading/os`、`content/reading/linux`、`content/reading/git`、`content/reading/agents` 剩余篇目。
+- 下一步：≥8 分档还有 110 篇，优先 `content/reading/agents`（06/07/08/09/10/11/14/15）、`content/reading/network`（02–11）、`content/courses/java`（12–27）、`content/courses/spring`（04–08/12–19）、`content/reading/linux-from-zero`（05–20）、`content/reading/docker`（04–12/15/16/21）、`content/reading/redis`、`content/reading/data-analysis`、`content/reading/frontend-*`、`content/reading/vibe-coding-from-zero`。
+- 效率事实：一个 writer agent 改 1 篇约 8–15 分钟；同时最多 8 个 agent。剩余 400+ 篇按此速度需要多轮，优先级按「错误会不会让读者配出错环境 / 学到错结论」排，不按目录顺序。
 
 ## 逐篇改稿时最常踩的六类错（都是本系列实测抓到的）
 
