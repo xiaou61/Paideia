@@ -172,7 +172,8 @@ class OpsEvidenceCollector {
         return new OpsDiagnoser.Evidence(
                 trigger, alertName, question,
                 summaryText, metricsText, baselinesText, contextText,
-                alertsText, logsText, patternsText, tracesText, deploysText);
+                alertsText, logsText, patternsText, tracesText, deploysText,
+                evidenceWindow.label());
     }
 
     private OpsEvidenceWindow defaultWindow(OpsProperties.Diagnosis config) {

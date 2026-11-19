@@ -86,7 +86,7 @@ approver_role:
 - 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-ops -Dtest=OpsEvidenceCollectorTest test` → 期望新增用例绿、原有用例不回归
 - 完成（2026-11-19）：`METRICS` 10 → 19 项；`formatRuntime(window, restartLogCount)` 追加到指标段，输出「进程已运行 / 进程重启 N 次（窗口内 changes）/ 内存 OOM kill N 次（窗口内 increase）」；两个来源不一致时同时写出「日志记录 N 次启动（两者不一致…）」并提示 Loki 可能少采。实施细节：日志改为 `collect` 里只查一次（`Map<unit, lines>`），运行态与日志段共用，避免两次查询落在不同瞬间制造假差异；`maxEvidenceChars <= 0` 时连 Loki 查询都不发。
 
-### TASK-004 | pending | Evidence.window 与提示词 `<window>`
+### TASK-004 | done | Evidence.window 与提示词 `<window>`
 
 - 对应：`REQ-001`、`AC-001`
 - 依赖：TASK-001、TASK-002
@@ -100,6 +100,7 @@ approver_role:
   2. 写 `OpsDiagnosisPromptTest#renders_window_tag`：`window="证据窗口 14:07–14:23（事件 #17）"` ⇒ 断言 prompt 含 `<window>证据窗口 14:07–14:23（事件 #17）</window>`。
   3. 跑 prompt 三个测试类确认绿；`golden-set` 若因提示词变动而红，更新期望文本并注明原因。
 - 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-ai -Dtest='OpsDiagnosisPromptTest,DefaultOpsDiagnoserTest,OpsDiagnosisGoldenSetTest' test` → 期望 0 failures
+- 完成（2026-11-19）：`Evidence` 13 组件、提示词 `ops-diagnosis-v7` 第 10 条硬规则、`user()` 的 `<window>` 均在 `<alert-name>` 之后；`OpsDiagnosisService.run` 改为先定 `triggerAt` 再经 `evidenceWindow(incidentId, triggerAt)` 取窗口（事件用 `firstSeen/lastSeen` 并 `withSource("事件 #" + id)`，无事件用默认窗口），并把窗口透传给 `collect` 与 `contexts.build`，两处时间基准因此统一。`OpsEvidenceCollector` 把 `evidenceWindow.label()` 作为第 13 个参数交给报告。实施与计划的差异：① `section()` 是「标签独占一行」的格式，`rendersWindowTag` 断言改为含 `<window>\n证据窗口 …\n</window>`；② `OpsDiagnosisServiceTest` 原 stub 的是 4 参 `collect` 重载，工作项把它改成 5 参后必须同步加一个 `any()`，否则 mock 不命中、证据为 null；③ 新增 `OpsEvidenceCollectorTest#evidenceCarriesWindowLabel` 同时断 `Evidence.window()` 形如「证据窗口 HH:mm–HH:mm（事件 #17）」与日志段首行的「窗口 」前缀，确保两段用的是同一个窗口。测试：`paideia-ai` 三个类 35 例（含 golden-set 26 例）0 failures，`paideia-ops` 采集器 11 例、`paideia-app` 的 `OpsDiagnosisServiceTest` 11 例均 0 failures。
 
 ### TASK-005 | pending | 邮件 HTML 渲染与结论摘要
 

@@ -319,6 +319,18 @@ class OpsEvidenceCollectorTest {
     }
 
     @Test
+    @DisplayName("窗口标签随证据一起交给报告，日志段与证据段用同一个窗口")
+    void evidenceCarriesWindowLabel() {
+        OpsDiagnoser.Evidence evidence = collector(List.of("paideia"), 10, 16000, true)
+                .collect("alert", "日志模板异常待处理", null, null, window());
+
+        assertThat(evidence.window())
+                .startsWith("证据窗口 ")
+                .endsWith("（事件 #17）");
+        assertThat(evidence.logs()).startsWith("窗口 ");
+    }
+
+    @Test
     @DisplayName("指标说重启 5 次、日志只有 4 次启动时两个数字都给人看")
     void restartCountMismatchIsReported() {
         prometheusRestarts = 5;

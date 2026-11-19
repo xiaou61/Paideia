@@ -133,6 +133,6 @@ class DefaultOpsDiagnoserTest {
                 "manual", null, "现在为什么慢",
                 "服务状态：OK", "p95 = 1.2s", "p95 ratio=1.0x",
                 "## 历史同类事件\n无历史同类事件", "无 firing 告警",
-                "2026-10-26T10:00:00Z WARN slow", null, null, "deploy 10:00");
+                "2026-10-26T10:00:00Z WARN slow", null, null, "deploy 10:00", null);
     }
 }

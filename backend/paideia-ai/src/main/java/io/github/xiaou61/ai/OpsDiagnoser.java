@@ -29,10 +29,13 @@ public interface OpsDiagnoser {
      * @param patterns  日志模板聚类与近期模板异常（WORK-085）
      * @param traces    错误/慢 trace 摘要（WORK-043；P2 起有值）
      * @param deploys   最近发版信息
+     * @param window    证据窗口的人读描述（WORK-086）：报告必须按这个窗口取数，
+     *                  窗口之外的事件不得写进证据
      */
     record Evidence(String trigger, String alertName, String question,
                     String summary, String metrics, String baselines, String context,
-                    String alerts, String logs, String patterns, String traces, String deploys) {
+                    String alerts, String logs, String patterns, String traces, String deploys,
+                    String window) {
     }
 
     /** @param usage 上游没有返回用量时为 null（此时结算会全额退回预留） */

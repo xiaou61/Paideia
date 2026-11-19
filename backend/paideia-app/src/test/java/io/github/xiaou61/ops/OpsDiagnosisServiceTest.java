@@ -66,9 +66,9 @@ class OpsDiagnosisServiceTest {
             row.setId(99L);
             return 1;
         }).when(mapper).insert(any());
-        when(evidence.collect(anyString(), any(), any(), any())).thenReturn(new OpsDiagnoser.Evidence(
+        when(evidence.collect(anyString(), any(), any(), any(), any())).thenReturn(new OpsDiagnoser.Evidence(
                 "manual", null, null, "summary", "metrics", "baselines", "ctx",
-                "alerts", "logs", "patterns", null, "deploys"));
+                "alerts", "logs", "patterns", null, "deploys", "证据窗口 14:07–14:23（事件 #17）"));
         when(diagnoser.diagnose(anyLong(), any())).thenReturn(new OpsDiagnoser.Diagnosis(
                 "report", new TokenUsage(1, 2, 3), "deepseek-flash"));
     }

@@ -254,8 +254,10 @@ class OpsDiagnosisService {
                      String alertName, String question) {
         try {
             mapper.markRunning(id);
-            String context = contexts.build(incidentId, alertName, Instant.now());
-            OpsDiagnoser.Evidence collected = evidence.collect(trigger, alertName, question, context);
+            Instant triggerAt = Instant.now();
+            String context = contexts.build(incidentId, alertName, triggerAt);
+            OpsDiagnoser.Evidence collected = evidence.collect(
+                    trigger, alertName, question, context, evidenceWindow(incidentId, triggerAt));
             OpsDiagnoser.Diagnosis diagnosis = diagnoser.diagnose(userId, collected);
             TokenUsage usage = diagnosis.usage();
             mapper.markDone(id, diagnosis.model(),
@@ -288,6 +290,25 @@ class OpsDiagnosisService {
         } finally {
             running.set(false);
         }
+    }
+
+    /**
+     * 证据窗口（WORK-086）：有事件就用事件的首末时间，没有就从触发时刻往前一段。
+     *
+     * <p>事件窗口是这个工作项的核心修正点——原来实现固定取"此刻往前一小时"，
+     * 于是 14:17 触发、14:41 才开始跑的诊断，看到的是 13:41–14:41，而不是事发的那 16 分钟。
+     */
+    private OpsEvidenceWindow evidenceWindow(Long incidentId, Instant triggerAt) {
+        OpsProperties.Diagnosis config = properties.getDiagnosis();
+        OpsEvidenceWindow base = incidentId == null
+                ? OpsEvidenceWindow.of(null, null, triggerAt,
+                        config.getEvidenceWindowMinutes(), config.getEvidenceWindowMaxMinutes())
+                : incidents.find(incidentId)
+                        .map(row -> OpsEvidenceWindow.of(row.getFirstSeen(), row.getLastSeen(), triggerAt,
+                                config.getEvidenceWindowMinutes(), config.getEvidenceWindowMaxMinutes()))
+                        .orElseGet(() -> OpsEvidenceWindow.of(null, null, triggerAt,
+                                config.getEvidenceWindowMinutes(), config.getEvidenceWindowMaxMinutes()));
+        return incidentId == null ? base : base.withSource("事件 #" + incidentId);
     }
 
     /** 冷却表按告警名增长；数量很小，但长时间运行也不该无界。 */
