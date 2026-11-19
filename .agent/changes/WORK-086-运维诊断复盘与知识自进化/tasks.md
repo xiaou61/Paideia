@@ -274,7 +274,7 @@ approver_role:
   6. 把命令、截图路径、响应片段写入 `testing/report.md`。
 - 验证：`ssh codenest-online "journalctl -u paideia.service --since '2026-11-19 14:10' --until '2026-11-19 14:30'"` 与诊断证据逐项对照，4 次重启全部对上
 
-### TASK-015 | pending | 诊断完成后自动起草复盘
+### TASK-015 | done | 诊断完成后自动起草复盘
 
 - 对应：`REQ-006`、`AC-006`
 - 依赖：TASK-008（服务）、TASK-009（无，仅服务层）
@@ -286,6 +286,17 @@ approver_role:
   2. 在 `run(...)` 成功路径末尾接入：条件 `incidentId != null`；异常 `catch (RuntimeException e)` 只 `log.warn`，不得让诊断状态回滚或邮件重发。
   3. 确认自动起草**不发送**任何邮件/通知（复用现有 `incidentId != null` 才发邮件的分支，起草发生在其后且独立 try）。
 - 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-ops -Dtest='PostmortemServiceTest,OpsDiagnosisServiceTest' test` → 期望 0 failures
+
+完成（2026-11-19）：
+
+- 直接构造注入 `PostmortemService`（没有用 `ObjectProvider`）：它是同包同模块的 `@Service`，不存在
+  "测试上下文缺 bean" 的场景，测试里 `mock()` 即可——多一层 provider 只是多一处噪音。
+- 挂钩点在 `run(...)` 的 `incidentId != null` 分支里、邮件之后，单列 `autoDraftPostmortem(id, trigger, incidentId)`：
+  条件 `"alert".equals(trigger) && incidentId != null`，内部 `createDraftIfAbsent` + `catch (RuntimeException)` 只 warn。
+- 测试：`OpsDiagnosisServiceTest#alertDiagnosisAutoDrafts`（告警+事件被调一次）、`#manualDiagnosisDoesNotAutoDraft`、
+  `#autoDraftFailureDoesNotFailDiagnosis`（起草抛异常时 `markDone` 仍被调用，诊断判成功）；
+  `PostmortemServiceTest` 原有的两条自动起草用例覆盖"同事件已有草稿不再起草"与 `origin=auto`。
+- `paideia-ops` 80 例、`paideia-app` 的 `OpsDiagnosisServiceTest` 15 例全绿。
 
 ## 完成条件
 

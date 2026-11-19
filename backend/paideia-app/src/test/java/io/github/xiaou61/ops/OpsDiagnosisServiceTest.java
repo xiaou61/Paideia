@@ -44,6 +44,7 @@ class OpsDiagnosisServiceTest {
     private OpsProperties properties;
     private OpsDiagnosisMailer mailer;
     private PostmortemKnowledge knowledge;
+    private PostmortemService postmortems;
     private AtomicReference<Runnable> pending;
     private TaskExecutor executor;
     private OpsDiagnosisService service;
@@ -60,10 +61,12 @@ class OpsDiagnosisServiceTest {
         mailer = mock(OpsDiagnosisMailer.class);
         knowledge = mock(PostmortemKnowledge.class);
         when(knowledge.recall(any(), any(), anyInt())).thenReturn(List.of());
+        postmortems = mock(PostmortemService.class);
+        when(postmortems.createDraftIfAbsent(anyLong())).thenReturn(java.util.Optional.empty());
         pending = new AtomicReference<>();
         executor = pending::set;
         service = new OpsDiagnosisService(mapper, evidence, diagnoser, incidents, contexts,
-                properties, mailer, knowledge, executor);
+                properties, mailer, knowledge, postmortems, executor);
         when(contexts.build(any(), any(), any())).thenReturn("无历史同类事件\n无同期事件\n");
 
         org.mockito.Mockito.doAnswer(invocation -> {
@@ -132,6 +135,41 @@ class OpsDiagnosisServiceTest {
                 .contains("复盘 #41")
                 .contains("以本次证据为准");
         verify(mapper).markDone(eq(99L), any(), any(), any(), any(), eq("41"), any());
+    }
+
+    @Test
+    @DisplayName("告警诊断完成后自动起草复盘（只起草，不批准）")
+    void alertDiagnosisAutoDrafts() {
+        when(incidents.canDiagnose(eq(5L), any(), anyLong())).thenReturn(true);
+        when(incidents.find(5L)).thenReturn(java.util.Optional.empty());
+        when(postmortems.createDraftIfAbsent(99L)).thenReturn(java.util.Optional.of(77L));
+
+        assertThat(service.start("alert", 5L, "disk-low", null, USER)).isEqualTo(99L);
+        pending.get().run();
+
+        verify(postmortems).createDraftIfAbsent(99L);
+    }
+
+    @Test
+    @DisplayName("手动诊断不自动起草复盘")
+    void manualDiagnosisDoesNotAutoDraft() {
+        assertThat(service.start("manual", null, null, null, USER)).isEqualTo(99L);
+        pending.get().run();
+
+        verify(postmortems, never()).createDraftIfAbsent(anyLong());
+    }
+
+    @Test
+    @DisplayName("起草失败只 warn，不影响诊断本身成功")
+    void autoDraftFailureDoesNotFailDiagnosis() {
+        when(incidents.canDiagnose(eq(5L), any(), anyLong())).thenReturn(true);
+        when(incidents.find(5L)).thenReturn(java.util.Optional.empty());
+        when(postmortems.createDraftIfAbsent(99L)).thenThrow(new IllegalStateException("boom"));
+
+        assertThat(service.start("alert", 5L, "disk-low", null, USER)).isEqualTo(99L);
+        pending.get().run();
+
+        verify(mapper).markDone(anyLong(), any(), any(), any(), any(), any(), any());
     }
 
     @Test

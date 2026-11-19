@@ -48,6 +48,7 @@ class OpsDiagnosisService {
     private final OpsProperties properties;
     private final OpsDiagnosisMailer mailer;
     private final PostmortemKnowledge knowledge;
+    private final PostmortemService postmortems;
     private final TaskExecutor executor;
     private final AtomicBoolean running = new AtomicBoolean();
     private final Map<String, Instant> alertCooldowns = new ConcurrentHashMap<>();
@@ -60,6 +61,7 @@ class OpsDiagnosisService {
                         OpsProperties properties,
                         OpsDiagnosisMailer mailer,
                         PostmortemKnowledge knowledge,
+                        PostmortemService postmortems,
                         @Qualifier("applicationTaskExecutor") TaskExecutor executor) {
         this.mapper = mapper;
         this.evidence = evidence;
@@ -69,6 +71,7 @@ class OpsDiagnosisService {
         this.properties = properties;
         this.mailer = mailer;
         this.knowledge = knowledge;
+        this.postmortems = postmortems;
         this.executor = executor;
     }
 
@@ -277,6 +280,7 @@ class OpsDiagnosisService {
                 // 顺带带上 traceId，让邮件成为「告警 → 日志 → 调用链」的全链路入口。
                 mailer.sendDiagnosis(id, alertName, diagnosis.report(),
                         traceIds(collected.traces()));
+                autoDraftPostmortem(id, trigger, incidentId);
             }
             log.info("ops.diagnosis.done id={} trigger={} model={}", id, trigger, diagnosis.model());
         } catch (RuntimeException failure) {
@@ -320,6 +324,25 @@ class OpsDiagnosisService {
     }
 
     // ---------------------------------------------------------------- 知识召回
+
+    /**
+     * 告警诊断完成后自动起草一份 DRAFT 复盘（REQ-006）。
+     *
+     * <p>只起草、不批准：闸门仍在人手里（见 {@link PostmortemService}）。失败只 warn——
+     * 复盘起草失败不该让一次已经成功的诊断变成失败。
+     */
+    private void autoDraftPostmortem(long diagnosisId, String trigger, Long incidentId) {
+        if (!"alert".equals(trigger) || incidentId == null) {
+            return;
+        }
+        try {
+            postmortems.createDraftIfAbsent(diagnosisId)
+                    .ifPresent(postmortemId -> log.info("ops.postmortem.auto-draft diagnosis={} postmortem={}",
+                            diagnosisId, postmortemId));
+        } catch (RuntimeException failure) {
+            log.warn("ops.postmortem.auto-draft-failed diagnosis={} error={}", diagnosisId, failure.toString());
+        }
+    }
 
     private int knowledgeLimit() {
         return properties.getPostmortem().getKnowledgeLimit();
