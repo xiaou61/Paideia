@@ -6,6 +6,11 @@ import io.agentscope.core.model.transport.HttpTransport;
 import io.agentscope.core.model.transport.HttpTransportException;
 import io.agentscope.core.model.transport.HttpTransportConfig;
 import io.agentscope.core.model.transport.OkHttpTransport;
+import io.github.xiaou61.ai.internal.billing.BillingProperties;
+import java.net.URI;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
@@ -23,6 +28,9 @@ import reactor.core.publisher.Flux;
 public class GuardedHttpTransport implements HttpTransport {
 
     private final UpstreamGuard guard;
+    /** 平台上游要求的固定请求头；仅在请求目标 host 与平台 baseUrl 一致时才附带。 */
+    private final Map<String, String> platformHeaders;
+    private final String platformHost;
     /**
      * 禁止跟随重定向。
      *
@@ -36,18 +44,61 @@ public class GuardedHttpTransport implements HttpTransport {
      * **这个缺陷只在"非流式 + 大输出"的调用上出现**，单篇抽题（几秒）永远撞不到。
      * 这里取与 AgentScope 默认一致的 5 分钟，真正的时间上限由调用方的 `blockLast(…)` 决定。
      */
-    private final OkHttpTransport delegate = new OkHttpTransport(
-            new okhttp3.OkHttpClient.Builder()
-                    .followRedirects(false)
-                    .followSslRedirects(false)
-                    .readTimeout(java.time.Duration.ofMinutes(5))
-                    .writeTimeout(java.time.Duration.ofMinutes(1))
-                    .callTimeout(java.time.Duration.ofMinutes(6))
-                    .build(),
-            HttpTransportConfig.defaults());
+    private final OkHttpTransport delegate;
 
+    /** 测试与不需要额外请求头的场景。 */
     public GuardedHttpTransport(UpstreamGuard guard) {
+        this(guard, null);
+    }
+
+    @Autowired
+    public GuardedHttpTransport(UpstreamGuard guard, BillingProperties billing) {
         this.guard = guard;
+        Map<String, String> headers = new LinkedHashMap<>();
+        String host = null;
+        if (billing != null && billing.getPlatformCredential() != null) {
+            BillingProperties.PlatformCredential credential = billing.getPlatformCredential();
+            if (credential.getHeaders() != null && !credential.getHeaders().isEmpty()
+                    && credential.getBaseUrl() != null) {
+                headers.putAll(credential.getHeaders());
+                host = hostOf(credential.getBaseUrl());
+            }
+        }
+        this.platformHeaders = Map.copyOf(headers);
+        this.platformHost = host;
+
+        okhttp3.OkHttpClient.Builder builder = new okhttp3.OkHttpClient.Builder()
+                .followRedirects(false)
+                .followSslRedirects(false)
+                .readTimeout(java.time.Duration.ofMinutes(5))
+                .writeTimeout(java.time.Duration.ofMinutes(1))
+                .callTimeout(java.time.Duration.ofMinutes(6));
+        if (!platformHeaders.isEmpty()) {
+            final String targetHost = platformHost;
+            final Map<String, String> extra = platformHeaders;
+            builder.addInterceptor(chain -> {
+                okhttp3.Request request = chain.request();
+                if (targetHost == null || targetHost.equalsIgnoreCase(request.url().host())) {
+                    okhttp3.Request.Builder mutated = request.newBuilder();
+                    for (Map.Entry<String, String> entry : extra.entrySet()) {
+                        if (request.header(entry.getKey()) == null) {
+                            mutated.addHeader(entry.getKey(), entry.getValue());
+                        }
+                    }
+                    request = mutated.build();
+                }
+                return chain.proceed(request);
+            });
+        }
+        this.delegate = new OkHttpTransport(builder.build(), HttpTransportConfig.defaults());
+    }
+
+    private static String hostOf(String baseUrl) {
+        try {
+            return URI.create(baseUrl.trim()).getHost();
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 
     @Override

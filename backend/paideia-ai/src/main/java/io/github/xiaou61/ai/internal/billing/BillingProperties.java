@@ -129,6 +129,12 @@ public class BillingProperties {
         private String baseUrl;
         private String model;
         private String apiKey;
+        /**
+         * 上游要求的额外请求头（如 OpenCode Go 的 {@code x-opencode-session}）。
+         *
+         * <p>只在该上游自己的 host 上发送，不会带给用户自带 Key 的其它上游。
+         */
+        private Map<String, String> headers = new LinkedHashMap<>();
 
         public boolean configured() {
             return notBlank(baseUrl) && notBlank(model) && notBlank(apiKey);
@@ -160,6 +166,14 @@ public class BillingProperties {
 
         public void setApiKey(String apiKey) {
             this.apiKey = apiKey;
+        }
+
+        public Map<String, String> getHeaders() {
+            return headers;
+        }
+
+        public void setHeaders(Map<String, String> headers) {
+            this.headers = headers;
         }
     }
 
