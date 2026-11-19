@@ -3,7 +3,9 @@
 
 三件事，一件都不连数据库、不连网络：
 
-1. **结构**：frontmatter 字段齐全、七个小节按序出现、误区至少两条；
+1. **结构**：frontmatter 字段齐全、至少两个二级小节、有一个能动手的块、有一个能自测的块；
+   （2026-11-19 起不再强制固定七小节与「常见误区」栏目——那套模板让 79% 的课长成同一张脸。
+   现在只管"结构能不能站住"，叙事骨架由作者自己定，老课程不受影响，照旧通过。）
 2. **可运行示例**：`<!-- run -->` 后面的代码块真的执行一次，输出必须与紧跟的 ```text 块逐字相同；
 3. **围栏块**：`code-challenge` / `quiz` / `learning-path` 必须是合法 JSON，且关键上限不超。
 
@@ -43,16 +45,6 @@ FRONTMATTER_KEYS = ("title", "category", "order", "minutes", "status")
 # 放在内容里而不是代码里，是为了"新增一条线不改代码"。
 OVERVIEW_KEYS = ("line_name", "line_kind", "line_sort")
 LINE_KINDS = ("course", "reading")
-SECTIONS = (
-    "这一课你要会",
-    "为什么",
-    "讲解",
-    "动手",
-    "检查一下",
-    "常见误区",
-    "小结",
-)
-
 LIMITS = {
     "id": 64,
     "title": 120,
@@ -67,7 +59,6 @@ LIMITS = {
 
 FENCE = re.compile(r"^```([A-Za-z0-9_-]*)\s*$", re.MULTILINE)
 H2 = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
-MISCONCEPTION = re.compile(r"^###\s+误区[：:].+$", re.MULTILINE)
 
 failures: list[str] = []
 
@@ -132,17 +123,11 @@ def check_structure(path: Path, meta: dict[str, str], body: str) -> None:
     if meta.get("status") not in (None, "published"):
         fail(path, "status 只允许 published（草稿不要放进课程目录）")
 
+    # 不再规定小节名与顺序：只要求正文真的分节（否则整篇一坨），
+    # 能动手（code-challenge）与能自测（quiz）由 check_blocks 强制。
     headings = [match.group(1).strip() for match in H2.finditer(body)]
-    missing = [name for name in SECTIONS if name not in headings]
-    if missing:
-        fail(path, "缺少小节：" + "、".join(missing))
-        return
-    positions = [headings.index(name) for name in SECTIONS]
-    if positions != sorted(positions):
-        fail(path, "小节顺序不对，应为：" + " → ".join(SECTIONS))
-
-    if len(MISCONCEPTION.findall(body)) < 2:
-        fail(path, "常见误区至少要两条（每条以 `### 误区：` 开头）")
+    if len(headings) < 2:
+        fail(path, f"正文至少要有两个二级小节（## 开头），实际 {len(headings)} 个")
 
 
 def check_blocks(path: Path, body: str) -> None:
