@@ -5,275 +5,307 @@ chapter: 容器
 level: intermediate
 category: spring-from-zero
 prerequisite: 08 · 作用域与生命周期
-minutes: 22
+minutes: 19
 status: published
 ---
 
 # 09 · 自动配置与自定义 starter
 
-## 报告里根本没有我这一条
+## 782 行报告里搜不到我的类
 
-我给自己的库写了个自动配置，本地能跑，打成 jar 放进另一个项目里，`Greeter` 注入不进来。第一反应是条件没满足，于是加上 `--debug`，在输出里搜类名：
+探针工程里只有两个类：`probe.lib.Greeter`，和一个本该把它装进容器的 `probe.lib.GreeterAutoConfiguration`。包名故意跟示例工程错开，省得撞名。清单文件这一轮故意不建，直接跑：
 
-```text
-$ java -jar app.jar --debug | grep -n Greeter
-（没有输出）
+```bash
+java -cp "out;res;lib/*" probe.app.MinimalApp --debug > report.txt 2>&1
 ```
 
-一条都没有。不在 `Positive matches`，也不在 `Negative matches`——**它压根没进入候选名单**。
+- Windows 用分号分隔，Linux / macOS 换冒号；
+- `lib/` 是 `mvn dependency:copy-dependencies` 拉下来的 jar；
+- `res/` 是放清单文件的资源目录，这一轮是空的。
 
-那一刻我才意识到自己少写了一整个文件：`META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`。类编译好了、注解也对、条件全满足，只是没人告诉 Spring"有这么个类要考虑"。
+`report.txt` 782 行，从 `Positive matches` 翻到 `Unconditional classes`，`GreeterAutoConfiguration` 一次都没出现；启动最后一行是 `[app] Greeter 定义数 = 0`。
 
-这一课就把这件事推到根上：自动配置不是框架在猜，它是**一份清单 + 一堆条件判断**。清单漏了，条件写得再对也不会被看一眼。
+我的第一反应是条件写错了，来回改了两轮 `@ConditionalOnClass`，报告一个字没变。后来才发现方向从头就错：我在查一个从没进过判断的条件。
 
-## 自动配置的全部逻辑
+下面所有输出都来自同一套探针，每次只改清单文件或启动参数：JDK 25.0.4（Temurin）、Spring Boot 3.5.6、Spring Framework 6.2.11，`WebApplicationType.NONE`（不起 web）。`content/reading/spring/03-自动配置.md` 里用同一套探针跑出的是 783 行——那是另一次运行，多一行日志，零命中的结论一样。
 
-去掉所有名词，就三句话：
+## 清单是一行类名，漏了不报错
 
-1. 有一份清单：**"可能用得上的配置类"**；
-2. 每个配置类上写着**"什么情况下我才生效"**；
-3. 生效的配置类往容器里登记对象；跳过的不登记。
+Boot 2.7 引入 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`，同一版把 `spring.factories` 里的 `EnableAutoConfiguration` 键标成过期，Boot 3.0 起不再读它。3.5.6 的 `spring-boot-autoconfigure` jar 里，这个文件 156 行，全是全限定类名，没有 `key=`：
 
-"加个 `starter-jdbc` 就自带连接池"就是这么来的。它没有猜，只是在清单里有一条"如果类路径上有连接池的类，就造一个"。
+```text
+src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports
+```
 
-## 手写一遍内核
+```text
+probe.lib.GreeterAutoConfiguration
+```
 
-下面这段代码就是那个内核，`applyAutoConfiguration` 里只有一句判断：
+把这一行搬进去、别的什么都不改，同一个命令再跑，报告里立刻多出两条记录——一条类级、一条方法级：
+
+```text
+   GreeterAutoConfiguration matched:
+      - @ConditionalOnClass found required class 'probe.extra.FancyClient' (OnClassCondition)
+
+   GreeterAutoConfiguration#greeter matched:
+      - @ConditionalOnMissingBean (types: probe.lib.Greeter; SearchStrategy: all) did not find any beans (OnBeanCondition)
+```
+
+为了确认不是路径碰运气，我又把同一行按 2.x 的写法塞进 `META-INF/spring.factories`：
+
+```ini
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+probe.lib.GreeterAutoConfiguration
+```
+
+还是 782 行、零命中、定义数 0。文件在、格式对、不报错、不警告——3.5.6 上这个键等于没写。这就是这类问题最难查的地方：**漏清单和条件不满足，启动日志都不会为这个配置类发一条错误或警告**，只有注入的时候才炸。
+
+## 报告里的一行，对应卡在哪一段
+
+清单登记过、类级条件、方法级条件，三段里任何一段没过，报告都记，但记法不同。先认样子，再决定查哪：
+
+| 报告里的样子 | 卡在哪一段 | 先去看什么 |
+| --- | --- | --- |
+| 两个 matches 段都搜不到类名 | 清单没读进来，后面三段都没发生 | 文件路径与文件名、是不是还写在 `spring.factories`、jar 里打没打包进去 |
+| 类名下面跟着 `Did not match` | 类级条件 | 它逐条列出的那句原因：缺哪个类、缺哪个属性 |
+| 类名 matched，`类名#方法名` 却挂在 `Negative matches` 下 | 方法级条件 | `found beans of type` 后面那个 bean 名是谁登记的 |
+| 只有 `类名#方法名`，没有类名那一行 | 类级没有条件可判，或者被漏判 | 它是不是待在 `Unconditional classes` 段 |
+| 落在 `Unconditional classes` 段 | 条件没参与判断 | 条件是不是写在你自己的组合注解里 |
+
+第二行和第三行差一层，症状却都是「`Greeter` 注入不进来」：一种是类根本没生效，一种是类生效了 bean 没注册。报告分开记，注入报错分不开。
+
+## 类级和方法级是两条记录
+
+上面那段输出是同一个类的两次判断，只是因为都通过才连在一起。把两者拆开看更清楚。
+
+**类级没过**：把编译好的 `out` 拷一份，删掉里面 `probe/extra/FancyClient.class` 一个文件，清单不变、代码不变：
+
+```text
+   GreeterAutoConfiguration:
+      Did not match:
+         - @ConditionalOnClass did not find required class 'probe.extra.FancyClient' (OnClassCondition)
+```
+
+这时的报告里只有这一条，`GreeterAutoConfiguration#greeter` 一处都没有——类没通过，它里面的 `@Bean` 方法根本不进判断。顺序是先类后方法，这条结论在这里能直接看出来。
+
+**类级过了、方法级没过**：给启动类加一个 `@Import`，里面自己声明一个 `Greeter`：
+
+```java
+@Configuration
+public class UserConfig {
+
+    @Bean
+    public Greeter greeter() {
+        return new Greeter("用户定义");
+    }
+}
+```
+
+报告里类级仍是 matched，方法级变成否：
+
+```text
+   GreeterAutoConfiguration#greeter:
+      Did not match:
+         - @ConditionalOnMissingBean (types: probe.lib.Greeter; SearchStrategy: all) found beans of type 'probe.lib.Greeter' greeter (OnBeanCondition)
+```
+
+注入拿到的就是 `Greeter(prefix=用户定义)`。
+
+顺带一个只看源码看不出来的细节：报告里写的是 `types: probe.lib.Greeter`，但 `GreeterAutoConfiguration` 里那个注解我根本没写 value，只有 `@ConditionalOnMissingBean`。类型是从 `@Bean` 方法的返回类型推出来的——把返回类型改成接口或父类，这一行跟着变。
+
+## 用户定义优先，靠的是导入顺序
+
+三个条件里没有一条写着「用户优先」，这件事是排队排出来的。`javap` 看 3.5.6 的那个选择器：
+
+```text
+public class org.springframework.boot.autoconfigure.AutoConfigurationImportSelector implements
+    org.springframework.context.annotation.DeferredImportSelector, ...
+```
+
+`DeferredImportSelector` 的意思是：等普通 `@Configuration` 都处理完，它才把清单里的类导进来。所以用户那个 `greeter` 先登记完，自动配置的方法级条件才有东西可看，才会判否。
+
+但这是**实现手段，不是框架承诺**。它成立的前提是你的 bean 在处理顺序上确实更早；如果你的 bean 来自另一个自动配置，或者它自己被扫描得更晚，「先看见」就不成立，得靠 `@AutoConfiguration(after = ...)` 排。这一层我没做对照实验，按官方文档写。
+
+## 同一个类里两个 @Bean，谁赢
+
+方法级条件看的是**判定那一刻已经登记的定义**，不是全部登记完再统一检查一遍。下面这段就是它的骨架——把 `OnBeanCondition` 换成一个按类型查表的 if，其余照旧：
 
 <!-- run -->
 ```java
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.function.Supplier;
 
 public class Main {
 
-    interface DataSource {
-        String name();
+    record Greeter(String prefix) {
     }
 
-    interface Cache {
-        String name();
-    }
+    // 判定那一刻已经登记的定义：bean 名 -> 类型
+    static final Map<String, Class<?>> defined = new LinkedHashMap<>();
+    static Greeter kept;
 
-    static class DefaultDataSource implements DataSource {
-        public String name() {
-            return "default-datasource";
-        }
-    }
-
-    static class UserDataSource implements DataSource {
-        public String name() {
-            return "user-datasource";
-        }
-    }
-
-    static class DefaultCache implements Cache {
-        public String name() {
-            return "default-cache";
-        }
-    }
-
-    // 一条自动配置 = 它提供什么类型 + 怎么造
-    static final class AutoConfig {
-        final Class<?> type;
-        final Supplier<Object> factory;
-
-        AutoConfig(Class<?> type, Supplier<Object> factory) {
-            this.type = type;
-            this.factory = factory;
-        }
-    }
-
-    static final class Context {
-        private final Map<Class<?>, Object> beans = new LinkedHashMap<>();
-
-        <T> void define(Class<T> type, T instance) {
-            beans.put(type, instance);
-        }
-
-        Object get(Class<?> type) {
-            return beans.get(type);
-        }
-
-        // 全部逻辑：用户已经有了就不动，没有才造
-        void applyAutoConfiguration(AutoConfig... configs) {
-            for (AutoConfig config : configs) {
-                if (beans.containsKey(config.type)) {
-                    continue;
-                }
-                beans.put(config.type, config.factory.get());
+    static void beanMethod(String beanName, Class<?> type, boolean conditionalOnMissingBean, Greeter bean) {
+        if (conditionalOnMissingBean) {
+            String existing = findRegistered(type);
+            if (existing != null) {
+                System.out.println(beanName + " -> Did not match: found beans of type " + existing);
+                return;
             }
         }
+        defined.put(beanName, type);
+        kept = bean;
+        System.out.println(beanName + " -> matched，登记定义");
+    }
+
+    static String findRegistered(Class<?> type) {
+        for (Map.Entry<String, Class<?>> entry : defined.entrySet()) {
+            if (entry.getValue() == type) {
+                return entry.getKey();
+            }
+        }
+        return null;
     }
 
     public static void main(String[] args) {
-        AutoConfig[] configs = {
-                new AutoConfig(DataSource.class, DefaultDataSource::new),
-                new AutoConfig(Cache.class, DefaultCache::new),
-        };
-
-        Context plain = new Context();
-        plain.applyAutoConfiguration(configs);
-        System.out.println("什么都没定义: " + ((DataSource) plain.get(DataSource.class)).name()
-                + " / " + ((Cache) plain.get(Cache.class)).name());
-
-        Context customized = new Context();
-        customized.define(DataSource.class, new UserDataSource());
-        customized.applyAutoConfiguration(configs);
-        System.out.println("用户定义了数据源: " + ((DataSource) customized.get(DataSource.class)).name()
-                + " / " + ((Cache) customized.get(Cache.class)).name());
+        // 同一个配置类里两个 @Bean 返回同一类型，都带 @ConditionalOnMissingBean(Greeter.class)
+        beanMethod("zFirst", Greeter.class, true, new Greeter("zFirst"));
+        beanMethod("aSecond", Greeter.class, true, new Greeter("aSecond"));
+        System.out.println("Greeter 定义数 = " + defined.size() + "，值是 " + kept.prefix());
     }
 }
 ```
 ```text
-什么都没定义: default-datasource / default-cache
-用户定义了数据源: user-datasource / default-cache
+zFirst -> matched，登记定义
+aSecond -> Did not match: found beans of type zFirst
+Greeter 定义数 = 1，值是 zFirst
 ```
 
-第二行是自动配置最核心的行为：**用户定义优先，自动配置让位**。这就是 `@ConditionalOnMissingBean` 的全部含义。
-
-注意我这个内核只判一种条件（"有没有"）。真实框架的条件有几十种，但每一种都长这个形状——一个返回 boolean 的检查，加一句"不成立就跳过"。
-
-## 常用的四类条件
-
-| 注解 | 成立条件 | 典型用途 |
-| --- | --- | --- |
-| `@ConditionalOnClass` | 类路径上有某个类 | "只有引了驱动才配数据源" |
-| `@ConditionalOnMissingBean` | 容器里还没有这个类型的对象 | 让用户定义优先 |
-| `@ConditionalOnProperty` | 配置项满足（值或是否存在） | 开关型功能 |
-| `@ConditionalOnBean` / `@ConditionalOnMissingClass` | 相反方向 | 互斥的两种实现 |
-
-前两条的命令不同：`@ConditionalOnBean` / `@ConditionalOnMissingBean` 是**顺序敏感**的，它只能看到"到目前为止"已经登记的 Bean。所以自动配置类在 `@AutoConfiguration` 里要写 `after`：
-
-```java
-@AutoConfiguration(after = DataSourceAutoConfiguration.class)
-```
-
-顺序错了，`@ConditionalOnMissingBean` 会在用户 Bean 还没登记时判断"没有"，然后抢着造一个。
-
-### `@ConditionalOnClass` 为什么常写成字符串
-
-```java
-@ConditionalOnClass(name = "com.mysql.cj.jdbc.Driver")   // 常见写法
-@ConditionalOnClass(DataSource.class)                    // 很多时候也没问题
-```
-
-网上流传的解释是"写 `X.class` 会让这个配置类加载失败，所以必须写字符串"。**这个说法只对一半。**
-
-- 当注解**直接标在配置类上**时，Spring 用 ASM 读字节码里的注解元数据，不会真的去解析那个 `Class` 引用——所以 `X.class` 缺类也是安全的，这是 `@ConditionalOnClass` 文档里明确写了的。
-- 只有当这个注解作为**元注解**出现在你自己写的组合注解里时，才必须用 `name`。因为那时 JVM 要加载你的组合注解，它的 `Class` 参数会被解析，目标类不在类路径上就抛 `ArrayStoreException` / `TypeNotPresentException`。
-
-所以判断标准是：**直接标注 → `X.class` 可以；写自己的组合注解 → 用 `name`。**
-
-## 候选清单放在哪
-
-老的写法是 `META-INF/spring.factories`，里面一个键挂一串类名。Boot 2.7 引入新的清单文件，Boot 3 起自动配置键从 `spring.factories` 移除：
+同一份配置在真容器里就是这个结果。报告里先声明的那条 matched、后声明的那条被判否：
 
 ```text
-src/main/resources/META-INF/spring/
-  org.springframework.boot.autoconfigure.AutoConfiguration.imports
-```
+   OrderProbeConfig#zFirst matched:
+      - @ConditionalOnMissingBean (types: probe.lib.Greeter; SearchStrategy: all) did not find any beans (OnBeanCondition)
 
-内容是纯文本，一行一个全限定类名，没有 `key=`：
-
-```text
-com.example.greeter.GreeterAutoConfiguration
-```
-
-这个文件是开头那个 bug 的答案。**漏了它，症状就是"报告里连 Negative matches 都没有"**——因为 Negative matches 记录的是"被考虑过但没通过"，而清单里没登记的类根本没被考虑。
-
-## 怎么看清哪些生效了
-
-```bash
-java -jar app.jar --debug
-```
-
-控制台会打出一张条件评估报告：
-
-```text
-============================
-CONDITIONS EVALUATION REPORT
-============================
-
-Positive matches:
------------------
-   DataSourceAutoConfiguration matched:
-      - @ConditionalOnClass found required classes 'javax.sql.DataSource', 'org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType'
-      - @ConditionalOnMissingBean did not find any beans (OnBeanCondition)
-
-Negative matches:
------------------
-   RedisAutoConfiguration:
+   OrderProbeConfig#aSecond:
       Did not match:
-         - @ConditionalOnClass did not find required class 'org.springframework.data.redis.core.RedisOperations'
+         - @ConditionalOnMissingBean (types: probe.lib.Greeter; SearchStrategy: all) found beans of type 'probe.lib.Greeter' zFirst (OnBeanCondition)
 ```
 
-这张表是排查"为什么没生效"的第一站，因为它逐条给出"哪些条件成立、哪些不成立、不成立是缺哪个类"。
+启动收尾：`[ord] Greeter 定义数 = 1`、`[ord] zFirst = Greeter(prefix=zFirst)`。
 
-顺便说一个容易看错的细节：`javax.sql.DataSource` 属于 JDK，不是漏改成 `jakarta` 的老代码。JDK 的 `java.sql` / `javax.sql` 包名从来没跟 Jakarta EE 一起改名，看到它不用去"修"。
+注意赢的是 `zFirst` 而不是 `aSecond`——按 bean 名字母序 `aSecond` 在前。所以顺序不是名字排的，是**方法声明顺序**：先声明的先登记，后声明的判定时看见了它。跨配置类时，顺序由配置类的处理顺序决定，`@AutoConfiguration` 的 `after` / `before` 就是干这个的（文档结论，同上，没做对照实验）。
 
-## 一个最小 starter 需要什么
+## 组合注解里写 X.class：我以为会抛异常
 
-`starter` 这个词在 Boot 里其实是两件事，很多人混着说：
+我读到的说法是：`@ConditionalOnClass(SomeClass.class)` 在**直接标注**时安全，但一旦包进自己写的组合注解，缺类就会抛 `ArrayStoreException` 或 `TypeNotPresentException`，所以组合注解必须写 `name`。
 
-| 名字 | 是什么 | 内容 |
-| --- | --- | --- |
-| `xxx-spring-boot-autoconfigure` | 自动配置的实现 | 配置类、条件注解、`AutoConfiguration.imports` |
-| `xxx-spring-boot-starter` | 空的聚合包 | 只有一个 `pom`，把实现与依赖都拉进来 |
+前半句对。后半句在 3.5.6 上不成立。组合注解长这样，条件原样照抄，只是搬进注解里：
 
-拆开的好处是别人可以只用你的自动配置、不引你带的依赖。小项目直接合成一个包也行。
+```java
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@ConditionalOnClass(probe.extra.FancyClient.class)
+public @interface ComposedOnFancy {
+}
+```
 
-一个最小的自动配置，三个文件：
+把它标在一个输出 `Greeter` 的自动配置类上，运行时 `FancyClient` 不在类路径（还是删掉那个 class 文件）。我准备抓异常，结果**没有任何异常**：启动正常，`Greeter` 照样是 `Greeter(prefix=meta)`，报告把它归到这一段，第 775 行：
+
+```text
+Unconditional classes:
+----------------------
+
+    ...
+    probe.lib.MetaAutoConfiguration
+```
+
+条件被整个漏掉了，连 `Did not match` 都没有。而它在类里的方法级条件照常工作，报告里仍有 `MetaAutoConfiguration#greeter matched:`。
+
+把同一个组合注解改成 `@ConditionalOnClass(name = "probe.extra.FancyClient")` 再跑，才恢复正常：
+
+```text
+   MetaByNameAutoConfiguration:
+      Did not match:
+         - @ConditionalOnClass did not find required class 'probe.extra.FancyClient' (OnClassCondition)
+```
+
+四种组合的实测结果（前两条用 `DirectXAutoConfiguration`，后两条用 `MetaAutoConfiguration` 与 `MetaByNameAutoConfiguration`，清单里一次只放一个，其余代码完全相同）：
+
+- 直接标在配置类上，`X.class`，类在 → matched；
+- 直接标在配置类上，`X.class`，类不在 → `Did not match`，配置跳过；
+- 组合注解里 `X.class`，类不在 → **条件消失**，进 `Unconditional classes`，配置照常生效；
+- 组合注解里 `name = "…"`，类不在 → `Did not match`，配置跳过。
+
+文档只承诺了第一种和第二种（直接标注时 `X.class` 缺类安全），对组合注解只要求写 `name`，没写不写会怎样。所以「必须写 name」这条规矩是**对的**，但它对的原因不是会抛异常，而是不写就会被静默漏判——这比抛异常难查得多，因为你会去等一个永远不会出现的报错。至于元注解解析在哪一步把条件丢掉了，我没挖到（见最后一节）。
+
+## @AutoConfiguration 和 @Configuration 差什么
+
+`javap` 看注解本身，`@AutoConfiguration` 就是 `@Configuration(proxyBeanMethods=false)` 加排序字段：
+
+```text
+    org.springframework.context.annotation.Configuration(
+      proxyBeanMethods=false
+    )
+```
+
+前半句是可验证的元数据；`proxyBeanMethods=false` 意味着配置类里 `@Bean` 方法之间的互相调用不再走 CGLIB 代理，每次都是真调用。所以别把 `@AutoConfiguration` 当「更高级的 `@Configuration`」往业务配置类上写：它多出来的那点东西（`before` / `after` 排序字段、清单语义）只在从清单加载时才起作用，落在扫描路径上就只剩下 `proxyBeanMethods=false` 这一个副作用。
+
+然后是那句流传很广的提醒：自动配置类不要放在组件扫描范围内，否则会被注册两次。我把 `probe.dup.DupConfig` 同时登记进清单、又留在扫描范围里（启动类 `scanBasePackages` 同时扫 `probe.iso2` 和 `probe.dup`），实测：
+
+```text
+[dup] new DupConfig #1 id=80026551
+[dup] DupConfig 实例数 = 1，构造函数执行次数 = 1
+[dup] DupConfig 的 bean 名字 = probe.dup.DupConfig
+```
+
+一个实例、构造一次、bean 名是全限定名（清单加载的命名方式，不是 `dupConfig`），日志里也没有 `Overriding bean definition` 之类的字样。也就是说这个组合下「扫描 + 清单」两条路只走了一条。
+
+原因能指到具体类：`javap -v` 看 `@SpringBootApplication` 的注解体，它内嵌的 `@ComponentScan` 带了两个排除过滤器：
+
+```text
+    org.springframework.context.annotation.ComponentScan(
+      excludeFilters=[@org.springframework.context.annotation.ComponentScan$Filter(
+        type=Lorg/springframework/context/annotation/FilterType;.CUSTOM
+        classes=[class Lorg/springframework/boot/context/TypeExcludeFilter;]
+      ),@org.springframework.context.annotation.ComponentScan$Filter(
+        type=Lorg/springframework/context/annotation/FilterType;.CUSTOM
+        classes=[class Lorg/springframework/boot/autoconfigure/AutoConfigurationExcludeFilter;]
+      )]
+    )
+```
+
+`AutoConfigurationExcludeFilter` 把「既在 `.imports` 清单里、又标了 `@Configuration` 的类」从扫描结果里排掉，剩下的从清单走。所以包放哪儿不是坑，注册两次也不是必然结果——不重复注册的原因是这两个过滤器，不是我放对了包。这是我测到的那一种组合，别的组合没验。
+
+## 最少要放两个文件
+
+一个能用的自动配置，两个文件：配置类，加上一行清单。配置类长这样（`Greeter` 从 `probe.lib` 来，包名换掉时整篇一起换）：
 
 ```java
 @AutoConfiguration
-@ConditionalOnClass(name = "com.example.greeter.client.Client")
-@EnableConfigurationProperties(GreeterProperties.class)
+@ConditionalOnClass(name = "probe.extra.FancyClient")
 public class GreeterAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public Greeter greeter(GreeterProperties properties) {
-        return new Greeter(properties.getPrefix());
+    public Greeter greeter() {
+        return new Greeter("hello");
     }
 }
 ```
 
-```java
-@ConfigurationProperties(prefix = "greeter")
-public class GreeterProperties {
+`@ConditionalOnMissingBean` 标在方法上只守这一个 bean，标在类上等于给类里所有 `@Bean` 方法都加一遍。上面这个例子放方法上是故意的：将来加进来的第二个 bean 未必也该让位。
 
-    private String prefix = "hello";
+想让前缀来自配置项，得用 `@ConfigurationProperties` 绑定——那是第 16 课的内容，这里先写常量，不提前牵进来。
 
-    public String getPrefix() {
-        return prefix;
-    }
+发布时拆成两个 artifact 是惯例：`greeter-spring-boot-autoconfigure` 放配置类和清单，`greeter-spring-boot-starter` 里只有一个 pom，把实现和依赖一起拉进来。拆开的好处是别人能只引自动配置、不引你带的实现依赖；小项目合成一个包也能跑。
 
-    public void setPrefix(String prefix) {
-        this.prefix = prefix;
-    }
-}
-```
+三个环节出问题，症状和报告里的痕迹都不一样：
 
-属性类里那两个方法必须是真的方法。我第一次抄别人的模板，正文里写着 `// getter / setter` 当注释，然后 `properties.getPrefix()` 编译报错——模板里的注释不是代码，这段我删掉了好几次才长记性。用 `record` 也可以（`record GreeterProperties(String prefix) {}`），但从 Boot 3 起绑定不可变对象的写法要求在 `@ConfigurationProperties` 上配构造器绑定，初学时用 getter/setter 版本更少踩坑。
-
-注意 `@ConditionalOnMissingBean` 在这个例子里标在**方法**上而不是类上：标在类上表示"这个类里所有 Bean 都要在缺失时才注册"，标在方法上只针对这一个。
-
-```text
-# META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports
-com.example.greeter.GreeterAutoConfiguration
-```
-
-### `@AutoConfiguration` 与 `@Configuration` 到底差什么
-
-`@AutoConfiguration` 做了两件事：一是标记"我属于自动配置阶段"（框架会给它 `proxyBeanMethods=false`，并允许写 `after`/`before` 排序）；二是它被设计成**只由清单加载**。
-
-但它**不会阻止组件扫描**。官方文档专门提了一条：自动配置类要放在**不被组件扫描覆盖的包**里，否则一旦你的启动类扫到它，它就会被当成普通配置类注册一次，加上清单里的那一次——**同一个配置类被处理两次**。
-
-我踩过的表现是启动日志里的 `Overriding bean definition for bean 'greeter'`，以及某些 Bean 初始化了两遍。修法不是删注解，而是移动包：`com.example.greeter.autoconfigure` 这类子包要避开使用方的扫描根（通常是 `com.example.demo`）。用官方脚手架（`spring-boot-starter-xxx` 模板）能避免这个坑，因为它默认就这么放。
-
-顺带一句：**自己的业务配置类别用 `@AutoConfiguration`**。它没有登记在清单里，标了也不会被特殊处理，只会在某个时刻给你一个"顺序按 after 排"的错觉。
+| 哪个环节出问题 | 启动与注入的症状 | 报告里有痕迹吗 |
+| --- | --- | --- |
+| 清单那一行 | 注入时报找不到 `Greeter`，启动本身不报错 | 没有，两个 matches 段都搜不到 |
+| 类级条件不成立（依赖没引、类名写错） | 同上，注入报找不到 | 有，`Did not match` 并给出缺哪个类 |
+| 方法级条件判否（别人已经定义了 `Greeter`） | 注入拿到别人的那个，取不到自动配置的默认值 | 有，`类名#方法名` 落在 `Negative matches`，`found beans of type` 指向谁 |
 
 ## 动手
 
@@ -285,18 +317,18 @@ com.example.greeter.GreeterAutoConfiguration
   "kind": "order",
   "title": "自动配置没生效时看什么",
   "lines": [
-    "在 Negative matches 里找自己那条配置",
-    "确认 AutoConfiguration.imports 里确实登记了这个类",
-    "启动时加 --debug，拿到 CONDITIONS EVALUATION REPORT",
-    "按原因修：补依赖、补配置项、或删掉自己的同名 Bean",
-    "读它下面列出的 Did not match 原因（缺类 / 缺属性 / 已有同类型 Bean）"
+    "启动加 --debug，把整份输出重定向到文件（七百多行，控制台里翻不完）",
+    "按报告给的原因修：补依赖、补配置项，或者删掉自己同名的 Bean",
+    "先在清单文件的路径与文件名上确认：这个类的全限定名是不是真被登记了",
+    "读它下面逐条列出的原因，不要先动条件注解",
+    "在 Positive matches / Negative matches / Unconditional classes 三段里找自己那条"
   ],
-  "answer": [2, 1, 0, 4, 3],
-  "explain": "先确认清单（类到底进没进候选名单），再看报告，再找原因，最后修。最容易跳过的是第二步：如果清单里没登记，报告里连这条都不会出现，你会把它误判成「条件不成立」，然后去查一堆根本没参与判断的条件。"
+  "answer": [2, 0, 4, 3, 1],
+  "explain": "先确认清单（类到底进没进候选名单），再拿报告，再分三段找自己那条，然后读原因，最后才动手改。最容易跳过的是清单那一步：没登记时报告里连条目都没有，你会把它误判成条件不成立，然后去改一堆根本没参与判断的条件。"
 }
 ```
 
-**提示**：报告里**找不到**某条配置，和它出现在 `Negative matches` 里，是两个完全不同的原因。
+**提示**：报告里**找不到**某条配置，和它出现在 `Negative matches` 里，是两个不同的原因——把这两种当成一种，是本课开头那个下午的全部代价。
 
 ## 检查一下
 
@@ -306,40 +338,46 @@ com.example.greeter.GreeterAutoConfiguration
   "title": "自动配置三问",
   "questions": [
     {
-      "question": "什么时候 @ConditionalOnClass 必须写成 name 字符串而不是 X.class？",
-      "options": ["任何时候都必须写字符串", "只有当它作为元注解出现在自己写的组合注解里时", "只有目标类在同一个 jar 里时"],
-      "answer": 1,
-      "explain": "直接标在配置类上时，Spring 用 ASM 读字节码元数据，不会真的解析 Class 引用，所以 X.class 缺类也安全。写组合注解时才必须用 name。"
+      "question": "加 --debug 后，Positive matches 和 Negative matches 里都搜不到你的自动配置类名。最可能卡在哪？",
+      "options": [
+        "条件注解写错了，被判成不成立",
+        "类的构造器是私有的，Spring 造不出来",
+        "依赖没引，@ConditionalOnClass 没通过",
+        "清单没被读到：路径或文件名不对，或者还写在 spring.factories 里"
+      ],
+      "answer": 3,
+      "explain": "Negative matches 记的是「被考虑过但没通过」，两个段都没有说明它压根没进候选名单。3.5.6 实测：同一个类写在 spring.factories 里，782 行报告零命中。"
     },
     {
-      "question": "自己定义了一个 DataSource 之后，默认的自动配置为什么不见了？",
-      "options": ["Boot 随机选一个", "@ConditionalOnMissingBean 发现已有同类型 Bean，主动让位", "两个都在，注入时随机挑"],
-      "answer": 1,
-      "explain": "这就是「用户定义优先」。如果两个都注册，注入时会变成候选不唯一，所以框架宁可自己退出。"
+      "question": "@ConditionalOnClass(Foo.class) 写在你自己的组合注解上，运行时 Foo 不在类路径，3.5.6 实测会怎样？",
+      "options": [
+        "没有异常：条件被整个漏掉，类进 Unconditional classes，配置照常生效",
+        "启动抛 ArrayStoreException / TypeNotPresentException",
+        "条件判为不成立，配置跳过，报告给出 did not find required class",
+        "编译期就报错"
+      ],
+      "answer": 0,
+      "explain": "实测没有任何异常，报告把它放在 Unconditional classes 段。同一个组合注解改成 name 字符串后，才正常跳过并给出 did not find required class。"
     },
     {
-      "question": "自动配置的候选清单现在在哪个文件？",
-      "options": ["META-INF/spring.factories", "META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports", "application.yml"],
-      "answer": 1,
-      "explain": "Boot 2.7 引入、Boot 3 起自动配置键从 spring.factories 移除，改成一行一个类名的 .imports 文件。"
+      "question": "一个配置类里两个 @Bean 方法都带 @ConditionalOnMissingBean(Greeter.class)，先声明的返回 zFirst，后声明的返回 aSecond。容器里是哪个？",
+      "options": [
+        "两个都注册，注入时报候选不唯一",
+        "按 bean 名字母序判断，aSecond 胜出",
+        "只有 zFirst：后声明的方法判定时看见它，记 Did not match",
+        "同一配置类内的 @Bean 不参与这个条件，两个都注册"
+      ],
+      "answer": 2,
+      "explain": "方法级条件看的是判定那一刻已登记的定义，同一个类内按方法声明顺序走。实测 OrderProbeConfig#aSecond 的记录是 found beans of type 'probe.lib.Greeter' zFirst。"
     }
   ]
 }
 ```
 
-## 两件我原以为是坑、其实不是
+## 还差的
 
-**一、`@ConditionalOnClass(X.class)` 会把配置类炸掉。** 不会，前提是直接标在配置类上。真正会炸的是把它包进自己的组合注解。
-
-**二、`@AutoConfiguration` 让类不会被扫描到。** 不会。它不改变扫描行为，官方只要求你**把类放在扫描不到的包**里。重复注册的原因是"扫描 + 清单"两条路都走到了。
-
-反过来，真正安静地失败的是这两种：
-
-- **清单漏登记**：`--debug` 报告里连条目都没有，症状最像"条件不满足"，最容易查错方向；
-- **`@ConditionalOnMissingBean` 顺序错**：用户 Bean 还没登记它就判断"没有"，于是抢着造一个，然后要么冲突、要么注入到错的那个。
-
-## 这一课之后
-
-自动配置 = 候选清单 + 条件判断。核心行为一条：用户定义优先，自动配置让位。清单在 `AutoConfiguration.imports`，排查先看 `--debug` 的条件评估报告。自建 starter 最少三个文件：配置类、属性类、清单文件——外加一个"别被扫描到"的包位置。
-
-容器这一章到此结束。下一章换角度：对象造好之后，怎么在不改它源码的前提下给它的方法加一层行为——代理，也是"注解为什么不生效"的总答案。
+- **Boot 4.1.1 只解包过 jar，没实跑。** 4.x 把自动配置按模块拆开了，清单不再只有一份、类名和排序都变，本课这些结论只在 3.5.6 上验过，换版本要重新量。
+- **组合注解漏判的成因没定位。** 我只测到结果（类进 `Unconditional classes`、配置照常生效），没查到元注解解析在哪一步丢掉了条件；Boot 2.x 上是否真的抛 `ArrayStoreException`，我也没跑旧版本。
+- **`after` / `before` 只按文档写。** 没做「两个自动配置互相依赖、顺序写反导致抢注」的对照实验，所以那一节的顺序敏感性是文档结论，不是我的测量。
+- **双重注册只测了一种组合。** 类标 `@Configuration`、落在默认扫描范围内、清单也登记了——这个组合注册一次。类加载器隔离、类没标 `@Configuration`、清单文本被改坏这几种情况下排除过滤器还奏不奏效，没验。
+- **只用过 `--debug`。** `/actuator/conditions` 那份报告与它字段是否逐条对应，我没验——探针是 `WebApplicationType.NONE`，Actuator 没起，不敢说等价。
