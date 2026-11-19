@@ -18,6 +18,9 @@ import org.apache.ibatis.annotations.Update;
  *
  * <p>桶按 `window-minutes` 对齐（不是整点），检测窗口与桶同宽，避免「15 分钟窗口落到整点桶里
  * 只算到几分钟」的系统性低估。
+ *
+ * <p>`total_count` 取 `GREATEST`（最近一轮回看窗口内的条数），不是累加：同步每几分钟重算同一段
+ * 历史，累加会把它越刷越大（2026-11-19 修正）。
  */
 @Mapper
 interface PatternMapper {
@@ -35,7 +38,7 @@ interface PatternMapper {
                 first_seen  = LEAST(first_seen, VALUES(first_seen)),
                 last_seen   = VALUES(last_seen),
                 last_count  = VALUES(last_count),
-                total_count = total_count + VALUES(total_count),
+                total_count = GREATEST(total_count, VALUES(total_count)),
                 updated_at  = VALUES(updated_at)
             """)
     int upsertTemplate(@Param("templateHash") String templateHash,
