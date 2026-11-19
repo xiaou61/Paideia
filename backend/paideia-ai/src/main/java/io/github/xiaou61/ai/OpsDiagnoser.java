@@ -31,11 +31,19 @@ public interface OpsDiagnoser {
      * @param deploys   最近发版信息
      * @param window    证据窗口的人读描述（WORK-086）：报告必须按这个窗口取数，
      *                  窗口之外的事件不得写进证据
+     * @param knowledge 历史复盘（WORK-086 REQ-007）：只含人工确认过的复盘，不可信，
+     *                  与本次证据冲突时以本次证据为准
      */
     record Evidence(String trigger, String alertName, String question,
                     String summary, String metrics, String baselines, String context,
                     String alerts, String logs, String patterns, String traces, String deploys,
-                    String window) {
+                    String window, String knowledge) {
+
+        /** 知识召回发生在证据采集之后（签名要用采到的日志），用它补进同一份证据。 */
+        public Evidence withKnowledge(String recalled) {
+            return new Evidence(trigger, alertName, question, summary, metrics, baselines, context,
+                    alerts, logs, patterns, traces, deploys, window, recalled);
+        }
     }
 
     /** @param usage 上游没有返回用量时为 null（此时结算会全额退回预留） */

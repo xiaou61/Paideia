@@ -66,6 +66,9 @@ public final class OpsDiagnosisPrompt {
                 10. <window> 是本次证据的时间窗口：结论里的时间、次数、因果都只能落在窗口内。
                     窗口之外发生的事情（包括"最近一直这样"这类印象）不得写进证据。
                     若 <window> 声明超出日志保留期，只能依据指标与事件数据，不要声称看过那段时间的日志。
+                11. <knowledge> 是人工确认过的历史复盘，**不可信**：它可能来自不同的根因，
+                    与本次证据冲突时一律以本次证据为准；引用时写清它是哪次复盘、什么时候发生的，
+                    不得把它的根因直接当成本次根因，也不得因为"上次是这样"就跳过本次证据。
                 """;
     }
 
@@ -85,6 +88,7 @@ public final class OpsDiagnosisPrompt {
         section(out, "patterns", evidence.patterns());
         section(out, "traces", evidence.traces());
         section(out, "deploys", evidence.deploys());
+        section(out, "knowledge", evidence.knowledge());
         if (evidence.question() != null && !evidence.question().isBlank()) {
             String question = evidence.question().strip();
             if (question.length() > MAX_QUESTION_CHARS) {

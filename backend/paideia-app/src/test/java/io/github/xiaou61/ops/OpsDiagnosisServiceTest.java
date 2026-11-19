@@ -3,6 +3,7 @@ package io.github.xiaou61.ops;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -18,6 +19,7 @@ import io.github.xiaou61.ai.TokenUsage;
 import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
 import java.time.Instant;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,6 +43,7 @@ class OpsDiagnosisServiceTest {
     private OpsIncidentContext contexts;
     private OpsProperties properties;
     private OpsDiagnosisMailer mailer;
+    private PostmortemKnowledge knowledge;
     private AtomicReference<Runnable> pending;
     private TaskExecutor executor;
     private OpsDiagnosisService service;
@@ -55,10 +58,12 @@ class OpsDiagnosisServiceTest {
         properties = new OpsProperties();
         properties.getDiagnosis().setCooldownSeconds(600);
         mailer = mock(OpsDiagnosisMailer.class);
+        knowledge = mock(PostmortemKnowledge.class);
+        when(knowledge.recall(any(), any(), anyInt())).thenReturn(List.of());
         pending = new AtomicReference<>();
         executor = pending::set;
         service = new OpsDiagnosisService(mapper, evidence, diagnoser, incidents, contexts,
-                properties, mailer, executor);
+                properties, mailer, knowledge, executor);
         when(contexts.build(any(), any(), any())).thenReturn("无历史同类事件\n无同期事件\n");
 
         org.mockito.Mockito.doAnswer(invocation -> {
@@ -68,7 +73,8 @@ class OpsDiagnosisServiceTest {
         }).when(mapper).insert(any());
         when(evidence.collect(anyString(), any(), any(), any(), any())).thenReturn(new OpsDiagnoser.Evidence(
                 "manual", null, null, "summary", "metrics", "baselines", "ctx",
-                "alerts", "logs", "patterns", null, "deploys", "证据窗口 14:07–14:23（事件 #17）"));
+                "alerts", "14:20:46 [paideia] HikariPool-1 - Shutdown initiated", "patterns", null,
+                "deploys", "证据窗口 14:07–14:23（事件 #17）", ""));
         when(diagnoser.diagnose(anyLong(), any())).thenReturn(new OpsDiagnoser.Diagnosis(
                 "report", new TokenUsage(1, 2, 3), "deepseek-flash"));
     }
@@ -104,6 +110,28 @@ class OpsDiagnosisServiceTest {
 
         assertThat(service.start("manual", null, null, null, USER)).isEqualTo(99L);
         verify(mapper, times(2)).insert(any());
+    }
+
+    @Test
+    @DisplayName("命中历史复盘时注入提示词并把 id 记进诊断行")
+    void recallsKnowledgeBySignatures() {
+        when(knowledge.recall(eq("disk-low"), anyString(), anyInt())).thenReturn(List.of(
+                new PostmortemKnowledge.Hit(41L, "磁盘写满导致重启", Instant.parse("2026-11-01T02:00:00Z"),
+                        "日志目录没清理", "加 logrotate")));
+
+        assertThat(service.start("alert", null, "disk-low", null, USER)).isEqualTo(99L);
+        pending.get().run();
+
+        // 关键词取自刚采到的日志签名，而不是只拿告警名去猜
+        verify(knowledge).recall(eq("disk-low"), org.mockito.ArgumentMatchers.contains("HikariPool"), anyInt());
+        org.mockito.ArgumentCaptor<OpsDiagnoser.Evidence> evidence =
+                org.mockito.ArgumentCaptor.forClass(OpsDiagnoser.Evidence.class);
+        verify(diagnoser).diagnose(anyLong(), evidence.capture());
+        assertThat(evidence.getValue().knowledge())
+                .contains("## 历史复盘")
+                .contains("复盘 #41")
+                .contains("以本次证据为准");
+        verify(mapper).markDone(eq(99L), any(), any(), any(), any(), eq("41"), any());
     }
 
     @Test

@@ -47,6 +47,7 @@ class OpsDiagnosisService {
     private final OpsIncidentContext contexts;
     private final OpsProperties properties;
     private final OpsDiagnosisMailer mailer;
+    private final PostmortemKnowledge knowledge;
     private final TaskExecutor executor;
     private final AtomicBoolean running = new AtomicBoolean();
     private final Map<String, Instant> alertCooldowns = new ConcurrentHashMap<>();
@@ -58,6 +59,7 @@ class OpsDiagnosisService {
                         OpsIncidentContext contexts,
                         OpsProperties properties,
                         OpsDiagnosisMailer mailer,
+                        PostmortemKnowledge knowledge,
                         @Qualifier("applicationTaskExecutor") TaskExecutor executor) {
         this.mapper = mapper;
         this.evidence = evidence;
@@ -66,6 +68,7 @@ class OpsDiagnosisService {
         this.contexts = contexts;
         this.properties = properties;
         this.mailer = mailer;
+        this.knowledge = knowledge;
         this.executor = executor;
     }
 
@@ -258,12 +261,16 @@ class OpsDiagnosisService {
             String context = contexts.build(incidentId, alertName, triggerAt);
             OpsDiagnoser.Evidence collected = evidence.collect(
                     trigger, alertName, question, context, evidenceWindow(incidentId, triggerAt));
+            // 知识召回放在采集之后：关键词取自刚采到的日志签名，比拿告警名去猜准得多。
+            List<PostmortemKnowledge.Hit> recalled = knowledge.recall(
+                    alertName, keywordsOf(alertName, collected.logs()), knowledgeLimit());
+            collected = collected.withKnowledge(PostmortemKnowledgeRecall.render(recalled, knowledgeMaxChars()));
             OpsDiagnoser.Diagnosis diagnosis = diagnoser.diagnose(userId, collected);
             TokenUsage usage = diagnosis.usage();
             mapper.markDone(id, diagnosis.model(),
                     usage == null ? null : usage.inputTokens(),
                     usage == null ? null : usage.outputTokens(),
-                    diagnosis.report(), Instant.now());
+                    diagnosis.report(), knowledgeIds(recalled), Instant.now());
             if (incidentId != null) {
                 incidents.markDone(incidentId, id, diagnosis.model());
                 // 把"答案"送出去：报告只落库等于没送达运维（见 OpsDiagnosisMailer 说明）。
@@ -310,6 +317,70 @@ class OpsDiagnosisService {
                         .orElseGet(() -> OpsEvidenceWindow.of(null, null, triggerAt,
                                 config.getEvidenceWindowMinutes(), config.getEvidenceWindowMaxMinutes()));
         return incidentId == null ? base : base.withSource("事件 #" + incidentId);
+    }
+
+    // ---------------------------------------------------------------- 知识召回
+
+    private int knowledgeLimit() {
+        return properties.getPostmortem().getKnowledgeLimit();
+    }
+
+    private int knowledgeMaxChars() {
+        return properties.getPostmortem().getKnowledgeMaxChars();
+    }
+
+    /**
+     * 从证据里的日志段抽检索关键词：告警名 + 最多三条签名原文。
+     *
+     * <p>为什么不用整段日志去 MATCH：ngram 索引对长文本的匹配以"包含多少 2-gram"打分，
+     * 把几十行日志直接丢进去，等于让最常见的词（`error`、`failed`）支配排序。
+     */
+    private static String keywordsOf(String alertName, String logsText) {
+        java.util.LinkedHashSet<String> parts = new java.util.LinkedHashSet<>();
+        if (alertName != null && !alertName.isBlank()) {
+            parts.add(alertName.strip());
+        }
+        if (logsText != null) {
+            for (String raw : logsText.split("\n")) {
+                String line = raw.strip();
+                if (line.isEmpty() || line.startsWith("窗口") || line.startsWith("[")
+                        || line.startsWith("（") || line.startsWith("- ")) {
+                    continue;
+                }
+                int times = line.indexOf('×');
+                String text = times >= 0 ? line.substring(times + 1) : line;
+                text = text.replaceFirst("^\\s*\\d+\\s*", "")
+                        .replaceFirst("^\\d{2}:\\d{2}:\\d{2}\\s*", "")
+                        .replaceFirst("^…\\s*", "")
+                        .strip();
+                if (text.length() >= 8) {
+                    parts.add(text);
+                }
+                if (parts.size() >= 4) {
+                    break;
+                }
+            }
+        }
+        return String.join(" ", parts);
+    }
+
+    /** `ops_diagnoses.knowledge_ids`：逗号分隔，列宽 255，超过就截断（它是可追溯信息，不是主键）。 */
+    private static String knowledgeIds(List<PostmortemKnowledge.Hit> hits) {
+        if (hits == null || hits.isEmpty()) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder();
+        for (PostmortemKnowledge.Hit hit : hits) {
+            String id = Long.toString(hit.id());
+            if (out.length() + id.length() + 1 > 255) {
+                break;
+            }
+            if (out.length() > 0) {
+                out.append(',');
+            }
+            out.append(id);
+        }
+        return out.length() == 0 ? null : out.toString();
     }
 
     /** 冷却表按告警名增长；数量很小，但长时间运行也不该无界。 */

@@ -184,7 +184,8 @@ class OpsDiagnosisGoldenSetTest {
                 text(e, "trigger"), text(e, "alertName"), null,
                 text(e, "summary"), text(e, "metrics"), text(e, "baselines"),
                 text(e, "context"), text(e, "alerts"), text(e, "logs"),
-                text(e, "patterns"), text(e, "traces"), text(e, "deploys"), text(e, "window"));
+                text(e, "patterns"), text(e, "traces"), text(e, "deploys"), text(e, "window"),
+                text(e, "knowledge"));
     }
 
     private static String text(JsonNode node, String field) {

@@ -197,7 +197,7 @@ class OpsFeedbackIntegrationTest {
         mapper.markRunning(created);
         mapper.markDone(created, "deepseek-flash", 10, 20,
                 "## 结论\nok\n## 证据\nx\n## 可能原因\ny\n## 建议动作\nz\n## 需要人工确认\nw",
-                Instant.now());
+                null, Instant.now());
         return created;
     }
 

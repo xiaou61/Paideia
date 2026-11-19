@@ -196,7 +196,7 @@ approver_role:
   4. 跑 typecheck 与单 spec。
 - 验证：`pnpm -C frontend --filter @paideia/admin typecheck` → 0 errors；`pnpm -C frontend --filter @paideia/admin exec playwright test e2e/postmortems.spec.ts` → 期望 passed
 
-### TASK-011 | pending | 知识召回（只认已确认复盘）
+### TASK-011 | done | 知识召回（只认已确认复盘）
 
 - 对应：`REQ-007`、`AC-007`
 - 依赖：TASK-008
@@ -210,7 +210,17 @@ approver_role:
   2. 实现 `PostmortemKnowledge` 至绿。
 - 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-ops -Dtest=PostmortemKnowledgeTest test` → 期望 0 failures
 
-### TASK-012 | pending | 知识注入诊断（Evidence.knowledge + 提示词规则）
+完成（2026-11-19）：
+
+- 拆成端口 + 实现两个文件：`PostmortemKnowledge`（接口 + `Hit`）与 `PostmortemKnowledgeRecall`（`@Service`），
+  这样 `OpsDiagnosisService` 依赖的是能 mock 的窄接口，而不是带 MyBatis 的具体类。
+- `render(List<Hit>, int maxChars)` 是**包内可见的静态方法**，服务层与测试都直接调它——渲染规则
+  （超预算丢整条、末尾写「以本次证据为准」）比"随便拼一段话"重要，值得单测。
+- `searchApproved` 的排序带 `(alert_name = #{alertName}) DESC`：同告警名的复盘优先于全文命中的，
+  因为同告警名往往就是同一个故障复现。`SELECT ... AS score` 靠 MyBatis 忽略未映射列，不污染 `PostmortemRow`。
+- 测试 `PostmortemKnowledgeTest` 4 例全绿（命中映射、空签名零查库、mapper 抛异常时返回空表并 warn、limit 收敛）。
+
+### TASK-012 | done | 知识注入诊断（Evidence.knowledge + 提示词规则）
 
 - 对应：`REQ-007`、`AC-007`
 - 依赖：TASK-002、TASK-011
@@ -224,6 +234,19 @@ approver_role:
   2. 写两条用例（prompt 含 `<knowledge>` 与「冲突时以本次证据为准」；召回 2 条时 `knowledge_ids="12,15"`，空则 NULL），确认红。
   3. 实现至绿。
 - 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-ai,paideia-ops -Dtest='OpsDiagnosisPromptTest,OpsDiagnosisServiceTest' test` → 期望 0 failures
+
+完成（2026-11-19）：
+
+- 提示词规则编号是 **11** 不是计划里的 10：TASK-004 已经用掉了规则 10（窗口）。
+- 召回时机在 `collect` **之后**：关键词取自刚采到的日志签名（`keywordsOf(alertName, collected.logs())`，
+  最多 3 条签名原文、跳过窗口/unit/省略行、剥掉 `×N` 与时间前缀、长度门槛 8），比只拿告警名去 MATCH 准得多。
+- `markDone` 增 `@Param("knowledgeIds")`，`knowledge_ids` 逗号分隔、超 255 截断、无命中写 NULL；
+  `OpsDiagnosisRow` 同步加字段，三处 SELECT 都补了该列。
+- 配置在 `paideia.ops.postmortem.knowledge-limit`（2）与 `knowledge-max-chars`（1200）；`OpsProperties.Postmortem`
+  与兄弟配置一样**不加** `@NestedConfigurationProperty`（该注解未导入，加了编译不过——第一次就是这个错）。
+- 测试：`OpsDiagnosisServiceTest#recallsKnowledgeBySignatures` 断言召回关键词含 `HikariPool`（来自日志签名而非告警名）、
+  注入文本含 `## 历史复盘`/`复盘 #41`/`以本次证据为准`、`markDone` 收到 `knowledge_ids="41"`。
+- 全量：`paideia-ai` 457 例 0 failures（含 14 skipped 的外部依赖用例）、`OpsDiagnosisServiceTest` 12 例全绿。
 
 ### TASK-013 | pending | 降级与安全的横切用例
 

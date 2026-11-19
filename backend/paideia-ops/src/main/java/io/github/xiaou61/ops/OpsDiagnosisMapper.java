@@ -40,6 +40,7 @@ interface OpsDiagnosisMapper {
             UPDATE ops_diagnoses
             SET status = 'DONE', model = #{model}, input_tokens = #{inputTokens},
                 output_tokens = #{outputTokens}, report_md = #{report},
+                knowledge_ids = #{knowledgeIds},
                 error_message = NULL, finished_at = #{finishedAt}
             WHERE id = #{id}
             """)
@@ -48,6 +49,7 @@ interface OpsDiagnosisMapper {
                  @Param("inputTokens") Integer inputTokens,
                  @Param("outputTokens") Integer outputTokens,
                  @Param("report") String report,
+                 @Param("knowledgeIds") String knowledgeIds,
                  @Param("finishedAt") Instant finishedAt);
 
     @Update("""
@@ -72,7 +74,7 @@ interface OpsDiagnosisMapper {
     @Select("""
             SELECT id, trigger_type, alert_name, question, status, model,
                    input_tokens, output_tokens, report_md, error_message,
-                   requested_by, created_at, finished_at, incident_id, rating, feedback_note, feedback_at
+                   requested_by, created_at, finished_at, incident_id, rating, feedback_note, feedback_at, knowledge_ids
             FROM ops_diagnoses
             WHERE id = #{id}
             """)
@@ -81,7 +83,7 @@ interface OpsDiagnosisMapper {
     @Select("""
             SELECT id, trigger_type, alert_name, question, status, model,
                    input_tokens, output_tokens, report_md, error_message,
-                   requested_by, created_at, finished_at, incident_id, rating, feedback_note, feedback_at
+                   requested_by, created_at, finished_at, incident_id, rating, feedback_note, feedback_at, knowledge_ids
             FROM ops_diagnoses
             ORDER BY created_at DESC, id DESC
             LIMIT #{limit}
@@ -91,7 +93,7 @@ interface OpsDiagnosisMapper {
     @Select("""
             SELECT id, trigger_type, alert_name, question, status, model,
                    input_tokens, output_tokens, report_md, error_message,
-                   requested_by, created_at, finished_at, incident_id, rating, feedback_note, feedback_at
+                   requested_by, created_at, finished_at, incident_id, rating, feedback_note, feedback_at, knowledge_ids
             FROM ops_diagnoses
             WHERE incident_id = #{incidentId}
             ORDER BY created_at DESC, id DESC

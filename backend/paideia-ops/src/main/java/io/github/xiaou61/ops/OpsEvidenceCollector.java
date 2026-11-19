@@ -143,6 +143,16 @@ class OpsEvidenceCollector {
      */
     OpsDiagnoser.Evidence collect(String trigger, String alertName, String question,
                                   String context, OpsEvidenceWindow window) {
+        return collect(trigger, alertName, question, context, window, null);
+    }
+
+    /**
+     * 采集证据；{@code knowledge} 是历史复盘注入文本（可为空）。
+     *
+     * <p>知识由调用方在采集之后补进来（签名要用采到的日志），这里只负责把它带进同一份证据。
+     */
+    OpsDiagnoser.Evidence collect(String trigger, String alertName, String question,
+                                  String context, OpsEvidenceWindow window, String knowledge) {
         OpsProperties.Diagnosis config = properties.getDiagnosis();
         OpsEvidenceWindow evidenceWindow = window == null ? defaultWindow(config) : window;
         // 日志只打一次 Loki：运行态要跟"日志里启动了几次"交叉验证，两边各查一次会拉到
@@ -173,7 +183,7 @@ class OpsEvidenceCollector {
                 trigger, alertName, question,
                 summaryText, metricsText, baselinesText, contextText,
                 alertsText, logsText, patternsText, tracesText, deploysText,
-                evidenceWindow.label());
+                evidenceWindow.label(), knowledge == null ? "" : knowledge.strip());
     }
 
     private OpsEvidenceWindow defaultWindow(OpsProperties.Diagnosis config) {

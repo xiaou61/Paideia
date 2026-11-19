@@ -56,7 +56,7 @@ class OpsIncidentIntegrationTest {
         assertThat(incidents.recentDoneDiagnosisForInstance(newId, now, 600)).isEmpty();
 
         OpsDiagnosisRow done = diagnosis(oldId, now);
-        diagnoses.markDone(done.getId(), "deepseek-flash", 1, 1, "## 结论\n已确认", now);
+        diagnoses.markDone(done.getId(), "deepseek-flash", 1, 1, "## 结论\n已确认", null, now);
         assertThat(incidents.recentDoneDiagnosisForInstance(newId, now, 600))
                 .contains(done.getId());
     }
@@ -178,3 +178,4 @@ class OpsIncidentIntegrationTest {
         return TestTokens.bearer(authPort, "1", role);
     }
 }
+

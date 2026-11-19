@@ -37,7 +37,7 @@ class OpsDiagnosisMapperTest {
         assertThat(mapper.markRunning(id)).isEqualTo(1);
         assertThat(mapper.markRunning(id)).isZero();
 
-        assertThat(mapper.markDone(id, "deepseek-flash", 11, 22, "## 结论\n正常", now.plusSeconds(1)))
+        assertThat(mapper.markDone(id, "deepseek-flash", 11, 22, "## 结论\n正常", null, now.plusSeconds(1)))
                 .isEqualTo(1);
 
         OpsDiagnosisRow done = mapper.findById(id).orElseThrow();

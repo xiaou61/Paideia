@@ -39,7 +39,7 @@ class OpsDiagnosisPromptTest {
                 "alert", "HTTP 5xx 比例超过 5%", null,
                 "服务状态：OK", "cpu = 12%", "cpu current=12% ratio=1.0x",
                 "## 历史同类事件\n无历史同类事件", "无 firing 告警", null, null, null, null,
-                null));
+                null, null));
 
         assertThat(user)
                 .contains("<trigger>alert</trigger>")
@@ -59,7 +59,7 @@ class OpsDiagnosisPromptTest {
         String question = "问".repeat(OpsDiagnosisPrompt.MAX_QUESTION_CHARS + 50);
         String user = OpsDiagnosisPrompt.user(new OpsDiagnoser.Evidence(
                 "manual", null, question, null, null, null, null, null, null, null, null, null,
-                null));
+                null, null));
 
         assertThat(user).contains("<question>");
         assertThat(user).doesNotContain(question);
@@ -71,7 +71,7 @@ class OpsDiagnosisPromptTest {
     void rendersWindowTag() {
         String user = OpsDiagnosisPrompt.user(new OpsDiagnoser.Evidence(
                 "alert", "日志模板异常待处理", null, null, null, null, null, null, null, null, null,
-                null, "证据窗口 14:07–14:23（事件 #17）"));
+                null, "证据窗口 14:07–14:23（事件 #17）", null));
 
         assertThat(user).contains("<window>\n证据窗口 14:07–14:23（事件 #17）\n</window>");
     }

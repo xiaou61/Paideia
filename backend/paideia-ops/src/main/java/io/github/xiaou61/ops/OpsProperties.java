@@ -43,6 +43,8 @@ public class OpsProperties {
 
     private final Patterns patterns = new Patterns();
 
+    private final Postmortem postmortem = new Postmortem();
+
     public String getPrometheusUrl() {
         return prometheusUrl;
     }
@@ -109,6 +111,10 @@ public class OpsProperties {
 
     public Patterns getPatterns() {
         return patterns;
+    }
+
+    public Postmortem getPostmortem() {
+        return postmortem;
     }
 
     public static class Thresholds {
@@ -611,6 +617,37 @@ public class OpsProperties {
 
         public void setIgnorePatterns(List<String> ignorePatterns) {
             this.ignorePatterns = ignorePatterns == null ? List.of() : ignorePatterns;
+        }
+    }
+
+    /**
+     * 复盘与知识召回（WORK-086）。
+     *
+     * <p>注入上限默认很小（1200 字）：历史复盘是"提醒"，不是证据。给太多会让模型拿上次的根因
+     * 去解释这次的现象，那正是这一节想防的事。
+     */
+    public static class Postmortem {
+
+        /** 单次诊断最多召回几条历史复盘。 */
+        private int knowledgeLimit = 2;
+
+        /** 注入文本总预算（字符）。 */
+        private int knowledgeMaxChars = 1200;
+
+        public int getKnowledgeLimit() {
+            return knowledgeLimit;
+        }
+
+        public void setKnowledgeLimit(int knowledgeLimit) {
+            this.knowledgeLimit = knowledgeLimit;
+        }
+
+        public int getKnowledgeMaxChars() {
+            return knowledgeMaxChars;
+        }
+
+        public void setKnowledgeMaxChars(int knowledgeMaxChars) {
+            this.knowledgeMaxChars = knowledgeMaxChars;
         }
     }
 }

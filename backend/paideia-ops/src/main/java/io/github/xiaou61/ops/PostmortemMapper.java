@@ -127,4 +127,25 @@ interface PostmortemMapper {
     int archiveOthersOfIncident(@Param("incidentId") long incidentId,
                                 @Param("keepId") long keepId,
                                 @Param("at") Instant at);
+
+    /**
+     * 知识召回：只查 APPROVED，按「同名告警 → 全文相关度 → 越新越前」排序。
+     *
+     * <p>`score` 列不在 {@link PostmortemRow} 上，MyBatis 默认忽略未映射列；排序仍按它，所以不用回填。
+     */
+    @Select("""
+            SELECT id, incident_id, diagnosis_id, alert_name, title, severity, status,
+                   root_cause, impact, timeline_md, actions_md, body_md, evidence_refs, origin,
+                   created_by, approved_by, approved_at, created_at, updated_at,
+                   MATCH(title, root_cause, body_md) AGAINST (#{query} IN NATURAL LANGUAGE MODE) AS score
+            FROM ops_postmortems
+            WHERE status = 'APPROVED'
+              AND (alert_name = #{alertName}
+                   OR MATCH(title, root_cause, body_md) AGAINST (#{query} IN NATURAL LANGUAGE MODE) > 0)
+            ORDER BY (alert_name = #{alertName}) DESC, score DESC, approved_at DESC
+            LIMIT #{limit}
+            """)
+    List<PostmortemRow> searchApproved(@Param("alertName") String alertName,
+                                       @Param("query") String query,
+                                       @Param("limit") int limit);
 }

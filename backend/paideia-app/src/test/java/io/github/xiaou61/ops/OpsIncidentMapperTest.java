@@ -93,7 +93,7 @@ class OpsIncidentMapperTest {
         done.setRequestedBy(1L);
         done.setCreatedAt(now);
         diagnoses.insert(done);
-        diagnoses.markDone(done.getId(), "deepseek-flash", 1, 1, "## 结论\n已确认", now);
+        diagnoses.markDone(done.getId(), "deepseek-flash", 1, 1, "## 结论\n已确认", null, now);
 
         var after = mapper.findCatchUpCandidate(since, diagnosedBefore);
         assertThat(after).isPresent();
@@ -211,3 +211,4 @@ class OpsIncidentMapperTest {
         assertThat(detail.events().getLast().actorUserId()).isEqualTo(7L);
     }
 }
+

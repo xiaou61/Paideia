@@ -24,6 +24,7 @@ class OpsDiagnosisRow {
     private Integer inputTokens;
     private Integer outputTokens;
     private String reportMd;
+    private String knowledgeIds;
     private String errorMessage;
     private Long requestedBy;
     private Instant createdAt;
@@ -95,6 +96,14 @@ class OpsDiagnosisRow {
 
     void setOutputTokens(Integer outputTokens) {
         this.outputTokens = outputTokens;
+    }
+
+    String getKnowledgeIds() {
+        return knowledgeIds;
+    }
+
+    void setKnowledgeIds(String knowledgeIds) {
+        this.knowledgeIds = knowledgeIds;
     }
 
     String getReportMd() {
@@ -169,3 +178,4 @@ class OpsDiagnosisRow {
         this.feedbackAt = feedbackAt;
     }
 }
+
