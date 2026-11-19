@@ -5,103 +5,48 @@ chapter: 横切
 level: intermediate
 category: spring-from-zero
 prerequisite: 10 · 手写动态代理
-minutes: 30
+minutes: 20
 status: published
 ---
 
 # 11 · Spring AOP
 
-## 这一课你要会
+## 一条日志有、一条日志没有
 
-- 写一个能生效的 `@Aspect`，并知道 `@Around` / `@Before` / `@AfterReturning` / `@AfterThrowing` 的边界；
-- 读懂最常用的三种切点表达式；
-- 用反射判断"一个方法能不能被代理"，从而在动手之前就知道会不会失效；
-- 决定切在哪一层：为什么切 Controller 通常不是好主意。
+给业务类加了个记日志的切面，`outer()` 上有，`inner()` 上没有——可 `inner()` 上也标了同一个注解：
 
-## 为什么
-
-有了第 10 课的代理，AOP 剩下的只是"怎么描述**要切哪些方法**"。
-
-但真实项目里的问题往往不是"会不会写切面"，而是"为什么这个切面只对一半方法生效"。答案基本都在同一个地方：**目标方法能不能被覆盖**。这一课给你一个两分钟就能查清的办法。
-
-## 讲解
-
-### 切点表达式：三种够用了
-
-```java
-// 1. 按包 + 任意方法
-@Around("execution(* com.example.order.service..*.*(..))")
-
-// 2. 按注解
-@Around("@annotation(com.example.common.Loggable)")
-
-// 3. 按类上的注解（整个类的所有方法）
-@Around("@within(org.springframework.stereotype.Service)")
+```text
+ASPECT SelfService.outer()
+CALL self.outer=inner
 ```
 
-`execution` 的结构是 `返回类型 包.类.方法(参数)`：
+第一行是切面打的，第二行是 `outer()` 里调 `inner()` 时打的。`inner()` 那一次，切面完全没进来。
 
-| 写法 | 含义 |
-| --- | --- |
-| `*` | 任意一个 |
-| `..` | 任意多个层级 / 任意多个参数 |
-| `(..)` | 任意参数 |
-| `(Long, ..)` | 第一个参数是 Long，后面任意 |
-
-`..*.*(..)` 拆开读是：`..` 包下任意层级 → `*` 任意类 → `.` → `*` 任意方法 → `(..)` 任意参数。
-
-**优先用第 2、3 种**。`execution` 里的包路径是字符串，重构时不会跟着改；按注解切，加一个注解就生效，删掉就失效，行为跟着代码走。
-
-### 五种通知的边界
-
-```sketch
-{
-  "title": "通知挂在方法的三条边上",
-  "rows": [
-    [
-      { "id": "before", "title": "@Before", "sub": "进方法之前", "tone": "blue" },
-      { "id": "target", "title": "目标方法", "sub": "真正干活的", "tone": "gray" },
-      { "id": "after", "title": "@AfterReturning", "sub": "正常返回后", "tone": "green" }
-    ],
-    [
-      { "id": "throw", "title": "@AfterThrowing", "sub": "抛异常才走这条", "tone": "amber" },
-      { "id": "around", "title": "@Around", "sub": "把整条包在里面", "tone": "violet" }
-    ]
-  ],
-  "arrows": [
-    { "from": "before", "to": "target" },
-    { "from": "target", "to": "after" },
-    { "from": "target", "to": "throw" }
-  ]
-}
-```
-
-| 注解 | 什么时候执行 | 拿得到返回值吗 | 能改变结果吗 |
-| --- | --- | --- | --- |
-| `@Before` | 方法之前 | 不能 | 不能（可以抛异常中断） |
-| `@AfterReturning` | 正常返回后 | 能 | 不能改返回对象，但能改它的字段 |
-| `@AfterThrowing` | 抛异常后 | 拿到异常 | 不能吞掉（要吞用 `@Around`） |
-| `@After` | 无论正常还是异常 | 不能 | 不能 |
-| `@Around` | 全包 | 能 | 能（改返回值、吞异常、重试、改参数） |
-
-`@Around` 能力最强，也最容易写错：**必须调用 `proceed()`，否则目标方法根本不会执行**，你会得到一个"接口不报错、什么都没干"的诡异现象。
+它既不是 `private`，也不是 `final`，更不是 `static`。它只是被**同一个类里的另一个方法**调用了：
 
 ```java
-@Around("@annotation(com.example.common.Loggable)")
-public Object log(ProceedingJoinPoint joinPoint) throws Throwable {
-    long start = System.nanoTime();
-    try {
-        return joinPoint.proceed();                 // 少了这一行，目标方法不执行
-    } finally {
-        long cost = (System.nanoTime() - start) / 1_000_000;
-        System.out.println(joinPoint.getSignature().toShortString() + " " + cost + "ms");
+@Service
+public class SelfService {
+
+    @Loggable
+    public String outer() {
+        return "self.outer=" + inner();   // 第 10 课那个 this 的坑，原样搬到了 AOP
+    }
+
+    @Loggable
+    public String inner() {
+        return "inner";
     }
 }
 ```
 
-### 先用反射判断会不会失效
+第 10 课你已经见过这个：`this.inner()` 里的 `this` 是原始对象，不是代理对象，所以调用根本没经过代理——也就谈不上被切面拦下来。
 
-第 10 课说了三条限制：`final` 类、`final` 方法、`private` 方法。这三条在**动手写代码之前**就能查——而且用的是纯 Java，不需要 Spring：
+**这一课的主线就是这个：先判断「这次调用有没有经过代理」，再谈「切点写对没写对」。**
+
+## 反射只能回答一半问题
+
+网上常见的一个排查办法是：用反射看目标方法能不能被覆盖。
 
 <!-- run -->
 ```java
@@ -122,6 +67,10 @@ public class Main {
         private String hidden() {
             return "hidden";
         }
+
+        public static String util() {
+            return "util";
+        }
     }
 
     static final class Frozen {
@@ -134,53 +83,153 @@ public class Main {
     }
 
     public static void main(String[] args) throws Exception {
-        System.out.println("fast 能被代理: " + overridable(Service.class.getDeclaredMethod("fast")));
-        System.out.println("pinned 能被代理: " + overridable(Service.class.getDeclaredMethod("pinned")));
-        System.out.println("hidden 能被代理: " + overridable(Service.class.getDeclaredMethod("hidden")));
+        System.out.println("fast 能被覆盖: " + overridable(Service.class.getDeclaredMethod("fast")));
+        System.out.println("pinned 能被覆盖: " + overridable(Service.class.getDeclaredMethod("pinned")));
+        System.out.println("hidden 能被覆盖: " + overridable(Service.class.getDeclaredMethod("hidden")));
+        System.out.println("util 能被覆盖: " + overridable(Service.class.getDeclaredMethod("util")));
         System.out.println("Service 能被子类化: " + !Modifier.isFinal(Service.class.getModifiers()));
         System.out.println("Frozen 能被子类化: " + !Modifier.isFinal(Frozen.class.getModifiers()));
     }
 }
 ```
 ```text
-fast 能被代理: true
-pinned 能被代理: false
-hidden 能被代理: false
+fast 能被覆盖: true
+pinned 能被覆盖: false
+hidden 能被覆盖: false
+util 能被覆盖: false
 Service 能被子类化: true
 Frozen 能被子类化: false
 ```
 
-这段代码可以直接拿去排查你自己的类：把类名与方法名换掉，跑一次就知道 AOP 会不会生效。**比启动起来看日志快得多。**
+这段代码有用，但它回答的是**「CGLIB 能不能覆盖这个方法」**，不是「这次调用会不会被 AOP 拦下来」。差在哪？
 
-注意 `static` 也在排除项里：静态方法属于类不属于实例，代理是实例层面的东西，覆盖不到——所以给 `static` 方法加 `@Transactional` 一定不生效。
+同一个 `final` 方法，换一种代理方式就被拦了。我在一个临时 Boot 4.1.1 工程里，把 `spring.aop.proxy-target-class` 改掉后跑到的日志：
 
-### 切在哪一层
+```text
+默认 CGLIB：
+CALL finalMethod=final-method              <- 没有 ASPECT
+
+--spring.aop.proxy-target-class=false（走 JDK 接口代理）：
+ASPECT Greeter.greet()
+CALL greeter=interface-final               <- 被拦了
+```
+
+`final` 只挡住「继承出一个子类来覆盖它」这一条路。如果 Bean 是靠实现接口生成代理的，调用入口本来就是接口上的方法，`final` 就管不着了。
+
+所以判断顺序应该是这三问，反射只覆盖第二问：
+
+1. **这次调用经过了代理对象吗**（自调用、`this`、内部 `new` 出来的对象 → 没经过，后面都不用看了）；
+2. **代理能覆盖这个方法吗**（`final` 类 / `final` 方法 / `private` / `static` / 包级可见且在别的包）；
+3. **切点匹配上了吗**（注解在不在、包路径对不对、`@within` 是否覆盖到这个类）。
+
+只查第二问，就是只看了三分之一。
+
+## 五种通知，边界差别比名字重要
+
+| 注解 | 什么时候执行 | 拿得到返回值吗 | 能改变结果吗 |
+| --- | --- | --- | --- |
+| `@Before` | 方法之前 | 不能 | 不能（可以抛异常中断） |
+| `@AfterReturning` | 正常返回后 | 能，要写 `returning = "x"` | 不能换返回对象，但能改它的字段 |
+| `@AfterThrowing` | 抛异常后 | 拿到异常，要写 `throwing = "e"` | 不能吞掉（要吞用 `@Around`） |
+| `@After` | 无论正常还是异常，等价于 `finally` | 不能 | 不能 |
+| `@Around` | 全包 | 能 | 能（改返回值、吞异常、重试、改参数） |
+
+表格里那两个 `returning` / `throwing` 不是可选项，少了它们参数绑不上：
+
+```java
+@AfterReturning(pointcut = "@annotation(com.example.common.Loggable)", returning = "result")
+public void afterReturn(Object result) {
+    System.out.println("返回: " + result);
+}
+
+@AfterThrowing(pointcut = "@annotation(com.example.common.Loggable)", throwing = "ex")
+public void afterThrow(RuntimeException ex) {
+    System.out.println("异常: " + ex.getMessage());
+}
+```
+
+`@Around` 能力最强，也最容易写出「不报错、什么都没干」的东西：
+
+```java
+@Around("@annotation(com.example.common.Loggable)")
+public Object log(ProceedingJoinPoint joinPoint) throws Throwable {
+    long start = System.nanoTime();
+    try {
+        return joinPoint.proceed();          // 少了这一行，目标方法压根不执行
+    } finally {
+        long cost = (System.nanoTime() - start) / 1_000_000;
+        System.out.println(joinPoint.getSignature().toShortString() + " " + cost + "ms");
+    }
+}
+```
+
+`getTarget()` 常被误用成 `proceed()`：它只是把目标对象取出来，不执行方法，返回类型还是那个业务对象——接口会拿到一个错的值，而且不报错。这就是下面动手题。
+
+## 切点表达式：常用的三种
+
+```java
+@Around("execution(* com.example.order.service..*.*(..))")   // 按包
+@Around("@annotation(com.example.common.Loggable)")          // 按方法注解
+@Around("@within(org.springframework.stereotype.Service)")    // 按类注解
+```
+
+| 写法 | 含义 |
+| --- | --- |
+| `*` | 任意一个 |
+| `..` | 任意多个层级 / 任意多个参数 |
+| `(..)` | 任意参数 |
+| `(Long, ..)` | 第一个参数是 Long，后面任意 |
+
+`..*.*(..)` 拆开读是：`..` 包下任意层级 → `*` 任意类 → `.` → `*` 任意方法 → `(..)` 任意参数。
+
+按注解切比按包路径切好在**行为跟着代码走**：加个注解就登进名单，删掉就退出，改包名不会静默失效。
+
+但 `@within(@Service)` 要把代价说清楚：它会把**这个类里所有方法**都切中，包括你只是想内部用的辅助方法、包括 `equals`/`toString` 之外的 getter。日志切面通常无所谓，可一旦切面里有计数、有耗时统计、有鉴权判断，范围大一圈就全是噪声。它在 `com.example..` 这种包根下还会把配置类、转换器一起扫进来。
+
+## 切在哪一层：三个更正
 
 | 层 | 适合切什么 | 不适合切什么 |
 | --- | --- | --- |
-| Controller | 统一日志（入参、状态码、耗时） | 事务、权限（太外层，误伤） |
-| Service | **事务**、缓存、重试、权限 | 依赖具体响应格式的日志 |
+| Controller | 统一日志（入参、状态码、耗时） | 事务 |
+| Service | 事务、缓存、重试 | 依赖具体响应格式的日志 |
 | Repository | 慢 SQL 统计 | 业务规则 |
 
-事务必须在 Service：第 2 课说过，范围要覆盖"要么都成、要么都不成"的整体。
+**更正一：事务「通常」在 Service，不是「必须」。** 第 2 课的原话是「事务边界通常就是一个 Service 方法」。`@Transactional` 标在 Repository 上也能工作，标在 Controller 上也能编译、也能回滚，只是事务范围会连参数解析和响应序列化一起包进去，通常不是你想要的。别把它记成框架限制，它是设计约定。
 
-权限也一样——切在 Controller 上时，一个内部调用的批处理可能根本不经过 Controller，权限就被绕过了。**安全相关的横切，切在业务入口（Service）比切在协议入口（Controller）更可靠。**
+**更正二：权限不要只靠切面。** 「切在 Service 就安全了」不成立——Service 方法同样会被自调用绕过，定时任务、消息消费者、直接调 Repository 的路径也全部绕过。权限交给 Spring Security 的方法授权（`@PreAuthorize`），它同样走代理、也会被自调用绕过，所以真正的护栏是：**任何入口都要经过被代理的那一层，并且给每条绕过路径写测试**。手写切面适合做审计和补充校验，不适合当唯一边界。
 
-### 顺序与副作用
+**更正三：`@Around` 吞异常是否影响事务，取决于顺序。** 只有切面在事务拦截器**内侧**时，异常先到切面、被吞掉后事务才看不见。如果 `@Around` 在事务外层，事务拦截器已经看到异常并标记回滚，外层再 catch 也回不去。这正好接下一节。
 
-一个方法被多个切面切中时，顺序由 `@Order` 决定（数字小的在外层）。这条在有"权限 + 事务 + 日志"三个切面时很关键：
+## 顺序：`@Order` 加在切面类上
+
+一个方法被多个切面切中时，顺序由 `@Order` 决定（数字小的在外层）：
+
+```java
+@Aspect
+@Component
+@Order(1)                     // 注意：加在切面类上，不是加在 @Around 方法上
+public class AuthAspect { }
+
+@Aspect
+@Component
+@Order(2)
+public class TxAspect { }
+```
 
 ```text
 权限（Order 1，最外层）→ 事务（Order 2）→ 日志（Order 3）→ 目标方法
 ```
 
-权限在最外层，意味着没权限的请求连事务都不开——这是对的。
+权限在最外层，意味着没权限的请求连事务都不开——这是对的，也是这件事值得单独讲的原因。
 
-`@Around` 里如果有副作用（打日志、发指标），要注意它会对**每一次**调用发生，包括被外层事务回滚的那些。别在切面里直接写库——那会进入同一个事务，跟着一起回滚或者一起提交，很难推理。
+另外两个常被忽略的点：
+
+- `@Around` 里有副作用（打日志、发指标）时，它会对**每一次**调用发生，包括后面被回滚的那些。数字会偏，自己心里要有数。
+- 别在切面里直接写库。它会跟着同一事务提交或回滚，而且传播行为、只读标记、异常吞没都会掺进来，很难推理。
 
 ## 动手
 
-下面这个切面写好了，但日志一条都不打。找出最该改的那一行：
+下面这个切面写好了，但接口拿到的返回值不对，日志也一条不打。找出最该改的那一行：
 
 ```code-challenge
 {
@@ -189,11 +238,11 @@ Frozen 能被子类化: false
   "title": "切面一条日志都不打",
   "code": "@Aspect\n@Component\npublic class TimingAspect {\n\n    @Around(\"@annotation(com.example.common.Loggable)\")\n    public Object around(ProceedingJoinPoint joinPoint) throws Throwable {\n        long start = System.nanoTime();\n        Object result = joinPoint.getTarget();\n        System.out.println(joinPoint.getSignature().toShortString()\n                + \" \" + (System.nanoTime() - start) / 1_000_000 + \"ms\");\n        return result;\n    }\n}",
   "bugLine": 8,
-  "explain": "第 8 行调的是 `getTarget()`，它只是把目标对象取出来，不会执行目标方法——而且返回值类型还是个业务对象，接口会拿到一个错误的值。必须改成 `Object result = joinPoint.proceed();`。`proceed()` 是 \"让目标方法跑起来\" 的唯一入口，漏了它，切面就变成了拦截器最坏的那种写法：不报错、什么都不干。"
+  "explain": "第 8 行调的是 `getTarget()`，它只是把目标对象取出来，不会执行目标方法——而且返回值类型还是个业务对象，接口会拿到一个错误的值。必须改成 `Object result = joinPoint.proceed();`。`proceed()` 是唯一能让目标方法跑起来的入口，漏了它，切面就变成最坏的那种拦截器：不报错、什么都不干。"
 }
 ```
 
-**提示**：`@Around` 与别的通知不同，它必须自己决定"目标方法要不要执行"。
+**提示**：`@Around` 与别的通知不同，它得自己决定「目标方法要不要执行」。
 
 ## 检查一下
 
@@ -203,49 +252,32 @@ Frozen 能被子类化: false
   "title": "AOP 三问",
   "questions": [
     {
-      "question": "@Around 里忘了调 proceed()，会发生什么？",
-      "options": ["启动报错", "目标方法不执行，接口返回 null 或你给的返回值", "切面不生效，目标照常执行"],
+      "question": "一个标了 @Loggable 的 public 方法，切面在同类另一个方法里被 this 调用，为什么没日志？",
+      "options": ["调用没经过代理对象，切面根本没被触发", "方法不是 final，所以不能被代理", "切点表达式写错了"],
+      "answer": 0,
+      "explain": "this 指向原始对象，绕过了代理。反射查修饰符查不出这个问题——这是「这次调用有没有经过代理」那一问。"
+    },
+    {
+      "question": "反射查出来 pinned 能被覆盖 = false，能不能由此断定这个 final 方法一定不会被 AOP 拦到？",
+      "options": ["能，final 就是不能覆盖", "不能，走 JDK 接口代理时仍然可能被拦到", "不能，要看 JVM 版本"],
       "answer": 1,
-      "explain": "proceed() 才是执行目标的唯一入口。不调它就是只包不执行，而且没有任何报错。"
+      "explain": "final 只挡住「子类覆盖」。用 spring.aop.proxy-target-class=false 走接口代理时，调用入口是接口方法，final 方法照样被拦。"
     },
     {
       "question": "为什么推荐用 @annotation 而不是 execution 里的包路径？",
-      "options": ["性能更好", "包路径是字符串，重构不跟着改；注解跟着代码走", "execution 不支持多参数"],
-      "answer": 1,
+      "options": ["性能更好", "execution 不支持多参数", "包路径是字符串，重构不跟着改；注解跟着代码走"],
+      "answer": 2,
       "explain": "包名或方法名一改，字符串切点就静默失效。按注解切，加/删注解就是开关。"
-    },
-    {
-      "question": "权限校验切在 Controller 上，最大的风险是？",
-      "options": ["性能差", "批处理、消息消费等入口不经过 Controller，权限被绕过", "日志太多"],
-      "answer": 1,
-      "explain": "横切要切在\"所有调用都会经过\"的地方。Controller 只是入口之一。"
     }
   ]
 }
 ```
 
-## 常见误区
+## 还差的
 
-### 误区：`@After` 就是"方法正常结束后"
+- **AspectJ 编译期织入没试过。** 它能绕过自调用（因为不是代理，是真的改了字节码），代价是构建配置和 IDE 支持。我只有机制上的理解，没在项目里跑过。
+- **`@Order` 与 `@Transactional` 传播行为的组合没实测。** 三层切面顺序不同时，回滚边界到底落在哪，我只按文档推导。
+- **`@within` 的扫描范围副作用没量化。** 我只知道它会多切，具体多切几个方法、日志涨多少没测。
+- **权限绕过路径没有穷举。** 我列了自调用、定时任务、消息消费、直调 Repository 四条，实际项目里还有内部管理工具、测试夹具。
 
-**你以为**：`@After` 在正常返回之后执行。
-**其实**：它等价于 `finally`——正常与异常都会执行。想只在正常返回后做事，用 `@AfterReturning`；只想在异常时做事，用 `@AfterThrowing`。
-**怎么验证**：在 `@After` 与 `@AfterReturning` 里各打一条日志，让目标方法抛异常，看哪一条出现了。
-
-### 误区：切面可以随便加，反正不影响业务
-
-**你以为**：多一个切面只是多一层日志。
-**其实**：每个切面都让调用多一次代理转发，更重要的是**它改变了调用链的语义**：`@Around` 能吞异常、能改返回值、能重试。一个写得随意的切面可以让"抛异常就回滚"变成"从不回滚"（`@Around` 里 catch 了异常没往外抛）。
-**怎么验证**：让 `@Around` 里写 `try { return proceed(); } catch (Exception e) { return null; }`，再看事务还会不会回滚。
-
-### 误区：切在 Controller 上就能覆盖所有业务
-
-**你以为**：所有请求都经过 Controller，所以切这里最全。
-**其实**：定时任务、消息消费者、内部管理工具、`CommandLineRunner` 都不经过 Controller。本项目里，SQL 沙箱、速递抓取、记忆提取这些任务全都是"没有 HTTP 入口"的路径。
-**怎么验证**：`rg "@Scheduled|ApplicationRunner|CommandLineRunner"`，看你的切点覆盖了它们没有。
-
-## 小结
-
-AOP 剩下的事就是"描述切哪些方法"。优先按注解切，`@Around` 必须调 `proceed()`。`final` / `private` / `static` 三条限制可以用一段反射代码提前查清。横切要切在所有入口都会经过的那一层——事务和权限在 Service，统一日志可以在 Controller。
-
-下一课：把这一层直接套在"事务"上，然后逐个复现四种失效。
+下一课：把这一层直接套在「事务」上，然后逐个复现四种失效。
