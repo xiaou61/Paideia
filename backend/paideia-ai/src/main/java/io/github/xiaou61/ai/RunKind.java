@@ -68,6 +68,12 @@ public final class RunKind {
     /** 文档导入蒸馏（WORK-076）：管理员上传文档 → 蒸馏成条目草稿。 */
     public static final String KNOWLEDGE_IMPORT = "knowledge_import";
 
+    /** 面经答案事实自检（WORK-084）：判定是否事实无误、是否需要修订。 */
+    public static final String ESSAY_VERIFY = "essay_verify";
+
+    /** 面经答案按依据修订（WORK-084）。与自检分开记，便于看修订那一步的成本。 */
+    public static final String ESSAY_REVISE = "essay_revise";
+
     private RunKind() {
     }
 }

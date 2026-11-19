@@ -130,6 +130,74 @@ public class EssayProperties {
      */
     private int maxPostsPerRun = 6;
 
+    /**
+     * 答案事实自检（WORK-084）。**默认关闭**：关闭时 {@code runOnce} 的入库路径与改动前逐条一致。
+     */
+    private Verify verify = new Verify();
+
+    /** 自检/修订的开关与阈值。阈值是经验值，靠 eval 基线校准。 */
+    public static class Verify {
+
+        /** 总开关；false 时完全不介入入库。 */
+        private boolean enabled = false;
+
+        /** 外部依据检索，enabled 为 true 时才可能生效；无白名单时自动失效。 */
+        private External external = new External();
+
+        /** 自检判定 ok 且置信度达到此值时直接入库。 */
+        private double acceptConfidence = 0.80;
+
+        /** 修订稿置信度达到此值才入库，否则转人工。 */
+        private double reviseAcceptConfidence = 0.75;
+
+        /** 单次运行的模型调用硬上限（含自检 + 修订），用尽后剩余题转人工。 */
+        private int maxCallsPerRun = 120;
+
+        /** 单题最多抓几个文档。 */
+        private int maxReferenceUrls = 3;
+
+        /** 单段喂给模型的字符上限。 */
+        private int snippetChars = 1200;
+
+        /** 单次抓取超时（秒）。 */
+        private int fetchTimeoutSeconds = 8;
+
+        /** 允许抓取的白名单域名；为空则只做内部校验。 */
+        private List<String> referenceDomains = List.of();
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public External getExternal() { return external; }
+        public void setExternal(External external) { this.external = external; }
+        public double getAcceptConfidence() { return acceptConfidence; }
+        public void setAcceptConfidence(double acceptConfidence) { this.acceptConfidence = acceptConfidence; }
+        public double getReviseAcceptConfidence() { return reviseAcceptConfidence; }
+        public void setReviseAcceptConfidence(double reviseAcceptConfidence) {
+            this.reviseAcceptConfidence = reviseAcceptConfidence;
+        }
+        public int getMaxCallsPerRun() { return maxCallsPerRun; }
+        public void setMaxCallsPerRun(int maxCallsPerRun) { this.maxCallsPerRun = maxCallsPerRun; }
+        public int getMaxReferenceUrls() { return maxReferenceUrls; }
+        public void setMaxReferenceUrls(int maxReferenceUrls) { this.maxReferenceUrls = maxReferenceUrls; }
+        public int getSnippetChars() { return snippetChars; }
+        public void setSnippetChars(int snippetChars) { this.snippetChars = snippetChars; }
+        public int getFetchTimeoutSeconds() { return fetchTimeoutSeconds; }
+        public void setFetchTimeoutSeconds(int fetchTimeoutSeconds) {
+            this.fetchTimeoutSeconds = fetchTimeoutSeconds;
+        }
+        public List<String> getReferenceDomains() { return referenceDomains; }
+        public void setReferenceDomains(List<String> referenceDomains) {
+            this.referenceDomains = referenceDomains;
+        }
+    }
+
+    /** 外部依据检索开关。 */
+    public static class External {
+        private boolean enabled = true;
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    }
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -216,5 +284,13 @@ public class EssayProperties {
 
     public void setSources(List<SourceSpec> sources) {
         this.sources = sources;
+    }
+
+    public Verify getVerify() {
+        return verify;
+    }
+
+    public void setVerify(Verify verify) {
+        this.verify = verify;
     }
 }
