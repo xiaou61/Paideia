@@ -3,6 +3,13 @@ package io.github.xiaou61.ai.internal.provider;
 /** 文档蒸馏提示词（WORK-076）。只给「结构化 JSON」一种输出形态，便于解析。 */
 final class DocumentDistillPrompt {
 
+    /**
+     * 版本键（`PromptVersionGuardTest` 要求 `<场景>-v<数字>`）。
+     *
+     * <p>改提示词正文就递增：调用日志按这个键归组，复用同一键会让"改了之后效果变差"无法归因。
+     */
+    static final String VERSION = "doc-distill-v1";
+
     private DocumentDistillPrompt() {
     }
 

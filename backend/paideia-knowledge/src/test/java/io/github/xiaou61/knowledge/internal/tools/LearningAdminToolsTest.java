@@ -41,7 +41,8 @@ class LearningAdminToolsTest {
             descriptors.add(((PaideiaTool) constructor.newInstance(args)).descriptor());
         }
 
-        assertThat(descriptors).hasSize(4);
+        // 5 个：导出作答明细、列出题目、推荐概念、整组替换标注、重建题库索引（WORK-083 新增）
+        assertThat(descriptors).hasSize(5);
         Set<String> names = new HashSet<>();
         for (ToolDescriptor descriptor : descriptors) {
             assertThat(descriptor.name()).startsWith("admin_learning_");
