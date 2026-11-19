@@ -5,151 +5,392 @@ chapter: 现代 Java
 level: intermediate
 prerequisite: 34 · instanceof 模式匹配
 category: java-from-zero
-minutes: 28
+minutes: 20
 status: published
 ---
 
 # 35 · record
 
-## 这一课你要会
+## 两个 `{1,2}`，`equals` 却是 `false`
 
-- 用 `record` 一行声明一个不可变数据类；
-- 知道它自动生成了什么（构造器、访问器、`equals`/`hashCode`/`toString`）；
-- 用紧凑构造器做参数校验；
-- 知道 record 的"浅不可变"与不能做的事。
-
-## 为什么
-
-写一个"只有几个字段的数据类"，传统写法要几十行：
-
-```text
-final class Point {
-    private final int x;
-    private final int y;
-
-    Point(int x, int y) { this.x = x; this.y = y; }
-    int x() { return x; }
-    int y() { return y; }
-    // equals、hashCode、toString……
-}
-```
-
-这些代码没有业务含义，却必须写对——尤其 `equals`/`hashCode` 写错，放进 `HashMap` 就会找不到。`record` 把这一整类样板代码交给编译器，你只声明"有哪些字段"。
-
-## 讲解
-
-### 一行声明
-
-```text
-record Point(int x, int y) {}
-```
-
-编译器自动生成：
-
-- **规范构造器**：`Point(int x, int y)`；
-- **访问器**：`x()`、`y()`（注意不是 `getX()`）；
-- **`equals` / `hashCode`**：按字段值比较；
-- **`toString`**：`Point[x=1, y=2]` 这种格式。
-
-`record` 是 `final` 的：不能被继承。字段也是 `final` 的：创建后不能改。所以它天生适合做"值对象"——坐标、金额、区间、查询条件。
-
-### 紧凑构造器：校验写在入口
+下面这段直接跑，`ArrayBox` 只有一个组件 `int[] values`。
 
 <!-- run -->
 ```java
+import java.util.Arrays;
+
 public class Main {
-    record Range(int from, int to) {
-        Range {
-            if (from > to) {
-                throw new IllegalArgumentException("from > to");
-            }
+    record ArrayBox(int[] values) {
+    }
+
+    public static void main(String[] args) {
+        ArrayBox a = new ArrayBox(new int[]{1, 2});
+        ArrayBox b = new ArrayBox(new int[]{1, 2});
+
+        System.out.println("a.equals(b)=" + a.equals(b));
+        System.out.println("Arrays.equals=" + Arrays.equals(a.values(), b.values()));
+        System.out.println("toString starts with ArrayBox[values=[I@: " + a.toString().startsWith("ArrayBox[values=[I@"));
+    }
+}
+```
+```text
+a.equals(b)=false
+Arrays.equals=true
+toString starts with ArrayBox[values=[I@: true
+```
+
+我原来以为 record 会把数组内容逐项比一遍，实际 `a.equals(b)` 是 `false`；`Arrays.equals` 对同一对数组返回 `true`，说明内容一样，差在 record 生成的 `equals`。
+
+生成的 `equals` 逐组件比较：引用组件走 `Objects.equals`，基本类型走 `==`。数组是引用类型，`Objects.equals` 落到 `Object.equals`，比的是不是同一个数组。`hashCode` 也一样：引用组件走 `Objects.hashCode`，数组的 `hashCode` 是 identity hash。`toString` 用 `String.valueOf`，数组打出来就是 `[I@...`。同一段代码里加一行 `System.out.println(a)`，我这次得到的是 `ArrayBox[values=[I@7852e922]`，再跑一次地址就变。
+
+所以数组组件会破坏 record 的值语义。record 只保证组件本身不能再赋值（引用类型就是引用不变），不保证组件指向的内容不变。这句话是这篇的主线，后面的 List 和 map key 都是它的推论。
+
+## `record Point(int x, int y) {}` 生成了什么
+
+这是一个完整的顶层声明，文件名 `Point.java`；放进 `Main` 里也一样。
+
+```java
+record Point(int x, int y) {
+}
+```
+
+编译器生成：
+
+- 规范构造器 `Point(int x, int y)`；
+- 访问器 `x()`、`y()`，不是 `getX()`；
+- `equals`、`hashCode`、`toString`；
+- 类是隐式 `final`，组件是 `private final` 字段；
+- 不能新增实例字段，但可以加实例方法、静态方法、静态字段。
+
+`equals` 逐组件比较，`hashCode` 逐组件取值，`toString` 的格式是 `Point[x=1, y=2]`。这三件事对「组件引用指向什么」不做深挖：组件是 `String`、`Integer` 这类不可变对象时没问题；组件是数组、集合、可变对象时，值语义只到引用这一层。准确说法是**组件引用不可变（浅不可变）**：组件的引用不能换，引用指向的内容仍可能变。想让内容也锁死，得在构造器里做防御性拷贝。
+
+## 数组组件：要么别放，要么补三个方法
+
+最省事的修法是不在 record 里放数组。坐标用两个 `int`，序列用 `List<Integer>`，都比 `int[]` 安全。确实需要数组时，自己覆盖 `equals`、`hashCode`、`toString`，并在紧凑构造器和访问器里做拷贝：
+
+<!-- run -->
+```java
+import java.util.Arrays;
+
+public class Main {
+    record ArrayBox(int[] values) {
+        ArrayBox {
+            values = values.clone();
         }
 
-        int length() {
-            return to - from;
+        @Override
+        public int[] values() {
+            return values.clone();
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof ArrayBox box && Arrays.equals(values, box.values);
+        }
+
+        @Override
+        public int hashCode() {
+            return Arrays.hashCode(values);
+        }
+
+        @Override
+        public String toString() {
+            return "ArrayBox[values=" + Arrays.toString(values) + "]";
         }
     }
 
     public static void main(String[] args) {
-        Range a = new Range(1, 5);
-        Range b = new Range(1, 5);
+        int[] raw = {1, 2};
+        ArrayBox a = new ArrayBox(raw);
+        ArrayBox b = new ArrayBox(new int[]{1, 2});
+        raw[0] = 9;
 
+        System.out.println("equals=" + a.equals(b));
+        System.out.println("hashEqual=" + (a.hashCode() == b.hashCode()));
         System.out.println(a);
-        System.out.println(a.equals(b));
-        System.out.println(a.from() + "/" + a.to() + "/" + a.length());
+
+        a.values()[0] = 7;
+        System.out.println("afterAccessorWrite=" + a);
+    }
+}
+```
+```text
+equals=true
+hashEqual=true
+ArrayBox[values=[1, 2]]
+afterAccessorWrite=ArrayBox[values=[1, 2]]
+```
+
+构造器里的 `values.clone()` 挡住外部数组后续修改；访问器再 `clone()` 一次，挡住调用方通过 `a.values()[0] = 7` 改内部状态。`equals` 用 `Arrays.equals`，`hashCode` 用 `Arrays.hashCode`，`toString` 用 `Arrays.toString`。少任何一个，值语义都漏一块。
+
+如果只覆盖 `equals`/`hashCode` 而不 clone，两个对象能相等，但外部还能改内容，`hashCode` 又会变，等于把 map key 的坑留在原地。
+
+## `List.copyOf` 只复制列表结构
+
+把数组换成 `List` 也不自动安全。看两个 record：`BareBox` 直接存传入的列表，`CopiedBox` 在紧凑构造器里做 `List.copyOf`。
+
+<!-- run -->
+```java
+import java.util.ArrayList;
+import java.util.List;
+
+public class Main {
+    record BareBox(List<String> items) {
+    }
+
+    record CopiedBox(List<StringBuilder> items) {
+        CopiedBox {
+            items = List.copyOf(items);
+        }
+    }
+
+    public static void main(String[] args) {
+        List<String> mutable = new ArrayList<>(List.of("a"));
+        BareBox bare = new BareBox(mutable);
+        bare.items().add("b");
+        System.out.println("bare=" + bare.items());
+
+        List<StringBuilder> builders = new ArrayList<>();
+        StringBuilder word = new StringBuilder("x");
+        builders.add(word);
+        CopiedBox copied = new CopiedBox(builders);
+        word.append("y");
+        System.out.println("copied=" + copied.items().get(0));
 
         try {
-            new Range(5, 1);
-        } catch (IllegalArgumentException error) {
-            System.out.println("rejected:" + error.getMessage());
+            copied.items().add(new StringBuilder("z"));
+        } catch (UnsupportedOperationException error) {
+            System.out.println("add: " + error.getClass().getSimpleName());
+        }
+
+        try {
+            List.copyOf(null);
+        } catch (NullPointerException error) {
+            System.out.println("copyOf(null): " + error.getClass().getSimpleName());
+        }
+
+        List<String> withNull = new ArrayList<>();
+        withNull.add("a");
+        withNull.add(null);
+        try {
+            List.copyOf(withNull);
+        } catch (NullPointerException error) {
+            System.out.println("copyOf(with null): " + error.getClass().getSimpleName());
         }
     }
 }
 ```
 ```text
-Range[from=1, to=5]
-true
-1/5/4
-rejected:from > to
+bare=[a, b]
+copied=xy
+add: UnsupportedOperationException
+copyOf(null): NullPointerException
+copyOf(with null): NullPointerException
 ```
 
-紧凑构造器不写参数列表：参数就是 record 的组件。它会在字段赋值**之前**执行，适合做校验。**不要在紧凑构造器里写 `this.from = from`**——字段赋值由编译器自动完成，手写反而编译不过。
+逐行看：
 
-### 可以加方法，不能加实例字段
+- `bare=[a, b]`：`BareBox` 存的是原列表引用，`items()` 返回同一个列表，`add` 直接改到它。
+- `copied=xy`：`List.copyOf` 复制的是「列表里有哪几个元素」，元素还是同一个 `StringBuilder`；`word.append("y")` 之后，`copied.items().get(0)` 也变成 `xy`。
+- `add: UnsupportedOperationException`：`List.copyOf` 返回不可改列表，`add` 被拒绝。所以「record 里放了 List 就真的不可变吗」的准确答案是：引用不可变，内容不一定——引用不可换、列表结构不能改，但元素内容可能变。
+- `copyOf(null)` 和含 null 元素的列表都抛 `NullPointerException`：`List.copyOf` 不接受 null。`BareBox` 也一样：传 `List.of("a")` 进去，`items().add("b")` 抛 `UnsupportedOperationException`；传 `new ArrayList<>(List.of("a"))` 才能改。record 本身不决定内容能不能改，传入的列表类型也决定了一半。
 
-```text
-record Range(int from, int to) {
-    int length() { return to - from; }              // 可以：实例方法
-    static Range ofOne(int n) { return new Range(n, n); }  // 可以：静态方法
-    static final int MAX = 100;                     // 可以：静态字段
-    // int extra;                                   // 不可以：额外的实例字段
-}
-```
+要更深一层，得自己复制元素：`items = items.stream().map(StringBuilder::new).toList();`，或者干脆用不可变元素类型（`String`、`Integer`、`LocalDate`）。`List.copyOf` 是浅拷贝，不是深拷贝。
 
-record 的字段集合就是它的"形状"，由声明决定。想加派生值（比如 `length()`），用方法算，不要存第二份——两份数据就可能不一致。
+## 当 map 的 key：组件一改，桶就找不到
 
-### 浅不可变：字段是 final，内容不一定
+record 适合当 map 的 key，但前提是组件稳定。`Order` 里放了一个可变 `List`，构造完再改列表，`hashCode` 就变了：
 
-```text
-record Order(String id, List<String> items) {}
-```
+<!-- run -->
+```java
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
-`items` 这个**引用**不能换，但 `items.add(...)` 仍然能改列表内容。如果需要真正不可变，在构造器里拷一份：
+public class Main {
+    record Order(String id, List<String> items) {
+    }
 
-```sketch
-{
-  "title": "final 锁住的是引用，不是里面的内容",
-  "rows": [
-    [
-      { "id": "field", "title": "record 的字段", "sub": "final，引用换不了", "tone": "green" },
-      { "id": "list", "title": "指向一个 List", "sub": "这个 List 本身没锁", "tone": "amber" },
-      { "id": "mutate", "title": "items.add(...)", "sub": "内容照样能改", "tone": "amber" }
-    ]
-  ],
-  "arrows": [
-    { "from": "field", "to": "list" },
-    { "from": "list", "to": "mutate" }
-  ]
-}
-```
+    public static void main(String[] args) {
+        List<String> items = new ArrayList<>(List.of("a"));
+        Order order = new Order("o1", items);
+        Set<Order> orders = new HashSet<>();
+        orders.add(order);
 
-```text
-record Order(String id, List<String> items) {
-    Order {
-        items = List.copyOf(items);
+        System.out.println("before=" + orders.contains(order) + ", size=" + orders.size());
+        items.add("b");
+        System.out.println("after=" + orders.contains(order) + ", size=" + orders.size());
+        System.out.println("equalsSelf=" + order.equals(order));
+
+        orders.add(order);
+        System.out.println("reAdd=" + orders.size());
     }
 }
 ```
+```text
+before=true, size=1
+after=false, size=1
+equalsSelf=true
+reAdd=2
+```
 
-（在紧凑构造器里重新给参数赋值，就会写入拷贝后的值。）这是 record 最容易被忽略的一点。
+`HashSet` 先用 `hashCode` 找桶，再用 `equals` 确认。`items.add("b")` 之后，`order` 的 `hashCode` 变了，`contains` 按新哈希去找，找不到旧桶里的那个对象；但 `order.equals(order)` 仍是 `true`。同一个对象在集合里，`contains` 却返回 `false`。再 `add` 一次，这次它进了另一个桶，`size` 变成 2——一个 `Set` 里出现两个「相等」的元素。
 
-### record 与普通类的取舍
+record 只是把 `hashCode` 生成出来了，不会让组件变稳定。当 key 的 record，组件要么本身不可变（`String`、`int`、`LocalDate`），要么在构造时就拷贝成不可改的，并且元素也不可变；之后不再改。数组组件更不适合当 key：两个内容相同的数组本来就是两个不同的 key。
 
-| 你的类型 | 建议 |
-| --- | --- |
-| 主要用来装数据、比较相等、当 map 的 key | `record` |
-| 有可变状态、需要继承、需要懒加载 | 普通类 |
-| 需要"只有几种实现"的封闭集合 | `sealed` + `record`（下一课） |
+## 紧凑构造器：校验和改参数都在赋值前
+
+`record Range(int low, int high)` 要求 `low <= high`。校验放进紧凑构造器：
+
+<!-- run -->
+```java
+public class Main {
+    record Range(int low, int high) {
+        Range {
+            if (low > high) {
+                throw new IllegalArgumentException("low > high: " + low + " > " + high);
+            }
+        }
+
+        int length() {
+            return high - low;
+        }
+    }
+
+    record Label(String text) {
+        Label {
+            text = text.strip();
+            if (text.isEmpty()) {
+                throw new IllegalArgumentException("blank label");
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        Range range = new Range(1, 5);
+        System.out.println(range);
+        System.out.println("length=" + range.length());
+
+        try {
+            new Range(5, 1);
+        } catch (IllegalArgumentException error) {
+            System.out.println("range: " + error.getMessage());
+        }
+
+        System.out.println("label=[" + new Label("  hi  ").text() + "]");
+        try {
+            new Label("   ");
+        } catch (IllegalArgumentException error) {
+            System.out.println("label: " + error.getMessage());
+        }
+    }
+}
+```
+```text
+Range[low=1, high=5]
+length=4
+range: low > high: 5 > 1
+label=[hi]
+label: blank label
+```
+
+紧凑构造器不写参数列表，`Range { ... }` 里的 `low`、`high` 就是组件参数。它在字段赋值之前执行：可以校验、可以抛异常，也可以给参数重新赋值；重新赋值后的参数才会写进字段。`Label` 里的 `text = text.strip()` 就是改参数。字段赋值由编译器在末尾自动完成，不要写 `this.low = low`——那是给 final 字段再赋一次值，编译报 `cannot assign a value to final variable low`。
+
+如果不想用紧凑写法，也可以写完整规范构造器 `Range(int low, int high) { this.low = low; this.high = high; }`，但校验和拷贝都要自己重复一遍。
+
+## static 字段：不用 final，也不参与比较
+
+record 的实例字段必须来自组件，但 static 字段不受这个限制。`StaticBox` 加一个 `static int count`，不写 `final` 也能编译：
+
+<!-- run -->
+```java
+public class Main {
+    record StaticBox(int x) {
+        static int count;
+    }
+
+    public static void main(String[] args) {
+        StaticBox a = new StaticBox(1);
+        StaticBox b = new StaticBox(1);
+        StaticBox.count = 7;
+
+        System.out.println("equals=" + a.equals(b));
+        System.out.println("hash=" + (a.hashCode() == b.hashCode()));
+        System.out.println("count=" + StaticBox.count);
+        System.out.println(a);
+    }
+}
+```
+```text
+equals=true
+hash=true
+count=7
+StaticBox[x=1]
+```
+
+`count` 不是组件，所以不需要 `final`，也不进 `equals`/`hashCode`/`toString`。`a`、`b` 的 `x` 都是 1，它们相等；`count` 改成 7 不影响这个判断。反过来说，static 字段是所有实例共享的可变状态，别把它当成 record 的值的一部分；需要「每个对象一份」的数据，只能放进组件。
+
+record 仍然不能加实例字段。写 `int extra;` 会编译报 `field declaration must be static`，编译器还会提示把它改成组件。
+
+## 不能继承类，但能实现接口
+
+record 是隐式 final 的。反射能看到它的直接父类是 `java.lang.Record`，不是 `Object`：
+
+<!-- run -->
+```java
+import java.lang.reflect.Modifier;
+
+public class Main {
+    record Point(int x, int y) implements Comparable<Point> {
+        @Override
+        public int compareTo(Point other) {
+            return Integer.compare(x, other.x);
+        }
+    }
+
+    public static void main(String[] args) {
+        Point a = new Point(2, 0);
+        Point b = new Point(1, 0);
+
+        System.out.println("a.compareTo(b)=" + a.compareTo(b));
+        System.out.println("final=" + Modifier.isFinal(Point.class.getModifiers()));
+        System.out.println("superclass=" + Point.class.getSuperclass().getName());
+        System.out.println("interfaces=" + Point.class.getInterfaces()[0].getName());
+    }
+}
+```
+```text
+a.compareTo(b)=1
+final=true
+superclass=java.lang.Record
+interfaces=java.lang.Comparable
+```
+
+`Point` 实现了 `Comparable<Point>`，所以能直接排序。record 可以实现任意接口，但只有一条继承线：直接父类固定是 `java.lang.Record`，不能再 `extends` 别的类。
+
+试一下 `record Bad(int x) extends Object {}`，编译器的第一句是：
+
+```text
+Main.java:2: error: '{' expected
+    record Bad(int x) extends Object {
+                     ^
+1 error
+```
+
+record 的语法里根本没有 `extends` 位置，所以它在这行就停了。
+
+反过来，继承一个 record 也不行：
+
+```text
+Main.java:5: error: cannot inherit from final Point
+    static class Sub extends Point {
+                             ^
+```
+
+同一份输出里还有一条 `constructor Point in record Point cannot be applied to given types`，因为子类没调用 `Point(int,int)`；但第一条已经说明了根因：`Point` 是 final。
+
+第 36 课的 `sealed` 会把 record 当封闭家族的成员：`sealed interface Shape permits Circle, Square`，`Circle`、`Square` 是实现了 `Shape` 的 record，`switch` 就能穷尽。这里先知道 record 能实现接口、不能被继承就够了。
 
 ## 动手
 
@@ -163,7 +404,7 @@ record Order(String id, List<String> items) {
   "language": "java",
   "code": "public class Main {\n    record Range(int from, int to) {\n        Range {\n            this.from = from;\n            this.to = to;\n        }\n    }\n\n    public static void main(String[] args) {\n        System.out.println(new Range(1, 5));\n    }\n}",
   "bugLine": 4,
-  "explain": "紧凑构造器的参数会在末尾自动赋给字段，字段本身是 final，所以手工 `this.from = from` 是\"给 final 变量再赋一次值\"，编译错误。只有想改写入库值（比如拷贝列表）时才给**参数**重新赋值：`items = List.copyOf(items);`，不是给 `this.items` 赋值。"
+  "explain": "紧凑构造器的参数会在末尾自动赋给字段，字段是 final，所以手写 `this.from = from` 等于给 final 变量再赋一次值，编译报 `cannot assign a value to final variable from`。要改变写进字段的值，只能给参数重新赋值，比如 `items = List.copyOf(items);`，不能给 `this.items` 赋值。"
 }
 ```
 
@@ -175,46 +416,27 @@ record Order(String id, List<String> items) {
   "title": "record 三问",
   "questions": [
     {
-      "question": "record Point(int x, int y) 自动生成的访问器叫什么？",
-      "options": ["getX()", "x()", "getx()"],
+      "question": "record ArrayBox(int[] values) 的两个实例 a、b，values 内容都是 {1,2} 但数组不是同一个，a.equals(b) 的结果是？",
+      "options": ["true，record 会按内容比较数组", "false，数组组件走引用比较", "编译错误，record 不能有数组组件"],
       "answer": 1,
-      "explain": "record 的访问器与字段同名：x()、y()。它没有 JavaBean 风格的 getX()。"
+      "explain": "生成的 equals 对每个组件调用 Objects.equals；数组没有重写 equals，比较的是不是同一个数组对象。要按内容比，自己用 Arrays.equals 覆盖。"
     },
     {
-      "question": "record 里能不能再加一个实例字段？",
-      "options": ["能，和普通类一样", "不能，字段集合由声明决定", "能，但必须是 private"],
+      "question": "record Order(List<String> items) 的 items 引用不能换，内容一定能改吗？",
+      "options": ["一定能，List 都是可变的", "不一定：传入 List.of 生成的不可变列表时 add 抛 UnsupportedOperationException，传入 ArrayList 时能改；元素本身可变时，改元素也会透过去", "不能，record 会深拷贝 List"],
       "answer": 1,
-      "explain": "record 的字段就是组件列表，不能再加实例字段；需要派生值就写成方法。"
+      "explain": "record 只锁组件引用。List.copyOf 也只复制列表结构，元素对象不复制；要深不可变，得自己复制元素或只用不可变元素类型。"
     },
     {
-      "question": "record Order(List<String> items) 真的不可变吗？",
-      "options": ["是，完全不可变", "不是，列表内容仍可改", "取决于 JDK 版本"],
+      "question": "record StaticBox(int x) { static int count; } 里的 count 哪句对？",
+      "options": ["必须写成 static final", "可以不加 final，且不参与 equals/hashCode/toString", "会成为一个 record 组件"],
       "answer": 1,
-      "explain": "字段引用是 final，但 List 本身可变。需要深不可变就在构造器里 List.copyOf。"
+      "explain": "static 字段不是组件，不需要 final，也不进生成的 equals/hashCode/toString；它是所有实例共享的可变状态。"
     }
   ]
 }
 ```
 
-## 常见误区
+## 还差的
 
-### 误区：record 就是"自动生成 getter 的类"
-
-**你以为**：和 Lombok 的 `@Data` 差不多。
-**其实**：record 字段不可变、类是 final、自动生成的是同名访问器不是 `getX()`，而且 `equals`/`hashCode`/`toString` 按组件生成。它表达的是"值"，不是"可变的 JavaBean"。
-
-### 误区：record 就一定完全不可变
-
-**你以为**：都是 final 字段，肯定改不了。
-**其实**：如果组件是数组、集合、可变对象，内容仍能改。要真不可变，构造时拷贝。
-
-### 误区：record 可以继承
-
-**你以为**：能像普通类一样 `extends`。
-**其实**：record 隐式 final，不能继承别的类，也不能被继承；但可以实现接口。
-
-## 小结
-
-`record` 一行声明不可变数据类，自动生成构造器、同名访问器、`equals`/`hashCode`/`toString`。紧凑构造器用于校验与拷贝，不能手工给 `this` 字段赋值。注意浅不可变。适合值对象、map 的 key、消息与查询条件。
-
-下一课：`sealed`——把"只有这几种"写进类型里。
+这篇没讲 record 的序列化：实现 `Serializable` 时组件怎么读写、反序列化是否经过紧凑构造器，规则和普通类不一样。也没讲 record 与 Jackson/JPA 的配合——Jackson 2.12 起能直接读写 record，JPA 实体则要求无参构造器和可变字段，record 当不了实体。还有「改一个组件、返回新 record」的写法：record 没有 `with` 方法，得自己写一个 `withX`。这些等用到再补。
