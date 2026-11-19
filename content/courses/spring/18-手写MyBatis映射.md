@@ -5,91 +5,107 @@ chapter: 数据
 level: intermediate
 category: spring-from-zero
 prerequisite: 17 · JdbcTemplate 与连接池
-minutes: 30
+minutes: 21
 status: published
 ---
 
 # 18 · 手写 MyBatis 映射
 
-## 这一课你要会
+## 查出来 4 行，两个字段停在默认值
 
-- 说清 MyBatis 的 mapper 接口没有实现类，运行时那个对象是什么；
-- 说清 `#{}` 与 `${}` 的机制差别，以及后者为什么是注入漏洞；
-- 手写一遍"接口 + SQL 字符串 + 反射填值"的映射器；
-- 知道本项目为什么要求"SQL 只写在 mapper 里，且禁 MyBatis-Plus"。
+我在自己练手的小书单服务里有一张 `book` 表（玩具级别，就四行）：
 
-## 为什么
+| id | title | created_at | t_count |
+| --- | --- | --- | --- |
+| 1 | 深入理解 Java 虚拟机 | 2024-03-01 09:00 | 1 |
+| 2 | Spring 实战 | 2024-05-20 09:00 | 0 |
+| 3 | Java 并发编程实战 | 2024-07-11 09:00 | 1 |
+| 4 | Spring 源码深度解析 | 2024-01-05 09:00 | 0 |
 
-上一课的 `RowMapper` 是手写的：每个查询都要写一遍"怎么把一行变成对象"。字段一多，这段代码就是重复劳动，而且改列名时容易漏。
-
-MyBatis 把这一步自动做了：**你只写接口和 SQL，映射由反射完成**。但它的两套占位符（`#{}` 与 `${}`）在表面上只差一个字符，一个是安全绑定、一个是直接拼字符串——这是本项目最重要的一条安全纪律的由来。
-
-## 讲解
-
-### mapper 接口没有实现类
-
-```sketch
-{
-  "title": "mapper 没有实现类，运行时给它造一个",
-  "rows": [
-    [
-      { "id": "iface", "title": "mapper 接口", "sub": "只有方法签名", "tone": "gray" },
-      { "id": "proxy", "title": "启动时生成代理", "sub": "按注解或 XML 找 SQL", "tone": "blue" },
-      { "id": "run", "title": "调方法就执行 SQL", "sub": "结果反射填进对象", "tone": "green" }
-    ]
-  ],
-  "arrows": [
-    { "from": "iface", "to": "proxy" },
-    { "from": "proxy", "to": "run" }
-  ]
-}
-```
+实体上对应的是 `Long id`、`String title`、`LocalDateTime createdAt`、`boolean tCount`。mapper 只有接口和 SQL：
 
 ```java
 @Mapper
 public interface BookMapper {
-    @Select("SELECT id, title FROM book WHERE id = #{id}")
-    Book findById(@Param("id") long id);
+    @Select("SELECT id, title, created_at FROM book")
+    List<Book> findAll();
+
+    @Select("SELECT id, title, t_count FROM book")
+    List<Book> tiny();
 }
 ```
 
-这个接口没有实现类，但你注入了就能用。原因是**第 10 课的动态代理**：
+启动之后把两件事打出来：MyBatis 当前的下划线映射配置，和两个方法的返回值。
 
 ```text
-Spring 启动时扫到 @Mapper
-  → 为每个接口生成一个代理对象（JDK 动态代理，接口正好满足前提）
-  → 代理的处理器：读方法上的 SQL、把参数塞进占位符、执行、把结果反射填进返回类型
-  → 把这个代理注册成 Bean
+mapUnderscoreToCamelCase | false
+findAll | [1:深入理解 Java 虚拟机:null, 2:Spring 实战:null, 3:Java 并发编程实战:null, 4:Spring 源码深度解析:null]
+tiny(TINYINT -> boolean) | [1:深入理解 Java 虚拟机:tCount=false, 2:Spring 实战:tCount=false, 3:Java 并发编程实战:tCount=false, 4:Spring 源码深度解析:tCount=false]
 ```
 
-所以"mapper 接口能被注入"和"`@Transactional` 能生效"是同一套机制的两个应用。你现在应该对"为什么没实现类也能调"毫无疑问了。
+四行都在，`id` 和 `title` 全对。第一个猜的是「SQL 少查列」——回去看 mapper，`created_at` 和 `t_count` 明明都写在 `SELECT` 里。第二个猜的是「TINYINT 转 boolean 坏了」——这个猜错了，下面会看到：开关一开，`t_count` 的 1/0 自己就变成 true/false，类型转换一点毛病没有。
 
-### `#{}` 与 `${}`
+打开开关，Java 代码和 SQL 一个字不改：
 
-```sketch
-{
-  "title": "#{} 走预编译，${} 直接拼进 SQL",
-  "rows": [
-    [
-      { "id": "hash", "title": "#{title}", "sub": "变成占位符 ?", "tone": "green" },
-      { "id": "dollar", "title": "${title}", "sub": "原样拼进去", "tone": "amber" },
-      { "id": "risk", "title": "拼接就会中注入", "sub": "只有表名列名才考虑", "tone": "amber" }
-    ]
-  ],
-  "arrows": [
-    { "from": "hash", "to": "dollar" },
-    { "from": "dollar", "to": "risk" }
-  ]
-}
+```text
+java -jar app.jar --mybatis.configuration.map-underscore-to-camel-case=true
 ```
 
-| 写法 | 底层 | 例子 |
-| --- | --- | --- |
-| `#{title}` | `PreparedStatement.setString(1, title)` | 值永远不参与 SQL 解析 |
-| `${title}` | 字符串直接拼进 SQL | 值成为 SQL 的一部分 |
+```text
+mapUnderscoreToCamelCase | true
+findAll | [1:深入理解 Java 虚拟机:2024-03-01T09:00, 2:Spring 实战:2024-05-20T09:00, 3:Java 并发编程实战:2024-07-11T09:00, 4:Spring 源码深度解析:2024-01-05T09:00]
+tiny(TINYINT -> boolean) | [1:深入理解 Java 虚拟机:tCount=true, 2:Spring 实战:tCount=false, 3:Java 并发编程实战:tCount=true, 4:Spring 源码深度解析:tCount=false]
+```
+
+两个字段都回来了，boolean 也对。出问题的是「列名 → 字段名」这一步：`created_at` 和 `createdAt` 是两个不同的字符串，没开转驼峰时 MyBatis 找不到叫 `createdAt` 的属性，**不报错，直接跳过**，字段停在 Java 默认值上——`createdAt` 是 null，`tCount` 是 false。于是「真的是 0」和「根本没赋值」在对象上长得一模一样。
+
+这类症状的排查顺序：
+
+| 症状 | 先看哪 |
+| --- | --- |
+| 只有带下划线的字段是 null / false，别的字段正常，不报错 | 下划线转驼峰开关（`mapUnderscoreToCamelCase`，默认 false），以及列名和字段名是否真对得上 |
+| 抛 `NumberFormatException: For input string: "created_at DESC"` | SQL 里是不是写了 `ORDER BY #{...}`，占位符被当成排序序号了 |
+| SQL 日志里的引号、`OR 1=1` 是你传进去的原文 | SQL 里用了 `${...}`，值参与了语法解析 |
+
+上面这三段输出和下面全部输出都来自同一台机器：Temurin 25.0.4、Spring Boot 4.1.1、mybatis-spring-boot-starter 4.1.0、H2 2.4.240，数据就是那四行。
+
+## mapper 接口没有实现类，注入进来的是一个代理
+
+上面那个 `BookMapper` 没有实现类，却能注入进 `@Component` 直接调。把注入进来的对象拆开看：
+
+```text
+mapper.getClass().getName() | jdk.proxy2.$Proxy51
+Proxy.isProxyClass | true
+InvocationHandler | org.apache.ibatis.binding.MapperProxy
+```
+
+三条信息：类名是 `jdk.proxy2.$Proxy51`（编号每次启动都不一样，但形态是 `jdk.proxy2.$Proxy` 加数字，磁盘上没有这个 `.java`）；`Proxy.isProxyClass` 为 true，说明它是 `Proxy.newProxyInstance` 造出来的；真正接住调用的是 `org.apache.ibatis.binding.MapperProxy`。
+
+这是第 10 课那个动态代理的一个用户，但它跟 `@Transactional` 的代理不是同一套东西。`@Transactional` 的代理由 Spring 的 `AbstractAutoProxyCreator` 在 bean 初始化后织入；mapper 的代理来自 MyBatis：`mybatis-spring-boot-starter` 扫到 `@Mapper` 接口（或者你用 `@MapperScan` 指定包），每个接口注册成一个 `MapperFactoryBean`，注入时 `getObject()` 把代理交出来。两者唯一的共同点是「都用了 JDK 动态代理」。所以 `new BookMapper()` 编译不过，你也拿不到一个别的实现。
+
+代理本身干的事很薄——按方法找到启动时就解析好的 `MappedStatement`，然后交给 `SqlSession`。参数绑定、执行、结果映射都在后面：
+
+```text
+service 调 mapper.findAll()
+  → 代理按方法找到 MappedStatement（注解里的 SQL 在启动时已经成了固定文本，参数位置也定了）
+  → SqlSessionTemplate → SqlSession → Executor
+  → 从当前事务拿连接；没有事务就借一个，用完还（第 17 课）
+  → prepareStatement、按顺序 setXxx、executeQuery
+  → ResultSetHandler 按列名反射填进 Book
+```
+
+倒数第二步那个连接是「当前事务的连接」，所以 `@Transactional` 加在 service 上时，里面对 mapper 的三次调用仍在同一个事务里（第 12 课）。
+
+## 跑一遍：手写「接口 + SQL + 反射填值」
+
+去掉 MyBatis 和数据库，只留接口、SQL、反射三样。一行的数据就是一个 `Map`，形状跟从 `ResultSet` 里读出来的差不多：
 
 <!-- run -->
 ```java
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Proxy;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -97,149 +113,185 @@ import java.util.Map;
 
 public class Main {
 
-    static final class Book {
-        final long id;
-        final String title;
+    public static class Book {
+        private Long id;
+        private String title;
+        private LocalDateTime createdAt;
 
-        Book(long id, String title) {
-            this.id = id;
-            this.title = title;
-        }
+        public void setId(Long id) { this.id = id; }
+        public void setTitle(String title) { this.title = title; }
+        public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
         public String toString() {
-            return id + ":" + title;
+            return id + "/" + title + "/" + createdAt;
         }
     }
 
-    static final class Table {
-        final List<Map<String, Object>> rows = new ArrayList<>();
-
-        Table add(long id, String title) {
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("id", id);
-            row.put("title", title);
-            rows.add(row);
-            return this;
-        }
+    interface BookMapper {
+        List<Book> findByTitle(String keyword);
     }
 
-    // 等价于 #{}：值被当成数据，只做字符串比较
-    static List<Book> boundQuery(Table table, String keyword) {
-        List<Book> result = new ArrayList<>();
-        for (Map<String, Object> row : table.rows) {
-            String title = (String) row.get("title");
-            if (title.contains(keyword)) {
-                result.add(new Book(((Number) row.get("id")).longValue(), title));
+    static Map<String, Object> row(long id, String title, String createdAt) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", id);
+        row.put("title", title);
+        row.put("created_at", createdAt);
+        return row;
+    }
+
+    static String toCamel(String column) {
+        StringBuilder out = new StringBuilder();
+        boolean upper = false;
+        for (char c : column.toCharArray()) {
+            if (c == '_') {
+                upper = true;
+                continue;
             }
+            out.append(upper ? Character.toUpperCase(c) : c);
+            upper = false;
         }
-        return result;
+        return out.toString();
     }
 
-    // 等价于 ${}：值被当成 SQL 语法的一部分拼进去
-    static String splicedSql(String keyword) {
-        return "SELECT id, title FROM book WHERE title LIKE '%" + keyword + "%'";
+    // 一行的 Map -> 对象：列名当字段名，类型按字段类型转
+    static Book fill(Map<String, Object> row, boolean camel) throws ReflectiveOperationException {
+        Book book = new Book();
+        for (Map.Entry<String, Object> entry : row.entrySet()) {
+            String property = camel ? toCamel(entry.getKey()) : entry.getKey();
+            Field field = Book.class.getDeclaredField(property);
+            field.setAccessible(true);
+            field.set(book, convert(entry.getValue(), field.getType()));
+        }
+        return book;
     }
 
-    public static void main(String[] args) {
-        Table table = new Table()
-                .add(1, "深入理解 Java 虚拟机")
-                .add(2, "Spring 实战");
+    static Object convert(Object value, Class<?> type) {
+        if (value instanceof String text && type == LocalDateTime.class) {
+            return LocalDateTime.parse(text);
+        }
+        return value;
+    }
 
-        System.out.println("正常输入 " + boundQuery(table, "Java"));
-        System.out.println("正常输入 " + boundQuery(table, "Spring"));
+    public static void main(String[] args) throws Exception {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        rows.add(row(1, "深入理解 Java 虚拟机", "2024-03-01T09:00"));
+        rows.add(row(2, "Spring 实战", "2024-05-20T09:00"));
 
-        String attack = "x' OR '1'='1";
-        System.out.println("拼接后的 SQL: " + splicedSql(attack));
-        System.out.println("同一个输入走 #{}: " + boundQuery(table, attack).size() + " 条");
+        try {
+            fill(rows.get(0), false);
+        } catch (NoSuchFieldException e) {
+            System.out.println("直接拿列名找字段：" + e);
+        }
+        for (Map<String, Object> row : rows) {
+            System.out.println("转驼峰后：" + fill(row, true));
+        }
+
+        InvocationHandler handler = (proxy, method, params) -> {
+            System.out.println("代理收到的 SQL：SELECT id, title, created_at FROM book WHERE title LIKE ?");
+            String keyword = (String) params[0];
+            List<Book> result = new ArrayList<>();
+            for (Map<String, Object> row : rows) {
+                if (String.valueOf(row.get("title")).contains(keyword)) {
+                    result.add(fill(row, true));
+                }
+            }
+            return result;
+        };
+        BookMapper mapper = (BookMapper) Proxy.newProxyInstance(
+                Main.class.getClassLoader(), new Class<?>[] {BookMapper.class}, handler);
+        System.out.println("是代理对象：" + Proxy.isProxyClass(mapper.getClass()));
+        System.out.println("接口：" + mapper.getClass().getInterfaces()[0].getSimpleName());
+        System.out.println("查出：" + mapper.findByTitle("Java"));
     }
 }
 ```
 ```text
-正常输入 [1:深入理解 Java 虚拟机]
-正常输入 [2:Spring 实战]
-拼接后的 SQL: SELECT id, title FROM book WHERE title LIKE '%x' OR '1'='1%'
-同一个输入走 #{}: 0 条
+直接拿列名找字段：java.lang.NoSuchFieldException: created_at
+转驼峰后：1/深入理解 Java 虚拟机/2024-03-01T09:00
+转驼峰后：2/Spring 实战/2024-05-20T09:00
+是代理对象：true
+接口：BookMapper
+代理收到的 SQL：SELECT id, title, created_at FROM book WHERE title LIKE ?
+查出：[1/深入理解 Java 虚拟机/2024-03-01T09:00]
 ```
 
-第三行就是漏洞的样子：`'x' OR '1'='1'` 把 `LIKE` 条件变成了恒真，**所有行都会被返回**。如果这是一个登录查询，或者后面还跟着 `DELETE`，结果就完全不同了。
+手写版把同一个问题摔成了异常：`fill(row, false)` 直接拿列名当字段名，`getDeclaredField("created_at")` 抛 `NoSuchFieldException`；`fill(row, true)` 先做 `created_at` → `createdAt` 再找，两行都填上了，连 `2024-03-01T09:00` 到 `LocalDateTime` 的转换也没问题。
 
-第四行是同一份输入走 `#{}` 的结果：`0 条`——它被当成一个普通的字符串去比较，没有变成语法。
+MyBatis 遇到同一件事不会抛，而是把一个 null 交给你：自动映射发现「这一列找不到对应属性」就直接跳过（`autoMappingUnknownColumnBehavior` 默认是 `NONE`，我这台机器启动日志里没有任何提示）。所以「字段莫名是 null / false」的第一嫌疑是名字没对上，不是类型转换。
 
-### 那 `${}` 还有存在必要吗
+手写这版也就到此为止：`toCamel` 和 `convert` 是这层的活，一个管名字一个管类型，而我这里只写了「String → LocalDateTime」这一种转换。真实框架还要处理 NULL、包装类、嵌套对象、泛型返回类型，那是框架长肉的地方。
 
-有，但只在"值不是数据，而是标识符"的时候：
+本项目是开开关解决的：`backend/paideia-persistence/src/main/java/io/github/xiaou61/persistence/MyBatisCustomization.java` 第 17 行是 `configuration.setMapUnderscoreToCamelCase(true)`，全局生效，mapper 里不用写别名。
 
-```sql
-ORDER BY ${sortColumn}        -- 列名不能是占位符
-${tableName}                  -- 表名不能是占位符
+## `#{}` 与 `${}`：一个字符，两种命运
+
+同一条查询，两种写法：
+
+```java
+@Select("SELECT id, title, created_at FROM book WHERE title LIKE CONCAT('%', #{kw}, '%')")
+List<Book> searchBound(@Param("kw") String kw);
+
+@Select("SELECT id, title, created_at FROM book WHERE title LIKE '%${kw}%'")
+List<Book> searchSpliced(@Param("kw") String kw);
 ```
 
-`PreparedStatement` 的占位符只能替换**值**，不能替换列名/表名。所以排序、动态表名这类需求只能用 `${}`。
+| mapper 里写 | 执行时发生什么 | 传 `x%' OR 1=1 --` 的结果 |
+| --- | --- | --- |
+| `#{kw}` | 变成 `?`，再 `setString(1, kw)` | 0 行 |
+| `${kw}` | 值原样拼进 SQL 文本，再去解析 | 4 行，全表 |
 
-代价是：**你必须自己保证这个值是白名单内的**。
+先传一个教科书 payload `x' OR '1'='1`：
+
+```text
+spliced SQL a1 | SELECT id, title, created_at FROM book WHERE title LIKE '%x' OR '1'='1%'
+bound a1 rows | 0
+spliced a1 rows | 0
+```
+
+两个都是 0 行。这里我猜错了——我以为它会把四行全拉出来。实际拼出来的 SQL 是 `LIKE '%x' OR '1'='1%'`：后半段 `'1'='1%'` 是字符串比较，假；前半段 `title LIKE '%x'` 也假。payload 和骨架不匹配，就注不进去。
+
+把注释符带上就进去了：
+
+```text
+spliced SQL a2 | SELECT id, title, created_at FROM book WHERE title LIKE '%x%' OR 1=1 --%'
+bound a2 rows | 0
+spliced a2 rows | 4
+```
+
+`--` 把后面多出来的 `%'` 注释掉，剩下 `OR 1=1` 恒真，四行全出。同一个输入走 `#{}` 还是 0 行，因为它从头到尾只是一个要比较的字符串。
+
+这也顺带否掉了我原来那条自查法——「传 `x' OR '1'='1`，看返回是不是全表」。在 `LIKE '%…%'` 这种骨架上它给的是 0 行，你会以为没事。
+
+## `${}` 只能用在这些地方，而且必须配白名单
+
+`PreparedStatement` 的 `?` 只能落在「值」的位置，落不到列名、表名、排序键上。这不是 MyBatis 的规矩，是语句执行本身的形状：语句结构在解析时就定了，占位符替换的是数据。
+
+所以 `ORDER BY` 想换列名只剩拼接。把 `#{}` 硬塞进去，传 `created_at DESC`：
+
+```text
+ORDER BY #{} | DataIntegrityViolationException <- NumberFormatException: For input string: "created_at DESC"
+```
+
+H2 把 `?` 当成了排序项的位置序号，于是去解析 `"created_at DESC"` 里的数字，抛 `NumberFormatException`，外层被 Spring 包成 `DataIntegrityViolationException`。换成 `${}`：
+
+```text
+ORDER BY ${} created_at ASC | [4:Spring 源码深度解析:2024-01-05T09:00, 1:深入理解 Java 虚拟机:2024-03-01T09:00, 2:Spring 实战:2024-05-20T09:00, 3:Java 并发编程实战:2024-07-11T09:00]
+ORDER BY ${} id DESC | [4:Spring 源码深度解析:2024-01-05T09:00, 3:Java 并发编程实战:2024-07-11T09:00, 2:Spring 实战:2024-05-20T09:00, 1:深入理解 Java 虚拟机:2024-03-01T09:00]
+```
+
+两次真的换了顺序。代价是排序键成了 SQL 文本的一部分——调用方传什么就拼什么。
+
+本项目干脆不让调用方传列名：`backend/paideia-account/src/main/java/io/github/xiaou61/account/internal/user/UserMapper.java` 里分页查询的排序写死成 `ORDER BY created_at DESC, id DESC`，注释是「排序不接受调用方传来的列名」；同一个文件里的模糊搜索用 `LIKE CONCAT('%', #{query}, '%')`，百分号在 SQL 里加、不在 Java 里拼，这样用户输入里的 `%` 和 `_` 不会变成通配符。
+
+真需要动态排序列时，白名单是唯一那道门：
 
 ```java
 private static final Set<String> SORTABLE = Set.of("created_at", "title", "id");
 
-if (!SORTABLE.contains(sortColumn)) {
-    throw new IllegalArgumentException("不允许的排序列: " + sortColumn);
-}
+String column = SORTABLE.contains(sort) ? sort : "id";
 ```
 
-**没有这层白名单，就不要写 `${}`。** 本项目这条纪律是硬的：`rg '\$\{' ` 在 mapper 目录里出现的每一处都必须能指到一段白名单校验。
-
-### 手写一遍映射（含反射填值）
-
-MyBatis 干的第二件事是"把一行 Map 填进对象"。手写版只需要反射：
-
-```text
-读方法的返回类型 → 创建实例 → 对每一列，找同名（或转驼峰后同名）的 setter/字段 → 填值
-```
-
-这一段代码比较长，这里只列关键几步（真实实现还要处理泛型、嵌套、类型转换，那属于框架的活）：
-
-```java
-static Object fill(Class<?> type, Map<String, Object> row) throws ReflectiveOperationException {
-    Object instance = type.getDeclaredConstructor().newInstance();
-    for (Map.Entry<String, Object> entry : row.entrySet()) {
-        String property = toCamel(entry.getKey());          // created_at → createdAt
-        Field field = type.getDeclaredField(property);
-        field.setAccessible(true);
-        field.set(instance, convert(entry.getValue(), field.getType()));
-    }
-    return instance;
-}
-```
-
-`toCamel` 与 `convert` 是这层真正的难点：
-
-- **列名与字段名不一致**：`created_at` 与 `createdAt`。MyBatis 的开箱配置是"不自动转"，需要 `map-underscore-to-camel-case: true`。
-- **类型不一致**：MySQL 的 `TINYINT(1)` 读出来是 `Byte`，字段是 `boolean`；`DATETIME` 读出来可能是 `LocalDateTime` 也可能是 `Timestamp`。这些转换散落在框架里，是很多"字段莫名是 0 或 false"的来源。
-
-所以本项目**坚持手写 MyBatis、禁 MyBatis-Plus**，理由不是怀旧：
-
-| | 手写 MyBatis | MyBatis-Plus |
-| --- | --- | --- |
-| SQL 在哪 | 全部在 mapper 里，可审查 | 大量由框架动态生成 |
-| 慢查询定位 | 直接看 SQL | 要看生成的 SQL，还得拼参数 |
-| 行为可预测 | 你写什么就是什么 | 内置方法与你的预期有偏差（如 `updateById` 忽略 null） |
-| 依赖 | 一个 | 一个 + 更频繁的破坏性升级 |
-
-**核心是"SQL 必须能被人读一遍"。** 动态生成的 SQL 让人无法审查注入风险与索引命中。
-
-### 一个查询的完整链路
-
-```text
-Service 调 mapper.findById(42)
-  → 代理：取方法上的 SQL
-  → 把 #{id} 替换成 ?，参数列表 [42]
-  → 从当前事务拿连接（没有事务就借一个，用完还）
-  → prepareStatement → bind → executeQuery
-  → 用返回类型 Book 反射建实例 → 按列名填值
-  → 返回 Book
-```
-
-第 4 步是关键：**mapper 拿到的连接来自当前事务**。这就是为什么 `@Transactional` 加在 Service 上，mapper 的多次调用才在同一个事务里。
+mapper 里还是 `${column} DESC`，但进到 SQL 里的只可能是 `SORTABLE` 里的三个字符串之一。排序方向同理，别把请求里的 `DESC` / `ASC` 原样拼进去。
 
 ## 动手
 
@@ -252,7 +304,7 @@ Service 调 mapper.findById(42)
   "title": "排序参数直接拼进 SQL",
   "code": "@Mapper\npublic interface BookMapper {\n\n    @Select(\"SELECT id, title FROM book ORDER BY ${sortColumn} DESC\")\n    List<Book> list(@Param(\"sortColumn\") String sortColumn);\n}\n\nclass BookController {\n    private final BookMapper mapper;\n\n    @GetMapping(\"/books\")\n    List<Book> list(@RequestParam(\"sort\") String sort) {\n        return mapper.list(sort);\n    }\n}",
   "bugLine": 4,
-  "explain": "第 4 行用了 `${sortColumn}`，而它的值直接来自请求参数——用户可以把 `sortColumn` 传成 `id; DROP TABLE book` 之类的内容。列名确实不能用 `#{}`，所以正确做法是**保留 `${}` 但加白名单校验**：在 Controller 或 Service 里先确认 `sort` 属于允许排序的列集合（如 `created_at` / `title` / `id`），不在就抛 400。不加白名单就不要用 `${}`。"
+  "explain": "第 4 行把 `${sortColumn}` 接在 `ORDER BY` 上，而它的值直接从 `@RequestParam` 进来，等于把请求参数接到了 SQL 文本里。列名不能用 `#{}`——上面实测会抛 `NumberFormatException`——所以正确做法是保留 `${}` 但加白名单：先确认 `sort` 在允许排序的列集合里，不在就用默认列或抛 400；排序方向也别从请求里原样拼。"
 }
 ```
 
@@ -266,49 +318,31 @@ Service 调 mapper.findById(42)
   "title": "映射三问",
   "questions": [
     {
-      "question": "mapper 接口没有实现类，注入进来的是什么？",
-      "options": ["一个空对象", "运行时生成的动态代理", "编译期生成的子类"],
-      "answer": 1,
-      "explain": "和 AOP 同一套机制：JDK 动态代理，处理器读 SQL、绑参数、反射填值。"
+      "question": "什么情况下 `#{}` 用不了？",
+      "options": ["任何情况下都能用", "参数是字符串的时候", "要替换列名、表名或排序键的时候"],
+      "answer": 2,
+      "explain": "占位符只能落在「值」的位置。标识符必须拼进 SQL 文本，所以只能用 `${}`，代价是自己加白名单。"
     },
     {
-      "question": "${} 在什么情况下必须用？",
-      "options": ["所有字符串参数", "替换列名、表名这类标识符时", "任何情况都不该用"],
-      "answer": 1,
-      "explain": "PreparedStatement 占位符只能替换值。标识符只能用拼接，但必须配白名单。"
+      "question": "`findAll()` 拿回来的对象里只有 `createdAt` 是 null，SQL 日志里 `created_at` 明明查出来了。先查什么？",
+      "options": ["下划线转驼峰开关，以及列名和字段名对不对得上", "TINYINT 转 boolean 坏了", "把 SQL 改成 SELECT *"],
+      "answer": 0,
+      "explain": "自动映射对不上的列是静默跳过的，字段停在 Java 默认值。类型转换本身没问题：开关打开后 `t_count` 的 1/0 正确变成了 true/false。"
     },
     {
-      "question": "本项目禁用 MyBatis-Plus 的核心理由是？",
-      "options": ["性能差", "SQL 大量由框架生成，无法审查注入风险与索引命中", "不兼容 Spring"],
+      "question": "mapper 接口没有实现类，注入进来的那个代理是谁造的？",
+      "options": ["Spring 的 AOP 自动代理", "MyBatis 的 MapperFactoryBean 在注册 bean 时造的 JDK 动态代理", "编译期的注解处理器"],
       "answer": 1,
-      "explain": "手写 MyBatis 让每条 SQL 都能被人读一遍。这是可审查性，不是偏好。"
+      "explain": "处理器是 `org.apache.ibatis.binding.MapperProxy`。它和 `@Transactional` 的代理只是都用了 JDK 动态代理，来路不一样。"
     }
   ]
 }
 ```
 
-## 常见误区
+## 还差的
 
-### 误区：`#{}` 和 `${}` 都是占位符，效果一样
-
-**你以为**：随便用，反正都能跑。
-**其实**：`#{}` 走 `PreparedStatement` 的参数绑定，值不参与语法；`${}` 是字符串拼接，值成为语法。一个注入漏洞就从这个字符的差别长出来。
-**怎么验证**：把一个字符串参数写成 `${}`，传 `x' OR '1'='1`，看返回是不是全部数据。
-
-### 误区：动态 SQL 更灵活，所以能少写很多接口
-
-**你以为**：一个 mapper 方法配 `<if>` 就能覆盖所有查询场景。
-**其实**：每加一个分支，SQL 的可审查性就下降一档——你无法从代码里直接看出最终会执行什么。真正需要动态条件时，宁可有三个明确的方法。
-**怎么验证**：看一个带 5 个 `<if>` 的查询，试着回答"排序字段会不会走索引"。答不出来就是复杂度已经超了。
-
-### 误区：字段名与列名不一致时，MyBatis 会自动处理
-
-**你以为**：`created_at` 会自己映射到 `createdAt`。
-**其实**：默认不会。要么开 `map-underscore-to-camel-case: true`，要么在 SQL 里写别名。默认不开的表现是"对象里字段全是 null，但 SQL 明明查出了数据"。
-**怎么验证**：故意用一个下划线列名，不加配置，看结果对象是否为空。
-
-## 小结
-
-mapper 接口没有实现类，靠的是动态代理；代理读 SQL、绑参数、反射填值。`#{}` 是安全的参数绑定，`${}` 是直接拼接，只能用于标识符且必须配白名单。本项目坚持手写 MyBatis、禁 MyBatis-Plus，核心是"每条 SQL 都能被人读一遍"。
-
-下一章只剩两课：测试怎么写得快，以及打出来的 jar 为什么起不来。
+- 只在 H2 2.4.240 上验过。`ORDER BY #{}` 在 MySQL 上是抛异常还是静默当常量排序（等于不生效），我没验证；能确定的只是两种结果都不会按你传的列名排。
+- `t_count` 的 TINYINT → boolean 是 H2 的转换行为。MySQL 的 `TINYINT(1)` 通过 JDBC 拿到什么类型、能不能直接填 `boolean`，我这里没有实例可测，不写结论。
+- 注入只试了两个 payload。带 `;` 的多语句在默认连接参数下能不能执行，取决于驱动和数据库，我没验，正文也就没说。
+- 手写那版只覆盖一层的简单字段。嵌套对象、`association` / `collection`、泛型返回类型全跳过了，那是框架真正长肉的地方。
+- `autoMappingUnknownColumnBehavior` 我只观察到「静默」，没把它改成 `WARNING` / `FAILING` 确认会不会报，也没确认 Boot 默认日志级别下打不打得出来。
