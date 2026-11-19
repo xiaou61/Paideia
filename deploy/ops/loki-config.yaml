@@ -41,6 +41,10 @@ limits_config:
   reject_old_samples: true
   reject_old_samples_max_age: 168h
   max_query_lookback: 720h
+  # 模板的指标聚合开关在 limits 里，不在 pattern_ingester.metric_aggregation 下（3.7.9）。
+  # 显式写出来，避免默认值随版本变化时静默关掉 loki_patterns_* 指标。
+  metric_aggregation_enabled: true
+  pattern_persistence_enabled: true
 
 compactor:
   working_directory: /var/lib/loki/compactor
@@ -50,14 +54,12 @@ compactor:
 
 # 日志模板（pattern ingester，WORK-085）。
 # 用 Loki 内建的 Drain 聚类，把几十万行压成「模板 + 频次」，不再让模型直读原始日志。
-# 单机 monolithic 仅靠本段开启；metric_aggregation 的 enabled 默认 false，必须显式打开，
-# 否则日志模板不会写进 loki_patterns_* 指标（配置开关陷阱，见 WORK-085 设计 §5.5）。
+# 3.7.9 的 aggregation.Config 只有 sample_period/loki_address/push_period/timeout 等字段，
+# 没有 enabled，也没有 downsample_period（flag 名才是 -downsample-period）。
 pattern_ingester:
   enabled: true
   metric_aggregation:
-    enabled: true
     loki_address: 127.0.0.1:3100
-    downsample_period: 10s
 
 analytics:
   reporting_enabled: false
