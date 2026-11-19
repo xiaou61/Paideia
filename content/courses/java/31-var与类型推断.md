@@ -101,7 +101,9 @@ error: cannot infer type for local variable x
   (variable initializer is 'null')
 ```
 
-`null` 不属于任何类型，什么都能赋给 `null`，所以没有唯一答案。写 `String x = null;`。
+`null` 有自己特殊的 null 类型，能赋给任何**引用**类型（`String`、`List`、你自己写的类），但不能赋给 `int`、`double` 这些基本类型——`int x = null;` 一样编译不过。
+
+正因为「能赋给任何引用类型」，它没有唯一答案，`var` 拒绝猜。写 `String x = null;` 或 `List<String> y = null;`。
 
 **二、右边是数组初始化：**
 
@@ -121,7 +123,9 @@ error: cannot infer type for local variable f
 
 lambda 没有独立类型，它必须"目标化"成某个函数式接口。写 `var f = (Supplier<Integer>) () -> 1;` 或者直接 `Supplier<Integer> f = () -> 1;`。
 
-顺带一条：`var x;`（不初始化）也编译不过，报的是 `cannot use 'var' on variable without initializer`。三个报错的共同点就是那句老话——**var 需要右边先有类型**。
+顺带一条：`var x;`（不初始化）也编译不过，报的是 `cannot use 'var' on variable without initializer`。这是第四种，不在上面三类里——它不是「推断不出来」，而是**根本没有可推断的表达式**。
+
+四条的共同点就是那句老话：**var 需要右边先有类型**。
 
 ## 一个安静得多、更容易漏的坑
 
@@ -132,7 +136,9 @@ var x = true ? 1 : 2.5;      // 你想的是 int，得到的是 double
 int r = x;                    // error: possible lossy conversion from double to int
 ```
 
-实际运行会打印 `Double 1.0`：`1` 与 `2.5` 在同一个三元表达式里，`1` 被提升成 `1.0`，整体类型是 `double`。写显式类型 `int x = ...` 时编译器当场就报错，用了 `var` 它反而放行到下一句才炸——**报错位置离原因更远了**。
+`1` 与 `2.5` 在同一个三元表达式里，`1` 被提升成 `1.0`，整体类型是**基本类型 `double`**（不是 `Double`）。
+
+所以：`System.out.println(x)` 打印 `1.0`；`x.getClass()` 会报 `error: double cannot be dereferenced`——基本类型没有方法可调。写显式类型 `int x = true ? 1 : 2.5;` 时编译器当场就报错，用了 `var` 它反而放行到下一句才炸——**报错位置离原因更远**。
 
 同类还有菱形退化：
 
@@ -142,7 +148,16 @@ list.add("a");
 String s = list.get(0);         // error: incompatible types: Object cannot be converted to String
 ```
 
-`<>` 也需要目标类型，`var` 给不了，于是退化成 `Object`。写 `new ArrayList<String>()` 或 `List.<String>of()`。
+菱形需要目标类型，`var` 给不了，于是退化成 `Object`。
+
+注意这里有个前提：**只有无参的裸菱形 `new ArrayList<>()` 才退化成 `Object`**。如果构造器参数本身带了类型，一样能推断：
+
+```java
+var list = new ArrayList<>(List.of("a"));   // 推断成 ArrayList<String>
+String s = list.get(0);                     // "a"
+```
+
+要修上面那个坑，写 `new ArrayList<String>()`。别把 `List.<String>of()` 当等价替代——`List.of()` 返回的是**不可变**列表，`list.add(...)` 会抛 `UnsupportedOperationException`；想可变就 `new ArrayList<>(List.of("a"))`，只读才用 `List.of`。
 
 ## 什么时候用，什么时候别用
 
@@ -151,6 +166,7 @@ String s = list.get(0);         // error: incompatible types: Object cannot be c
 ```java
 var users = new ArrayList<User>();                // 右边写了 User
 var entry = map.entrySet().iterator().next();
+// 片段：Files.newBufferedReader 会抛 IOException，main 里要先 throws 或 try
 var reader = Files.newBufferedReader(path);
 ```
 
@@ -222,6 +238,6 @@ var data = list.get(0);                           // User 还是 String？
 
 `var` 是局部变量的类型推断：必须初始化、右边不能是 `null`、不能是裸数组初始化或裸 lambda、不能用于字段和参数（lambda 参数是特例）。推断结果仍是静态类型。
 
-判断标准是"只看这一行能不能知道类型"。三元表达式与菱形这两个地方，`var` 会把编译错误推远，遇到数字运算时优先写显式类型。
+判断标准是"只看这一行能不能知道类型"。三元表达式与裸菱形这两个地方，`var` 会把编译错误推到下一句才报——**混合类型的三元表达式、`int` 与 `double` 混算得出你不想要的结果时，写显式类型**。普通加减法（`var total = 0;`）不受影响，那是本课自己的示例。
 
 下一课：文本块——把 JSON、SQL 原样写进代码。
