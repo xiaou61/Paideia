@@ -198,7 +198,9 @@ public class EssayCollectionService {
                         KnowledgeApi.CreateOutcome outcome = knowledge.createCollected(
                                 new KnowledgeApi.CollectedEntry(
                                         question.title(),
-                                        render(question, post),
+                                        EssayBodyRenderer.render(
+                                                question.title(), question.answer(),
+                                                post.url(), post.title()),
                                         categoryId,
                                         properties.isPublishDirectly() ? "published" : "draft",
                                         fingerprint,
@@ -249,26 +251,6 @@ public class EssayCollectionService {
                 .distinct()
                 .reduce((left, right) -> left + "," + right)
                 .orElse("");
-    }
-
-    /**
-     * 组装入库正文：题目 + 我们的解析 + 来源链接。
-     *
-     * <p>**不放帖子原文**：面经正文里有公司名、薪资、个人经历，逐字入库既是转载也不适合做学习内容。
-     */
-    private static String render(EssayExtractionPrompt.ExtractedQuestion question, FetchedPost post) {
-        return "## " + question.title() + "\n\n"
-                + question.answer() + "\n\n"
-                + "---\n\n"
-                + "> 题目来源：[" + safeTitle(post.title()) + "](" + post.url() + ")\n";
-    }
-
-    private static String safeTitle(String title) {
-        if (title == null || title.isBlank()) {
-            return "原帖";
-        }
-        // 标题里若有方括号会把 markdown 链接语法弄坏
-        return title.replace("[", "(").replace("]", ")");
     }
 
     /**
