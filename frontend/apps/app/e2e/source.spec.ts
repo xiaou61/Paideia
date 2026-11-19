@@ -56,9 +56,12 @@ test.describe('核心源码解析', () => {
     await expect(page.getByTestId('source-walk')).toBeVisible({ timeout: 15_000 })
 
     const steps = page.getByTestId('source-walk-step')
-    await expect(steps.filter({ hasText: 'BATCH' })).toHaveCount(0)
+    // 只盯「BATCH 才出现」的那一步（标题里带 CachingExecutor(BatchExecutor)）。
+    // 不能拿 'BATCH' 当锚点：第 8 步「BATCH 查询先 flush」本来就常驻可见。
+    const batchOnly = steps.filter({ hasText: 'CachingExecutor(BatchExecutor)' })
+    await expect(batchOnly).toHaveCount(0)
     await page.getByTestId('source-walk-control-executor').selectOption('BATCH')
-    await expect(steps.filter({ hasText: 'BATCH' })).toHaveCount(1)
+    await expect(batchOnly).toHaveCount(1)
   })
 
   test('答完小测后「已读完」写进服务端，换一个浏览器上下文仍然在', async ({ page, browser }) => {

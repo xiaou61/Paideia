@@ -192,29 +192,22 @@ export function SourceProjectPage() {
                 <Link
                   to={`/source/${slug}/${chapter.id}`}
                   data-testid={`source-chapter-${chapter.id}`}
-                  className="hover:bg-muted/40 focus-ring group flex items-center gap-4 px-4 py-4 transition-colors"
+                  className="hover:bg-muted/40 focus-ring group flex items-start gap-4 px-4 py-4 transition-colors"
                 >
                   <span className="text-muted-foreground w-8 shrink-0 text-right font-mono text-sm tabular-nums">
                     {typeof chapter.sortOrder === 'number' ? chapter.sortOrder + 1 : '·'}
                   </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2">
-                      <span className="group-hover:text-primary min-w-0 truncate transition-colors">
-                        {chapter.title}
-                      </span>
-                      {passed.has(chapter.id) ? (
-                        <span className="text-success flex shrink-0 items-center gap-1 text-xs">
-                          <CheckCircle2 className="size-3.5" />
-                          已读完
-                        </span>
-                      ) : null}
-                    </span>
-                    {chapter.excerpt === null ? null : (
-                      <span className="text-muted-foreground mt-1 line-clamp-1 block text-sm">
-                        {plainText(chapter.excerpt)}
-                      </span>
-                    )}
+                  {/* 不放摘要：每篇正文都以「版本：…；行号核对日期 …」开头（版本标注的规矩），
+                      而条目摘要会把这段连同代码围栏一起截出来，24 关看着全一样。标题已经够认。 */}
+                  <span className="group-hover:text-primary min-w-0 flex-1 truncate transition-colors">
+                    {chapter.title}
                   </span>
+                  {passed.has(chapter.id) ? (
+                    <span className="text-success flex shrink-0 items-center gap-1 text-xs">
+                      <CheckCircle2 className="size-3.5" />
+                      已读完
+                    </span>
+                  ) : null}
                   <ChevronRight className="text-muted-foreground group-hover:text-foreground size-4 shrink-0 transition-colors" />
                 </Link>
               </li>

@@ -92,13 +92,6 @@ export function SourceProjectsPage() {
       <PageHeader
         title="核心源码解析"
         description="把真实项目的源码钉在某个版本上，一关只讲一个机制：左边是原文行号，右边是流程图，点流程回到代码。"
-        actions={
-          total === 0 ? undefined : (
-            <span className="text-muted-foreground hidden text-sm sm:inline">
-              {projects.length} 个项目 · {total} 关
-            </span>
-          )
-        }
       />
 
       {/* 没有 `source` 根分类时 `entries` 被禁用，而被禁用的 query 永远停在 isPending——
@@ -127,10 +120,10 @@ export function SourceProjectsPage() {
         </Empty>
       ) : null}
 
-      {doneTotal > 0 ? (
-        <div className="mb-6 flex items-center gap-3" data-testid="source-summary">
+      {total > 0 ? (
+        <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2" data-testid="source-summary">
           <div
-            className="bg-muted h-1.5 w-40 overflow-hidden rounded-full"
+            className="bg-muted h-1.5 w-full max-w-2xl flex-1 overflow-hidden rounded-full"
             role="progressbar"
             aria-valuemin={0}
             aria-valuemax={total}
@@ -142,7 +135,12 @@ export function SourceProjectsPage() {
               style={{ width: `${Math.round((doneTotal / total) * 100)}%` }}
             />
           </div>
-          <span className="text-muted-foreground text-xs">已读 {doneTotal} / {total} 关</span>
+          <span className="text-muted-foreground text-xs tabular-nums">
+            已读 {doneTotal} / {total} 关
+          </span>
+          <Badge variant="secondary" className="shrink-0">
+            {projects.length} 个项目
+          </Badge>
         </div>
       ) : null}
 
