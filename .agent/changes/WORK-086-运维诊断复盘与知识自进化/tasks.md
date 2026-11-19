@@ -136,7 +136,7 @@ approver_role:
 - 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-ops -Dtest=OpsDiagnosisMailerTest test` → 期望 0 failures
 - 完成（2026-11-19）：`OpsDiagnosisMailer.compose(String[] recipients, long diagnosisId, String alertName, String reportMd, List<String> traceIds, String baseUrl)` 把「组装」与「发送」拆开——`sendDiagnosis(...)` 只负责开关判断、收件人解析、`send()` 与 warn。`MimeMessageHelper(message, true, "UTF-8")`，纯文本始终保留，`mail.isHtmlEnabled()` 时才 `setText(plain, html)`；`diagnosisId > 0` 且报告非空才挂 `diagnosis-<id>.md`（`text/markdown; charset=UTF-8`）。`OpsDiagnosisService.run` 改传 `id`。实施与计划的差异：① 计划里的 `#attachment_failure_keeps_body`（附件超限回退）**未实现**：附件是内存字节数组、没有 100KB 上限这个机制，为它造一个人为限制再测它没有意义；改为 `#composeSkipsAttachmentWithoutId`（无 id 不挂附件）与 `#composeWithoutHtmlKeepsPlainAndAttachment`（关 HTML 不影响附件与纯文本）。② `compose` 末尾必须 `message.saveChanges()`：不物化就只拿到未落头的 TextSource，`getContentType()` 全报 `text/plain`，测试与真实排查都会被误导。③ 附件内容按 `InputStream` 读（测试里 `Part.getContent()` 返回 `ByteArrayInputStream`，直接 `String.valueOf` 只会得到对象地址）。测试 `OpsDiagnosisMailerTest` 3 例全绿；`paideia-ops` 整模块 62 例 SUCCESS。
 
-### TASK-007 | pending | 复盘表与诊断关联列
+### TASK-007 | done | 复盘表与诊断关联列
 
 - 对应：`REQ-006`、`AC-006`
 - 依赖：无
@@ -149,8 +149,9 @@ approver_role:
   3. 起一次测试库跑迁移三件：`MigrationVersionFormatTest`、`MigrationChecksumTest`、`MigrationSeedOverlapTest`。
   4. 在测试库执行 `SHOW CREATE TABLE ops_postmortems` 人工确认 FULLTEXT 与字符集。
 - 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest='MigrationVersionFormatTest,MigrationChecksumTest,MigrationSeedOverlapTest' -Dsurefire.failIfNoSpecifiedTests=false test` → 期望 0 failures
+- 完成（2026-11-19）：`V20261119160000__create_ops_postmortems.sql` 与 `V20261119160100__ops_diagnoses_knowledge.sql` 落地；`ops_postmortems` 含 `origin VARCHAR(16) NOT NULL DEFAULT 'manual'`、`FULLTEXT ft_ops_pm_body (title, root_cause, body_md) WITH PARSER ngram`、`utf8mb4_0900_ai_ci`，索引两条（`idx_ops_pm_incident`、`idx_ops_pm_status(status, updated_at)`）。`MigrationChecksumTest.newMigrationsAreRecorded` 要求新迁移登记校验和，用 `-Dmigration.checksums.update=true` 重跑一次，`backend/paideia-app/src/test/resources/migration-checksums.txt` 只增两行（634088730、507405275）。迁移三件 8 例 0 failures。
 
-### TASK-008 | pending | 复盘状态机与草稿生成
+### TASK-008 | done | 复盘状态机与草稿生成
 
 - 对应：`REQ-006`、`REQ-009`、`AC-006`
 - 依赖：TASK-007
@@ -168,6 +169,7 @@ approver_role:
   1. 写三条失败测试（审批归档前一份、`password=abc123` 落库为 `<redacted>`、草稿含三节），确认红。
   2. 实现 Mapper + Service，跑至绿。
 - 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-ops -Dtest=PostmortemServiceTest test` → 期望 0 failures
+- 完成（2026-11-19）：`PostmortemRow`（状态与来源常量）、`PostmortemMapper`（状态推进全用带条件的 UPDATE，避免并发确认把归档行拉回 APPROVED）、`PostmortemService` 落地。草稿只搬运不判断：`section(report, "可能原因")` → 根因、`section(report, "建议动作")` → 处置、事件表 → 时间线（无事件时退化为"诊断发起/完成"两条），`body_md` 按「根因 → 影响 → 时间线 → 处置 → 证据」固定顺序渲染，空章节整节省略。`update` 对 APPROVED 的行退回 DRAFT 并清掉审批人；`approve` 成功后把同 incident 旧 APPROVED 置 ARCHIVED。脱敏新增 `OpsLogRedactor.redactDocument(text)`：同一组模式但**不做 500 字符单行截断**（复盘正文是文档，截断会砍掉整段根因）。实施与计划的差异：① 替换标记沿用既有 `***` 而不是计划写的 `<redacted>`，与日志脱敏保持同一口径；② `createDraft` 对外是两个参数，第三参数 `origin` 收成私有重载，`createDraftIfAbsent` 才传 `auto`；③ `get` 返回的 record 命名为 `PostmortemDetail`。测试 `PostmortemServiceTest` 11 例全绿（起草搬运、未完成诊断拒绝、自动起草去重与建草稿、编辑退回草稿、口令脱敏、归档不可编辑、确认后退役旧版、重复确认冲突、章节提取、空章节省略）。
 
 ### TASK-009 | pending | 复盘管理接口与访问控制
 

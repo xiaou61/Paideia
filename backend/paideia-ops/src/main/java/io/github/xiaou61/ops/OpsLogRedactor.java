@@ -85,4 +85,21 @@ final class OpsLogRedactor {
         }
         return out.toString();
     }
+
+    /**
+     * 文档正文的脱敏：与 {@link #redact(String)} 同一组模式，但**不做 500 字符截断**。
+     *
+     * <p>日志行截断只是少给几行上下文；复盘正文是给人读、也会进知识库的文档，一刀切在 500 字符
+     * 会把一整段根因砍掉。脱敏本身照旧——认错一个词的代价远小于漏掉一个令牌。
+     */
+    static String redactDocument(String text) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        String redacted = CONTROL.matcher(text).replaceAll(" ");
+        for (Pattern pattern : List.of(AUTH_SCHEME, JWT, ASSIGNMENT, EMAIL, LONG_HEX)) {
+            redacted = pattern.matcher(redacted).replaceAll("***");
+        }
+        return redacted;
+    }
 }
