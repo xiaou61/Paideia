@@ -2,25 +2,51 @@
 title: TCP 为什么需要三次握手
 category: network-basics
 order: 4
-minutes: 24
+minutes: 18
 level: intermediate
 status: published
 ---
 
-## 一句话版本
+## 同一台机器，两个端口，两种失败
 
-三次握手要解决的不是"确认对方在线"，而是**双方各自确认两件事：对方的收、对方的发都正常，并且双方对初始序号达成了一致**。
+先跑两条，目标是我手边这台网关的同一个地址，按常见的 443/80 组合各跑一条。下面用 `https://` 连 443、`http://` 连 80，和题目里的命令形状一致；TCP 连接先发生，443 这条在 TLS 开始前就已经失败了。
 
-打个比方，三次握手像两个人隔着马路喊话：我喊一声"你能听见吗"，你回"听见了，我也能听见你"，我再回"好，我也听见你了"。少一句，就有人不确定自己有没有被听见。落到协议上，这三句就是双方交换初始序号、并各自确认收到了对方的序号。
+```text
+$ curl.exe -sS -v --connect-timeout 3 -o NUL https://192.168.8.1:443/
+*   Trying 192.168.8.1:443...
+* connect to 192.168.8.1 port 443 failed: Connection refused
+* Failed to connect to 192.168.8.1 port 443 after 2051 ms: Couldn't connect to server
+* Closing connection 0
+curl: (7) Failed to connect to 192.168.8.1 port 443 after 2051 ms: Couldn't connect to server
+
+$ curl.exe -sS -v --connect-timeout 3 -o NUL http://192.168.8.1:80/
+*   Trying 192.168.8.1:80...
+* ipv4 connect timeout after 3000ms, move on!
+* Failed to connect to 192.168.8.1 port 80 after 3013 ms: Timeout was reached
+* Closing connection 0
+curl: (28) Failed to connect to 192.168.8.1 port 80 after 3013 ms: Timeout was reached
+```
+
+第一条在 2051 毫秒后回了 `Connection refused`；第二条等到 3013 毫秒的 `--connect-timeout` 才放弃。一个有人回了 RST，一个没有回音。
+
+题目里常见的组合是 443 超时、80 拒绝（`https://host:443` 等到超时，`http://host:80` 很快回 RST）；我先按这个顺序试，结果在这台网关上正好相反——下面是我实际跑到的反例。这个反转就是第一件事：**端口号不决定报错，谁回 RST 才决定。** 换一台机器，顺序可能又反过来；判断方法一样，不要背端口。
+
+`Connection refused` 可能是：目标端口没有程序监听，目标 TCP 栈回 RST；也可能是防火墙或负载均衡按策略回 RST；还可能是本机代理或协议栈在连接前就拒绝。它说明有人回了拒绝（RST），不证明「包到了应用」。
+
+`Timeout was reached` 可能是：SYN 被本机防火墙、云安全组静默丢弃，路由黑洞，服务端半连接队列满后丢 SYN，或者目标关机。它只说明「没收到回音」，不证明「服务器死了」。
+
+三次握手就是在这个分岔口上开始的：客户端发 SYN，等 SYN+ACK；收到就回 ACK，收不到就按计时器重传。
+
+## 三个段各自证明了什么
 
 ```sketch
 {
-  "title": "三次握手：各确认一次收发，并对齐序号",
+  "title": "三个段：第二个段同时确认并发送",
   "rows": [
     [
-      { "id": "syn", "title": "SYN", "sub": "我的序号从 x 开始", "tone": "blue" },
-      { "id": "synack", "title": "SYN + ACK", "sub": "收到 x，我的从 y 开始", "tone": "blue" },
-      { "id": "ack", "title": "ACK", "sub": "收到 y，连接建立", "tone": "green" }
+      { "id": "syn", "title": "SYN", "sub": "seq=x，ACK 位=0", "tone": "blue" },
+      { "id": "synack", "title": "SYN+ACK", "sub": "ACK 位=1，ack=x+1，seq=y", "tone": "blue" },
+      { "id": "ack", "title": "ACK", "sub": "ACK 位=1，ack=y+1，可捎带数据", "tone": "green" }
     ]
   ],
   "arrows": [
@@ -30,128 +56,200 @@ status: published
 }
 ```
 
-两次做不到，因为第二次只能让一方确认双向，另一方还缺一半信息。
-
-## 先把"序号"这件事摆到前面
-
-很多人以为握手是"打个招呼、确认连接"，于是觉得两次够了。真正的核心是**初始序号**（ISN）。
-
-TCP 是可靠传输：每个字节都有编号，收到就回 ACK 说"第 N 号及之前的都收到了"。所以连接一开始，双方必须知道对方的起始编号是多少——否则你不知道该确认到哪个位置。
-
-而且这个起编号不能随便定。如果每次都从 0 开始，那么上一轮连接里**还在网络中游荡的旧包**就可能被当成这一轮的数据。这类包叫"残留包"，它在网络里可能活几分钟。起编号取一个随时间递增的随机值，残留包落在窗口外的概率就极低。
-
-于是握手的真实目的变成了：**交换双方的初始序号，并确认对方收到了我的。**
-
-## 三个包，各自证明什么
-
-```
-客户端                        服务端
-   |  SYN, seq=x           →   |
-   |                            |  收到：客户端能发；它的起点是 x
-   |  ←  SYN, seq=y, ack=x+1    |  回：我也能发（y），我收到了你的 x
-   |  ACK, seq=x+1, ack=y+1 →   |  收到：服务端能发；我收到了你的 y
-   |                            |  双方都确认：收、发都通，起点一致
+```text
+客户端                                服务端
+  |  SYN, seq=x, ACK 标志=0            →  |  客户端能发；我的 ISN 是 x
+  |  ←  SYN+ACK, seq=y, ack=x+1, ACK 标志=1 |  服务端能发；收到了 x
+  |  ACK, seq=x+1, ack=y+1, ACK 标志=1 →  |  收到了 y；客户端已 ESTABLISHED
 ```
 
-逐条看：
+第二段是 `SYN+ACK`，不是单独的 `SYN`：`ACK` 标志位是 1，表示确认号有效；`ack=x+1` 是对客户端 SYN 的确认；`seq=y` 是服务端自己的 SYN。一个段干了两件事。这里的 `ACK=1` 是控制位，不是确认号 1。
 
-1. **SYN(x)**：客户端说"我想连接，我的起点是 x"。此时服务端只知道一件事——客户端**能发**。
-2. **SYN+ACK(y, x+1)**：服务端说"我同意，我的起点是 y，你那个 x 我收到了"。此时客户端能确认两件事——自己发的对方收到了、对方也能发。但服务端自己还不知道它的 y 有没有被收到。
-3. **ACK(x+1, y+1)**：客户端说"你的 y 我也收到了"。到此服务端才确认它的发也通。
+| 段 | 发送时状态 | 对方由此知道 |
+| --- | --- | --- |
+| 1. SYN(x) | 客户端 SYN-SENT | 客户端能发；客户端的 ISN 是 x |
+| 2. SYN+ACK(y, x+1) | 服务端 SYN-RECEIVED | 服务端能收能发，且收到了 x；服务端自己的 ISN 是 y，但还不知道 y 有没有被收到 |
+| 3. ACK(y+1) | 客户端 ESTABLISHED | 客户端收到了 y；服务端收到后进入 ESTABLISHED |
 
-**少了第三步，服务端手上是"半开"的**：它知道对方能发，但不知道自己发的对方能不能收到，也不知道自己的序号有没有被采纳。
+为什么不是两次：第二次之后，客户端已经能确认服务端收到了自己的 SYN，也收到了服务端的 SYN；但服务端还不知道自己的 SYN+ACK 有没有到达客户端。它如果这时就开始发数据，而 SYN+ACK 丢了，客户端还在 SYN-SENT，不会把数据当成已建立连接的一部分。第三个 ACK 是给服务端的「我收到了你的 y」。RFC 9293 还把「防止旧的重复连接请求造成混淆」列为三次握手的主要原因：迟到的旧 SYN 可能让服务端回 SYN+ACK，但客户端不在 SYN-SENT，会用 RST 或 challenge ACK 拒掉，不会建立一条假连接。
 
-## 为什么不能用两次，而用四次又多余
+为什么三次是最小：如果每个方向都单独发 SYN、单独回 ACK，是四段：客户端 SYN → 服务端 ACK → 服务端 SYN → 客户端 ACK。TCP 把中间两个合成 `SYN+ACK`，所以是三个。**省下的是第二段的合并，不是第三步捎带数据。** 第三步捎带数据是额外优化：客户端发完 ACK 已经 ESTABLISHED，可以把请求数据放在同一个段里；这只省下一个单独的段，不是省下一个往返。
 
-两次的问题已经说清：第二次只能让客户端确认双向，服务端缺"我的序号被收到"这一条。
+两端不是同一时刻连上：客户端发出第三个 ACK 就 ESTABLISHED；服务端收到它（或收到带 ACK 的数据）才 ESTABLISHED。忽略处理时间，客户端是 1 个 RTT，服务端是 1.5 个 RTT。
 
-四次当然也能工作，但第三步和第四步可以合并——客户端收到 SYN+ACK 后要发 ACK，这个 ACK 可以**顺手带上业务数据**（如果有的话），不需要再单独走一个来回。所以最小是三次。
+把它想成隔街喊话也行：三次里有一次是「我听见你了，我也报一下我的名字」。但喊话只能解释为什么要回音，解释不了序号、ACK 和重传。
 
-顺便纠正一个常见误解：**第三次 ACK 不是"等它到了才连上"**。在客户端发出第三次 ACK 的瞬间，客户端就认为连接已建立，可以开始发数据；服务端则要等到收到这个 ACK（或直接收到数据）才认为建立。所以真实抓包里，客户端可能紧跟着就发 HTTP 请求了。
+## 初始序号：两边各选各的，不是一个数
 
-## 半连接队列：第三次没到会怎样
+握手不是让两端把初始序号对成一个数。客户端选 x，服务端选 y；两个数由两端各自选，不需要相同，也可能碰巧相同。握手要做的是：每一方都拿到对方的 ISN，并回一个确认。RFC 9293 图 6 的例子就是 x=100、y=300：第二个段是 `SEQ=300, ACK=101, SYN,ACK`，第三个段是 `SEQ=101, ACK=301, ACK`。
 
-服务端收到 SYN、回了 SYN+ACK，但第三次 ACK 一直没来。这时连接在服务端处于一个中间状态（SYN_RECV），占着一个队列位置。
+ISN 不是纯随机。RFC 6528 的公式是 `ISN = M + F(localip, localport, remoteip, remoteport, secretkey)`：M 是一个大约每 4 微秒加一的时钟，F 是带密钥的伪随机函数。它把四元组和密钥混进去，所以不可预测，但整体随时间大致递增。不是 `rand()`，也不是每次从 0 开始。
 
-这就引出了两个真实问题：
+为什么不能从 0 开始：上一轮连接的残包可能还在网络里（旧 SYN、旧数据）；如果新连接也从同一个序号开始，接收方可能把旧包当成新连接的一部分。ISN 让新连接的序号空间避开旧包；TIME_WAIT 的 2MSL 再兜一层，但只靠它不够（服务端重启、连接被 RST 掉都可能绕过）。
 
-### 问题一：SYN 洪水
+32 位序号会回绕；比较时按模 2^32 算，不能直接比大小。
 
-攻击者伪造大量源地址发 SYN，永远不发第三次 ACK。服务端为每个都分配资源、等待超时，队列被占满，正常用户连不上。
+## ACK 号不是「到此为止」
 
-对策里最直接的是 **SYN Cookie**：不在内存里记状态，而是把连接信息编码进那个初始序号里。等 ACK 回来时，从序号里还原信息、校验一下就知道是不是真的。这样半连接状态不占内存，洪水就基本失效了。
+ACK=200 不是「第 200 号及之前的都收到了」，而是「下一个期望的字节序号是 200」：200 之前的字节都收到了，200 还没收到。RFC 9293 的原话是，ACK 字段是发送方期望收到的下一个序号。
 
-### 问题二：正常的"丢了个包"
+SYN 和 FIN 各占一个序号。客户端 SYN 的 seq=x，SYN 本身占掉 x，所以第一个数据字节是 x+1；服务端回 `ack=x+1`，即使它一个数据字节都没收到。FIN 同理：FIN 的 seq=N 会被确认成 N+1。
 
-网络偶尔丢包是常态。三次握手中任何一个包丢了，都靠**超时重传**兜底：客户端等一段时间没收到 SYN+ACK 就重发 SYN，间隔指数增长。
+TCP 不要求每收到一个字节或一个段就立刻回 ACK。它用累积 ACK：收到 100..199 和 300..399，但 200..299 缺了，接收方仍然可以回 ACK=200；SACK 选项可以额外告诉发送方「300..399 我收到了」。延迟 ACK 也是正常行为：RFC 9293 说实现 SHOULD 支持，延迟必须小于 0.5 秒，并且至少每两个全尺寸段回一次。所以抓包里看不到「每个数据包后面跟一个 ACK」是正常的。
 
-所以你在抓包里看到"客户端连发了两次 SYN，间隔一秒"，那不是 bug，是重传。如果重传几次都失败，客户端报"连接超时"。
+第三个 ACK 可以带数据：它仍然是一个 ACK，只是顺便把应用数据放在同一个段里；服务端看到 `ack=y+1` 就完成握手，数据照常交付。
 
-## 握手失败时，你能看到什么
+## 第三个 ACK 丢了，客户端不会重发 SYN
 
-这一节最实用：不同阶段的失败，报错文本完全不同。
+这是最容易被「丢包就重传」带错的地方。三个段丢的地方不同，后续也不同：
 
-| 现象 | 通常意味着 |
-| --- | --- |
-| 立刻报"Connection refused" | 对方回了 RST——端口没有程序在听，或被主动拒绝。包到了，只是没人接 |
-| 等很久后报"Connection timed out" | SYN 发出去了，没有任何回应。防火墙丢弃、路由不通、或对方忙到不回 |
-| 报"Network is unreachable" | 本机路由表里没有去这个地址的路，压根没发出去 |
-| 连上就断，抓包看到 RST | 端口通了，但应用层拒绝（比如协议不对、被限流） |
+| 丢的段 | 谁在等 | 谁会重传 |
+| --- | --- | --- |
+| 第一个 SYN | 客户端在 SYN-SENT | 客户端重传 SYN；RFC 6298 建议初始 RTO 为 1 秒，重传后翻倍 |
+| SYN+ACK | 客户端在 SYN-SENT；服务端在 SYN-RECEIVED | 服务端重传 SYN+ACK；客户端如果自己的 SYN 计时器也到了，会重发 SYN |
+| 第三个 ACK | 客户端已经 ESTABLISHED；服务端还在 SYN-RECEIVED | **服务端重传 SYN+ACK**；客户端再回 ACK，或它已发的数据携带 ACK |
 
-**"refused" 和 "timeout" 的区别非常关键**：前者说明包已经到了那台机器，网络是通的；后者说明包可能根本没到，或者回包被丢了。这一条能把排查范围直接砍一半。
+第三个 ACK 丢了，客户端那边已经完成握手：它在发出 ACK 的瞬间进入 ESTABLISHED，可以立刻发 HTTP 请求。它不会退回 SYN-SENT，也不会重发 SYN。服务端没收到 ACK，仍然停在 SYN-RECEIVED，按自己的重传计时器再发一个 SYN+ACK。客户端收到这个重复的 SYN+ACK，会再回一个 ACK（或者它已经发出的数据段里本来就带着 ACK）。服务端收到任何一个可接受的 ACK，才进入 ESTABLISHED。
 
-## 握手要多花多少时间
+如果客户端紧接着发了数据，而数据先到了服务端，数据段里的 ACK 也会让服务端完成握手；如果数据也丢了，服务端会继续重传 SYN+ACK，客户端的数据重传也会带 ACK。
 
-一次握手 = 一个往返。同城 5 ms 就是 5 ms，跨洲 150 ms 就是 150 ms。
+最坏的情况：服务端的 SYN+ACK 重传一直丢，客户端以为连接已建立，开始发数据；服务端已经超时把半连接清掉，没有这条连接的 TCB，可能回 RST。于是客户端看到「刚连上就断」。这也是为什么第三个 ACK 的丢失不能靠「客户端重发 SYN」解释。
 
-看起来不多，但它是**每一次新连接**都要付的。所以连接复用（keep-alive）的收益本质上是"省掉握手"，而不是"省掉服务端计算"。
+这一段是 RFC 9293 状态机的标准形态；本机没装 Wireshark，我没抓到真实的重复 SYN+ACK，抓包条件写在后面。
 
-还有一个数字值得记住：**首字节时间（TTFB）里包含了握手**。所以你排队优化接口逻辑、把 50 ms 降到 30 ms，可能还不如把连接复用做上去省得多。
+## 半连接队列与 SYN 洪水
 
-## 自己看一遍
+服务端收到 SYN 后，不是「什么都不记」。它要为这条半连接分配一个 TCB（或至少一个队列条目），回 SYN+ACK，状态置为 SYN-RECEIVED。第三个 ACK 没来，这个条目就占着位置，直到重传超时或被清理。队列有限；满了以后，不同协议栈的行为不同：有的丢新 SYN，有的回 RST，有的覆盖最老的条目（RFC 4987 明确说这是实现相关的）。所以「队列满了」不一定表现为 timeout，也可能表现为 refused。
 
-在能连通的地址上，用 `curl -v` 看握手过程：
+SYN 洪水：攻击者伪造大量源地址发 SYN，服务端为每个都回 SYN+ACK、占一个半连接条目；伪造地址不会回 ACK，条目一直占着。RFC 4987 说这种攻击的目标是端主机的半连接 backlog，不是链路带宽；打满后正常用户连不上。
+
+SYN Cookie：服务端不存半连接状态，而是把四元组、一个时间或计数器和一个密钥做哈希，算出一个值放进 SYN+ACK 的 ISN；ACK 回来时用同样的输入重算并比对。它是带密钥的哈希，不是把整条连接的信息可逆地编码进序号再还原。它缓解的是「半连接队列被占满」，不减少 SYN 到达网卡、协议栈解析和计算哈希的 CPU 或带宽开销；所以它缓解队列耗尽，但不能让洪水消失。另外，SYN Cookie 要把 MSS、窗口缩放等信息编进去才能不影响选项协商，具体实现有取舍。
+
+其他手段：SYN cache（把半连接放哈希表，限制每个桶的数量）、增大 backlog、缩短 SYN-RECEIVED 计时器、在防火墙或负载均衡上做 SYN 代理。它们各自有代价，不是一句「开 Cookie 就完了」。
+
+## 失败时你看到什么
+
+| 你看到 | 可能是 | 抓包或命令该看什么 |
+| --- | --- | --- |
+| `Connection refused` | 目标端口没监听，目标栈回 RST；也可能是防火墙或负载均衡策略拒绝，或本机代理、协议栈拒绝 | 有没有 SYN？RST 从哪个 IP 回来？RST 的 seq 是多少？ |
+| `Timeout was reached` | SYN 发出后没有任何回音：本机或云防火墙静默丢、路由黑洞、服务端半连接队列满后丢 SYN、目标关机 | 有没有重复 SYN？有没有 SYN+ACK？如果连 SYN 都没有，先查本机防火墙或代理 |
+| `Network is unreachable` | 本机路由表没有去这个地址的路，或路由器回了 ICMP unreachable | `route print` 或 `Get-NetRoute`；看有没有 ICMP；先 ping 网关 |
+| 连上就断，抓包看到 RST | 握手成功了，之后应用层或中间设备发 RST（协议不对、被限流、负载均衡主动断） | RST 在哪个方向、seq 是多少、RST 之前有没有应用数据 |
+| `curl: (7) Couldn't connect to server` | Windows 上 curl 对连接失败的统称；具体原因要看上一行 | 上面那行是 `Connection refused` 还是别的？ |
+
+这张表里每一项都写了「可能」，因为同一个报错不只有一个来源。`refused` 不代表包到了应用，`timeout` 也不代表服务器死了。要判断，得看包：SYN 有没有发出去、有没有 SYN+ACK、RST 从哪来。
+
+Wireshark 过滤：`tcp.flags.syn == 1` 只能看到 SYN 和 SYN+ACK，**看不到第三个 ACK**，因为第三个 ACK 的 SYN 位是 0。正确做法是先抓 `tcp.port == 443`，找到第一条 SYN 的 `tcp.stream`，再用 `tcp.stream eq N` 看完整握手；要看 RST 用 `tcp.flags.reset == 1`，要看重传用 `tcp.analysis.retransmission`。本机没装 Wireshark，这段过滤条件是标准形态，未实跑。
+
+如果抓包在你自己的机器上：先看有没有 SYN。如果连 SYN 都没有，问题在本机（防火墙、代理、路由）而不是服务端。看到 SYN 但没有 SYN+ACK，可能是路径丢包、云安全组、服务端 backlog 满。看到 SYN → RST，说明有人回了拒绝；RST 的源 IP 可能是目标，也可能是防火墙或负载均衡。看到 SYN → SYN+ACK → ACK，握手已经完成，后面再断就是另一个问题。
+
+`Test-NetConnection -Port` 只给 `TcpTestSucceeded` 的 True/False，不告诉你 RST 还是超时；要区分，还是得看 `curl.exe -v` 的那一行，或者抓包。
+
+## 跑一遍
+
+Windows 上没有 `grep`，也没有 `/dev/null`；把这两处换掉：
 
 ```text
-curl -v -o /dev/null https://example.com 2>&1 | grep -E "Connected|TLS|HTTP/"
+curl.exe -sS -v -o NUL https://example.com/ 2>&1 | Select-String -Pattern 'Connected to|ALPN|HTTP/'
 ```
 
-输出里 `Connected to ...` 那一行的时间点，就是三次握手完成的位置。想看得更细，用抓包工具过滤 `tcp.flags.syn == 1`，能看到完整的三个包和它们的时间差。
+实际输出（这台机器，2026-11-19）：
+
+```text
+* Connected to example.com (172.66.147.243) port 443 (#0)
+* ALPN: offers http/1.1
+* ALPN: server accepted http/1.1
+* using HTTP/1.1
+> GET / HTTP/1.1
+< HTTP/1.1 200 OK
+```
+
+`Connected to` 这行没有时间戳；要看它什么时候出现，加 `--trace-time`：
+
+```text
+curl.exe -sS --trace-time -v --connect-timeout 5 -o NUL https://example.com/ 2>&1 | Select-String -Pattern 'Trying|Connected to'
+```
+
+```text
+12:46:45.159970 *   Trying 172.66.147.243:443...
+12:46:45.327511 * Connected to example.com (172.66.147.243) port 443 (#0)
+```
+
+两条时间戳相减：327511 - 159970 = 167541 微秒，约 167.5ms。这是这一次到 example.com 的 TCP 握手（加一点本机调度）。换个时间、换个网络会变，不要当常数。
+
+用 `-w` 也能看分段，但它是累计值：`connect` 包含 DNS，`tls` 包含前面的 connect；要看差值，不要看单个绝对值。
+
+```text
+curl.exe -sS -o NUL -o NUL -w 'num_connects=%{num_connects} connect=%{time_connect} tls=%{time_appconnect} first=%{time_starttransfer}\n' https://example.com/ https://example.com/
+```
+
+实际输出：
+
+```text
+num_connects=1 connect=0.164878 tls=0.401755 first=0.544799
+num_connects=0 connect=0.000000 tls=0.000000 first=0.149955
+```
+
+第一个请求 `num_connects=1`，第二个 `num_connects=0`：第二条复用了同一条连接，所以 connect 和 tls 都是 0。`first` 从 0.545s 降到 0.150s，差的是 TCP+TLS 握手，不是服务端突然变快。单次数字会变，但 `num_connects` 的 1 → 0 是结构性的。
+
+## 握手时间与 keep-alive
+
+先看这台机器的两组 ping（2026-11-19，Wi-Fi）：
+
+```text
+$ ping.exe -n 4 192.168.8.1
+Pinging 192.168.8.1 with 32 bytes of data:
+Reply from 192.168.8.1: bytes=32 time=29ms TTL=255
+Reply from 192.168.8.1: bytes=32 time=46ms TTL=255
+Reply from 192.168.8.1: bytes=32 time=104ms TTL=255
+Reply from 192.168.8.1: bytes=32 time=7ms TTL=255
+
+Ping statistics for 192.168.8.1:
+    Packets: Sent = 4, Received = 4, Lost = 0 (0% loss),
+Approximate round trip times in milli-seconds:
+    Minimum = 7ms, Maximum = 104ms, Average = 46ms
+
+$ ping.exe -n 4 example.com
+Pinging example.com [172.66.147.243] with 32 bytes of data:
+Reply from 172.66.147.243: bytes=32 time=133ms TTL=48
+Reply from 172.66.147.243: bytes=32 time=135ms TTL=48
+Reply from 172.66.147.243: bytes=32 time=146ms TTL=48
+Reply from 172.66.147.243: bytes=32 time=186ms TTL=48
+
+Ping statistics for 172.66.147.243:
+    Packets: Sent = 4, Received = 4, Lost = 0 (0% loss),
+Approximate round trip times in milli-seconds:
+    Minimum = 133ms, Maximum = 186ms, Average = 150ms
+```
+
+同城 5ms 是假设；跨洲 150ms 也只是常见量级，不是这次实测出来的规律。这台机器到 example.com 的 ping 平均正好是 150ms，但那是一个具体目标，不是「跨洲就该 150ms」。同一个目标多跑几次也会跳，别把 5/150 当常数。
+
+一次握手，客户端视角是 1 个 RTT：SYN 出去，SYN+ACK 回来。第三个 ACK 发出去时客户端就 ESTABLISHED，不用再等一个 RTT。服务端视角是 1.5 个 RTT：它要等第三个 ACK 到。
+
+TTFB 里包含握手，只对新建连接成立。复用连接时，TTFB 从发请求开始算，不含 TCP/TLS 握手；所以拿 TTFB 对比两个服务时，先确认是不是都复用了连接。
+
+keep-alive 省的不只是「少一次握手」这一点。它省掉的是：TCP 三次握手、TLS 握手（同一连接上）、慢启动重新爬升，以及相应的 RTT；连服务端为建连做的那部分计算（TLS 密钥交换、socket 初始化）也一起省了。服务端处理业务请求的 CPU 仍然要花，这部分不会因为复用连接而消失。上面的 `num_connects` 输出就能看到：第一个请求 1 条新连接，第二个 0 条；connect 和 tls 都是 0。
+
+## 动手
+
+- 把 `192.168.8.1` 换成你手边的网关或一台你控制的主机，先跑 `curl.exe -sS -v --connect-timeout 3 -o NUL http://<host>:443/` 和 `:80/`，看哪一个是 refused、哪一个是 timeout。不要拿别人的地址扫。
+- 用 `curl.exe -sS --trace-time -v -o NUL https://example.com/ 2>&1 | Select-String -Pattern 'Trying|Connected to'` 算一次握手时间；再把同一个 URL 写两遍，加 `-w 'num_connects=%{num_connects} ...'`，看第二条是不是 0。
+- 如果你装了 Wireshark，抓 `tcp.port == 443`，找到第一条 SYN 的 `tcp.stream`，再用 `tcp.stream eq N` 看第三个 ACK；顺手确认 `tcp.flags.syn == 1` 过滤会漏掉它。
 
 ## 检查一下
 
 ```quiz
 {"id":"net-04-quiz","title":"三次握手三问","questions":[
- {"question":"第二次握手（SYN+ACK）之后，谁还不能确认双向通信都正常？","options":["客户端","服务端","双方都已经确认","双方都没确认"],"answer":1,"explain":"客户端此时能确认双向；服务端还不知道自己的 SYN 有没有被收到，要等第三次 ACK。"},
- {"question":"初始序号为什么不能每次都从 0 开始？","options":["因为 0 不合法","为了避免上一轮连接在网络里残留的旧包被误当成新数据","因为序号必须递增到最大值","为了节省内存"],"answer":1,"explain":"随机/递增的初始序号让残留包落在接收窗口之外，避免串号。"},
- {"question":"连一个没开端口的地址，报 Connection refused 说明了什么？","options":["包丢了","对方的机器可达，回了 RST，只是没有程序监听那个端口","DNS 解析失败","本机没有路由"],"answer":1,"explain":"refused 说明包到了对方并收到回复；timeout 才是没有回音。"}
+ {"question":"第三个 ACK 丢了，接下来最可能发生什么？","options":["客户端退回 SYN-SENT，重发 SYN","客户端已经 ESTABLISHED，服务端停在 SYN-RECEIVED 并重发 SYN+ACK，客户端再回 ACK","双方都认为连接已建立，什么也不发生","服务端立刻发 RST，客户端收到后重连"],"answer":1,"explain":"客户端发出第三个 ACK 后就已经进入 ESTABLISHED，不会退回 SYN-SENT。服务端没收到 ACK，仍停在 SYN-RECEIVED，会重传 SYN+ACK；客户端再回 ACK，或者它已经发出的数据段携带 ACK，服务端才进入 ESTABLISHED。"},
+ {"question":"客户端和服务端的初始序号（ISN）是什么关系？","options":["必须相等，否则连接建立失败","服务端沿用客户端的 ISN","由客户端指定，服务端必须接受","双方各自选自己的，不需要相同；各自确认收到对方的 ISN"],"answer":3,"explain":"握手不是让两个数相等，而是让每一方拿到对方的 ISN 并回确认。RFC 9293 的示例就是客户端 x=100、服务端 y=300，第三个段 ACK=301。"},
+ {"question":"抓包里看到 ACK=200，最准确的解释是？","options":["第 200 号字节已经收到","200 号及之前的字节都收到了","下一个期望的字节序号是 200，说明 200 之前的都收到了","接收窗口是 200 字节"],"answer":2,"explain":"ACK 号是下一个期望的序号；ACK=200 表示 200 之前的字节都收到了，200 本身还没收到。"}
 ]}
 ```
 
-## 常见误区
+## 还差的
 
-### 误区：握手是为了"确认对方还活着"
-
-**你以为**：三次握手的目的是探活。
-**其实**：探活只需要一次回包。三次是为了**双向确认**加上**交换并确认初始序号**。
-**怎么验证**：看抓包里三个包的 `seq` 与 `ack` 字段，第三步的 `ack` 正是服务端序号加一。
-
-### 误区：握手完成才能发数据
-
-**你以为**：必须等三个包全跑完才能发业务数据。
-**其实**：第三次 ACK 可以捎带数据；客户端发出 ACK 的瞬间就认为已连接。
-**怎么验证**：抓一次 HTTP（非 HTTPS）请求，常能看到第三次 ACK 与第一个请求包紧挨着，甚至合在同一段里。
-
-### 误区：连接超时就一定是对方挂了
-
-**你以为**：超时说明服务端死了。
-**其实**：超时只说明"没有收到任何回应"。中间设备静默丢包、路由黑洞，表现完全一样。
-**怎么验证**：从另一台机器、另一个网络试；或用 `traceroute` 看包在哪一跳之后没了回音。
-
-## 小结
-
-三次握手交换并确认双方的初始序号，同时让双方各自确认收发都通。两次不够，四次多余。握手失败时的报错文本能直接定位阶段：`refused` 说明包到了对方，`timeout` 说明没有回音。一次握手是一个往返，这就是连接复用的价值所在。
-
-下一篇：连接怎么关，以及为什么主动关闭的那一方会留下一堆 TIME_WAIT。
-
-**延伸阅读**：[RFC 9293 · Transmission Control Protocol](https://www.rfc-editor.org/rfc/rfc9293)（取代了 793，第 3.5 节讲连接建立）。
+- 没抓到第三个 ACK 丢失的真实包：本机没装 Wireshark 或 tshark，`pktmon` 也连不上驱动；这一段是按 RFC 9293 状态机写的标准形态。
+- 没做服务端的半连接队列实验：没有改 `backlog`、`tcp_syn_retries`，也没有在真实服务器上打过 SYN 洪水；SYN Cookie 的代码路径没有实测，只按 RFC 4987 说明。
+- 没做跨网络或跨洲的 RTT 对比：只测了本机 Wi-Fi 到网关和 example.com；5ms 不是这次实测，150ms 只是到 example.com 的平均值，不能当「跨洲」的通用基准。
+- 没验证不同操作系统或负载均衡的 RST 行为：表里的可能是要在具体环境里抓包确认的，Windows、Linux、云负载均衡的默认行为不一样。
+- 没讲 TCP Fast Open、MPTCP、QUIC 的握手差异；这一篇只讲经典 TCP 的三次握手。
