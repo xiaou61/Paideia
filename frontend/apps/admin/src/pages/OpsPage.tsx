@@ -90,6 +90,42 @@ interface DiagnosisStats {
   helpfulRate: number | null
 }
 
+/** 日志模板与模板异常（WORK-085）。Top 模板按当前窗口频次排序。 */
+interface PatternTop {
+  unit: string
+  templateHash: string
+  pattern: string
+  count: number
+}
+
+type PatternKind = 'NEW_TEMPLATE' | 'FREQ_SPIKE' | 'DISAPPEARED'
+
+interface PatternAnomaly {
+  id: number
+  kind: PatternKind
+  templateHash: string
+  unit: string
+  ratio: number | null
+  z: number | null
+  baselineCount: number | null
+  currentCount: number | null
+  status: string
+  diagnosisId: number | null
+  detail: string | null
+  createdAt: string
+}
+
+interface PatternOverview {
+  top: PatternTop[]
+  anomalies: PatternAnomaly[]
+}
+
+const PATTERN_KIND: Record<PatternKind, { label: string; variant: 'warning' | 'destructive' | 'outline' }> = {
+  NEW_TEMPLATE: { label: '新模板', variant: 'warning' },
+  FREQ_SPIKE: { label: '频次突增', variant: 'destructive' },
+  DISAPPEARED: { label: '模板消失', variant: 'outline' },
+}
+
 /** 三档评分的显示文案；值与后端约定的 -1/0/1 一一对应。 */
 const RATINGS: { value: number; label: string }[] = [
   { value: 1, label: '准' },
@@ -233,6 +269,8 @@ export function OpsPage() {
       )}
 
       <DiagnosisSection />
+
+      <PatternSection />
 
       {/*
         面板用 Grafana 自己的登录：iframe 的子请求带不上平台令牌（本项目无 Cookie、纯 Bearer），
@@ -503,6 +541,116 @@ function DiagnosisItem({
         )
       ) : null}
     </li>
+  )
+}
+
+/**
+ * 日志模板与模板异常（WORK-085）。
+ *
+ * <p>先聚类再给人看：几十万行日志被 Loki 的 pattern ingester 压成几十个模板，这里只展示
+ * 「当前窗口 Top 模板」与「近 24 小时的模板级异常」。异常卡只做展示与指路——真正的原因分析
+ * 走上面的 AI 诊断（模板异常会自动触发一条诊断，diagnosisId 会回填）。
+ *
+ * <p>只读，不改路由：挂在既有「运维」页里，避免"新页面没入口等于没上线"。
+ */
+function PatternSection() {
+  const overview = useQuery({
+    queryKey: ['admin-ops-patterns'],
+    queryFn: () => api.requestEnvelope<PatternOverview>('/api/v1/ops/admin/patterns'),
+    refetchInterval: 30_000,
+  })
+
+  const top = overview.data?.top ?? []
+  const anomalies = overview.data?.anomalies ?? []
+
+  return (
+    <Card className="mb-6" data-testid="ops-pattern-card">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-sm font-medium">
+          <span className="tile-surface border-border text-primary grid size-8 shrink-0 place-items-center rounded-lg border">
+            <Activity className="size-4" />
+          </span>
+          日志模板与异常
+        </CardTitle>
+        <CardDescription>
+          日志先压成模板再看频次：当前窗口 Top 模板、近 24 小时的模板级异常（频次突增 / 新模板 / 模板消失）。
+          模板消失往往比报错更危险——它意味着服务静默。
+        </CardDescription>
+        <CardAction>
+          {anomalies.length > 0 ? (
+            <Badge variant="destructive" data-testid="ops-pattern-anomaly-count">
+              {anomalies.length} 条异常
+            </Badge>
+          ) : (
+            <Badge variant="outline">无异常</Badge>
+          )}
+        </CardAction>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {overview.isPending ? (
+          <p className="text-muted-foreground flex items-center gap-2 text-sm">
+            <Spinner /> 正在读取模板…
+          </p>
+        ) : overview.isError ? (
+          <p className="text-muted-foreground text-sm">
+            模板读取失败：{errorMessage(overview.error, '未知错误')}
+          </p>
+        ) : (
+          <>
+            <div>
+              <p className="text-muted-foreground mb-2 text-xs">当前窗口 Top 模板</p>
+              {top.length === 0 ? (
+                <p className="text-muted-foreground text-sm" data-testid="ops-pattern-top-empty">
+                  暂无模板数据。Loki pattern_ingester 刚开启时可能要等一两个同步周期。
+                </p>
+              ) : (
+                <ul className="divide-border divide-y" data-testid="ops-pattern-top-list">
+                  {top.slice(0, 10).map((item) => (
+                    <li key={`${item.unit}-${item.templateHash}`} className="flex items-start gap-3 py-2 text-sm">
+                      <Badge variant="outline" className="shrink-0">
+                        {item.unit}
+                      </Badge>
+                      <code className="text-muted-foreground min-w-0 flex-1 truncate text-xs">{item.pattern}</code>
+                      <span className="text-muted-foreground shrink-0 text-xs">{item.count} 次</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div>
+              <p className="text-muted-foreground mb-2 text-xs">近 24 小时模板异常</p>
+              {anomalies.length === 0 ? (
+                <p className="text-muted-foreground text-sm" data-testid="ops-pattern-anomaly-empty">
+                  没有检测到模板级异常。
+                </p>
+              ) : (
+                <ul className="divide-border divide-y" data-testid="ops-pattern-anomaly-list">
+                  {anomalies.slice(0, 20).map((item) => {
+                    const style = PATTERN_KIND[item.kind] ?? { label: item.kind, variant: 'outline' as const }
+                    return (
+                      <li key={item.id} className="py-2">
+                        <div className="flex flex-wrap items-center gap-2 text-sm">
+                          <Badge variant={style.variant}>{style.label}</Badge>
+                          <Badge variant="outline">{item.unit}</Badge>
+                          <span className="text-muted-foreground text-xs">{formatTime(item.createdAt)}</span>
+                          {item.diagnosisId ? (
+                            <span className="text-muted-foreground text-xs">已触发诊断 #{item.diagnosisId}</span>
+                          ) : null}
+                        </div>
+                        {item.detail ? (
+                          <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{item.detail}</p>
+                        ) : null}
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 

@@ -701,6 +701,39 @@
           "legendFormat": "{{tool}}"
         }
       ]
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "日志模板异常（未处理）",
+      "description": "WORK-085：应用侧把日志压成模板后检测「新模板 / 频次突增 / 模板消失」，未处理异常数由 PatternSyncJob 暴露为 Gauge。模板消失往往意味着服务静默，比报错更该先看。明细见运维页「日志模板与异常」卡片。",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "paideia-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 1
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "paideia_ops_pattern_anomalies_open",
+          "legendFormat": "未处理模板异常"
+        }
+      ]
     }
   ]
 }

@@ -43,7 +43,7 @@ approver_role: CTO
 
 ## 任务
 
-### TASK-001 | pending | Loki 启用 pattern_ingester 并可查询（探针）
+### TASK-001 | done | Loki 启用 pattern_ingester 并可查询（探针）
 
 - 对应：`REQ-002`、`AC-001`
 - 依赖：无
@@ -58,7 +58,7 @@ approver_role: CTO
   5. 结论写入 `.agent/notes/ops-pattern-ingester.md`
 - 验证：笔记文件存在且包含上述四项结论；Loki 服务 active、无 ERROR 日志
 
-### TASK-002 | pending | Grafana「日志模板 / 异常」面板
+### TASK-002 | done | Grafana「日志模板 / 异常」面板
 
 - 对应：`REQ-002`、`AC-001`
 - 依赖：`TASK-001`
@@ -71,7 +71,7 @@ approver_role: CTO
   3. 部署后 Grafana 打开仪表盘确认两块面板出图
 - 验证：Grafana 面板可见且返回数据（截图/描述写入验证记录）
 
-### TASK-003 | pending | 迁移：三张表 + 全文索引
+### TASK-003 | done | 迁移：三张表 + 全文索引
 
 - 对应：`REQ-002`、`REQ-003`、`REQ-004`、`REQ-007`
 - 依赖：无
@@ -84,7 +84,7 @@ approver_role: CTO
   3. 跑迁移三件守卫
 - 验证：`scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=MigrationVersionFormatTest,MigrationChecksumTest,MigrationSeedOverlapTest -Dsurefire.failIfNoSpecifiedTests=false test` 全绿
 
-### TASK-004 | pending | `OpsProperties.Patterns` 配置 + `PatternMapper`
+### TASK-004 | done | `OpsProperties.Patterns` 配置 + `PatternMapper`
 
 - 对应：`REQ-003`、`REQ-004`、`REQ-009`
 - 依赖：`TASK-003`
@@ -97,7 +97,7 @@ approver_role: CTO
   3. 写映射测试
 - 验证：`scripts/test-db.sh mvn -B -T 1C -pl paideia-ops -am -Dtest=PatternsSqlTest -Dsurefire.failIfNoSpecifiedTests=false test` 绿
 
-### TASK-005 | pending | `PatternSyncService` + `PatternSyncJob` 同步落库
+### TASK-005 | done | `PatternSyncService` + `PatternSyncJob` 同步落库
 
 - 对应：`REQ-002`、`REQ-003`、`REQ-009`
 - 依赖：`TASK-004`
@@ -110,7 +110,7 @@ approver_role: CTO
   3. 写三个测试（假 `LokiClient`）
 - 验证：`... -Dtest=PatternSyncServiceTest ... test` 全绿
 
-### TASK-006 | pending | `PatternAnomalyDetector` 三类检测 + Micrometer 指标
+### TASK-006 | done | `PatternAnomalyDetector` 三类检测 + Micrometer 指标
 
 - 对应：`REQ-004`、`REQ-010`
 - 依赖：`TASK-005`
@@ -123,7 +123,7 @@ approver_role: CTO
   3. 写五个测试（含边界）
 - 验证：`... -Dtest=PatternAnomalyDetectorTest ... test` 全绿
 
-### TASK-007 | pending | 证据扩链：`Evidence.patterns` + prompt v6
+### TASK-007 | done | 证据扩链：`Evidence.patterns` + prompt v6
 
 - 对应：`REQ-005`、`AC-003`
 - 依赖：`TASK-004`
@@ -136,7 +136,7 @@ approver_role: CTO
   3. 写/改测试
 - 验证：`... -Dtest=OpsDiagnosisPromptTest,DefaultOpsDiagnoserTest,OpsDiagnosisServiceTest,OpsDiagnosisGoldenSetTest ... test` 全绿（`paideia-ai` 与 `paideia-app` 两端各跑）
 
-### TASK-008 | pending | `PatternQueryService` 证据摘要（截断）
+### TASK-008 | done | `PatternQueryService` 证据摘要（截断）
 
 - 对应：`REQ-005`、`AC-003`
 - 依赖：`TASK-004`、`TASK-007`
@@ -149,7 +149,7 @@ approver_role: CTO
   3. 写两个测试
 - 验证：`... -Dtest=PatternQueryServiceTest ... test` 全绿
 
-### TASK-009 | pending | `PatternTriggerService` 触发既有诊断（冷却/降级）
+### TASK-009 | done | `PatternTriggerService` 触发既有诊断（冷却/降级）
 
 - 对应：`REQ-006`、`AC-004`
 - 依赖：`TASK-006`、`TASK-008`
@@ -162,7 +162,7 @@ approver_role: CTO
   3. 写两个测试
 - 验证：`... -Dtest=PatternTriggerServiceTest ... test` 全绿
 
-### TASK-010 | pending | 只读端点 + 告警规则 + 管理端卡片
+### TASK-010 | done | 只读端点 + 告警规则 + 管理端卡片
 
 - 对应：`REQ-005`、`REQ-006`、`AC-003`、`AC-004`、`AC-006`
 - 依赖：`TASK-008`、`TASK-009`
@@ -176,7 +176,7 @@ approver_role: CTO
   4. 跑守卫三件 + admin 端 `pnpm playwright test`（或人工验收）
 - 验证：守卫三件绿；管理端「运维」页出现卡片且能读到数据
 
-### TASK-011 | pending | 知识闭环：全文检索端点与查询
+### TASK-011 | done | 知识闭环：全文检索端点与查询
 
 - 对应：`REQ-007`
 - 依赖：`TASK-003`、`TASK-010`
@@ -188,7 +188,7 @@ approver_role: CTO
   2. 写测试
 - 验证：`... -Dtest=PatternControllerTest ... test` 绿
 
-### TASK-012 | pending | 最小服务拓扑输出
+### TASK-012 | done | 最小服务拓扑输出
 
 - 对应：`REQ-008`
 - 依赖：`TASK-008`
@@ -201,7 +201,7 @@ approver_role: CTO
   3. 写测试
 - 验证：`... -Dtest=PatternQueryServiceTest ... test` 绿
 
-### TASK-013 | pending | 架构图与 `.archify.json` 同步
+### TASK-013 | done | 架构图与 `.archify.json` 同步
 
 - 对应：`REQ-002`、`REQ-004`（结构变更同提交改图）
 - 依赖：`TASK-003`
@@ -219,3 +219,4 @@ approver_role: CTO
 - 内环测试与守卫三件全绿；Loki/Grafana 侧部署实测有记录（TASK-001 笔记 + 面板截图）。
 - 迁移三件、`ApiContractTest`、`AuthorizationIsolationTest` 通过；`ModularityTest` 确认新包在 `paideia-ops`。
 - `docs/architecture` 图与 `.archify.json` 与实现提交一致；无凭据入库。
+

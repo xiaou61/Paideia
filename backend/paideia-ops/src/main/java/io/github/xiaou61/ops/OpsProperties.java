@@ -41,6 +41,8 @@ public class OpsProperties {
 
     private final Notify notify = new Notify();
 
+    private final Patterns patterns = new Patterns();
+
     public String getPrometheusUrl() {
         return prometheusUrl;
     }
@@ -103,6 +105,10 @@ public class OpsProperties {
 
     public Thresholds getThresholds() {
         return thresholds;
+    }
+
+    public Patterns getPatterns() {
+        return patterns;
     }
 
     public static class Thresholds {
@@ -332,6 +338,183 @@ public class OpsProperties {
 
         public void setBaseUrl(String baseUrl) {
             this.baseUrl = baseUrl == null ? "" : baseUrl;
+        }
+    }
+
+    /**
+     * 日志模板聚类与模板级异常检测（WORK-085）。
+     *
+     * <p>聚类不走应用自研 Drain：直接用 Loki 自带的 pattern ingester（Drain 算法）在采集侧成模板，
+     * 应用只做「同步 → 分桶 → 与历史同 dow/hour 基线比对 → 触发诊断」。阈值全部放这里，
+     * 面板与告警读同一份，不再各自写死。
+     */
+    public static class Patterns {
+
+        private boolean enabled = true;
+
+        /** 同步周期（秒）。与 Loki pattern ingester 的 downsample 相比可以粗一些。 */
+        private long syncIntervalSeconds = 300;
+
+        /** 检测窗口宽度（分钟），桶按此宽度对齐。 */
+        private int windowMinutes = 15;
+
+        /** 基线回看周数；同 dow+hour 的历史窗口在这段范围内取样。 */
+        private int baselineWeeks = 4;
+
+        /** 频次突增：当前窗口 / 基线均值 达到此倍数。 */
+        private double freqSpikeRatio = 3.0;
+
+        /** 频次突增：同时要求 z 分数达到此值，压住低方差噪声。 */
+        private double zScoreThreshold = 3.0;
+
+        /** 新模板：窗口内条数达到此值才算「值得说」的新模板。 */
+        private int newTemplateMinCount = 10;
+
+        /** 消失：基线均值达到此值，而本窗口一条都没有，才判「服务静默」。 */
+        private int disappearedBaselineMin = 20;
+
+        /** 同一模板同类型的触发冷却（秒），防止同一异常每轮同步都发一次诊断。 */
+        private long triggerCooldownSeconds = 900;
+
+        /** 单次同步最多处理多少模板，防止第一次接入时把整库拉爆。 */
+        private int maxTemplates = 2000;
+
+        /** 桶与模板字典的保留天数。 */
+        private int retentionDays = 30;
+
+        /** 端点展示的 Top 模板数。 */
+        private int topN = 15;
+
+        /** 拼进证据/展示的模板文本最大长度。 */
+        private int maxPatternChars = 2000;
+
+        /**
+         * 最小服务拓扑（REQ-008）。不引 CMDB，只把「应用依赖哪些外部组件」写成一行配置，
+         * 拼进证据头部，帮助模型判断「某个依赖挂了」而不是「应用自己出错」。空串则不出该行。
+         */
+        private String topology = "app → MySQL/Redis/RustFS/Laya/Tempo";
+
+        /** 参与聚类的日志单元白名单。 */
+        private List<String> units = List.of("paideia", "laya");
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public long getSyncIntervalSeconds() {
+            return syncIntervalSeconds;
+        }
+
+        public void setSyncIntervalSeconds(long syncIntervalSeconds) {
+            this.syncIntervalSeconds = syncIntervalSeconds;
+        }
+
+        public int getWindowMinutes() {
+            return windowMinutes;
+        }
+
+        public void setWindowMinutes(int windowMinutes) {
+            this.windowMinutes = windowMinutes;
+        }
+
+        public int getBaselineWeeks() {
+            return baselineWeeks;
+        }
+
+        public void setBaselineWeeks(int baselineWeeks) {
+            this.baselineWeeks = baselineWeeks;
+        }
+
+        public double getFreqSpikeRatio() {
+            return freqSpikeRatio;
+        }
+
+        public void setFreqSpikeRatio(double freqSpikeRatio) {
+            this.freqSpikeRatio = freqSpikeRatio;
+        }
+
+        public double getZScoreThreshold() {
+            return zScoreThreshold;
+        }
+
+        public void setZScoreThreshold(double zScoreThreshold) {
+            this.zScoreThreshold = zScoreThreshold;
+        }
+
+        public int getNewTemplateMinCount() {
+            return newTemplateMinCount;
+        }
+
+        public void setNewTemplateMinCount(int newTemplateMinCount) {
+            this.newTemplateMinCount = newTemplateMinCount;
+        }
+
+        public int getDisappearedBaselineMin() {
+            return disappearedBaselineMin;
+        }
+
+        public void setDisappearedBaselineMin(int disappearedBaselineMin) {
+            this.disappearedBaselineMin = disappearedBaselineMin;
+        }
+
+        public long getTriggerCooldownSeconds() {
+            return triggerCooldownSeconds;
+        }
+
+        public void setTriggerCooldownSeconds(long triggerCooldownSeconds) {
+            this.triggerCooldownSeconds = triggerCooldownSeconds;
+        }
+
+        public int getMaxTemplates() {
+            return maxTemplates;
+        }
+
+        public void setMaxTemplates(int maxTemplates) {
+            this.maxTemplates = maxTemplates;
+        }
+
+        public int getRetentionDays() {
+            return retentionDays;
+        }
+
+        public void setRetentionDays(int retentionDays) {
+            this.retentionDays = retentionDays;
+        }
+
+        public int getTopN() {
+            return topN;
+        }
+
+        public void setTopN(int topN) {
+            this.topN = topN;
+        }
+
+        public int getMaxPatternChars() {
+            return maxPatternChars;
+        }
+
+        public void setMaxPatternChars(int maxPatternChars) {
+            this.maxPatternChars = maxPatternChars;
+        }
+
+        public String getTopology() {
+            return topology;
+        }
+
+        public void setTopology(String topology) {
+            this.topology = topology == null ? "" : topology;
+        }
+
+        public List<String> getUnits() {
+            return units;
+        }
+
+        public void setUnits(List<String> units) {
+            this.units = units == null ? List.of() : units;
         }
     }
 }
