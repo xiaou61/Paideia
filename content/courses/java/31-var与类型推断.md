@@ -5,52 +5,32 @@ chapter: 现代 Java
 level: beginner
 prerequisite: 30 · 日志：程序出事了怎么查
 category: java-from-zero
-minutes: 22
+minutes: 16
 status: published
 ---
 
 # 31 · var 与类型推断
 
-## 这一课你要会
+## 一个数组初始化把我卡了十分钟
 
-- 用 `var` 声明局部变量，知道它仍然是**静态类型**；
-- 说清 `var` 能用在哪儿、不能用在哪儿；
-- 判断什么时候用 `var` 更清楚、什么时候反而更难读。
+想用 `var` 简化一段代码：
 
-## 为什么
+```java
+var arr = {1, 2, 3};
+```
 
-Java 以前的写法很啰嗦：
+javac 25 的原文：
 
 ```text
-Map<String, List<Integer>> groups = new HashMap<String, List<Integer>>();
+error: cannot infer type for local variable arr
+  (array initializer needs an explicit target-type)
 ```
 
-右边已经把类型写全了，左边还要再抄一遍。`var` 让编译器从右边推断，少写一次重复信息。但它**不是** JavaScript 的 `let`——类型在编译期就定死了，写错一样编译不过。
+数组初始化 `{1,2,3}` 本身没有类型——它得靠左边的目标类型才能变成 `int[]`。而 `var` 的意思是"我不知道类型，你自己看右边"，两边互相等，编译器就没法开工。
 
-```sketch
-{
-  "title": "var：让编译器替你写左边类型",
-  "rows": [
-    [
-      { "id": "right", "title": "右边类型写全", "sub": "new HashMap 已够", "tone": "gray" },
-      { "id": "compiler", "title": "编译器推断", "sub": "编译期就定死", "tone": "blue" },
-      { "id": "left", "title": "左边写 var", "sub": "少抄一遍", "tone": "green" }
-    ],
-    [
-      { "id": "ok", "title": "可用于局部变量", "sub": "必须带初始化", "tone": "green" },
-      { "id": "no", "title": "不可字段与参数", "sub": "不是动态类型", "tone": "amber" }
-    ]
-  ],
-  "arrows": [
-    { "from": "right", "to": "compiler" },
-    { "from": "compiler", "to": "left" }
-  ]
-}
-```
+这件事说明 `var` 不是"省事的语法糖"，它有一个明确的前提：**右边必须自己带着类型信息**。这篇把这个前提、以及三个推断不出来时会给出的真实报错讲清楚。
 
-## 讲解
-
-### `var` 是"让编译器替你写类型"
+## var 是"让编译器替你写左边"
 
 <!-- run -->
 ```java
@@ -79,61 +59,111 @@ ArrayList
 170
 ```
 
-`name` 的类型就是 `String`，不是"什么都能装"。下面这行**编译不过**：
+`name` 的类型就是 `String`。下面这行**编译不过**：
 
 ```text
 var name = "小林";
-name = 42;          // 错误：int 不能赋给 String
+name = 42;          // error: incompatible types: int cannot be converted to String
 ```
 
-类型在声明那一刻就固定了，和写 `String name = "小林"` 完全等价。`var` 只是省了左边的重复，不改变 Java 是静态类型语言这件事。
+类型在声明那一刻由右边推断出来并固定，和写 `String name = "小林"` 完全等价。`var` 只省了左边的字，不改变 Java 是静态类型语言这件事。
 
-### 能用的地方很窄
+## 能用的地方很窄
 
 | 位置 | 能用 `var` 吗 |
 | --- | --- |
 | 方法里的局部变量 | 能 |
 | `for` / `for-each` 的循环变量 | 能 |
 | `try-with-resources` 的资源变量 | 能 |
+| lambda 参数（Java 11+） | 能，但必须全部用 `var` 或全部写类型 |
+| `catch` 的参数 | 不能 |
 | 方法参数 | 不能 |
 | 成员变量（字段） | 不能 |
 | 方法返回值 | 不能 |
 
-原因：局部变量的类型在声明处一眼可见；字段和参数是"对外契约"，必须写清楚，否则调用者得读实现才知道类型。
+原因：局部变量的类型在声明处一眼可见，写两遍是浪费；字段和参数是**对外契约**，必须写清楚，否则调用方要读实现才知道类型。
 
-### 两个硬性要求
-
-1. **必须初始化**：`var x;` 编译不过——没有右边，推断不出类型；
-2. **右边不能是 `null`**：`var x = null;` 也编译不过——`null` 没有类型。
-
-### 什么时候用，什么时候别用
-
-**适合**：右边类型一目了然，或者类型名字很长。
+lambda 那条限制有讲究：`(var p, var q) -> p + q` 合法，但 `(var p, int q) -> p + q` 不行：
 
 ```text
-var users = new ArrayList<User>();          // 右边说了是 ArrayList<User>
+error: invalid lambda parameter declaration
+  (cannot mix 'var' and explicitly-typed parameters)
+```
+
+## 推断不出来的三种情况
+
+都是真实报错，原文贴在这里。
+
+**一、右边是 `null`：**
+
+```text
+error: cannot infer type for local variable x
+  (variable initializer is 'null')
+```
+
+`null` 不属于任何类型，什么都能赋给 `null`，所以没有唯一答案。写 `String x = null;`。
+
+**二、右边是数组初始化：**
+
+```text
+error: cannot infer type for local variable arr
+  (array initializer needs an explicit target-type)
+```
+
+改成 `var arr = new int[]{1, 2, 3};`——右边带了 `int[]`，就能推断。
+
+**三、右边是 lambda：**
+
+```text
+error: cannot infer type for local variable f
+  (lambda expression needs an explicit target-type)
+```
+
+lambda 没有独立类型，它必须"目标化"成某个函数式接口。写 `var f = (Supplier<Integer>) () -> 1;` 或者直接 `Supplier<Integer> f = () -> 1;`。
+
+顺带一条：`var x;`（不初始化）也编译不过，报的是 `cannot use 'var' on variable without initializer`。三个报错的共同点就是那句老话——**var 需要右边先有类型**。
+
+## 一个安静得多、更容易漏的坑
+
+`var` 会把三元表达式的**数值提升结果**原样接住：
+
+```java
+var x = true ? 1 : 2.5;      // 你想的是 int，得到的是 double
+int r = x;                    // error: possible lossy conversion from double to int
+```
+
+实际运行会打印 `Double 1.0`：`1` 与 `2.5` 在同一个三元表达式里，`1` 被提升成 `1.0`，整体类型是 `double`。写显式类型 `int x = ...` 时编译器当场就报错，用了 `var` 它反而放行到下一句才炸——**报错位置离原因更远了**。
+
+同类还有菱形退化：
+
+```java
+var list = new ArrayList<>();   // 推断成 ArrayList<Object>
+list.add("a");
+String s = list.get(0);         // error: incompatible types: Object cannot be converted to String
+```
+
+`<>` 也需要目标类型，`var` 给不了，于是退化成 `Object`。写 `new ArrayList<String>()` 或 `List.<String>of()`。
+
+## 什么时候用，什么时候别用
+
+**适合**：右边已经把类型说清楚了，或者类型名字很长。
+
+```java
+var users = new ArrayList<User>();                // 右边写了 User
 var entry = map.entrySet().iterator().next();
 var reader = Files.newBufferedReader(path);
 ```
 
-**不适合**：右边看不出类型，或者用 `var` 会丢掉关键信息。
+**不适合**：只看这一行看不出类型。
 
-```text
-var result = service.handle(request);       // handle 返回什么？读代码的人得跳过去看
-var data = list.get(0);                     // data 是 User 还是 String？
+```java
+var result = service.handle(request);             // handle 返回什么？
+var data = list.get(0);                           // User 还是 String？
 ```
 
-判断标准很简单：**读者能不能只看这一行就知道它是什么**。能，就用；不能，就写清楚。
+判据就一句：**读者只看这一行，能不能知道它是什么类型**。能，用；不能，写出来。
 
-### `var` 与泛型一起用时的小坑
-
-```text
-var list = new ArrayList<>();   // 推断成 ArrayList<Object>
-list.add("a");
-String s = list.get(0);         // 编译错误：Object 不能赋给 String
-```
-
-菱形 `<>` 在没有左边目标类型时会退化成 `Object`。想要 `ArrayList<String>`，就写 `new ArrayList<String>()` 或 `List.<String>of()`。
+这条判据背后是重构成本：`var result = ...` 在 IDE 里重命名、找引用时会因为推断链而更难判断影响面；写清类型时，改 `handle` 的返回类型编译器立刻在调用点报错。
 
 ## 动手
 
@@ -171,34 +201,27 @@ String s = list.get(0);         // 编译错误：Object 不能赋给 String
       "explain": "字段是对外契约，必须显式写类型；局部变量和循环变量可以用 var。"
     },
     {
-      "question": "什么时候不适合用 var？",
-      "options": ["右边是 new ArrayList<User>()", "右边是 service.handle(request)，返回类型不明显", "右边是 Files.newBufferedReader(path)"],
+      "question": "var x = true ? 1 : 2.5; 里 x 是什么类型？",
+      "options": ["int", "double", "编译错误"],
       "answer": 1,
-      "explain": "读者只看这一行不知道类型时，应该写清楚。var 的目的是减少重复，不是隐藏信息。"
+      "explain": "三元表达式两边会做数值提升，1 被提升成 1.0，整体是 double。写 int x = ... 会当场报错，用 var 会把错误推到下一句。"
     }
   ]
 }
 ```
 
-## 常见误区
+## 三件我原来以为对的事
 
-### 误区：`var` 是动态类型
+**一、`var` 是动态类型。** 它是编译期推断 + 固定。`var` 变量之后换类型照样编译失败，字节码里也是具体类型（局部变量表里可能带 `Ljava/lang/String;` 这种签名）。
 
-**你以为**：像 JavaScript 一样，变量可以随时换类型。
-**其实**：类型在编译期由右边推断并固定，之后赋值类型不符照样编译失败。`var` 只省了左边的字。
+**二、能省就省，代码短就是好。** 短只在"右边自带类型"时才划算。`var result = service.handle(req)` 省了 12 个字符，代价是每个读者都要跳一次源码。
 
-### 误区：`var` 可以用在字段和参数上
+**三、`var` 只是少写字，行为完全一样。** 大部分情况是。但三元表达式的数值提升、菱形退化这两处，`var` 会让错误从"声明那一行"漂到"使用那一行"——排查成本变高。
 
-**你以为**：哪里都能省。
-**其实**：只能用于局部变量、循环变量和 try-with-resources。字段、方法参数、返回值都必须显式写类型。
+## 这一课之后
 
-### 误区：`var` 一定让代码更短就更好
+`var` 是局部变量的类型推断：必须初始化、右边不能是 `null`、不能是裸数组初始化或裸 lambda、不能用于字段和参数（lambda 参数是特例）。推断结果仍是静态类型。
 
-**你以为**：能省就省。
-**其实**：`var result = service.handle(request);` 让读者必须跳进 `handle` 才知道类型，重构时也更难看出影响。可读性优先于少打几个字。
-
-## 小结
-
-`var` 是局部变量的类型推断，推断出来仍是静态类型。必须初始化、右边不能是 `null`，不能用于字段和参数。判断标准是"只看这一行能不能知道类型"。
+判断标准是"只看这一行能不能知道类型"。三元表达式与菱形这两个地方，`var` 会把编译错误推远，遇到数字运算时优先写显式类型。
 
 下一课：文本块——把 JSON、SQL 原样写进代码。
