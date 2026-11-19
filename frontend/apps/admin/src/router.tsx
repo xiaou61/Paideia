@@ -9,6 +9,7 @@ import { KnowledgeConceptsPage } from './pages/KnowledgeConceptsPage'
 import { KnowledgeEntriesPage } from './pages/KnowledgeEntriesPage'
 import { KnowledgeImportPage } from './pages/KnowledgeImportPage'
 import { KnowledgeEntryChunksPage } from './pages/KnowledgeEntryChunksPage'
+import { EssayReviewPage } from './pages/EssayReviewPage'
 import { AdminUsersPage } from './pages/AdminUsersPage'
 import { NoteReportsPage } from './pages/NoteReportsPage'
 import { SqlDatasetReportsPage } from './pages/SqlDatasetReportsPage'
@@ -93,6 +94,15 @@ export const router = createHashRouter([
     element: (
       <RequireAdmin>
         <KnowledgeEntriesPage />
+      </RequireAdmin>
+    ),
+  },
+  {
+    // 面经复核（WORK-084）：自动采集的题先过事实自检，存疑的在这里人工裁决。
+    path: '/knowledge/essay-reviews',
+    element: (
+      <RequireAdmin>
+        <EssayReviewPage />
       </RequireAdmin>
     ),
   },

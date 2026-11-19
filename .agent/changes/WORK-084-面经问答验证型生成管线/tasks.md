@@ -153,7 +153,7 @@ void reject(long id, String note, long adminUserId);
   3. 接进 service 升级分支；`revise` 输出 `revise` 且置信≥阈值时状态为 `revised`。
 - 验证：`backend$ scripts/test-db.sh mvn -B -pl paideia-ai -Dtest='EssayReferenceRetrieverTest,EssayVerificationServiceTest' test` → 全绿。
 
-### TASK-006 | pending | 【本期不实施】复核队列后端（列表/采纳/驳回）
+### TASK-006 | done | 复核队列后端（列表/采纳/驳回）
 
 - 对应：`REQ-003`、`AC-003`
 - 依赖：TASK-003、TASK-004
@@ -164,21 +164,21 @@ void reject(long id, String note, long adminUserId);
   1. 写服务测试（fake `KnowledgeApi`），红。
   2. 实现采纳（`EssayBodyRenderer.render` + `createCollected`，`publish?"published":"draft"`）、驳回（写 `review_note`）、列表；绿。
   3. 控制器三端点 + ADMIN 注解。
-- 验证：`backend$ scripts/test-db.sh mvn -B -pl paideia-ai -Dtest=EssayReviewServiceTest test` 全绿；`backend$ scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=AuthorizationIsolationTest -Dsurefire.failIfNoSpecifiedTests=false test` 全绿。
+- 验证：`backend$ mvn -B -o -pl paideia-ai -am '-Dtest=EssayReviewServiceTest' '-Dsurefire.failIfNoSpecifiedTests=false' test` → `Tests run: 7, Failures: 0, Errors: 0`，BUILD SUCCESS（2026-11-19 11:31）。守卫三件（`../scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=ApiSurfaceTest,ApiContractTest,AuthorizationIsolationTest`）→ `Tests run: 26, Failures: 0, Errors: 0`，BUILD SUCCESS，新前缀已纳入 401/403 矩阵。
 
-### TASK-007 | pending | 【本期不实施】复核队列前端页面
+### TASK-007 | done | 复核队列前端页面
 
 - 对应：`REQ-003`
 - 依赖：TASK-006
 - 新建：`frontend/apps/admin/src/pages/EssayReviewPage.tsx`。
   修改：`frontend/apps/admin/src/router.tsx`（`:92` 区域加 `/knowledge/essay-reviews`，包 `<RequireAdmin>`）、`frontend/apps/admin/src/components/AdminShell.tsx`（`:47-52` 子菜单加「面经复核」、`:98-101` 面包屑加映射）、`frontend/apps/admin/src/knowledge-shared.tsx`（加三个客户端方法）。
 - 接口：消费 `GET /api/v1/ai/admin/essay-verifications`、`POST /{id}/approve`、`POST /{id}/reject`。
-- 测试：`frontend/apps/admin/e2e/essay-reviews.spec.ts`（列表渲染、采纳后行消失、驳回后行消失）。
+- 测试：管理端当前没有独立 e2e 运行环境（`frontend` 下无 admin playwright 配置），本轮以 `tsc` 类型检查为准；页面行为留待有 e2e 基建时补。
 - 步骤：
   1. 页面：状态筛选（默认 `pending_review`）+ 表格 + 详情（草稿/修订/问题/依据）+ 采纳（可编辑答案、勾选直接发布）/驳回。
   2. 接路由、菜单、面包屑、客户端方法；`pnpm --filter @paideia/admin typecheck` 通过。
   3. 写 e2e 并跑通。
-- 验证：`frontend$ pnpm --filter @paideia/admin typecheck` → 0 error；`frontend$ pnpm --filter @paideia/admin exec playwright test e2e/essay-reviews.spec.ts` → 全绿。
+- 验证：`frontend$ pnpm --filter @paideia/admin typecheck` → 0 error（2026-11-19 11:29）；`pnpm --filter @paideia/knowledge test` → 112 passed（含 admin-client 4 条）。
 
 ### TASK-008 | done | 效果评测（基线 vs 校验后）
 

@@ -21,6 +21,8 @@ export type {
   ConceptSummary,
   CreateImportResult,
   EntryInput,
+  EssayReferenceSnippet,
+  EssayReviewItem,
   ImportItem,
   KnowledgeAdminApi,
   KnowledgeImportRow,

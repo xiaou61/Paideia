@@ -85,6 +85,34 @@ export interface KnowledgeImportRow {
   updatedAt: string
 }
 
+// ── 面经复核队列（WORK-084） ─────────────────────────────────────
+
+/** 校验阶段引用的文档片段（本期只做内部自检，通常为空）。 */
+export interface EssayReferenceSnippet {
+  url: string
+  title: string | null
+  excerpt: string
+}
+
+/** 待复核的一条面经：草稿答案 + 自检发现的问题 + 修订后的答案。 */
+export interface EssayReviewItem {
+  id: number
+  status: string
+  questionTitle: string
+  draftAnswer: string
+  finalAnswer: string | null
+  confidence: number
+  issues: string[]
+  snippets: EssayReferenceSnippet[]
+  categoryId: number | null
+  sourceUrl: string | null
+  sourceTitle: string | null
+  entryId: number | null
+  reviewNote: string | null
+  createdAt: string
+  reviewedAt: string | null
+}
+
 // ── 检索切片编辑（WORK-076） ─────────────────────────────────────
 
 export interface ChunkView {
@@ -148,6 +176,13 @@ export interface KnowledgeAdminApi {
     edit(entryId: number, chunkIndex: number, content: string): Promise<ChunkEditResult>
     revisions(entryId: number, chunkIndex: number): Promise<ChunkRevision[]>
     rollback(entryId: number, chunkIndex: number, version: number): Promise<{ version: number }>
+  }
+
+  /** 面经复核（WORK-084）：列出被内部自检拦下的题，采纳或驳回。 */
+  essayReviews: {
+    list(status?: string, page?: number, size?: number): Promise<PageResult<EssayReviewItem>>
+    approve(id: number, input: { title?: string; answer?: string; publish: boolean }): Promise<{ entryId: number }>
+    reject(id: number, note?: string): Promise<null>
   }
 }
 
@@ -287,6 +322,30 @@ export function createKnowledgeAdminApi(client: ApiClient): KnowledgeAdminApi {
           `/api/v1/ai/admin/knowledge-entries/${entryId}/chunks/${chunkIndex}/rollback`,
           { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ version }) },
         ),
+    },
+
+    essayReviews: {
+      list: (status, page = 1, size = 20) => {
+        const params = new URLSearchParams({ page: String(page), size: String(size) })
+        if (status !== undefined && status !== '') {
+          params.set('status', status)
+        }
+        return client.requestEnvelope<PageResult<EssayReviewItem>>(
+          `/api/v1/ai/admin/essay-verifications?${params.toString()}`,
+        )
+      },
+      approve: (id, input) =>
+        client.requestEnvelope<{ entryId: number }>(`/api/v1/ai/admin/essay-verifications/${id}/approve`, {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+        }),
+      reject: (id, note) =>
+        client.requestEnvelope<null>(`/api/v1/ai/admin/essay-verifications/${id}/reject`, {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ note }),
+        }),
     },
   }
 }
