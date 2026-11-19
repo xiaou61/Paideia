@@ -2,288 +2,260 @@
 title: systemd：把程序变成服务
 category: linux-from-zero
 order: 12
-minutes: 28
+minutes: 18
 level: beginner
 status: published
 ---
 
-## 这一关在解决什么
+## 两个单元抢同一个端口，`restart` 改不到真正在跑的那个
 
-`nohup ./app.sh &` 能跑。但机器一重启就没了，崩了不会自己起来，日志混在某个文件里，`ps` 里也看不出它是谁。**把这些"能跑"升级成"能长期活着"，就是 systemd 的职责。**
+`deploy/ops/install-ops.sh` 第 214–217 行有一段注释，是 2026-10-27 一次真实排查留下的，下面原文照抄（连它自己的半角引号一起）：
 
-```sketch
-{
-  "title": "从「能跑」到「长期活着」",
-  "rows": [
-    [
-      { "id": "nohup", "title": "nohup 后台跑", "sub": "重启就没了", "tone": "amber" },
-      { "id": "unit", "title": "写成 unit", "sub": "崩了自动拉起", "tone": "blue" },
-      { "id": "journal", "title": "日志进 journald", "sub": "开机自启、状态可查", "tone": "green" }
-    ]
-  ],
-  "arrows": [
-    { "from": "nohup", "to": "unit" },
-    { "from": "unit", "to": "journal" }
-  ]
-}
+```text
+# **包自带的 grafana-server.service 必须停用**（2026-10-27 实测踩过）：apt 装的 grafana 会
+# enable 它自己的单元，而本脚本用的是自写的 grafana.service。两个单元抢 127.0.0.1:3000，
+# 后启动的那个 bind 失败并进入 `Restart=on-failure` 重启循环（半小时内 66 次），
+# 而先启动的那个只是"看着正常"——`systemctl restart grafana-server` 更是完全改不了真正在跑的那个。
 ```
 
-这一关给你一份能直接改用的 unit 文件，和三个必须知道的行为：改完要 `daemon-reload`、`ExecStart` 必须是绝对路径、单元里读不到你的 shell 环境变量。
+这四行里同时成立三件事，每一件单独看都会让人误判：
 
-打个比方：systemd 像一个常驻的管家，负责把你要的东西一开机就摆好、倒了再扶起来。真实机制是，systemd 作为 1 号进程启动后常驻内存，按 unit 文件的描述启动、监控进程，并在它退出时按策略重启。
+- 两个单元都被 enable 了，都认为自己拥有 3000 端口；
+- 输的那个不是「没起来」，是「起来就死、死了又起」——`Active:` 一行的状态在你敲命令的那一瞬间是什么，取决于你赶上了哪一拍；
+- 赢的那个是谁，由启动顺序决定，跟哪份 unit 写得更好没关系。
 
-## 为什么是 systemd
+所以「我的服务在跑吗」这个问题，`systemctl status` 一个命令回答不完，得连着端口和 PID 一起看。下面就拿这一份 `deploy/ops/grafana.service` 走完全程：写对、起得来、分得清在跑哪个进程、坏了先看哪。
 
-它取代了老的 SysV init 脚本，主要解决三件事：
+> 写作环境是 Windows，没有 systemd。本文所有 `systemctl` / `journalctl` 的回显都标了「标准形态，未实跑」——命令、字段名、状态码按 systemd 文档与仓库里的真实文件写，具体数字（PID、内存）你在自己机器上看到的不一样。能在这台机器上真跑的部分（读仓库文件、静态对账）贴的是真实输出，并注明用什么跑的。
 
-- **依赖与并行**：老式脚本靠编号（`S20` 排在 `S21` 前），systemd 声明 `After=`、`Wants=` 之后能并行启动无依赖的服务，开机快得多。
-- **cgroup 管理**：每个服务放进自己的 cgroup，能精确知道"这个服务用了多少内存、起过哪些子进程"。`systemctl stop` 能把整棵进程树一次清掉（第 09 关讲的"杀一整组"它默认就做）。
-- **统一的日志**：服务的 stdout/stderr 自动进 journal，不用自己在脚本里重定向。
+## 先看这份 unit 到底长什么样
 
-## 讲解
-
-### 单元是什么
-
-systemd 管的一切都是"单元"（unit），一个单元一个文件：
-
-| 后缀 | 管什么 | 例子 |
-| --- | --- | --- |
-| `.service` | 后台服务 | `paideia.service` |
-| `.timer` | 定时任务（替代 cron，第 18 关） | `backup.timer` |
-| `.socket` | 按需唤醒（有人连端口才启动服务） | `docker.socket` |
-| `.mount` | 挂载点 | `/data.mount` |
-| `.target` | 一组单元的集合，类似"运行级别" | `multi-user.target` |
-
-单元文件放哪，决定它归谁管：
-
-| 目录 | 谁放 | 优先级 |
-| --- | --- | --- |
-| `/etc/systemd/system/` | **管理员自己写的** | 最高 |
-| `/usr/lib/systemd/system/` | 包管理器装的（apt 装的服务在这） | 中 |
-| `~/.config/systemd/user/` | 用户级服务（`systemctl --user`） | 仅该用户 |
-
-**自己的服务写在 `/etc/systemd/system/`**。要改包管理器装的单元，也在这里放一个同名文件覆盖，不要去改 `/usr/lib` 下的原件。升级时会被覆盖回去。
-
-### 一份能直接用的 unit
-
-假设程序在 `/opt/paideia/paideia.jar`，用专用账号 `paideia` 跑：
+完整内容（24 行，`deploy/ops/grafana.service`）：
 
 ```ini
-# /etc/systemd/system/paideia.service
 [Unit]
-Description=Paideia API
-Documentation=https://example.com/paideia
-After=network-online.target mysql.service
-Wants=network-online.target
-Requires=mysql.service
+Description=Grafana（Paideia 运维面板）
+After=network-online.target prometheus.service
 
 [Service]
 Type=simple
-User=paideia
-Group=paideia
-WorkingDirectory=/opt/paideia
-Environment=LANG=C.UTF-8
-EnvironmentFile=-/etc/paideia/paideia.env
-ExecStart=/usr/bin/java -Xms256m -Xmx512m -jar /opt/paideia/paideia.jar
-ExecReload=/bin/kill -HUP $MAINPID
+User=grafana
+Group=grafana
+# 主配置走 /etc/grafana/grafana.ini；口令等敏感项走 600 的环境文件
+EnvironmentFile=/etc/grafana/grafana.env
+ExecStart=/usr/share/grafana/bin/grafana server \
+    --homepath=/usr/share/grafana \
+    --config=/etc/grafana/grafana.ini
 Restart=on-failure
 RestartSec=5
-TimeoutStopSec=30
-LimitNOFILE=65535
-StandardOutput=journal
-StandardError=journal
+MemoryMax=512M
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/grafana /var/log/grafana
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-逐段看：
+三段各管一件事，管的对象不一样：
 
-**[Unit] 段——关系和元信息**
+- **`[Unit]`** 写「我和别人是什么关系」——排序（`After=`/`Before=`）与需求（`Wants=`/`Requires=`）。这份文件第 3 行只写了 `After=`、没写 `Wants=`，这件事后面单独一节说——它是本文最长的一个坑。
+- **`[Service]`** 写「怎么跑这个进程」：用哪个账号（`User=`）、执行什么（`ExecStart=`）、崩了要不要重来（`Restart=`）、给自己留几条退路（`MemoryMax=`、`ProtectSystem=` 这些）。
+- **`[Install]`** 只被 `systemctl enable` 读，管「开机时谁把我拉起来」。`WantedBy=multi-user.target` 的意思是：enable 时在 `/etc/systemd/system/multi-user.target.wants/` 下建一个指向本文件的符号链接，开机走到 `multi-user.target` 时顺着链接把它拉进来（`systemd.unit(5)` 的 Example 1 就是这个例子）。没有 `[Install]` 段的 unit，`systemctl enable` 会直接拒绝——因为它不知道该往哪个 target 的 wants 目录里放链接。
 
-| 指令 | 含义 |
-| --- | --- |
-| `Description` | `systemctl status` 里显示的一句话 |
-| `After=X` | **启动顺序**：X 起来之后再启动我。只定顺序，不建立依赖 |
-| `Wants=X` | **弱依赖**：想启动 X，X 失败我也照跑 |
-| `Requires=X` | **强依赖**：X 失败我就不启动；X 停止时我也被停 |
-| `Documentation` | 文档地址，`systemctl status` 里可点 |
+顺带一个反常识的点：`enable` 和 `start` 是两件事。`enable` 只改开机行为，对当前进程毫无影响；`start` 只改当前进程，重启后不会自己回来。要一步到位是 `systemctl enable --now grafana.service`。仓库的安装脚本用的就是这个写法（`deploy/ops/install-ops.sh:225`）。
 
-`After` 和 `Requires` 是两件不同的事，这也是最容易配错的地方。只写 `After=mysql.service` 只是"排在 mysql 后面"，mysql 没起来它照样启动然后连不上库。要"mysql 必须可用"得写 `Requires=` + `After=`（或 `BindsTo=`）。
+## 它到底读了哪个文件
 
-`network-online.target` 与 `network.target` 也别混。前者等网络**真正可用**（拿到地址），后者只是"网络子系统初始化完了"。依赖外部服务的程序要用 `network-online.target`。
+别背 `/etc`、`/usr/lib`、`/run` 三个目录谁优先——直接看回显第一行。`Loaded:` 后面的括号就是它实际读的路径：
 
-**[Service] 段——怎么跑**
+```text
+# 标准形态，未实跑
+$ systemctl status grafana.service --no-pager
+● grafana.service - Grafana（Paideia 运维面板）
+     Loaded: loaded (/etc/systemd/system/grafana.service; enabled; preset: enabled)
+     Active: active (running) since Wed 2026-11-19 10:21:07 CST; 2h 14min ago
+   Main PID: 1187 (grafana)
+      Tasks: 21 (limit: 4629)
+     Memory: 214.6M (max: 512.0M available: 297.3M)
+     CGroup: /system.slice/grafana.service
+             ├─1187 /usr/share/grafana/bin/grafana server --homepath=/usr/share/grafana ...
+             └─1219 /usr/share/grafana/bin/grafana server --homepath=/usr/share/grafana ...
+```
 
-| 指令 | 说明 |
-| --- | --- |
-| `Type=simple` | 默认值。`ExecStart` 启动的进程就是主进程，不 fork |
-| `Type=forking` | 老式守护进程（自己 fork 到后台），要配 `PIDFile=` |
-| `Type=oneshot` | 跑完就退出（脚本、初始化任务），常配 `RemainAfterExit=yes` |
-| `User` / `Group` | **以谁的身份跑**。不写就是 root（第 05 关讲过为什么不该这样） |
-| `WorkingDirectory` | 进程的工作目录——**相对路径的基准**（第 02 关） |
-| `Environment=` | 直接给变量，可以写多行 |
-| `EnvironmentFile=` | 从文件读 `KEY=VALUE`；路径前加 `-` 表示文件不存在也不报错 |
-| `ExecStart` | **必须是绝对路径**，且**不经过 shell** |
-| `ExecReload` | `systemctl reload` 时执行什么；`$MAINPID` 是主进程 PID |
-| `Restart=` | `no`（默认）/ `on-failure` / `always` |
-| `RestartSec` | 重启前等几秒，防止疯狂重启 |
-| `TimeoutStopSec` | SIGTERM 之后等多久发 SIGKILL（默认 90） |
-| `LimitNOFILE` | 打开文件数上限，服务报 "Too many open files" 就改它 |
-| `StandardOutput` | `journal` / `file:` / `null`；默认进 journal |
+三行信息决定后面所有判断：
 
-**[Install] 段——什么时候自启**
+- **`Loaded:`** —— 读了哪个文件、有没有 enable、preset 是什么。如果你改的是一份文件、它读的是另一份（比如包自带的 `/usr/lib/systemd/system/grafana-server.service`），那后面全白干。
+- **`Active:`** —— `active (running)` 只说明「主进程还活着」，不说明它绑到了端口、能连上数据库。`activating`/`failed` 反复出现就是重启循环。
+- **`Main PID:` 与 `CGroup:`** —— 这一层是第 08 关 `ps` 的延伸：unit 名下挂着的是一整组进程（cgroup），`Main PID` 只是其中被认定为主进程的那个。所以停服务时 systemd 默认给整组发信号，而不是只杀一个 PID。
 
-`WantedBy=multi-user.target` 表示"多用户模式（也就是正常启动）时把我带上"。`systemctl enable` 就是根据这一段创建软链接；没有这一段，`enable` 会报错。
+`Active:` 说 running 但端口不在它手里——这就是开头那个事故的样子。核对只需要一条命令（第 15 关的 `ss`）：
 
-### `ExecStart` 的两个硬约束
+```text
+# 标准形态，未实跑
+$ ss -ltnp | grep ':3000'
+LISTEN 0 4096 127.0.0.1:3000 0.0.0.0:* users:(("grafana",pid=1187,fd=7))
+```
 
-**1. 必须是绝对路径。**
+拿 `pid=1187` 去和 `Main PID` 对。对不上，就是「你在管的那个不是真正在跑的那个」。
+
+同一条信息也能让机器读，仓库里就有现成用法——`deploy/ops/ops-textfile.sh` 把 unit 状态抓成 Prometheus 指标，靠的是 `systemctl show`，而不是去解析 `status` 的排版：
+
+```bash
+values=$(systemctl show "$unit" \
+    --property=ActiveState,MemoryCurrent,MemoryMax 2>/dev/null) || values=""
+```
+
+`status` 给人看，排版会随版本变；`show` 的 `键=值` 给脚本看，稳定得多。
+
+## ExecStart 的三条硬约束
+
+**一、命令的首参数必须是绝对路径。** systemd 不查 PATH 去找可执行文件，`ExecStart=grafana server` 这种写法在启动时会直接失败（`status=203/EXEC`）。但要注意反向的那一半：**进程内部的 PATH 不是你的登录 shell**，systemd 给服务的是个固定值 `/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`（`systemd.exec(5)` 的 Environment Variables 一节）。所以「我在 shell 里敲 `java -jar` 好好的」和「unit 里同一行找不到 java」可以同时为真——区别在于你的 PATH 里有 `~/.sdkman/candidates/java/current/bin`，服务里没有。如果 `ExecStart=` 指向的是一个脚本，脚本内部再调 `java`，踩的就是这一条；让脚本自己设 PATH，或者在 unit 里写 `Environment=PATH=...`。
+
+**二、不经过 shell。** `>`、`|`、`&&`、`$(...)`、`*` 都不由 shell 解释，systemd 只把这一行按空白和引号切成参数，然后 `execve()`。需要管道或重定向，就显式写一个 shell：`ExecStart=/bin/sh -c 'exec /opt/app/run.sh >> /var/log/app.log 2>&1'`。变量要展开成字面 `$`，写 `$$`。
+
+**三、改完文件必须 `daemon-reload`。** unit 文件在管理器启动时被读进内存，之后看的是缓存。改了配置只 `restart`，起来的还是旧内容，症状是「我明明改了但报错一模一样」。
+
+同一段里还有一处容易自相矛盾的地方，顺手说清：服务**不继承你登录 shell 的环境变量**——这不等于「unit 里读不到环境变量」。注入有三条路，从窄到宽：
+
+1. `Environment=KEY=value`，只给这一个 unit；
+2. `EnvironmentFile=/etc/grafana/grafana.env`，敏感项单独放一份 600 的文件（这份 unit 第 10 行就是）。**没有 `-` 前缀时，文件不存在服务直接起不来**；写成 `EnvironmentFile=-/path` 才是「缺了也继续」。仓库里两边都有真实用法：`/etc/grafana/grafana.env` 由安装脚本在缺的时候先建好再 `chmod 600`（`deploy/ops/install-ops.sh:150`、`:162`），所以它可以不加 `-`；
+3. drop-in：`/etc/systemd/system/<unit>.d/*.conf`，只写要覆盖的那几行，不动原来的文件。仓库注入诊断令牌走的就是这条（`deploy/ops/install-ops.sh:124` 用 heredoc 写 `/etc/systemd/system/paideia.service.d/ops.conf`，路径变量在 `:120`）——好处是包升级时那份 unit 被覆盖掉，你的补充还在。
+
+## 依赖行：`After=` 不拉起对方
+
+这是本文最长的一节，因为仓库里 11 份 unit 有 9 份踩了同一个形态。下面是我在 Windows 上用 PowerShell 对 `deploy/ops/*.service` 做的一次静态对账（真跑，脚本放 `%TEMP%`，11 份 unit 的输出全抄在下面；最后一列判断的是：`After=` 里的 target 有没有被同一个 unit 的 `Wants=` 一起拉起）：
+
+```text
+PS> pwsh -NoProfile -File $env:TEMP\unit-audit.ps1
+unit                      User              user_ok ReadWritePaths                    rw_ok EnvFile                  env_ok AfterTarget
+----                      ----              ------- --------------                    ----- -------                  ------ -----------
+alloy.service             alloy             ok      /var/lib/alloy                    ok                             -      network-online.target=NO-PULL
+blackbox-exporter.service blackbox_exporter ok                                        -                              -      network-online.target=NO-PULL
+grafana.service           grafana           ok      /var/lib/grafana /var/log/grafana ok    /etc/grafana/grafana.env ok     network-online.target=NO-PULL
+loki.service              loki              ok      /var/lib/loki                     ok                             -      network-online.target=NO-PULL
+mysqld-exporter.service   mysqld_exporter   ok                                        -                              -      network-online.target=NO-PULL
+node-exporter.service     node_exporter     ok      /var/lib/node_exporter            ok                             -      network-online.target=NO-PULL
+ops-textfile.service                        -                                         -                              -      -
+paideia-backup.service                      -                                         -                              -      -
+prometheus.service        prometheus        ok      /var/lib/prometheus               ok                             -      network-online.target=NO-PULL
+redis-exporter.service    redis_exporter    ok                                        -                              -      network-online.target=NO-PULL
+tempo.service             tempo             ok      /var/lib/tempo                    ok                             -      network-online.target=NO-PULL
+```
+
+9 份 unit 全写着 `After=network-online.target`，没有一份写 `Wants=network-online.target`。剩下两行是 `-`：`ops-textfile` 与 `paideia-backup` 都是 `Type=oneshot` 的一次性单元，没有 `User=`，`paideia-backup` 等的还是 `mysql.service` 这个真单元而不是 target——这一列只判 target。
+
+`After=` 的语义是「如果这两个单元都要启动，让我排在它后面」——`systemd.unit(5)` 写得很直白：`Before=`/`After=` 生效的前提是 *and both units are being started*。它不负责把对方拉进这次启动事务。拉人是 `Wants=`/`Requires=` 的活，而需求类依赖**不决定顺序**（同一份文档：requirement dependencies do not influence the order）。两件事必须成对写：
 
 ```ini
-ExecStart=java -jar app.jar            # ✗ 启动失败：Executable path is not absolute
-ExecStart=/usr/bin/java -jar app.jar   # ✓
+[Unit]
+Wants=network-online.target
+After=network-online.target
 ```
 
-原因：systemd 不读你的 PATH（第 10 关），它只认绝对路径。想用 `which java` 查出来的路径，写死进去。
-
-**2. 不经过 shell。**
-
-```ini
-ExecStart=/bin/sh -c 'cd /opt/app && ./start.sh && echo done'   # 要用 shell 特性就这样写
-ExecStart=/opt/app/start.sh                                     # 或者把逻辑写进脚本
-```
-
-`ExecStart=/opt/app/start.sh > /var/log/app.log` 这种写法里的 `>` **不会被解释**。它只会被当成一个奇怪的参数传给程序。重定向要用 `StandardOutput=file:/var/log/app.log`，或者在脚本内部做。
-
-同理，单元里也**没有** `$PATH` 里的命令、没有你在 `.bashrc` 里 export 的变量。要环境变量就显式写 `Environment=` 或 `EnvironmentFile=`。
-
-### 日常命令
+所以那 9 行 `After=` 什么时候算数？只有当别的单元（或发行版的 preset）已经把 `network-online.target` 拉进这次启动时才算数。要确认就查谁 want 它：
 
 ```text
-$ sudo systemctl daemon-reload      # 改了 unit 文件后必须执行
-$ sudo systemctl start paideia
-$ sudo systemctl status paideia
-$ sudo systemctl enable paideia     # 开机自启
-$ sudo systemctl restart paideia
-$ sudo systemctl stop paideia
-$ systemctl is-active paideia       # active / inactive / failed
-$ systemctl is-enabled paideia      # enabled / disabled
-$ systemctl list-units --failed     # 哪些服务起不来
+# 标准形态，未实跑
+$ systemctl list-dependencies --reverse network-online.target
+network-online.target
+● └─apt-daily.service
 ```
 
-`daemon-reload` 是最容易被忘记的一步：**改完 unit 不 reload，`start` 用的还是旧配置**，症状是"我明明改了怎么没生效"。
+（这里拿 Debian/Ubuntu 上 apt 自己的定时任务举例；具体是谁 want 它在各发行版、各安装方式下都不一样，以你机器上的输出为准。看着它为空，就说明那 9 行 `After=` 里其实一行都没生效。）
 
-`enable` 和 `start` 也是两件事：`enable` 只管"下次开机自启"，`start` 只管"现在就起来"。两个都要就都执行（或者用 `systemctl enable --now paideia`）。
+顺带解释这份 unit 第 3 行另一半为什么没问题：`After=network-online.target prometheus.service` 里的 `prometheus.service` 自己 `WantedBy=multi-user.target` 且已 enable，开机时它本来就在这次启动里，所以排序排得上。同一个 `After=`，一个目标在事务里、一个不在，行为完全不同。
 
-`status` 的输出值得学会读：
+再往下还有三个真实差异，照抄会出事：
+
+- **`Requires=` 指向不存在的单元，这次启动事务根本建不起来**（报 `Unit xxx.service not found`）；`Wants=` 指向不存在的单元只在日志里留一条警告，本单元照起。所以下面的发行版差异不是洁癖问题。
+- **数据库单元的名字是发行版给的**：Debian/Ubuntu 的 `mysql-server` 包提供 `mysql.service`，RHEL 系提供 `mysqld.service`。把 `After=mysql.service` 抄到 RHEL 上，等的是一个永远不存在的单元；Debian 上默认装的若是 MariaDB，名字又是 `mariadb.service`。写之前先 `systemctl list-unit-files | grep -i -e mysql -e mariadb` 看真名。
+- **`network-online.target` 由谁「点亮」，取决于装了哪个 wait-online 实现**：`NetworkManager-wait-online`、`systemd-networkd-wait-online`、`ifupdown-wait-online` 都行，但装哪个、默认 enable 与否是发行版和安装方式决定的。它表示的是「有人报告网络已就绪」，不是「你的上游服务能连上了」——这两件事别混。
+
+装包命令同理，Debian 系 `apt`、RHEL 系 `dnf`，本文不展开（第 11 关）。unit 文件覆盖不要把 `/usr/lib/systemd/system/` 里包自带的改掉——包升级会覆盖回去；要么在 `/etc/systemd/system/` 放同名文件，要么用 drop-in。
+
+## 出问题先看哪
+
+坏掉的服务基本只有三种脸：起不来、起来又死、起来了但不干活。三种都是先看同样的三处，按信息量从大到小：
 
 ```text
-● paideia.service - Paideia API
-     Loaded: loaded (/etc/systemd/system/paideia.service; enabled; preset: enabled)
-     Active: active (running) since Wed 2026-10-29 14:02:11 CST; 1h 3min ago
-   Main PID: 9812 (java)
-      Tasks: 42 (limit: 4629)
-     Memory: 512.3M
-        CPU: 47.102s
-     CGroup: /system.slice/paideia.service
-             ├─9812 /usr/bin/java -jar /opt/paideia/paideia.jar
-             └─9840 mysqld --defaults-file=/opt/paideia/my.cnf
+# 标准形态，未实跑
+$ systemctl status grafana.service -l --no-pager     # 状态 + 最后 10 行日志 + 退出码
+$ journalctl -u grafana.service -n 100 --no-pager    # 完整最后 100 行（第 13 关）
+$ journalctl -u grafana.service -p err -b            # 本次开机以来 error 及以上
 ```
 
-四行信息量最大。`Loaded` 看它从哪个文件加载、是否自启；`Active` 看状态和跑了多久；`Main PID` 是主进程。`CGroup` 里能看到它启动的**全部子进程**，这在排查"服务起了但端口被谁占着"时很关键。
+`status` 里那行 `status=203/EXEC` 的斜杠前面是 systemd 自己的退出码，后面是它的名字。常见几个：
 
-### 出问题先看三处
+| `status=` 看到什么 | 实际含义 | 下一步 |
+| --- | --- | --- |
+| `203/EXEC` | 找不到 `ExecStart=` 的可执行文件，或它没有执行权限 | `ls -l` 那个绝对路径；注意 `--homepath` 之类的参数不能写在路径前面 |
+| `200/CHDIR` | `WorkingDirectory=` 指到了不存在的目录 | 改 `WorkingDirectory=`，或先用 `ExecStartPre=` 建目录 |
+| `217/USER` | `User=` 指定的账号不存在 | `id grafana`；安装脚本里 `useradd --system` 那一行漏了 |
+| `226/NAMESPACE` | 沙箱相关的挂载准备失败（`ProtectSystem=`、`ReadWritePaths=` 这一类） | 先看这些路径在不在、属主对不对 |
+| `start request repeated too quickly` | 短时间内的启动次数撞上了限速，单元被钉在 `failed` | 先修根因，再 `systemctl reset-failed` 解锁。不解锁怎么改都不重启 |
 
-```text
-$ systemctl status paideia -l --no-pager    # -l 不截断长行
-$ journalctl -u paideia -n 100 --no-pager   # 该服务最近 100 行
-$ journalctl -u paideia -p err -b           # 本次开机以来的错误级别日志
+「起来了但不干活」不在这个表里：`Active:` 是 `active (running)`，但端口没绑上、上游连不上、日志里一行业务输出都没有。这类只能靠端口和日志对照，也就是前面 `ss -ltnp` 那一步。
+
+还有一条最容易被漏掉、也最反直觉的：**`Type=simple` 下 `systemctl start` 可能报了成功，服务其实是死的**。`systemd.service(5)` 在 `Type=` 的 `simple` 一节里明说了这一点——`simple` 会在 `fork()` 之后就认为启动完成，此时子进程还没 `execve()`，所以「`User=` 的账号不存在」「可执行文件不存在」这类准备阶段的失败，`start` 命令照样可能返回 0。文档给的建议是长驻服务用 `Type=exec`：它要等 `execve()` 成功才算启动完成，这类错误会直接报失败。判断依据永远是 `status` 和 `journalctl`，不是 `start` 的返回码。
+
+`Restart=` 也要看清楚：`on-failure` 只在**非零退出、被信号杀掉、超时、OOM** 这几种情况下重来（`systemd.service(5)` 的 Table 1 是完整对照表）；干净退出不会重启，`systemctl stop` 停掉的也不会重启。而 `RestartSec=` 的默认值是 100ms——这解释了为什么「启动即崩」的服务会在一瞬间堆出一大片日志，然后撞上限速。这份 unit 显式写了 `RestartSec=5`，5 秒一拍，翻日志时才看得清。
+
+## 加固：先给它划边界
+
+这份 unit 从 17 行到 21 行是五条白送的约束，不改一行代码就能上：
+
+- `NoNewPrivileges=true`：进程不能通过 setuid 提权。
+- `PrivateTmp=true`：`/tmp`、`/var/tmp` 换成私有挂载，看不见别人的临时文件。
+- `ProtectHome=true`：`/home`、`/root`、`/run/user` 对它不可见。
+- `ProtectSystem=strict`：整个文件系统对它只读。
+- `ReadWritePaths=/var/lib/grafana /var/log/grafana`：上面那条的唯一例外清单。
+
+`ProtectSystem=strict` 和 `ReadWritePaths=` 必须成对理解。`systemd.exec(5)` 的原话是：开了 strict 之后「为了允许服务写某些目录，必须用 `ReadWritePaths=` 把它们加入白名单」。也就是说，加了 strict 却没补白名单，最先坏的不是启动，是**写日志和数据目录**——文件系统对它是只读的，`Permission denied` 或者 `Read-only file system` 会出现在业务日志里。这份 unit 的白名单正好对应 Grafana 的两处写入点：数据目录和日志目录。
+
+还有一件配套的事：`ReadWritePaths=` 只是「允许写」，systemd 不会替你建这些目录、也不会改属主。所以安装脚本里一定有这两行（`deploy/ops/install-ops.sh:72`、`:73`）：
+
+```bash
+mkdir -p /var/lib/grafana /var/log/grafana
+chown -R grafana:grafana /var/lib/grafana /var/log/grafana
 ```
 
-最常见的三类失败：
-
-| 现象 | 原因 |
-| --- | --- |
-| `status=203/EXEC` | `ExecStart` 路径不存在或没有执行权限 |
-| `status=200/CHDIR` | `WorkingDirectory` 不存在 |
-| `status=217/USER` | `User=` 指定的账号不存在 |
-| `start request repeated too quickly` | 启动即崩，`Restart=` 重试太频繁被 systemd 拦住（先 `reset-failed`） |
-
-```text
-$ sudo systemctl reset-failed paideia    # 清掉失败计数再试
-```
-
-### 加固：几行就够的常见项
-
-```ini
-[Service]
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/var/lib/paideia /var/log/paideia
-```
-
-- `NoNewPrivileges`：禁止服务通过 setuid 提权。
-- `PrivateTmp`：给它一个私有的 `/tmp`，和其他进程隔离。
-- `ProtectSystem=strict`：整个文件系统只读，只有 `ReadWritePaths` 里的可写。
-
-这几项能挡住"服务被攻破后顺手改系统文件"的一大类后果，代价很小。注意 `ProtectSystem=strict` 之后要显式列出所有需要写的目录。漏了会报"只读文件系统"。
+`MemoryMax=512M` 是另一条：它写进 cgroup 的内存上限，超了内核会在这一组进程里 OOM kill，而不是把整台机器拖死。代价是 unit 会进 `oom-kill` 状态，`Restart=on-failure` 接得住它（`systemd.service(5)` 的表里 OOM 一行对 `on-failure` 是打勾的）。
 
 ## 动手
 
-```code-challenge
-{"id":"linux-12-unit-bug","kind":"bug","title":"这个 unit 起不来，错在哪一行？","language":"ini",
- "code":"[Unit]\nDescription=Paideia API\nAfter=network-online.target\n\n[Service]\nWorkingDirectory=/opt/paideia\nExecStart=java -jar paideia.jar\nRestart=on-failure\n\n[Install]\nWantedBy=multi-user.target","bugLine":7,
- "explain":"systemd 不读 PATH，`ExecStart` 必须是绝对路径，否则报 `Executable path is not absolute`（status=203/EXEC）。应写成 `ExecStart=/usr/bin/java -jar paideia.jar` 或先 `which java` 查真实路径。"}
-```
-
-这一道写一份 unit 文件，用 `systemd-analyze` 做静态检查。
+下面这份 unit 改错了三个地方，你看能不能一次说清每一处会报什么。
 
 ```code-challenge
 {
- "id": "linux-12-shell-unit-file",
- "kind": "shell",
- "title": "写一份能过静态检查的 unit",
- "seed": [
-  {
-   "path": "app/paideia.jar",
-   "content": "占位文件，不参与运行\n"
-  }
- ],
- "starter": "# 写一个 Java 服务的 unit 到 app/paideia.service：\n# 用 /usr/bin/java 以 paideia 用户跑 /opt/paideia/paideia.jar，失败自动重启，开机自启\n",
- "judge": "set -e\n[ -f app/paideia.service ] || { echo \"app/paideia.service 不存在\"; exit 1; }\ncommand -v systemd-analyze > /dev/null || { echo \"镜像里没有 systemd-analyze\"; exit 1; }\nout=$(systemd-analyze verify app/paideia.service 2>&1 || true)\ncase \"$out\" in\n  *\"Executable path is not absolute\"*) echo \"ExecStart 必须是绝对路径：$out\"; exit 1;;\n  *\"Invalid section\"*) echo \"段落名不合法：$out\"; exit 1;;\n  *\"no ExecStart\"*) echo \"缺 ExecStart：$out\"; exit 1;;\nesac\ngrep -q '^ExecStart=/usr/bin/java' app/paideia.service || { echo \"ExecStart 应为 /usr/bin/java -jar ...\"; exit 1; }\ngrep -q '^User=paideia' app/paideia.service || { echo \"缺 User=paideia（服务不该以 root 跑）\"; exit 1; }\ngrep -q '^Restart=' app/paideia.service || { echo \"缺 Restart=（崩了要能自己起来）\"; exit 1; }\ngrep -q 'WantedBy=multi-user.target' app/paideia.service || { echo \"缺 WantedBy=multi-user.target，否则 enable 不了\"; exit 1; }",
- "explain": "四个要点：ExecStart 必须绝对路径（systemd 不读 PATH，就是第 01 关那个 203/EXEC 的成因）、以专用用户跑、失败重启、WantedBy 才能 enable。`systemd-analyze verify` 做的事和真实加载一致，它不报错基本就等于能起来。"
+  "id": "linux-12-grafana-unit-bug",
+  "title": "这份 unit 起不来，错在哪",
+  "kind": "bug",
+  "language": "ini",
+  "code": "[Unit]\nDescription=Grafana（Paideia 运维面板）\nAfter=network-online.target\n\n[Service]\nType=simple\nUser=grafana\nExecStart=grafana server --homepath=/usr/share/grafana --config=/etc/grafana/grafana.ini\nRestart=on-failure\nProtectSystem=strict\n\n[Install]\nWantedBy=multi-user.target\n",
+  "bugLine": 8,
+  "explain": "`ExecStart=` 的首参数必须是绝对路径，写成 `grafana` 会在启动时报 `status=203/EXEC`——systemd 不查 PATH。顺带两处：第 3 行只写了 `After=` 没写 `Wants=`，开机时 `network-online.target` 若没人拉进事务，这一行等于没写；第 10 行 `ProtectSystem=strict` 之后没有任何 `ReadWritePaths=`，Grafana 写 `/var/lib/grafana` 与 `/var/log/grafana` 会被只读挡掉。"
 }
 ```
+
+想继续练就把这份文件写到 `/etc/systemd/system/`，`mkdir -p` 好两个目录、`chown` 好属主，`systemctl daemon-reload` 之后再 `enable --now`。这一步我没法在 Windows 上替你验。
 
 ## 检查一下
 
 ```quiz
 {"id":"linux-12-quiz","title":"systemd 三问","questions":[
- {"question":"改完 unit 文件后，为什么 `restart` 没生效？","options":["要先 `systemctl daemon-reload`","必须先重启机器","unit 文件不能改"],"answer":0,"explain":"systemd 缓存已解析的单元；改文件后必须 daemon-reload 让它重新读取，否则 restart 用的是旧配置。"},
- {"question":"`After=mysql.service` 保证了什么？","options":["只保证启动顺序，不保证 mysql 可用","保证 mysql 一定起来","保证 mysql 挂了本服务也停"],"answer":0,"explain":"After 只定顺序。要依赖 mysql 可用得加 Requires=（或 BindsTo=）；弱依赖用 Wants=。"},
- {"question":"服务报 `Too many open files`，改哪个配置？","options":["unit 里的 LimitNOFILE","/etc/security/limits.conf 就够","ExecStart 加参数"],"answer":0,"explain":"限流是每进程的，systemd 服务要写在 unit 的 LimitNOFILE=（或 [Service] 段的同名字段），改 shell 的 ulimit 不作用于它。"}
+ {"question":"`systemctl start grafana.service` 返回 0，`systemctl status` 却是 failed。最可能是哪种情况？","options":["unit 文件写错了，start 不可能返回 0","`Type=simple` 在 fork 之后就认为启动完成，准备阶段（账号、可执行文件）的失败还没暴露","必须先把 `[Install]` 段删掉才能 start"],"answer":1,"explain":"`systemd.service(5)` 的 `Type=simple` 一节写明：simple 在 `fork()` 后即认为启动完成，所以 `User=` 的账号不存在、可执行文件缺失这类失败，`start` 仍可能报成功。要这类错误直接失败，用 `Type=exec`；判断依据永远是 `status` 和 `journalctl`。"},
+ {"question":"unit 里只有 `After=network-online.target`，没有 `Wants=`。这一行什么时候才真的起作用？","options":["一直起作用，`After=` 会自动把 target 拉起来","完全不起作用，`After=` 只能配合 `Before=` 使用","只有当别的单元已经把 `network-online.target` 拉进这次启动事务时才起作用"],"answer":2,"explain":"`Before=`/`After=` 只管顺序，前提是两个单元都在启动中；拉人是 `Wants=`/`Requires=` 的事，而需求类依赖不决定顺序。`systemctl list-dependencies --reverse network-online.target` 能看出谁 want 它。"},
+ {"question":"改了 unit 文件里的 `ExecStart=`，`systemctl restart` 之后报错一字未变。先怀疑什么？","options":["没 `systemctl daemon-reload`，管理器用的还是内存里的旧配置","内存不够，进程没起来","`restart` 不支持改过的 unit，必须重启机器"],"answer":0,"explain":"unit 文件在管理器启动时被读入并缓存，改完要 `daemon-reload` 才会重新读盘；只 `restart` 起来的是缓存里那份旧配置，症状就是报错一模一样。"}
 ]}
 ```
 
-## 常见误区
+## 还差的
 
-### 误区：把 `nohup` 换成 systemd 就自动重启了
-
-**你以为**：写成服务就有了高可用。
-**其实**：默认 `Restart=no`，进程崩了就是 `failed`，不会自己起来。要自动重启必须显式写 `Restart=on-failure`（或 `always`）并配 `RestartSec`。而 `Restart=always` 遇到"启动即崩"会快速重试，被 systemd 拦在 `start request repeated too quickly`。那说明问题在程序自己，不在重启策略。
-**怎么验证**：`systemctl show paideia -p Restart` 看当前值；`kill` 掉主进程后 `status` 会在几秒内显示 `activating (auto-restart)`。
-
-### 误区：unit 文件里能直接用 shell 变量
-
-**你以为**：`Environment=JAVA_HOME=/opt/jdk21` 之后 `ExecStart=$JAVA_HOME/bin/java` 就成立。
-**其实**：`$JAVA_HOME` 这种**变量展开在 `ExecStart` 里支持**（systemd 会展开 `Environment=` 定义过的变量），但不支持管道、重定向、`&&`、通配符。那些是 shell 的语法，systemd 不启动 shell。想用 shell 特性就显式 `/bin/sh -c '...'`。
-**怎么验证**：写 `ExecStart=/opt/app/start.sh > /tmp/x.log`，`status` 会显示它把 `>` 当参数传给了脚本；改成 `StandardOutput=file:/tmp/x.log` 才生效。
-
-### 误区：`systemctl enable` 之后服务就在跑
-
-**你以为**：enable 等于启动。
-**其实**：`enable` 只建了开机自启的软链接，当前状态还是 `inactive`。要立刻起来用 `systemctl enable --now 服务名`，或者再 `start` 一次。
-**怎么验证**：`systemctl is-enabled x` 与 `systemctl is-active x` 是两个独立的问题，分别查。
+- 我在这台机器上验不了任何运行期行为：`Type=simple` 下 `start` 报成功而服务已死、`ReadWritePaths=` 指向不存在的目录时报哪一条错，这两条的结论都来自文档，不是实测回显。第 226/NAMESPACE 那一行同样只是「这一类错误」的归纳。
+- 仓库那 9 份 unit 现在能跑通，不代表 `After=network-online.target` 生效了——开机时到底有没有谁把那个 target 拉进事务，我查不了。要确定得在真机上 `systemctl list-dependencies --reverse network-online.target`，并 `systemd-analyze plot` 看关键路径。
+- 发行版只覆盖了 Debian/Ubuntu 与 RHEL 系两条差异（`mysql.service` vs `mysqld.service`、`apt` vs `dnf`）。Alpine 用 OpenRC，整套 systemd 概念不适用；容器里一般没有 PID 1 的 systemd，`systemctl` 直接不可用。
+- 没验的是「包升级会不会把 enable 状态改回去」：`install-ops.sh` 每次跑都会 `disable --now grafana-server.service`，但 `apt upgrade grafana` 不一定触发这个脚本，两个单元再次并存的可能性我没有排除。
+- 本文那道题只在纸上改。那份 unit 我没在真机装上跑过，所以「改成什么样能起来」只有文档依据；要真验，得在 Debian 12 上装 systemd、建 `/var/lib/grafana`、`daemon-reload` 后 `enable --now`。
