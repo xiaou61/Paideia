@@ -264,7 +264,7 @@ approver_role:
   注入文本含 `## 历史复盘`/`复盘 #41`/`以本次证据为准`、`markDone` 收到 `knowledge_ids="41"`。
 - 全量：`paideia-ai` 457 例 0 failures（含 14 skipped 的外部依赖用例）、`OpsDiagnosisServiceTest` 12 例全绿。
 
-### TASK-013 | pending | 降级与安全的横切用例
+### TASK-013 | done | 降级与安全的横切用例
 
 - 对应：`REQ-009`、`REQ-010`、`AC-009`、`AC-010`
 - 依赖：TASK-002、TASK-005、TASK-011
@@ -275,6 +275,19 @@ approver_role:
   3. 编辑 ARCHIVED 复盘 ⇒ 断言抛业务异常/返回 409。
   4. 三条全绿。
 - 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-ops -Dtest='OpsEvidenceCollectorTest,OpsDiagnosisEmailTest,PostmortemServiceTest' test` → 期望 0 failures
+
+完成（2026-11-19）：
+
+- **降级不是"少写一段"，而是"写对是哪一种"**：`query_range` 失败与"窗口内本来没日志"都返回空列表，
+  报告里这两句话含义相反。新增 `LokiClient.reachable()`（探 `/loki/api/v1/labels`，**不用 `/ready`**——
+  它返回纯文本 `ready`，`OpsHttp.getJson` 按 JSON 解析会失败、把可用的 Loki 判成不可达），
+  只在日志全空时才探，正常路径不多打一次请求。文案分叉：可达 → 「该 unit 在窗口内无日志；可能未接入
+  Loki」，不可达 → 「Loki 不可达，窗口内日志无法获取；其余证据不受影响」。
+- 超长报告降级：`OpsDiagnosisMailer.MAX_HTML_CHARS=100_000`，超过就只发纯文本 + `.md` 附件
+  （附件是唯一完整的一份）。
+- `update_rejectsArchived` 断言收紧到 `ErrorCode.CONFLICT`。
+- 实测：`mvn -pl paideia-ops -am test` **82 例 0 failures**（`OpsEvidenceCollectorTest` 12、
+  `OpsDiagnosisMailerTest` 4、`PostmortemServiceTest` 11）。
 
 ### TASK-014 | pending | 生产实测：重放 2026-11-19 14:10–14:30 窗口
 

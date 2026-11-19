@@ -63,6 +63,20 @@ class LokiClient {
         return lines.size() > limit ? lines.subList(0, limit) : lines;
     }
 
+    /**
+     * Loki 当前是否可达（WORK-086 AC-009）。
+     *
+     * <p>为什么需要单独探一次：`query_range` 失败与「窗口内本来就没有日志」返回的都是空列表，
+     * 调用方分不出「Loki 挂了」和「这段时间真的没日志」——而这两句话在诊断报告里的含义完全相反。
+     * 只在日志全空时才探，正常有日志的路径不多付一次请求。
+     *
+     * <p>探的是 `/loki/api/v1/labels`（返回 JSON），不是 `/ready`：后者返回纯文本 `ready`，
+     * {@link OpsHttp#getJson} 按 JSON 解析会失败，把可用的 Loki 判成不可达。
+     */
+    boolean reachable() {
+        return OpsHttp.getJson(http, baseUrl + "/loki/api/v1/labels", timeout).isPresent();
+    }
+
     record LogLine(Instant at, String line) {
     }
 

@@ -35,6 +35,8 @@ class OpsEvidenceCollectorTest {
     private final List<String> lokiQueries = new CopyOnWriteArrayList<>();
     /** changes() 返回的重启次数；测试可按需改写。 */
     private volatile double prometheusRestarts = 4;
+    /** 让 Loki 整体返回 500（含可达性探测），用来验降级文案。 */
+    private volatile boolean lokiDown = false;
 
     /** 每个 unit 的日志，按 unit 名区分；没有登记的 unit 返回空。 */
     private final List<String> restartLines = List.of(
@@ -59,6 +61,7 @@ class OpsEvidenceCollectorTest {
     void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/loki/api/v1/query_range", this::loki);
+        server.createContext("/loki/api/v1/labels", this::lokiLabels);
         server.createContext("/api/v1/query", this::prometheus);
         server.createContext("/api/search", this::tempo);
         server.start();
@@ -75,6 +78,10 @@ class OpsEvidenceCollectorTest {
     }
 
     private void loki(HttpExchange exchange) throws IOException {
+        if (lokiDown) {
+            respond(exchange, 500, "{\"status\":\"error\"}");
+            return;
+        }
         String query = URLDecoder.decode(param(exchange.getRequestURI().getRawQuery(), "query"), StandardCharsets.UTF_8);
         lokiQueries.add(exchange.getRequestURI().getRawQuery());
         List<String> body;
@@ -96,6 +103,14 @@ class OpsEvidenceCollectorTest {
             body = body.subList(0, limit);
         }
         respond(exchange, 200, streams(body));
+    }
+
+    private void lokiLabels(HttpExchange exchange) throws IOException {
+        if (lokiDown) {
+            respond(exchange, 500, "{\"status\":\"error\"}");
+            return;
+        }
+        respond(exchange, 200, "{\"status\":\"success\",\"data\":[\"unit\"]}");
     }
 
     private static String unitOf(String query) {
@@ -285,7 +300,7 @@ class OpsEvidenceCollectorTest {
     }
 
     @Test
-    @DisplayName("Loki 不可达时日志段降级为空，不抛异常也不假装有日志")
+    @DisplayName("Loki 连不上时日志段明说不可达，不抛异常也不假装没日志")
     void lokiDownDegrades() {
         OpsProperties properties = new OpsProperties();
         properties.setPrometheusUrl("http://127.0.0.1:1");
@@ -302,7 +317,24 @@ class OpsEvidenceCollectorTest {
 
         OpsDiagnoser.Evidence evidence = collector.collect("alert", "x", null, null, window());
 
-        assertThat(evidence.logs()).contains("未接入 Loki");
+        assertThat(evidence.logs())
+                .contains("Loki 不可达")
+                .doesNotContain("未接入 Loki");
+    }
+
+    @Test
+    @DisplayName("Loki 返回 500 也按不可达处理，其余证据照常产出")
+    void lokiServerErrorDegrades() {
+        lokiDown = true;
+
+        OpsDiagnoser.Evidence evidence = collector(List.of("paideia"), 10, 16000, true)
+                .collect("alert", "日志模板异常待处理", null, null, window());
+
+        assertThat(evidence.logs()).contains("Loki 不可达");
+        // 降级只影响日志段：指标（Prometheus）与 trace（Tempo）仍在
+        assertThat(evidence.metrics()).contains("运行态");
+        assertThat(evidence.traces()).isNotBlank();
+        assertThat(evidence.window()).startsWith("证据窗口 ");
     }
 
     @Test

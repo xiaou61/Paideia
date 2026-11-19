@@ -100,6 +100,27 @@ class OpsDiagnosisMailerTest {
                 assertThat(part.getFileName()).isNotNull());
     }
 
+    @Test
+    @DisplayName("报告超长时退回纯文本，正文里不再有 HTML 部件")
+    void oversizedReportFallsBackToPlain() throws Exception {
+        // 120KB：真实报告不会这么长，但"证据预算被改大 + 模型啰嗦"能凑出来，
+        // 而一封 120KB 的 HTML 在部分客户端会被截断成半封。
+        String report = "## 结论\n" + "x".repeat(120_000);
+
+        MimeMessage message = mailer(true).compose(new String[] {"ops@example.com"}, 9L,
+                "X", report, List.of(), "http://h:8081");
+
+        List<Part> parts = parts(message);
+
+        assertThat(parts).noneSatisfy(part -> assertThat(contentType(part)).contains("text/html"));
+        assertThat(parts).anySatisfy(part -> {
+            assertThat(contentType(part)).contains("text/plain");
+            assertThat(text(part)).contains("■ 结论");
+        });
+        // 附件仍然完整：纯文本正文可能被截断，附件是唯一可信的全文
+        assertThat(parts).anySatisfy(part -> assertThat(part.getFileName()).isEqualTo("diagnosis-9.md"));
+    }
+
     private static String contentType(Part part) throws Exception {
         String type = part.getContentType();
         return type == null ? "" : type.toLowerCase();

@@ -179,7 +179,11 @@ class PostmortemServiceTest {
 
         assertThatThrownBy(() -> service.update(7L, new PostmortemService.PostmortemDraft(
                 "改不动", null, null, null, null, null, null, null, null), 9L))
-                .isInstanceOf(BizException.class);
+                .isInstanceOf(BizException.class)
+                // 归档是「这件事已经了结」的承诺：不再是 409 以外的任何语义，
+                // 否则前端会把"已归档"当成可编辑状态（AC-009）。
+                .extracting(error -> ((BizException) error).errorCode())
+                .isEqualTo(ErrorCode.CONFLICT);
     }
 
     @Test
@@ -270,4 +274,3 @@ class PostmortemServiceTest {
         return row;
     }
 }
-

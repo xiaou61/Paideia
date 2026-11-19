@@ -177,7 +177,11 @@ class OpsEvidenceCollector {
                 + alertsText.length() + patternsText.length()
                 + tracesText.length() + deploysText.length();
         int logBudget = Math.max(0, config.getMaxEvidenceChars() - nonLogChars);
-        String logsText = renderLogs(unitLogs, evidenceWindow, config.getSignatureTop(), logBudget);
+        // 「一条日志都没有」有两种完全不同的原因，报告里必须写对是哪一种（AC-009）：
+        // 全空时才探一次 Loki，探不通就明说不可达，而不是让模型去猜"是不是没接入"。
+        boolean hasAnyLog = unitLogs.values().stream().anyMatch(lines -> !lines.isEmpty());
+        boolean lokiReachable = hasAnyLog || loki.reachable();
+        String logsText = renderLogs(unitLogs, evidenceWindow, config.getSignatureTop(), logBudget, lokiReachable);
 
         return new OpsDiagnoser.Evidence(
                 trigger, alertName, question,
@@ -462,7 +466,8 @@ class OpsEvidenceCollector {
     }
 
     private String renderLogs(Map<String, List<LokiClient.LogLine>> unitLogs,
-                              OpsEvidenceWindow window, int signatureTop, int maxChars) {
+                              OpsEvidenceWindow window, int signatureTop, int maxChars,
+                              boolean lokiReachable) {
         if (maxChars <= 0) {
             return "（证据预算已用完，未采集日志）";
         }
@@ -474,7 +479,9 @@ class OpsEvidenceCollector {
             List<LokiClient.LogLine> lines = entry.getValue();
             rows.add("[" + unit + "]");
             if (lines.isEmpty()) {
-                rows.add("（该 unit 在窗口内无日志；可能未接入 Loki，alloy 白名单待核实）");
+                rows.add(lokiReachable
+                        ? "（该 unit 在窗口内无日志；可能未接入 Loki，alloy 白名单待核实）"
+                        : "（Loki 不可达，窗口内日志无法获取；其余证据不受影响）");
                 continue;
             }
             rows.addAll(renderSignatures(lines, signatureTop));

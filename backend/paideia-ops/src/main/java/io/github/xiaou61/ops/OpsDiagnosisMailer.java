@@ -32,6 +32,9 @@ class OpsDiagnosisMailer {
 
     private static final Logger log = LoggerFactory.getLogger(OpsDiagnosisMailer.class);
 
+    /** HTML 正文的报告字符上限；超过就退回纯文本 + `.md` 附件。 */
+    static final int MAX_HTML_CHARS = 100_000;
+
     private final OpsMailProperties mail;
     private final OpsProperties ops;
     private final JavaMailSenderImpl sender;
@@ -120,7 +123,9 @@ class OpsDiagnosisMailer {
         String link = incidentLink(baseUrl);
         String explore = grafanaExploreBase(baseUrl);
         String plain = OpsDiagnosisEmail.body(alertName, reportMd, link, traceIds, explore);
-        if (mail.isHtmlEnabled()) {
+        // 超长报告退回纯文本（AC-010 的降级面）：几十万字符的 HTML 既撑爆客户端渲染，
+        // 也会被部分企业邮箱直接截断成半封；纯文本 + .md 附件至少内容完整。
+        if (mail.isHtmlEnabled() && reportMd != null && reportMd.length() <= MAX_HTML_CHARS) {
             helper.setText(plain, OpsDiagnosisEmail.html(alertName, reportMd, link, traceIds, explore));
         } else {
             helper.setText(plain, false);
