@@ -5,186 +5,234 @@ chapter: 类与对象
 level: intermediate
 prerequisite: 05 · 类与对象
 category: java-from-zero
-minutes: 26
+minutes: 18
 status: published
 ---
 
 # 06 · static 与值传递
 
-## 这一课你要会
+## error: non-static variable bonus cannot be referenced from a static context
 
-- 分清 `static` 成员与实例成员，知道为什么 `static` 方法里没有 `this`；
-- 说清"Java 只有值传递"，以及为什么方法里改对象会影响外面；
-- 用 `null` 之前先判断，不写靠运气的代码。
+给我那个记分的小程序加一个「全班统一加分」的工具方法，第一版写成这样：
 
-## 为什么
+```java
+public class Main {
+    int bonus = 5;
 
-这两条是 Java 面试最常问、也最容易被含糊带过的：`static` 和"是不是引用传递"。
-
-含糊的代价是实打实的：以为方法是引用传递，就会写出"我明明在方法里换了对象，外面却没变"的困惑；以为 `static` 只是省事，就会在静态方法里访问实例字段然后编译失败。
-
-## 讲解
-
-### `static` 属于类，不属于对象
-
-```text
-class Counter {
-    static int created = 0;   // 所有实例共享
-    int value = 0;            // 每个实例一份
-
-    Counter() {
-        created++;
+    static int withBonus(int score) {
+        return score + bonus;
     }
 
-    static int createdCount() {
-        return created;
-    }
-
-    int getValue() {
-        return value;
+    public static void main(String[] args) {
+        System.out.println(withBonus(80));
     }
 }
 ```
 
-两条规则：
-
-- **`static` 方法里不能直接用实例字段**，也没有 `this`——因为它不知道操作的是哪个对象；
-- **实例方法可以直接访问 `static` 成员**，反过来不行。
-
-`static` 适合工具函数（`Math.max`）和常量（`static final`）。**不该用来存"全局状态"**：多线程下会变成共享可变数据，第 22 课会看到代价。
-
-### Java 只有值传递
-
-参数传递时，传的是**值的副本**：
-
-- 传基本类型，复制的是那个数字。方法里改，外面不变；
-- 传对象，复制的是**引用的副本**。方法里改对象的**字段**，外面看得到（同一个对象）；方法里让参数指向新对象，外面**看不到**（只改了副本）。
-
 ```text
-static void changeNumber(int x) { x = 99; }
-static void changeField(Student s) { s.score = 99; }
-static void reassign(Student s) { s = new Student("新", 0); }
+$ javac --release 21 Main.java
+Main.java:5: error: non-static variable bonus cannot be referenced from a static context
+        return score + bonus;
+                       ^
+1 error
 ```
 
-三次调用后：`changeNumber` 无影响；`changeField` 改到了原对象；`reassign` 无影响。
+我一开始的判断是「`static` 不过就是省掉 `new`」，所以往 `this` 上找问题，来回改了几次编译参数——都没用。原因不在语法糖上：`static` 成员在类加载时就已经存在，它不依附任何一个对象；而 `bonus` 是每个 `Main` 实例各一份的数据。方法体里没有「这是哪个实例」这个信息，编译器不知道该取谁的 5。
 
-**这就是"引用传递"这个说法的错处**：它让人以为 reassign 会生效。准确说法是"传引用的值"。
+所以修的方向只有两条，选哪条取决于这份数据到底有几份：
 
-```sketch
-{
-  "title": "传进去的永远是副本",
-  "rows": [
-    [
-      { "id": "num", "title": "int x", "sub": "副本是那个数字", "tone": "gray" },
-      { "id": "numCopy", "title": "方法里的 x", "sub": "改成 99，外面不变", "tone": "amber" }
-    ],
-    [
-      { "id": "obj", "title": "Student s", "sub": "副本是那个引用", "tone": "gray" },
-      { "id": "objCopy", "title": "方法里的 s", "sub": "指向同一个对象", "tone": "blue" },
-      { "id": "real", "title": "同一个对象", "sub": "改字段外面看得到", "tone": "green" }
-    ]
-  ],
-  "arrows": [
-    { "from": "num", "to": "numCopy" },
-    { "from": "obj", "to": "objCopy" },
-    { "from": "objCopy", "to": "real" }
-  ]
-}
-```
+- 全班共用同一个值 → 它本来就该是 `static` 字段；
+- 每个对象各一份 → 把它当参数传进来，或者先有对象、再通过对象读。
 
-### `null`
+第 05 课那个 `Student` 的分数属于后者，所以下面走第二条。
 
-引用类型默认值是 `null`。访问 `null` 的字段或方法抛 `NullPointerException`。
-
-三种常见防护：
-
-- 判空：`if (value != null)`；
-- 常量放前面：`"abc".equals(value)`；
-- 用 `Optional` 表达"可能没有"（第 18 课细讲，别到处套）。
-
-**不要为了"防 NPE"到处塞 null 检查**：先想清楚"这里允许为 null 吗"。允许就在类型和文档上标明。
-
-### 跑一遍
+## 跑一遍
 
 <!-- run -->
 ```java
 public class Main {
 
     static class Student {
-        String name;
-        int score;
+        static int created = 0;
+        private final String name;
+        private int score;
 
         Student(String name, int score) {
             this.name = name;
+            setScore(score);
+            created++;
+        }
+
+        void setScore(int score) {
+            if (score < 0) {
+                throw new IllegalArgumentException("分数不能为负：" + score);
+            }
             this.score = score;
+        }
+
+        int getScore() {
+            return score;
+        }
+
+        String getName() {
+            return name;
         }
     }
 
-    static int counter = 0;
-
-    static void changeNumber(int x) {
-        x = 99;
+    static void addFiveToScore(int score) {
+        score = score + 5;
     }
 
-    static void changeField(Student s) {
-        s.score = 99;
+    static void addFive(Student student) {
+        student.setScore(student.getScore() + 5);
     }
 
-    static void reassign(Student s) {
-        s = new Student("新学生", 0);
+    static void replace(Student student) {
+        student = new Student(student.getName(), 100);
     }
 
     public static void main(String[] args) {
-        int number = 1;
-        changeNumber(number);
-        System.out.println(number);
+        Student lin = new Student("小林", 80);
 
-        Student student = new Student("小林", 80);
-        changeField(student);
-        System.out.println(student.score);
+        addFiveToScore(lin.getScore());
+        System.out.println("1 int 参数：" + lin.getScore());
 
-        reassign(student);
-        System.out.println(student.name + " " + student.score);
+        addFive(lin);
+        System.out.println("2 改字段：" + lin.getScore());
 
-        counter++;
-        counter++;
-        System.out.println(counter);
+        replace(lin);
+        System.out.println("3 换对象：" + lin.getName() + " " + lin.getScore());
 
-        Student empty = null;
-        System.out.println("abc".equals(empty));
+        new Student("小周", 70);
+        new Student("小何", 60);
+        System.out.println("4 created=" + Student.created);
+
+        int viaInstance = lin.created;
+        System.out.println("5 实例读 static：" + viaInstance);
+
+        Student absent = null;
         try {
-            System.out.println(empty.name);
+            System.out.println(absent.getName());
         } catch (NullPointerException error) {
-            System.out.println("空引用不能取字段");
+            System.out.println("6 " + error.getMessage());
         }
     }
 }
 ```
 ```text
-1
-99
-小林 99
-2
-false
-空引用不能取字段
+1 int 参数：80
+2 改字段：85
+3 换对象：小林 85
+4 created=4
+5 实例读 static：4
+6 Cannot invoke "Main$Student.getName()" because "<local3>" is null
 ```
 
-`reassign` 那一段最关键：方法里确实造了新对象，但外面打印的还是原来的——参数只是引用的副本。
+三个加分方法，一个都没生效、一个生效、一个「看起来该生效却没用」：
+
+- 第 1 行：`addFiveToScore(lin.getScore())` 传进去的是 `80` 这个数字的副本。`score = score + 5` 改的是方法自己的局部变量，方法一返回就没了，所以还是 80。
+- 第 2 行：`addFive(lin)` 传进去的副本是一个引用，这个副本和 `lin` 指着同一个对象。`student.setScore(...)` 改的是对象里的字段，所以外面看到 85。
+- 第 3 行：`replace` 里 `student = new Student(...)` 只让**副本**改指新对象。`lin` 还指着原来那个，分数 85、名字小林，一动不动。
+
+这三行合起来就是「Java 只有值传递」的全部内容。说「Java 是引用传递」错在哪：如果真是引用传递，第 3 行就该改到 `lin`。准确说法是**传引用的值**——值本身是一个引用，但仍然是复制的。
+
+## 计数器报 4，我只叫得出 3 个学生
+
+第 4 行那个 4 值得停一下。我 `new` 出来的学生只有三个：小林、小周、小何。第四个是 `replace` 里 `new` 的那个——它真的被造出来了，构造函数跑了、`created++` 也加了，只是方法返回后除了计数器再没人指着它。
+
+也就是说，第 3 行不是「没执行」，是**执行了、结果留在了方法里**。`created` 报 4，是这个判断唯一能拿到的证据。
+
+`created` 和 `score` 的区别就在这里：
+
+- `static int created` 只有一份，挂在类上，所有实例读写的是同一个格子；
+- `private int score` 每个对象一份，`lin.setScore(85)` 只改小林的。
+
+第 5 行 `int viaInstance = lin.created;` 能编译、也能打印 4，但 `-Xlint:static` 会警告：
+
+```text
+$ javac --release 21 -Xlint:static Main.java
+Main.java:58: warning: [static] static variable should be qualified by type name, Student, instead of by an expression
+        int viaInstance = lin.created;
+                             ^
+1 warning
+```
+
+默认编译不出这个警告。所以「用实例访问 static 字段」语法上是通的，读到的还是类那一份——**通不等于对**，它容易让人以为这个字段跟着对象走。
+
+反方向是合法的：实例上下文里读写 `static` 字段、调 `static` 方法都没问题——构造函数里的 `created++` 就是实例上下文改的类字段。这条规则只有一个方向：**static 方法看不见实例，实例方法看得见 static**。
+
+## 没来报到的那个学生
+
+第 6 行是 `absent` 为 `null` 时调方法的结果。这里有两个我原先搞混的点。
+
+**「引用类型的默认值是 `null`」只对字段成立。** 局部变量没有默认值，不赋值就不能用：
+
+```java
+public class Main {
+    static class Student {
+        private final String name;
+
+        Student(String name) {
+            this.name = name;
+        }
+
+        String getName() {
+            return name;
+        }
+    }
+
+    public static void main(String[] args) {
+        Student s;
+        System.out.println(s.getName());
+    }
+}
+```
+
+```text
+$ javac --release 21 Main.java
+Main.java:16: error: variable s might not have been initialized
+        System.out.println(s.getName());
+                           ^
+1 error
+```
+
+字段不一样：`private Student s;` 这种声明不赋值也合法，默认值才是 `null`（JLS 4.12.5 给字段和数组元素定默认值，局部变量只要求「用之前必须确定已赋值」）。
+
+**NPE 的文案会指出是谁为 null，但名字不一定在。** 从 JDK 14 起（JEP 358，默认开启），空指针消息会补上「因为哪个引用是 null」——第 6 行那句的后半段就是。可它出现的是槽位号 `<local3>` 而不是变量名 `absent`，因为 `javac` 默认不写局部变量表。我用 `javap -v` 看过默认构建的 class 文件：只有 `LineNumberTable`，没有 `LocalVariableTable`。加 `-g:vars` 重编，同一行就变成：
+
+```text
+6 Cannot invoke "Main$Student.getName()" because "absent" is null
+```
+
+槽位号也不是定值。把 `main` 里那行 `int viaInstance = lin.created;` 删掉重编，同一个异常就变成 `<local2>`——槽位是按 `main` 里局部变量的声明顺序数下来的。
+
+把这条帮助信息关掉（`-XX:-ShowCodeDetailsInExceptionMessages`），`getMessage()` 返回的就是 `null` 这两个字。所以「新 JDK 会告诉你在哪空指针」要加条件：**想定位到变量名，编译时得带局部变量表。**
+
+至于防 NPE，比到处塞 `!= null` 更省事的是在入口处失败：`Objects.requireNonNull(student, "学生不能为 null")`，抛出来的消息就是你写的那句。不带第二个参数时 `getMessage()` 是字符串 `null`，等于什么也没说。
+
+把上面这些症状收成一张对照表：
+
+| 看到的症状 | 先看哪一行 | 结论 |
+| --- | --- | --- |
+| `non-static variable X cannot be referenced from a static context` | 这行是不是在 static 方法里直接读了实例字段 | 把字段传进来，或者它本来就该是 static |
+| 方法里改了参数，调用方没变 | 这行是不是给参数本身赋了值（`x = ...`、`s = new ...`） | 改的是副本，出不去 |
+| 方法里改了对象，调用方也变了 | 这行改的是字段、或者调了会改字段的方法 | 同一个对象，正常 |
+| `Cannot invoke ... because "<local3>" is null` | 哪个引用从没被赋过值 | 编译没带 `-g:vars`，槽位号代替了变量名 |
 
 ## 动手
 
-把这段代码补完整，使 `static` 方法能访问实例字段（提示：先创建对象）。
+下面这个 `doubled` 是 static 方法，要读某个学生的分数。三个候选写法里只有一个能编译，选它。
 
 ```code-challenge
 {
   "id": "java-06-fill",
   "kind": "fill",
-  "title": "修正 static 里的访问",
+  "title": "static 方法里怎么拿到实例数据",
   "language": "java",
-  "template": "public class Main {\n    static class Counter {\n        int value = 3;\n    }\n\n    static int read() {\n        Counter counter = new Counter();\n        return {{0}};\n    }\n\n    public static void main(String[] args) {\n        System.out.println(read());\n    }\n}",
-  "options": [["counter.value", "value", "this.value"]],
+  "template": "public class Main {\n    static class Student {\n        private int score;\n\n        Student(int score) {\n            this.score = score;\n        }\n\n        int getScore() {\n            return score;\n        }\n    }\n\n    static int doubled(Student student) {\n        return {{0}} * 2;\n    }\n\n    public static void main(String[] args) {\n        System.out.println(doubled(new Student(21)));\n    }\n}",
+  "options": [["student.getScore()", "getScore()", "score"]],
   "answers": [0],
-  "explain": "static 方法里没有 this，也不能直接访问实例字段；必须先有对象再通过它取字段。"
+  "explain": "static 方法里没有 this：只写 score 是直接读实例字段，只写 getScore() 也没有对象可调用。必须经由传进来的 student 走一步。"
 }
 ```
 
@@ -196,59 +244,42 @@ false
   "title": "static 与传参三问",
   "questions": [
     {
-      "question": "static 方法里为什么不能用 this？",
+      "question": "static 方法里为什么不能直接读实例字段 bonus？",
       "options": [
-        "因为语法不允许写",
-        "因为 static 属于类，没有「当前对象」这个东西",
-        "因为 this 只能用在构造器里"
+        "因为 static 方法里没有 this，编译器不知道要取哪个对象的 bonus",
+        "因为 bonus 没有标 final",
+        "因为 bonus 是 private 的，跨方法读不到"
       ],
-      "answer": 1,
-      "explain": "static 成员在类加载时就存在，不依附任何实例，所以没有 this 可指。"
+      "answer": 0,
+      "explain": "private 只限制从哪个类能访问，与 static 无关；而 static 方法不依附实例，方法体里没有「当前对象」可指。"
     },
     {
-      "question": "方法里 s = new Student(...) 之后，调用方的变量会变吗？",
+      "question": "方法里执行 student = new Student(...) 之后，调用方那个变量会变吗？",
       "options": [
-        "会，因为传的是引用",
-        "不会，方法拿到的是引用的副本，重新赋值只改副本",
-        "取决于对象大小"
+        "会变，因为对象是按引用传的",
+        "不会变，参数拿到的是引用的副本，重新赋值只改副本",
+        "取决于新对象占多大内存"
       ],
       "answer": 1,
-      "explain": "Java 只有值传递；对象传的是引用的值。改字段能传出去，换对象不能。"
+      "explain": "Java 只有值传递。改字段能传出去，让参数改指新对象传不出去。"
     },
     {
-      "question": "static 适合用来做什么？",
+      "question": "static int created 这个字段存在几份？",
       "options": [
-        "存全局可变状态",
-        "工具方法与常量",
-        "每个对象独有的数据"
+        "每个 new 出来的对象各一份",
+        "每个线程各一份",
+        "整个类一份，所有实例共用"
       ],
-      "answer": 1,
-      "explain": "静态可变状态在多线程下是共享数据，容易出事；它适合无状态的工具与常量。"
+      "answer": 2,
+      "explain": "static 字段挂在类上，类加载时初始化一次；所以 replace 里那个没人再引用的对象也照样把它加到了 4。"
     }
   ]
 }
 ```
 
-## 常见误区
+## 还差的
 
-### 误区：Java 是引用传递
-
-**你以为**：方法里把参数换成新对象，外面会跟着变。
-**其实**：传的是引用的副本。改字段能传出去，重新赋值不能。
-**怎么验证**：写一个 reassign 方法，调用后打印外面那个变量。
-
-### 误区：`static` 方法里可以直接用实例字段
-
-**你以为**：同一个类里的东西都能随便用。
-**其实**：静态方法没有 `this`，必须先有对象。编译期就报 `non-static variable cannot be referenced from a static context`。
-
-### 误区：多判几次 `!= null` 就更安全
-
-**你以为**：到处判空能防住所有空指针。
-**其实**：判空只是把错误挪到别处。真正要做的是想清楚"这里能不能为空"，并在类型或方法名上表达出来。
-
-## 小结
-
-`static` 属于类，没有 `this`。Java 只有值传递：改对象字段能传出去，换对象不能。`null` 要先想清楚再判。
-
-下一课：继承、多态与接口——三种"复用"各自解决什么问题。
+- **并发没验证。** `created++` 是读-改-写三步，我这里只有单线程的实测（就是那个 4）。两个线程同时 `new` 会不会少算，我没测，不敢替它下结论；并发本身在第 22 课。
+- **`-Werror` 没试。** 第 5 行只产生 warning，我没验证加 `-Werror` 后是否直接编译失败，所以不敢写「公司构建里照样能过」。
+- **文案只在一台机器上核过。** JDK 25.0.4 加 `--release 21` 编译；课程沙箱基线是 Java 21，`<local3>` 里的槽位号取决于 `main` 里局部变量的声明顺序——这篇里我为了 `-Xlint` 演示加了一个 `int viaInstance`，槽位就从 2 挪到了 3。数组元素为 null、字段为 null 时的文案我没实测。
+- **`requireNonNull` 不带消息时的 `getMessage()`** 返回字符串 `null`，我只测到这一个版本的行为，没去查它算规范还是实现细节。
