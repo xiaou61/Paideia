@@ -268,7 +268,8 @@ class OpsDiagnosisService {
                 incidents.markDone(incidentId, id, diagnosis.model());
                 // 把"答案"送出去：报告只落库等于没送达运维（见 OpsDiagnosisMailer 说明）。
                 // 顺带带上 traceId，让邮件成为「告警 → 日志 → 调用链」的全链路入口。
-                mailer.sendDiagnosis(alertName, diagnosis.report(), traceIds(collected.traces()));
+                mailer.sendDiagnosis(id, alertName, diagnosis.report(),
+                        traceIds(collected.traces()));
             }
             log.info("ops.diagnosis.done id={} trigger={} model={}", id, trigger, diagnosis.model());
         } catch (RuntimeException failure) {

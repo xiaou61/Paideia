@@ -12,6 +12,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * ModularityTest（ApplicationModules.verify）拦下。
  *
  * <p>凭据只来自配置（本地文件或环境变量），不写进仓库、不进日志。
+ *
+ * <p>{@code htmlEnabled} 用 {@link Boolean} 而不是 {@code boolean}：属性缺省时必须落到「开」，
+ * 而原始类型的缺省值是 false——那会让所有未显式配置的环境悄悄退回纯文本。
  */
 @ConfigurationProperties(prefix = "paideia.mail")
 public record OpsMailProperties(
@@ -22,12 +25,18 @@ public record OpsMailProperties(
         String fromAddress,
         String fromName,
         boolean startTls,
-        boolean ssl) {
+        boolean ssl,
+        Boolean htmlEnabled) {
 
     public OpsMailProperties {
         port = port <= 0 ? 587 : port;
         fromName = fromName == null || fromName.isBlank() ? "Paideia 运维" : fromName;
         fromAddress = fromAddress == null || fromAddress.isBlank() ? username : fromAddress;
+        htmlEnabled = htmlEnabled == null ? Boolean.TRUE : htmlEnabled;
+    }
+
+    public boolean isHtmlEnabled() {
+        return Boolean.TRUE.equals(htmlEnabled);
     }
 
     public boolean hasHost() {
@@ -42,8 +51,8 @@ public record OpsMailProperties(
     @Override
     public String toString() {
         return ("OpsMailProperties[host=%s, port=%d, username=%s, password=%s, fromAddress=%s,"
-                + " fromName=%s, startTls=%s, ssl=%s]")
+                + " fromName=%s, startTls=%s, ssl=%s, htmlEnabled=%s]")
                 .formatted(host, port, username, password == null || password.isEmpty() ? null : "***",
-                        fromAddress, fromName, startTls, ssl);
+                        fromAddress, fromName, startTls, ssl, htmlEnabled);
     }
 }

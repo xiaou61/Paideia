@@ -59,6 +59,12 @@
       NoSuchMethodError。升级要等 AgentScope 一起升。
     -->
     <mcp-sdk.version>0.17.2</mcp-sdk.version>
+    <!--
+      commonmark-java（WORK-086 诊断邮件用）。运维邮件要把 AI 写的 Markdown 报告渲染成 HTML，
+      自己写渲染器等于重新实现一遍表格/强调/转义规则并留下 XSS 面；这个库 0 依赖、纯解析、
+      渲染成 HTML 时默认转义原始 HTML，正好是"不可信文本"该走的路径。
+    -->
+    <commonmark.version>0.24.0</commonmark.version>
   </properties>
 
   <dependencyManagement>
@@ -77,6 +83,16 @@
         <version>${spring-modulith.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.commonmark</groupId>
+        <artifactId>commonmark</artifactId>
+        <version>${commonmark.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.commonmark</groupId>
+        <artifactId>commonmark-ext-gfm-tables</artifactId>
+        <version>${commonmark.version}</version>
       </dependency>
       <dependency>
         <groupId>io.github.xiaou61</groupId>

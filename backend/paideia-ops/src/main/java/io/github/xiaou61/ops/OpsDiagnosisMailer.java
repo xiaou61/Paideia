@@ -1,7 +1,10 @@
 package io.github.xiaou61.ops;
 
 import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
+import java.io.ByteArrayInputStream;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import org.slf4j.Logger;
@@ -62,17 +65,18 @@ class OpsDiagnosisMailer {
 
     /** 不带 traceId 的简版。 */
     void sendDiagnosis(String alertName, String reportMd) {
-        sendDiagnosis(alertName, reportMd, List.of());
+        sendDiagnosis(0L, alertName, reportMd, List.of());
     }
 
     /**
      * 诊断完成后调用。只在配置了收件人且 SMTP 可用的前提下真正发信。
      *
+     * @param diagnosisId 诊断 id（报告附件按它命名，0 表示不附附件）
      * @param alertName 告警名（主题与正文抬头用）
      * @param reportMd  AI 生成的诊断报告原文
      * @param traceIds  本次采集到的 traceId（用于邮件里做全链路串联；可为空）
      */
-    void sendDiagnosis(String alertName, String reportMd, List<String> traceIds) {
+    void sendDiagnosis(long diagnosisId, String alertName, String reportMd, List<String> traceIds) {
         OpsProperties.Notify notify = ops.getNotify();
         if (sender == null || !notify.isEnabled()) {
             return;
@@ -83,21 +87,54 @@ class OpsDiagnosisMailer {
             return;
         }
         try {
-            var message = sender.createMimeMessage();
-            // false = 非 multipart（纯文本）；UTF-8 必填，否则中文主题乱码
-            MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
-            helper.setFrom(mail.fromAddress(), mail.fromName());
-            helper.setTo(recipients);
-            helper.setSubject(OpsDiagnosisEmail.subject(alertName));
-            helper.setText(OpsDiagnosisEmail.body(alertName, reportMd,
-                    incidentLink(notify.getBaseUrl()), traceIds,
-                    grafanaExploreBase(notify.getBaseUrl())), false);
+            MimeMessage message = compose(recipients, diagnosisId, alertName, reportMd,
+                    traceIds, notify.getBaseUrl());
             sender.send(message);
-            log.info("ops.mail.sent alert={} recipients={}", alertName, recipients.length);
+            log.info("ops.mail.sent alert={} diagnosisId={} recipients={}",
+                    alertName, diagnosisId, recipients.length);
         } catch (MessagingException | UnsupportedEncodingException | MailException failure) {
             // MailException 必须一并接住：send() 抛的是 Spring 包装过的运行时异常
             log.warn("ops.mail.failed alert={} error={}", alertName, failure.toString());
         }
+    }
+
+    /**
+     * 组装邮件（发信之外的全部内容都在这里，便于断言）。
+     *
+     * <p>三段结构：纯文本兜底 + HTML 正文 + 报告原文 {@code .md} 附件。
+     * 纯文本**始终保留**——只发 HTML 时，把 HTML 判成垃圾的客户端会收到一封空信；
+     * 附件是为了让收到的人能直接把内容转存成复盘，而不用从邮件里往外复制。
+     *
+     * <p>multipart(true) 是必需的：要挂附件就是 mixed 结构。HTML 关掉时只改正文部件，
+     * 附件与纯文本不受影响。
+     */
+    MimeMessage compose(String[] recipients, long diagnosisId, String alertName, String reportMd,
+                        List<String> traceIds, String baseUrl)
+            throws MessagingException, UnsupportedEncodingException {
+        MimeMessage message = sender.createMimeMessage();
+        // UTF-8 必填，否则中文主题与正文乱码
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+        helper.setFrom(mail.fromAddress(), mail.fromName());
+        helper.setTo(recipients);
+        helper.setSubject(OpsDiagnosisEmail.subject(alertName));
+        String link = incidentLink(baseUrl);
+        String explore = grafanaExploreBase(baseUrl);
+        String plain = OpsDiagnosisEmail.body(alertName, reportMd, link, traceIds, explore);
+        if (mail.isHtmlEnabled()) {
+            helper.setText(plain, OpsDiagnosisEmail.html(alertName, reportMd, link, traceIds, explore));
+        } else {
+            helper.setText(plain, false);
+        }
+        if (diagnosisId > 0 && reportMd != null && !reportMd.isBlank()) {
+            byte[] bytes = reportMd.getBytes(StandardCharsets.UTF_8);
+            helper.addAttachment("diagnosis-" + diagnosisId + ".md",
+                    () -> new ByteArrayInputStream(bytes),
+                    "text/markdown; charset=UTF-8");
+        }
+        // 提前定稿：multipart 的结构与每个部件的头部都要在 send() 之前落到消息上，
+        // 否则这里拿到的还是一堆未物化的 TextSource，读不出 content-type。
+        message.saveChanges();
+        return message;
     }
 
     private static String[] recipients(String raw) {

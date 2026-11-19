@@ -64,6 +64,17 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-mail</artifactId>
     </dependency>
+    <!-- 诊断邮件的 HTML 正文：把 AI 写的 Markdown 渲染成可直接阅读的邮件。
+         0 依赖、默认转义原始 HTML（报告是模型输出，按不可信文本处理）；
+         表格扩展是因为报告里的指标对比常用 Markdown 表格。 -->
+    <dependency>
+      <groupId>org.commonmark</groupId>
+      <artifactId>commonmark</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.commonmark</groupId>
+      <artifactId>commonmark-ext-gfm-tables</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>

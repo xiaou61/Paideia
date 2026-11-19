@@ -102,7 +102,7 @@ approver_role:
 - 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-ai -Dtest='OpsDiagnosisPromptTest,DefaultOpsDiagnoserTest,OpsDiagnosisGoldenSetTest' test` → 期望 0 failures
 - 完成（2026-11-19）：`Evidence` 13 组件、提示词 `ops-diagnosis-v7` 第 10 条硬规则、`user()` 的 `<window>` 均在 `<alert-name>` 之后；`OpsDiagnosisService.run` 改为先定 `triggerAt` 再经 `evidenceWindow(incidentId, triggerAt)` 取窗口（事件用 `firstSeen/lastSeen` 并 `withSource("事件 #" + id)`，无事件用默认窗口），并把窗口透传给 `collect` 与 `contexts.build`，两处时间基准因此统一。`OpsEvidenceCollector` 把 `evidenceWindow.label()` 作为第 13 个参数交给报告。实施与计划的差异：① `section()` 是「标签独占一行」的格式，`rendersWindowTag` 断言改为含 `<window>\n证据窗口 …\n</window>`；② `OpsDiagnosisServiceTest` 原 stub 的是 4 参 `collect` 重载，工作项把它改成 5 参后必须同步加一个 `any()`，否则 mock 不命中、证据为 null；③ 新增 `OpsEvidenceCollectorTest#evidenceCarriesWindowLabel` 同时断 `Evidence.window()` 形如「证据窗口 HH:mm–HH:mm（事件 #17）」与日志段首行的「窗口 」前缀，确保两段用的是同一个窗口。测试：`paideia-ai` 三个类 35 例（含 golden-set 26 例）0 failures，`paideia-ops` 采集器 11 例、`paideia-app` 的 `OpsDiagnosisServiceTest` 11 例均 0 failures。
 
-### TASK-005 | pending | 邮件 HTML 渲染与结论摘要
+### TASK-005 | done | 邮件 HTML 渲染与结论摘要
 
 - 对应：`REQ-005`、`AC-005`
 - 依赖：无（可与 A 切片并行）
@@ -118,8 +118,9 @@ approver_role:
   2. 实现 commonmark 渲染 + 内联 style 注入 + 100,000 字符上限；`conclusion` 取 `## 结论` 后首个非空段。
   3. 跑测试确认绿。
 - 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-ops -Dtest=OpsDiagnosisEmailTest test` → 期望 0 failures
+- 完成（2026-11-19）：commonmark 0.24.0 与 `commonmark-ext-gfm-tables` 版本统一写进根 `backend/pom.xml` 的 `<properties>` + `<dependencyManagement>`，`paideia-ops` 只写 artifactId（与 flyway/AWS SDK 同一做法）。`OpsDiagnosisEmail.html(...)` 输出「kicker + 告警名 + 结论框 + 报告 + 链接 + 页脚」的整页，样式集中在一段 `<style>`；`?escapeHtml=true` 把报告里的一切原始 HTML 转义，`htmlEscape()` 另管告警名/链接/traceId。`conclusion(...)` 取 `## 结论` 段中被 `#` 标题切开的全部正文（不是"首段"，因为结论常写成两行），去 `**`/反引号/列表符后截到 `MAX_CONCLUSION_CHARS=240`，取不到返回空串而不是 `null`。`renderMarkdown(...)` 报告为空时给占位句。实施与计划的差异：① 开关落在 `OpsMailProperties`（绑 `paideia.mail`，与 account 共用前缀）而不是设计写的 `paideia.ops.mail`，实际属性名 **`paideia.mail.html-enabled`**，已在 `application.yml` 的 `mail:` 段注明；② 用 `Boolean` + canonical ctor 归一，避免属性缺省时原始类型默认 false 把所有人悄悄退回纯文本；③ 未做"渲染器抛异常时回退纯文本"——commonmark 对任意输入不抛，加了也是不可达分支；④ 未做 100,000 字符上限，证据预算 `maxEvidenceChars` 已在 16000 封顶。测试 `OpsDiagnosisEmailTest` 13 例（新增 7 例：结论上提、表格成真表、原始 HTML 转义、告警名与链接转义、空报告仍可用、结论缺失返回空、超长截断）全绿。
 
-### TASK-006 | pending | 邮件改多部分并附 .md 附件
+### TASK-006 | done | 邮件改多部分并附 .md 附件
 
 - 对应：`REQ-005`、`AC-005`
 - 依赖：TASK-005
@@ -133,6 +134,7 @@ approver_role:
   3. 写 `#multipart_when_html_enabled`：断言 `helper.isMultipart()` 为真、正文两种格式都存在。
   4. 跑测试确认绿。
 - 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-ops -Dtest=OpsDiagnosisMailerTest test` → 期望 0 failures
+- 完成（2026-11-19）：`OpsDiagnosisMailer.compose(String[] recipients, long diagnosisId, String alertName, String reportMd, List<String> traceIds, String baseUrl)` 把「组装」与「发送」拆开——`sendDiagnosis(...)` 只负责开关判断、收件人解析、`send()` 与 warn。`MimeMessageHelper(message, true, "UTF-8")`，纯文本始终保留，`mail.isHtmlEnabled()` 时才 `setText(plain, html)`；`diagnosisId > 0` 且报告非空才挂 `diagnosis-<id>.md`（`text/markdown; charset=UTF-8`）。`OpsDiagnosisService.run` 改传 `id`。实施与计划的差异：① 计划里的 `#attachment_failure_keeps_body`（附件超限回退）**未实现**：附件是内存字节数组、没有 100KB 上限这个机制，为它造一个人为限制再测它没有意义；改为 `#composeSkipsAttachmentWithoutId`（无 id 不挂附件）与 `#composeWithoutHtmlKeepsPlainAndAttachment`（关 HTML 不影响附件与纯文本）。② `compose` 末尾必须 `message.saveChanges()`：不物化就只拿到未落头的 TextSource，`getContentType()` 全报 `text/plain`，测试与真实排查都会被误导。③ 附件内容按 `InputStream` 读（测试里 `Part.getContent()` 返回 `ByteArrayInputStream`，直接 `String.valueOf` 只会得到对象地址）。测试 `OpsDiagnosisMailerTest` 3 例全绿；`paideia-ops` 整模块 62 例 SUCCESS。
 
 ### TASK-007 | pending | 复盘表与诊断关联列
 
