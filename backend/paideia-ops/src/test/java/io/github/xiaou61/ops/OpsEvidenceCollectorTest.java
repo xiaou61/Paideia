@@ -33,6 +33,7 @@ class OpsEvidenceCollectorTest {
     private HttpServer server;
     private String baseUrl;
     private final List<String> lokiQueries = new CopyOnWriteArrayList<>();
+    private final List<String> prometheusQueries = new CopyOnWriteArrayList<>();
     /** changes() 返回的重启次数；测试可按需改写。 */
     private volatile double prometheusRestarts = 4;
     /** 让 Loki 整体返回 500（含可达性探测），用来验降级文案。 */
@@ -125,10 +126,11 @@ class OpsEvidenceCollectorTest {
 
     private void prometheus(HttpExchange exchange) throws IOException {
         String query = URLDecoder.decode(param(exchange.getRequestURI().getRawQuery(), "query"), StandardCharsets.UTF_8);
+        prometheusQueries.add(query);
         String value = null;
         if (query.startsWith("changes(process_start_time_seconds")) {
             value = String.valueOf(prometheusRestarts);
-        } else if (query.startsWith("time() - process_start_time_seconds")) {
+        } else if (query.startsWith("time() - max(process_start_time_seconds")) {
             value = "4320";
         } else if (query.startsWith("increase(node_vmstat_oom_kill")) {
             value = "0";
@@ -245,6 +247,18 @@ class OpsEvidenceCollectorTest {
             assertThat(param(raw, "start")).isEqualTo(expectedStart);
             assertThat(param(raw, "end")).isEqualTo(expectedEnd);
         });
+    }
+
+    @Test
+    @DisplayName("运行态指标钉住 paideia-app job：process_start_time_seconds 不是应用独有指标")
+    void runtimeQueriesArePinnedToAppJob() {
+        collector(List.of("paideia"), 10, 16000, true)
+                .collect("alert", "日志模板异常待处理", null, null, window());
+
+        assertThat(prometheusQueries)
+                .filteredOn(q -> q.contains("process_start_time_seconds"))
+                .isNotEmpty()
+                .allSatisfy(q -> assertThat(q).contains("{job=\"paideia-app\"}"));
     }
 
     @Test

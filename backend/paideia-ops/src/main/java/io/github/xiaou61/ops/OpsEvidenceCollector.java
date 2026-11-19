@@ -55,6 +55,13 @@ class OpsEvidenceCollector {
     private static final String LOG_ERROR_QUERY =
             "sum(count_over_time({unit=\"paideia.service\"} |~ \"(?i)(error|exception|failed)\" [5m]))";
 
+    /**
+     * `process_start_time_seconds` 不是应用独有的：node_exporter、mysqld_exporter、redis_exporter
+     * 都会导出它。生产实测（2026-11-19）不限定 job 时 `scalar` 取到的是别的导出器那条（"进程已运行
+     * 30 天"、重启 0 次），与日志里的重启互斥——所以凡是这个指标一律钉住本应用的 job。
+     */
+    private static final String APP_JOB = "{job=\"paideia-app\"}";
+
     /** 固定指标目录：名字 → 查询、精度、单位。 */
     private static final List<Metric> METRICS = List.of(
             new Metric("targets_down", "(sum(up < 1) or vector(0)) + (sum(probe_success < 1) or vector(0))", 0, "个"),
@@ -80,7 +87,8 @@ class OpsEvidenceCollector {
             new Metric("scheduled_failures", "count(paideia_scheduled_last_success < 1) or vector(0)", 0, "个"),
             // 以下 9 项是 WORK-086 补的"运行态"（REQ-003）：连接池、GC、线程、负载与重启/内存
             // 杀进程是那次事故里真实存在、却完全没进证据的信号。
-            new Metric("process_uptime", "time() - process_start_time_seconds", 0, "秒"),
+            new Metric("process_uptime",
+                    "time() - max(process_start_time_seconds" + APP_JOB + ")", 0, "秒"),
             new Metric("hikari_pending", "max(hikaricp_connections_pending)", 0, "连接"),
             new Metric("hikari_acquire_max", "max(hikaricp_connections_acquire_seconds_max)", 3, "秒"),
             new Metric("hikari_timeouts", "sum(increase(hikaricp_connections_timeout_total[1h]))", 0, "次/小时"),
@@ -513,11 +521,12 @@ class OpsEvidenceCollector {
         int minutes = Math.max(1, window.minutes());
         StringBuilder out = new StringBuilder("运行态（窗口 ").append(minutes).append(" 分钟）：\n");
 
-        Double uptime = prometheus.scalar("time() - process_start_time_seconds");
+        Double uptime = prometheus.scalar("time() - max(process_start_time_seconds" + APP_JOB + ")");
         out.append("  进程已运行 ").append(uptime == null || !Double.isFinite(uptime)
                 ? "无数据" : humanAge(uptime.longValue())).append('\n');
 
-        Double restarts = prometheus.scalar("changes(process_start_time_seconds[" + minutes + "m])");
+        Double restarts = prometheus.scalar(
+                "changes(process_start_time_seconds" + APP_JOB + "[" + minutes + "m])");
         String restartText = restarts == null || !Double.isFinite(restarts)
                 ? "无数据" : String.valueOf(restarts.longValue());
         out.append("  进程重启 ").append(restartText).append(" 次")
