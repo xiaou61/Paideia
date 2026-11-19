@@ -48,6 +48,10 @@ class OpsEvidenceCollector {
     private static final int LIFECYCLE_LOG_LIMIT = 20;
     private static final int CONTEXT_LOG_LIMIT = 2;
 
+    /** Spring Boot 的启动完成行："Started PaideiaApplication in 28.4 seconds"。 */
+    private static final Pattern RESTART_LINE =
+            Pattern.compile("(?i)started\\s+\\S*application\\s+in\\s+");
+
     private static final String LOG_ERROR_QUERY =
             "sum(count_over_time({unit=\"paideia.service\"} |~ \"(?i)(error|exception|failed)\" [5m]))";
 
@@ -73,7 +77,18 @@ class OpsEvidenceCollector {
                     1, "%"),
             new Metric("mysql_connections", "mysql_global_status_threads_connected", 0, "个"),
             new Metric("redis_memory_mb", "redis_memory_used_bytes / 1024 / 1024", 1, "MB"),
-            new Metric("scheduled_failures", "count(paideia_scheduled_last_success < 1) or vector(0)", 0, "个"));
+            new Metric("scheduled_failures", "count(paideia_scheduled_last_success < 1) or vector(0)", 0, "个"),
+            // 以下 9 项是 WORK-086 补的"运行态"（REQ-003）：连接池、GC、线程、负载与重启/内存
+            // 杀进程是那次事故里真实存在、却完全没进证据的信号。
+            new Metric("process_uptime", "time() - process_start_time_seconds", 0, "秒"),
+            new Metric("hikari_pending", "max(hikaricp_connections_pending)", 0, "连接"),
+            new Metric("hikari_acquire_max", "max(hikaricp_connections_acquire_seconds_max)", 3, "秒"),
+            new Metric("hikari_timeouts", "sum(increase(hikaricp_connections_timeout_total[1h]))", 0, "次/小时"),
+            new Metric("jvm_gc_pause_max", "max(jvm_gc_pause_seconds_max)", 3, "秒"),
+            new Metric("jvm_threads_blocked", "sum(jvm_threads_states_threads{state=\"blocked\"})", 0, "线程"),
+            new Metric("node_load1", "node_load1", 2, ""),
+            new Metric("node_oom_kill", "increase(node_vmstat_oom_kill[1h])", 0, "次/小时"),
+            new Metric("mysql_threads", "mysql_global_status_threads_connected", 0, "连接"));
 
     private final OpsProperties properties;
     private final OpsSummaryService summary;
@@ -130,9 +145,15 @@ class OpsEvidenceCollector {
                                   String context, OpsEvidenceWindow window) {
         OpsProperties.Diagnosis config = properties.getDiagnosis();
         OpsEvidenceWindow evidenceWindow = window == null ? defaultWindow(config) : window;
+        // 日志只打一次 Loki：运行态要跟"日志里启动了几次"交叉验证，两边各查一次会拉到
+        // 不同瞬间的数据，反而制造出并不存在的差异。
+        // 证据预算整体为 0 时连查询都不发：预算配置错了不该顺带压垮 Loki。
+        Map<String, List<LokiClient.LogLine>> unitLogs = config.getMaxEvidenceChars() <= 0
+                ? Map.of()
+                : collectUnitLogs(evidenceWindow, config.getLogsPerUnit());
 
         String summaryText = formatSummary(summary.summary());
-        String metricsText = formatMetrics();
+        String metricsText = formatMetrics() + formatRuntime(evidenceWindow, countRestarts(unitLogs));
         String baselinesText = formatBaselines();
         String contextText = context == null ? "" : context.strip();
         String alertsText = firingAlerts();
@@ -146,8 +167,7 @@ class OpsEvidenceCollector {
                 + alertsText.length() + patternsText.length()
                 + tracesText.length() + deploysText.length();
         int logBudget = Math.max(0, config.getMaxEvidenceChars() - nonLogChars);
-        String logsText = formatDiagnosisLogs(
-                evidenceWindow, config.getLogsPerUnit(), config.getSignatureTop(), logBudget);
+        String logsText = renderLogs(unitLogs, evidenceWindow, config.getSignatureTop(), logBudget);
 
         return new OpsDiagnoser.Evidence(
                 trigger, alertName, question,
@@ -422,17 +442,26 @@ class OpsEvidenceCollector {
      * 上下文段给"没有 error 关键字但发生在同一时刻"的行一个机会。只捞 error 会漏掉
      * 系统级重启前的 Stopping、以及只为佐证时间线的普通行。
      */
-    private String formatDiagnosisLogs(OpsEvidenceWindow window, int perUnitLines,
-                                      int signatureTop, int maxChars) {
+    private Map<String, List<LokiClient.LogLine>> collectUnitLogs(OpsEvidenceWindow window, int perUnitLines) {
+        Map<String, List<LokiClient.LogLine>> byUnit = new LinkedHashMap<>();
+        for (String unit : properties.getDiagnosis().getUnits()) {
+            byUnit.put(unit, queryUnit(unit, window, perUnitLines));
+        }
+        return byUnit;
+    }
+
+    private String renderLogs(Map<String, List<LokiClient.LogLine>> unitLogs,
+                              OpsEvidenceWindow window, int signatureTop, int maxChars) {
         if (maxChars <= 0) {
             return "（证据预算已用完，未采集日志）";
         }
         List<String> rows = new ArrayList<>();
         rows.add("窗口 " + LOG_CLOCK.format(window.start()) + "–" + LOG_CLOCK.format(window.end())
                 + "（" + window.source() + "）");
-        for (String unit : properties.getDiagnosis().getUnits()) {
+        for (Map.Entry<String, List<LokiClient.LogLine>> entry : unitLogs.entrySet()) {
+            String unit = entry.getKey();
+            List<LokiClient.LogLine> lines = entry.getValue();
             rows.add("[" + unit + "]");
-            List<LokiClient.LogLine> lines = queryUnit(unit, window, perUnitLines);
             if (lines.isEmpty()) {
                 rows.add("（该 unit 在窗口内无日志；可能未接入 Loki，alloy 白名单待核实）");
                 continue;
@@ -440,6 +469,56 @@ class OpsEvidenceCollector {
             rows.addAll(renderSignatures(lines, signatureTop));
         }
         return OpsLogRedactor.joinRedacted(rows, rows.size(), maxChars);
+    }
+
+    /** 日志里"启动了几次"：与 Prometheus 的 {@code changes()} 互相印证。 */
+    private static int countRestarts(Map<String, List<LokiClient.LogLine>> unitLogs) {
+        int count = 0;
+        for (List<LokiClient.LogLine> lines : unitLogs.values()) {
+            for (LokiClient.LogLine line : lines) {
+                if (RESTART_LINE.matcher(line.line()).find()) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    /**
+     * 运行态：进程活了多久、窗口内重启几次、有没有被 OOM kill（WORK-086 REQ-003）。
+     *
+     * <p>重启次数用两个来源交叉验证：`changes(process_start_time_seconds[窗口])` 是权威计数，
+     * 但它只给数字；日志里有具体时间点。两者不一致时把两个数字都写出来——这本身就是线索
+     * （比如进程被外部重启但日志还没落盘，或 Loki 少采了一段）。
+     */
+    private String formatRuntime(OpsEvidenceWindow window, int restartLogCount) {
+        int minutes = Math.max(1, window.minutes());
+        StringBuilder out = new StringBuilder("运行态（窗口 ").append(minutes).append(" 分钟）：\n");
+
+        Double uptime = prometheus.scalar("time() - process_start_time_seconds");
+        out.append("  进程已运行 ").append(uptime == null || !Double.isFinite(uptime)
+                ? "无数据" : humanAge(uptime.longValue())).append('\n');
+
+        Double restarts = prometheus.scalar("changes(process_start_time_seconds[" + minutes + "m])");
+        String restartText = restarts == null || !Double.isFinite(restarts)
+                ? "无数据" : String.valueOf(restarts.longValue());
+        out.append("  进程重启 ").append(restartText).append(" 次")
+                .append("（窗口内 changes）");
+        boolean mismatch = restarts != null && Double.isFinite(restarts)
+                && restarts.longValue() != restartLogCount;
+        if (mismatch) {
+            out.append("；日志记录 ").append(restartLogCount).append(" 次启动（两者不一致，"
+                    + "以日志时间点为准，并注意 Loki 可能少采）");
+        } else if (restarts == null || !Double.isFinite(restarts)) {
+            out.append("；日志记录 ").append(restartLogCount).append(" 次启动");
+        }
+        out.append('\n');
+
+        Double oom = prometheus.scalar("increase(node_vmstat_oom_kill[" + minutes + "m])");
+        out.append("  内存 OOM kill ").append(oom == null || !Double.isFinite(oom)
+                ? "无数据" : String.valueOf(oom.longValue())).append(" 次")
+                .append("（窗口内 increase）\n");
+        return out.toString();
     }
 
     /** 三段查询后按 (时间, 原文) 去重：上下文段几乎一定会把异常段的行再捞回来一次。 */

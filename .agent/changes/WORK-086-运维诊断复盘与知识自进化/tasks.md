@@ -72,7 +72,7 @@ approver_role:
 - 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-ops -Dtest='OpsLogSignatureTest,OpsEvidenceCollectorTest' test` → 期望 0 failures
 - 完成（2026-11-19）：`OpsLogSignatureTest` 4 例 + `OpsEvidenceCollectorTest` 7 例全绿，`paideia-ops` 整模块 `mvn test` 亦 SUCCESS。实施与计划的差异：① 签名规则多了 `长哈希→<hash>`、`日期时间→<ts>`（`\d{2}:\d{2}:\d{2}` 的旧规则无法覆盖 ISO 时间）；② 数字匹配去掉了词边界，否则 `1234ms`（数字紧跟单位）不会被归约；③ `Evidence.window` 字段留给 TASK-004 一次性改 record 与提示词，本任务窗口只在 `collect` 内部生效；④ 上下文段固定 2 条、生命周期段 20 条，预算不够时先保异常与生命周期。
 
-### TASK-003 | pending | 运行态指标与重启聚合
+### TASK-003 | done | 运行态指标与重启聚合
 
 - 对应：`REQ-003`、`AC-003`
 - 依赖：TASK-001
@@ -84,6 +84,7 @@ approver_role:
   3. 写 `OpsEvidenceCollectorTest#restart_count_cross_checks_logs`：mock 返回 `changes=4`、日志含 4 条 `Started PaideiaApplication` ⇒ 断言 metrics 段含 `重启 4 次` 且列出 4 个时间；两者不一致时断言同时出现 `日志记录 3 次启动` 供人判断。
   4. 跑测试由红到绿。
 - 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-ops -Dtest=OpsEvidenceCollectorTest test` → 期望新增用例绿、原有用例不回归
+- 完成（2026-11-19）：`METRICS` 10 → 19 项；`formatRuntime(window, restartLogCount)` 追加到指标段，输出「进程已运行 / 进程重启 N 次（窗口内 changes）/ 内存 OOM kill N 次（窗口内 increase）」；两个来源不一致时同时写出「日志记录 N 次启动（两者不一致…）」并提示 Loki 可能少采。实施细节：日志改为 `collect` 里只查一次（`Map<unit, lines>`），运行态与日志段共用，避免两次查询落在不同瞬间制造假差异；`maxEvidenceChars <= 0` 时连 Loki 查询都不发。
 
 ### TASK-004 | pending | Evidence.window 与提示词 `<window>`
 

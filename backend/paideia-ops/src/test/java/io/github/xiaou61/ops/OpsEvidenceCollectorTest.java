@@ -33,6 +33,8 @@ class OpsEvidenceCollectorTest {
     private HttpServer server;
     private String baseUrl;
     private final List<String> lokiQueries = new CopyOnWriteArrayList<>();
+    /** changes() 返回的重启次数；测试可按需改写。 */
+    private volatile double prometheusRestarts = 4;
 
     /** 每个 unit 的日志，按 unit 名区分；没有登记的 unit 返回空。 */
     private final List<String> restartLines = List.of(
@@ -107,7 +109,21 @@ class OpsEvidenceCollectorTest {
     }
 
     private void prometheus(HttpExchange exchange) throws IOException {
-        respond(exchange, 200, "{\"status\":\"success\",\"data\":{\"resultType\":\"vector\",\"result\":[]}}");
+        String query = URLDecoder.decode(param(exchange.getRequestURI().getRawQuery(), "query"), StandardCharsets.UTF_8);
+        String value = null;
+        if (query.startsWith("changes(process_start_time_seconds")) {
+            value = String.valueOf(prometheusRestarts);
+        } else if (query.startsWith("time() - process_start_time_seconds")) {
+            value = "4320";
+        } else if (query.startsWith("increase(node_vmstat_oom_kill")) {
+            value = "0";
+        }
+        if (value == null) {
+            respond(exchange, 200, "{\"status\":\"success\",\"data\":{\"resultType\":\"vector\",\"result\":[]}}");
+            return;
+        }
+        respond(exchange, 200, "{\"status\":\"success\",\"data\":{\"resultType\":\"vector\",\"result\":["
+                + "{\"metric\":{},\"value\":[1700000000.0,\"" + value + "\"]}]}}");
     }
 
     private void tempo(HttpExchange exchange) throws IOException {
@@ -287,5 +303,43 @@ class OpsEvidenceCollectorTest {
         OpsDiagnoser.Evidence evidence = collector.collect("alert", "x", null, null, window());
 
         assertThat(evidence.logs()).contains("未接入 Loki");
+    }
+
+    @Test
+    @DisplayName("运行态与日志的重启次数一致时只报一个数字")
+    void restartCountAgreesWithLogs() {
+        prometheusRestarts = 4;
+
+        OpsDiagnoser.Evidence evidence = collector(List.of("paideia"), 10, 16000, true)
+                .collect("alert", "日志模板异常待处理", null, null, window());
+
+        assertThat(evidence.metrics())
+                .contains("进程重启 4 次")
+                .doesNotContain("两者不一致");
+    }
+
+    @Test
+    @DisplayName("指标说重启 5 次、日志只有 4 次启动时两个数字都给人看")
+    void restartCountMismatchIsReported() {
+        prometheusRestarts = 5;
+
+        OpsDiagnoser.Evidence evidence = collector(List.of("paideia"), 10, 16000, true)
+                .collect("alert", "日志模板异常待处理", null, null, window());
+
+        assertThat(evidence.metrics())
+                .contains("进程重启 5 次")
+                .contains("日志记录 4 次启动");
+    }
+
+    @Test
+    @DisplayName("运行态段带上窗口分钟数，进程存活时长按人读的粒度展示")
+    void runtimeUsesWindowAndHumanDurations() {
+        OpsDiagnoser.Evidence evidence = collector(List.of("paideia"), 10, 16000, true)
+                .collect("alert", "日志模板异常待处理", null, null, window());
+
+        assertThat(evidence.metrics())
+                .contains("运行态（窗口 20 分钟）")
+                .contains("进程已运行")
+                .contains("内存 OOM kill");
     }
 }
