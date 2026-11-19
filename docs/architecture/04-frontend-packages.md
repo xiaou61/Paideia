@@ -6,7 +6,7 @@
 
 # 前端包依赖
 
-由 `frontend/` 的 16 个 workspace 包生成（`packages/*` 是库，`apps/*` 是可运行端）。
+由 `frontend/` 的 17 个 workspace 包生成（`packages/*` 是库，`apps/*` 是可运行端）。
 只画**包之间**的依赖，外部依赖（React、Vite 等）不画。箭头方向是**依赖方 → 被依赖方**。
 
 ```mermaid
@@ -18,6 +18,7 @@ flowchart TB
     core["core"]
     identity["identity"]
     knowledge["knowledge"]
+    patterns["patterns"]
     platform_desktop["platform-desktop"]
     platform_web["platform-web"]
     resume["resume"]
@@ -40,6 +41,7 @@ flowchart TB
   identity --> core
   knowledge --> core
   knowledge --> ui
+  patterns --> ui
   platform_desktop --> core
   platform_web --> core
   resume --> core
@@ -47,6 +49,7 @@ flowchart TB
   admin --> auth
   admin --> core
   admin --> knowledge
+  admin --> patterns
   admin --> platform_web
   admin --> ui
   app --> assistant
@@ -61,6 +64,7 @@ flowchart TB
   app --> sql_workbench
   app --> ui
   public --> ui
+  ui_kit --> patterns
   ui_kit --> platform_web
   ui_kit --> ui
 ```
@@ -75,16 +79,17 @@ flowchart TB
 | `@paideia/core` | `packages` | （无） |
 | `@paideia/identity` | `packages` | `@paideia/core` |
 | `@paideia/knowledge` | `packages` | `@paideia/core`、`@paideia/ui` |
+| `@paideia/patterns` | `packages` | `@paideia/ui` |
 | `@paideia/platform-desktop` | `packages` | `@paideia/core` |
 | `@paideia/platform-web` | `packages` | `@paideia/core` |
 | `@paideia/resume` | `packages` | `@paideia/core` |
 | `@paideia/sql-workbench` | `packages` | `@paideia/ui` |
 | `@paideia/ui` | `packages` | （无） |
-| `@paideia/admin` | `apps` | `@paideia/auth`、`@paideia/core`、`@paideia/knowledge`、`@paideia/platform-web`、`@paideia/ui` |
+| `@paideia/admin` | `apps` | `@paideia/auth`、`@paideia/core`、`@paideia/knowledge`、`@paideia/patterns`、`@paideia/platform-web`、`@paideia/ui` |
 | `@paideia/app` | `apps` | `@paideia/assistant`、`@paideia/auth`、`@paideia/camp`、`@paideia/core`、`@paideia/identity`、`@paideia/knowledge`、`@paideia/platform-desktop`、`@paideia/platform-web`、`@paideia/resume`、`@paideia/sql-workbench`、`@paideia/ui` |
 | `@paideia/desktop` | `apps` | （无） |
 | `@paideia/public` | `apps` | `@paideia/ui` |
-| `@paideia/ui-kit` | `apps` | `@paideia/platform-web`、`@paideia/ui` |
+| `@paideia/ui-kit` | `apps` | `@paideia/patterns`、`@paideia/platform-web`、`@paideia/ui` |
 
 `@paideia/desktop` 是 Tauri 2 外壳，它的"依赖"是构建期的 app 产物（脚本里 `--filter @paideia/app build:desktop`），
 不是包依赖，所以图上没有边。

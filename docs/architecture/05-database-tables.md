@@ -6,8 +6,8 @@
 
 # 数据库表
 
-由 `backend/paideia-app/src/main/resources/db/migration/` 的 50 个迁移生成：
-共 **65 张表**，其中只有 **15 条外键**。
+由 `backend/paideia-app/src/main/resources/db/migration/` 的 56 个迁移生成：
+共 **74 张表**，其中只有 **16 条外键**。
 
 外键少是**刻意的**，不是遗漏：跨模块的关联（比如 `ai_memories_structured.user_id` → `users.id`）
 由应用层保证，不交给数据库。所以下面这张图只画**有真实外键约束**的关系，
@@ -25,6 +25,7 @@ flowchart LR
   knowledge_self_assessments["knowledge_self_assessments"]
   learning_progress["learning_progress"]
   learning_track_stages["learning_track_stages"]
+  password_reset_tokens["password_reset_tokens"]
   refresh_tokens["refresh_tokens"]
   user_identities["user_identities"]
   learning_progress -->|entry_id| knowledge_entries
@@ -36,6 +37,7 @@ flowchart LR
   refresh_tokens -->|user_id| users
   user_identities -->|user_id| users
   ai_knowledge_chunk_edits -->|entry_id| knowledge_entries
+  password_reset_tokens -->|user_id| users
   learning_track_stages -->|entry_id| knowledge_entries
   knowledge_categories -->|parent_id| knowledge_categories
   knowledge_entries -->|category_id| knowledge_categories
@@ -52,6 +54,7 @@ flowchart LR
 | `ai_credit_accounts` | `V11__create_credit_tables` | （无） |
 | `ai_credit_ledger` | `V11__create_credit_tables` | （无） |
 | `ai_entry_summaries` | `V4__create_ai_tables` | （无） |
+| `ai_essay_verifications` | `V20261119103000__create_ai_essay_verifications` | （无） |
 | `ai_feedback` | `V20261023140000__create_ai_feedback` | （无） |
 | `ai_interview_evaluations` | `V14__create_learner_profiles` | （无） |
 | `ai_knowledge_chunk_edits` | `V20261106173000__create_ai_knowledge_chunk_edits` | `entry_id` → `knowledge_entries` |
@@ -100,9 +103,17 @@ flowchart LR
 | `ops_diagnoses` | `V20261026180000__create_ops_diagnoses` | （无） |
 | `ops_incident_events` | `V20261027140000__create_ops_incidents` | （无） |
 | `ops_incidents` | `V20261027140000__create_ops_incidents` | （无） |
+| `ops_log_template_buckets` | `V20261119110000__create_ops_log_patterns` | （无） |
+| `ops_log_templates` | `V20261119110000__create_ops_log_patterns` | （无） |
+| `ops_pattern_anomalies` | `V20261119110000__create_ops_log_patterns` | （无） |
+| `paper_answers` | `V20261118161000__create_papers` | （无） |
+| `paper_items` | `V20261118161000__create_papers` | （无） |
+| `papers` | `V20261118161000__create_papers` | （无） |
+| `password_reset_tokens` | `V20261119150000__create_password_reset_tokens` | `user_id` → `users` |
 | `question_attempts` | `V20261022170000__create_question_attempts_and_mastery` | （无） |
 | `question_concepts` | `V20261022170000__create_question_attempts_and_mastery` | （无） |
 | `question_difficulty` | `V20261022170000__create_question_attempts_and_mastery` | （无） |
+| `question_index` | `V20261118160000__create_question_index` | （无） |
 | `refresh_tokens` | `V1__create_account_tables` | `user_id` → `users` |
 | `resume_documents` | `V15__create_resume_tables` | （无） |
 | `resume_edit_history` | `V15__create_resume_tables` | （无） |

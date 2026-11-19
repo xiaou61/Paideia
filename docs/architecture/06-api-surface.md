@@ -6,7 +6,7 @@
 
 # API 端点清单
 
-由后端 48 个 Controller 生成：**195 个端点**，分布在 9 个模块。
+由后端 53 个 Controller 生成：**212 个端点**，分布在 9 个模块。
 
 这是**结构性的清单**，不是手写文档——端点加一个这里就多一行，
 所以它不会像手写的接口文档那样过期。真正的授权规则在 `SecurityConfiguration`，
@@ -16,12 +16,13 @@
 | --- | --- | --- | --- | --- |
 | `paideia-account` | `/api/v1/account/oauth` | `OAuthIdentityController` | 登录即可 | 3 |
 | `paideia-account` | `/api/v1/account/profile` | `LearnerProfileController` | 登录即可 | 2 |
-| `paideia-account` | `/api/v1/auth` | `AuthController` | 免鉴权 | 6 |
+| `paideia-account` | `/api/v1/auth` | `AuthController` | 免鉴权 | 8 |
 | `paideia-account` | `/api/v1/auth/oauth` | `OAuthController` | 免鉴权 | 4 |
 | `paideia-account` | `/api/v1/me` | `AccountDeletionController` | 登录即可 | 1 |
 | `paideia-ai` | `/api/v1/ai` | `QuickInsightController` | 登录即可 | 5 |
 | `paideia-ai` | `/api/v1/ai` | `ResumeOptimizationController` | 登录即可 | 9 |
 | `paideia-ai` | `/api/v1/ai/admin/credits` | `AiCreditAdminController` | 仅管理员 | 4 |
+| `paideia-ai` | `/api/v1/ai/admin/essay-verifications` | `EssayReviewAdminController` | 仅管理员 | 3 |
 | `paideia-ai` | `/api/v1/ai/admin/knowledge-entries/{entryId}/chunks` | `KnowledgeChunkAdminController` | 仅管理员 | 4 |
 | `paideia-ai` | `/api/v1/ai/admin/knowledge-imports` | `KnowledgeImportController` | 仅管理员 | 3 |
 | `paideia-ai` | `/api/v1/ai/admin/runs` | `AiRunAdminController` | 仅管理员 | 7 |
@@ -38,13 +39,16 @@
 | `paideia-app` | `/api/v1/account/admin/users` | `AdminUserController` | 仅管理员 | 5 |
 | `paideia-knowledge` | `/api/v1/knowledge` | `EntryViewController` | 登录即可 | 1 |
 | `paideia-knowledge` | `/api/v1/knowledge` | `KnowledgeFileController` | 登录即可 | 2 |
-| `paideia-knowledge` | `/api/v1/knowledge` | `KnowledgeReadController` | 登录即可 | 4 |
+| `paideia-knowledge` | `/api/v1/knowledge` | `KnowledgeReadController` | 登录即可 | 5 |
 | `paideia-knowledge` | `/api/v1/knowledge` | `SelfAssessmentController` | 登录即可 | 3 |
 | `paideia-knowledge` | `/api/v1/knowledge/admin` | `KnowledgeAdminController` | 仅管理员 | 20 |
 | `paideia-knowledge` | `/api/v1/learn` | `LearnTrackController` | 登录即可 | 2 |
 | `paideia-knowledge` | `/api/v1/learning` | `LearningController` | 登录即可 | 10 |
 | `paideia-knowledge` | `/api/v1/learning` | `QuestionAttemptController` | 登录即可 | 5 |
+| `paideia-knowledge` | `/api/v1/learning` | `WrongBookController` | 登录即可 | 1 |
 | `paideia-knowledge` | `/api/v1/learning/admin` | `QuestionConceptAdminController` | 仅管理员 | 4 |
+| `paideia-knowledge` | `/api/v1/learning/papers` | `PaperController` | 登录即可 | 6 |
+| `paideia-knowledge` | `/api/v1/learning/practice` | `PracticeController` | 登录即可 | 1 |
 | `paideia-mcp` | `/api/v1/ai/mcp-tokens` | `McpTokenController` | 登录即可 | 3 |
 | `paideia-note` | `/api/v1` | `NoteShareController` | 登录即可 | 3 |
 | `paideia-note` | `/api/v1/notes` | `NoteController` | 登录即可 | 5 |
@@ -53,6 +57,7 @@
 | `paideia-note` | `/api/v1/reports` | `ReportController` | 登录即可 | 1 |
 | `paideia-ops` | `(根)` | `OpsGrafanaProxyController` | 登录即可 | 2 |
 | `paideia-ops` | `/api/v1/ops/admin` | `OpsSummaryController` | 仅管理员 | 1 |
+| `paideia-ops` | `/api/v1/ops/admin` | `PatternController` | 仅管理员 | 3 |
 | `paideia-ops` | `/api/v1/ops/admin/analytics` | `AnalyticsController` | 仅管理员 | 1 |
 | `paideia-ops` | `/api/v1/ops/admin/content-import` | `ContentImportController` | 仅管理员 | 2 |
 | `paideia-ops` | `/api/v1/ops/admin/diagnoses` | `OpsDiagnosisController` | 仅管理员 | 5 |
@@ -67,8 +72,8 @@
 
 | 方法 | 数量 |
 | --- | --- |
-| `GET` | 89 |
-| `POST` | 72 |
-| `DELETE` | 19 |
+| `GET` | 98 |
+| `POST` | 79 |
+| `DELETE` | 20 |
 | `PUT` | 12 |
 | `PATCH` | 3 |
