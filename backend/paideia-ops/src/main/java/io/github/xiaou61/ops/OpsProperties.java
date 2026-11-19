@@ -200,6 +200,12 @@ public class OpsProperties {
         /** 日志单元白名单（WORK-049）：配置本身就是白名单，未知单元仍然报错。 */
         private List<String> units = List.of("paideia", "laya");
 
+        /** 没有关联事件时，证据窗口向前的默认跨度（分钟，WORK-086）。 */
+        private int evidenceWindowMinutes = OpsEvidenceWindow.DEFAULT_MINUTES;
+
+        /** 证据窗口总长上限（分钟，WORK-086）：事件再长也不把整个事故现场塞进提示词。 */
+        private int evidenceWindowMaxMinutes = OpsEvidenceWindow.MAX_MINUTES;
+
         public boolean isEnabled() {
             return enabled;
         }
@@ -270,6 +276,22 @@ public class OpsProperties {
 
         public void setUnits(List<String> units) {
             this.units = units == null ? List.of() : units;
+        }
+
+        public int getEvidenceWindowMinutes() {
+            return evidenceWindowMinutes;
+        }
+
+        public void setEvidenceWindowMinutes(int evidenceWindowMinutes) {
+            this.evidenceWindowMinutes = evidenceWindowMinutes;
+        }
+
+        public int getEvidenceWindowMaxMinutes() {
+            return evidenceWindowMaxMinutes;
+        }
+
+        public void setEvidenceWindowMaxMinutes(int evidenceWindowMaxMinutes) {
+            this.evidenceWindowMaxMinutes = evidenceWindowMaxMinutes;
         }
     }
 
