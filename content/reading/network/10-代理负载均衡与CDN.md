@@ -2,301 +2,272 @@
 title: 代理、负载均衡与 CDN：请求路上还有谁
 category: network-basics
 order: 10
-minutes: 24
+minutes: 20
 level: intermediate
 status: published
 ---
 
-## 先把结论摆出来
+## 一个 404 的 favicon，在边缘是 HIT
 
-**你的请求从客户端到服务端，中间通常不止一跳。** 正向代理代表客户端，反向代理代表服务端，负载均衡把流量分给多台后端，CDN 把内容提前放到离用户近的节点。
-
-打个比方，这像寄一份跨国快递，中间要过揽收点、分拣中心、区域仓，每一站都可能拆包、换单、贴标签。网络里，这些站就是正向代理、反向代理、负载均衡和 CDN，每一跳都可能改首部、做缓存、隐藏真实 IP。
-
-```sketch
-{
-  "title": "中间每一跳，各代表一方",
-  "rows": [
-    [
-      { "id": "client", "title": "客户端", "sub": "正向代理替它出面", "tone": "gray" },
-      { "id": "cdn", "title": "CDN", "sub": "内容提前放到近处", "tone": "violet" },
-      { "id": "lb", "title": "负载均衡", "sub": "分给多台后端", "tone": "blue" },
-      { "id": "server", "title": "服务端", "sub": "反向代理代表它", "tone": "green" }
-    ]
-  ],
-  "arrows": [
-    { "from": "client", "to": "cdn" },
-    { "from": "cdn", "to": "lb" },
-    { "from": "lb", "to": "server" }
-  ]
-}
-```
-
-每多一跳，就多一个会改首部、会缓存、会超时、会隐藏真实 IP 的地方。线上很多"玄学问题"不是代码写的，而是这一串中间人造成的：
-
-- 日志里全是 `10.0.0.12`，因为看到的是负载均衡的地址；
-- 用户 A 看到了用户 B 的数据，因为 CDN 缓存了一个带 `Set-Cookie` 的响应；
-- 服务端明明支持 HTTPS，却一直 301 到 `http://`，因为 TLS 在代理上终止，应用不知道原始协议；
-- 后端只挂了一台，健康检查却全绿，因为检查的是 TCP 端口而不是业务。
-
-这一篇按"请求经过的顺序"讲清每个角色的职责、配置点和典型坑。
-
-## 正向代理与反向代理
-
-两者都是"中间人"，区别在**站在谁那边**。
-
-| 对比项 | 正向代理 | 反向代理 |
-| --- | --- | --- |
-| 代表谁 | 客户端 | 服务端 |
-| 谁知道它存在 | 客户端要显式配置 | 客户端通常不知道 |
-| 典型用途 | 科学上网、企业出口、匿名访问、爬虫 | TLS 终止、缓存、限流、WAF、路由 |
-| 看到的流量 | 一个客户端访问很多站点 | 很多客户端访问一组后端 |
-| 例子 | Squid、公司 HTTP 代理、`curl -x` | Nginx、Envoy、HAProxy、云负载均衡 |
-
-用 `curl` 走正向代理：
-
-```bash
-curl -x http://proxy.example.com:8080 https://example.com/
-```
-
-服务端的反向代理则是这样一条链路：
+本机 Windows 11，2026-11-19。先看一个公开回显服务的 favicon：
 
 ```text
-客户端 → 负载均衡（TLS 终止）→ Nginx → 应用 → 数据库
+$ curl.exe -sS -I https://postman-echo.com/favicon.ico
+HTTP/1.1 404 Not Found
+Date: Thu, 19 Nov 2026 06:20:32 GMT
+Content-Type: application/json; charset=utf-8
+Connection: keep-alive
+vary: Accept-Encoding
+x-envoy-upstream-service-time: 4
+Age: 12
+Cache-Control: public, max-age=14400
+cf-cache-status: HIT
+set-cookie: __cf_bm=...
+set-cookie: _cfuvid=...
+Server: cloudflare
+CF-RAY: a5cd1c11cfd1dc9c-FRA
 ```
 
-反向代理最常见的四件事：
+一个不存在的文件返回 404，`cf-cache-status` 却是 `HIT`，`Age` 是 12。我第一次看到时把 `Age` 当成了「这次请求花了 12 秒」，其实它是这份响应在缓存里已经存了约 12 秒（RFC 9111 §5.1）。404 也能被缓存：十几秒前第一次请求是 `EXPIRED`，回源拿到新的 404 后，第二次就 `HIT` 了。你要是在这个时间窗口里把 favicon 补上，边缘可能还在回 404，直到缓存过期或被 purge；具体 TTL 我从外部看不出来，下面有对照。
 
-1. **TLS 终止**：证书装在代理上，后端只说 HTTP，省掉每台机器的证书管理；
-2. **路由**：按域名或路径把请求分给不同服务；
-3. **缓存与压缩**：静态资源直接由代理返回；
-4. **防护**：限流、黑白名单、WAF、请求体大小限制。
+同一条响应里出现了三层：
 
-正向代理和反向代理可以同时存在：客户端先过公司正向代理出去，到达目标站点的反向代理，再进后端。排查时要把每一跳都算上。
+- `Server: cloudflare` 和 `CF-RAY: ...-FRA`：CDN 边缘。FRA 是法兰克福的 IATA 代码，Cloudflare 文档用它标记处理请求的数据中心。
+- `x-envoy-upstream-service-time: 4`：响应里的 Envoy 头，单位毫秒。它说明 Cloudflare 后面还有一层 Envoy（L7 代理）；具体在哪台机器上，我从外部看不到。它算的是 Envoy 到上游的处理时间加这段网络延迟，不是整个请求的耗时。
+- `Content-Type: application/json` 的 404 body：源站应用自己的 404。
 
-## L4 与 L7：看得到多少，决定能做什么
+下面把这条响应拆开看。正向代理（`curl -x`、企业出口）是客户端侧的另一条链路，不在这条响应里；这篇只跟反向代理和 CDN 走。
 
-负载均衡按"能看懂哪一层"分两类：
+## Age 是缓存年龄，CF-Cache-Status 是厂商字段
 
-| 对比项 | L4（传输层） | L7（应用层） |
-| --- | --- | --- |
-| 看什么 | IP、端口、TCP/UDP | HTTP 方法、路径、Host、首部、Cookie |
-| 是否拆连接 | 通常转发或 NAT，不改载荷 | 终止客户端连接，再向后端新建连接 |
-| 路由能力 | 只能按地址和端口 | 可按 `/api`、`Host`、灰度标记路由 |
-| 性能 | 高，几乎只做转发 | 低一些，要解析和重建报文 |
-| TLS | 透传或只卸一层 | 通常终止 TLS，能看到明文 |
-| 客户端 IP | 需要 PROXY protocol 或透明代理 | 可用 `X-Forwarded-For` |
-| 典型协议 | 任意 TCP/UDP | HTTP/1.1、HTTP/2、gRPC、WebSocket |
+`Age` 是标准字段，RFC 9111 的定义是「响应在源站生成或验证之后，到这次响应发出为止的估算秒数」。`Age: 12` 不是请求耗时，也不是节点运行时间。它和 `Cache-Control: public, max-age=14400` 一起看：按响应头算，这份缓存还能新鲜约 14388 秒；CDN 自己的 TTL 规则可能更短，下面会看到。响应里同时有 `Expires` 时，`max-age` 优先；如果还有 `s-maxage`，共享缓存看 `s-maxage`，不看 `max-age`。
 
-**L4 不知道该连的是哪个虚拟主机**，所以它不能按域名分流，也不能改首部。它的优势是快、协议无关，数据库代理、游戏服务器、非 HTTP 流量常用 L4。
+`cf-cache-status` 不是标准字段，是 Cloudflare 的。`x-cache` 是另一家的名字。值也别背：我这次见到了 `HIT`（命中）、`EXPIRED`（有缓存但过期，回源）、`MISS`（没命中，回源）、`DYNAMIC`（这条链路决定不缓存）。日志和告警不要只匹配 `x-cache`，换个 CDN 就匹配不上了。
 
-L7 的代价不只是性能，还有**连接语义的变化**：客户端到代理是一条 TCP，代理到后端是另一条。后端的超时、重试、连接池都与客户端侧无关。排查"为什么客户端超时了后端还在跑"时，要想到这是两段独立的连接。
+`Vary: Accept-Encoding` 也在响应里。它的意思是这份响应的变体取决于请求的 `Accept-Encoding`；缓存键要按这个头区分 gzip/br。漏了它，压缩版本可能发给不支持的客户端；但边缘统一压缩是另一回事，不要看到 `Vary` 就以为源站按编码存了两份。
 
-几个实际影响：
+## 同一个域名，`/headers` 为什么不缓存
 
-- **WebSocket / gRPC** 需要 L7 代理正确支持 `Upgrade` 或 HTTP/2。老版本 Nginx 默认不支持 gRPC，要显式配置；
-- **L7 重试**只该对幂等请求做。`POST` 超时后自动重试，可能重复下单；
-- **L4 透传 TLS** 时，后端看到的是代理的 IP，要拿真实 IP 得用 PROXY protocol 或透明代理；
-- **L7 终止 TLS** 后，后端看到的是 HTTP。应用要生成绝对 URL 时，必须知道原始协议是 HTTPS。
-
-最后一条是重定向循环的根源。应用看到 `X-Forwarded-Proto: http`（代理没设或设错），就返回 `301 https://...`；客户端再请求，代理再转成 HTTP，循环。修复是代理设置 `X-Forwarded-Proto $scheme`，应用框架开启"信任代理首部"。
-
-## 负载均衡算法：没有一种全能
-
-| 算法 | 怎么分 | 适合 | 什么时候出问题 |
-| --- | --- | --- | --- |
-| 轮询（RR） | 依次轮流 | 后端同质、请求耗时接近 | 慢请求堆积在某一台 |
-| 加权轮询 | 按权重分 | 机器配置不同 | 权重长期不调整 |
-| 最少连接 | 给当前连接最少的 | 请求耗时差异大 | 连接数不等于负载 |
-| 最少响应时间 | 给响应最快的 | 延迟敏感 | 抖动导致流量来回摆 |
-| 源 IP 哈希 | 同一 IP 固定到一台 | 需要简单会话保持 | NAT 后大量用户集中 |
-| 一致性哈希 | 按 key 落到环上 | 缓存节点、分片 | 节点变化时部分 key 迁移 |
-
-**没有一种算法能同时做到"均匀、低延迟、少迁移"。** 选择顺序分三步。先看后端是否同质，同质就用轮询。再看请求耗时是否差异大，差异大就用最少连接。最后看是否需要把同一个用户/同一份数据固定到一台，需要才用哈希。
-
-一致性哈希值得单独说一句：它解决的是"节点增减时，尽量少的 key 需要搬家"。普通取模 `hash(key) % N`，N 一变几乎所有 key 都要重算；一致性哈希把节点和 key 都映射到一个环上，增删一个节点只影响相邻一段。缓存集群、分库分表路由常用它。
-
-还有一个在实际系统里效果很好的"随机两个选一个"（power of two choices）：随机挑两台，选负载低的那台。实现简单，避免"最少连接"在极端情况下的羊群效应。
-
-## 健康检查：别把整条链检挂
-
-健康检查分两种：
-
-| 类型 | 怎么工作 | 优点 | 风险 |
-| --- | --- | --- | --- |
-| 主动检查 | 定期请求 `/healthz` 或探 TCP 端口 | 能提前摘除故障节点 | 检查太深会误杀 |
-| 被动检查 | 根据真实请求的失败率/超时摘除 | 反映真实流量 | 需要足够的样本 |
-
-一个常见的自伤配置：`/healthz` 里查数据库、查 Redis、查下游服务。数据库抖动一下，所有节点的健康检查同时失败，负载均衡把所有后端摘光，**小故障变成全站不可用**。
-
-正确做法是分层：
-
-- **存活检查**（liveness）：进程还在不在，只检查自己，不查依赖；
-- **就绪检查**（readiness）：能不能接流量，可以查关键依赖，但要有超时和缓存；
-- **深度检查**：给人工排查用，不挂到自动摘除上。
-
-参数也要合理：`interval` 太短会放大检查压力，`timeout` 太长会让故障节点继续接流量，`unhealthy_threshold` 太小会因一次抖动误杀。常见起点是 5 秒间隔、2 秒超时、连续 3 次失败才摘除。再配合"慢启动"：节点刚上线时逐步加流量，避免冷缓存被瞬间打满。
-
-负载均衡器自身也可能是单点。生产上至少两台，用 VIP、BGP 或 DNS 做入口高可用；否则"高可用架构"只高可用到了负载均衡前面。
-
-## 会话保持：方便，但和扩容打架
-
-会话保持（sticky session）让同一个用户的请求固定落到同一台后端。实现方式：
-
-- **Cookie 插入**：负载均衡在响应里种一个 Cookie，后续按它分流；
-- **源 IP 哈希**：按客户端 IP 固定；
-- **一致性哈希**：按用户 ID 或 session ID 固定。
-
-它解决的问题是"登录状态存在本机内存"。但它带来三个新问题：
-
-1. **扩容不均衡**：新加的机器分不到老用户，热点依旧；
-2. **故障丢会话**：那台机器挂了，用户被重新分配到别的机器，登录态丢失；
-3. **NAT 后集中**：公司出口一个 IP，几千人可能被分到同一台。
-
-更好的做法是**让会话不依赖本机**：存 Redis、存数据库，或者用签名的无状态令牌（JWT）。这样任何一台后端都能处理任何请求，负载均衡可以随便选算法。
-
-如果确实需要保持（比如本地缓存预热成本高），优先用一致性哈希而不是源 IP：它按业务 key 分，粒度更合理，节点变化时迁移量也可控。
-
-## 真实客户端 IP：X-Forwarded-For 的水有多深
-
-代理转发请求时会加一个首部，记录客户端地址。常见的有三种：
-
-| 首部 | 形式 | 说明 |
-| --- | --- | --- |
-| `X-Forwarded-For` | `client, proxy1, proxy2` | 每经过一个代理追加一个地址 |
-| `X-Real-IP` | `client` | 只记一个，Nginx 常用 |
-| `Forwarded` | `for=...;proto=...;by=...` | RFC 7239 标准格式，支持度一般 |
-
-`X-Forwarded-For` 的关键是**它是可伪造的**。客户端可以自己带一个 `X-Forwarded-For: 1.2.3.4`，代理默认只在后面追加，于是最左边的值不可信。
+换一条路径，还是这个域名：
 
 ```text
-客户端伪造: X-Forwarded-For: 1.2.3.4
-代理追加:   X-Forwarded-For: 1.2.3.4, 203.0.113.7
+$ curl.exe -sS -I https://postman-echo.com/headers
+HTTP/1.1 200 OK
+Date: Thu, 19 Nov 2026 06:19:05 GMT
+Content-Type: application/json; charset=utf-8
+Content-Length: 137
+Connection: keep-alive
+etag: W/"89-4inUppSm2qmlxZdAGYO7XGyFmU0"
+vary: Accept-Encoding
+x-envoy-upstream-service-time: 6
+cf-cache-status: DYNAMIC
+Set-Cookie: sails.sid=...
+set-cookie: __cf_bm=...
+set-cookie: _cfuvid=...
+Server: cloudflare
+CF-RAY: a5cd19ebcaeb566a-FRA
 ```
 
-如果应用直接取第一个值做限流或审计，攻击者换个假 IP 就能绕过。正确做法是：
+`DYNAMIC` 的意思是 Cloudflare 这次决定不缓存。为什么 favicon 能 `HIT`，这个不能？把两条响应的 `Set-Cookie` 对一下：favicon 只有 Cloudflare 自己加的 `__cf_bm` 和 `_cfuvid`；`/headers` 多了一个源站的 `sails.sid`。按 Cloudflare 的文档，源站响应带 `Set-Cookie` 就不缓存；它还只默认缓存扩展名列表里的静态文件，HTML/JSON 不在列表里。`/headers` 两条都占了。
 
-1. **在入口代理上剥掉客户端自带的这类首部**，只保留自己写入的；
-2. 应用只信任**已知代理**追加的那一段，从右往左数；
-3. 用框架提供的"信任代理"配置，不要手写解析。
+我一开始以为「源站写了 `Cache-Control: public` 就会缓存」。再试一条显式写 `public` 的：
 
-Nginx 侧可以用 `realip` 模块：
+```text
+$ curl.exe -sS -D - -o NUL "https://postman-echo.com/response-headers?Cache-Control=public%2C%20max-age%3D60"
+HTTP/1.1 200 OK
+...
+Cache-Control: public, max-age=60
+cf-cache-status: DYNAMIC
+x-envoy-upstream-service-time: 4
+...
+```
+
+还是 `DYNAMIC`。`public` 只是告诉共享缓存「这份响应可以被共享」，不是命令它「存」。CDN 还有自己的规则：扩展名、Cookie、Cache Rules。源站不禁止、CDN 也愿意存，才会真正进缓存。反过来说，如果 CDN 规则被改成「忽略 Cookie 和 Authorization，按 URL 缓存」，源站又返回了 `public`，那就可能把个人数据存进共享缓存。默认值不是安全边界，规则才是。
+
+## 缓存键：`?cb=` 这次进了键，`no-cache` 没让边缘回源
+
+把同一个 favicon 的几次请求按时间排一下，都是 `curl -I`，只留关键列：
+
+| 时间 (GMT) | URL | CF-Cache-Status | Age |
+| --- | --- | --- | --- |
+| 06:20:20 | `/favicon.ico` | EXPIRED | — |
+| 06:20:32 | `/favicon.ico` | HIT | 12 |
+| 06:20:36 | `/favicon.ico?cb=20261119` | MISS | — |
+| 06:25:11 | `/favicon.ico?cb=20261119` | EXPIRED | — |
+| 06:25:11 | `/favicon.ico?cb=20261119` | HIT | 0 |
+| 06:27:23 | `/favicon.ico` | HIT | 74 |
+
+三件事：
+
+1. `?cb=` 第一次 `MISS`，几分钟后同一个带参 URL 出现 `EXPIRED`，再请求就是 `HIT Age: 0`。这个查询串在这条链路上进了缓存键；它不是「加个参数就回源」的万能开关，也不是「加参数没用」，取决于配置。
+2. 同一秒里先 `EXPIRED` 再 `HIT`，说明第一次回源拿到的新 404 立刻被存了下来。
+3. 不带参数的 `/favicon.ico` 在 06:20:32 是 `HIT Age: 12`，06:27:23 变成 `HIT Age: 74`，不是约 7 分钟。中间有别的请求回源刷新了这个对象，或者它被重新缓存了；`Age` 是每个缓存对象的年龄，不是全局计时器。公共服务还有别的流量，别从一个 `Age` 推 TTL。
+
+再换请求头：
+
+```text
+$ curl.exe -sS -I -H "Cache-Control: no-cache" https://postman-echo.com/favicon.ico
+...
+Age: 12
+cf-cache-status: HIT
+```
+
+`Cache-Control: no-cache` 是请求指令，意思是「用之前先验证」；这条链路没有按它回源，还是 `HIT`，`Age` 还是 12。不同 CDN 对客户端指令的处理不一样，我不能从这两条推出「所有 CDN 都这样」。但能推出一个实用结论：发版时别把 `?cb=` 或 `Cache-Control: no-cache` 当成通用刷新手段。要立刻生效，用 CDN 的 purge/invalidate；要长期不踩，静态资源用内容哈希文件名，入口 HTML 短缓存。
+
+`immutable` 是 RFC 8246 的扩展指令，浏览器在新鲜期内连刷新都不验证；它主要约束浏览器，不代替 CDN 的 TTL 配置。静态资源用内容哈希文件名时，它可以和长 `max-age` 一起用；普通 HTML 不要用。
+
+还有一个容易混的点：`Age` 可以来自上层缓存。开了分层缓存（CloudFront 叫 Origin Shield，Cloudflare 叫 Tiered Cache）时，边缘命中的 `Age` 可能是在上层就已经存了很久，可能不等于本地节点什么时候存的。`Age` 要和 `Cache-Control`/`s-maxage` 一起读，单独看不够。
+
+缓存投毒也不是某个头名自带的：一种常见形态是源站把未键控的头反射进响应（比如用 `X-Forwarded-Host` 拼绝对 URL），而缓存键又没包含它。其他形态（键归一化、请求走私）我没展开，也没造环境，未实跑。
+
+## 三层各自能改什么
+
+把上面三条响应按层拆（从响应头推断）：
+
+```text
+客户端 → Cloudflare 边缘（TLS 终止、缓存、CF-RAY）
+       → Envoy（L7 代理，x-envoy-upstream-service-time）
+       → 应用（404 body、sails.sid）
+```
+
+`CF-RAY` 的后缀 `FRA` 是 Cloudflare 处理请求的数据中心。`nslookup` 这个域名：
+
+```text
+$ nslookup postman-echo.com
+...
+Name:    postman-echo.com
+Address:  162.159.142.41
+```
+
+`162.159.142.41` 是 Cloudflare 的 anycast 地址。同一个 IP 从很多位置宣告，BGP 把包带到其中一个边缘；GeoDNS 也可能按解析位置返回不同地址。所以「DNS 把用户导到最近的节点」这句话只能当粗略描述：`CF-RAY` 是 `FRA` 不代表我离法兰克福最近，只代表这次路由落到了那里。
+
+L4 和 L7 的差别不是「快慢」，是「能看到哪一层」：
+
+| | 纯 L4 | L7 |
+| --- | --- | --- |
+| 看得到 | IP、端口、TCP/UDP；配了 SNI 嗅探才能看 SNI | HTTP 方法、Host、路径、首部、Cookie |
+| 能改 | NAT/转发、按地址和端口选后端 | 改首部、按路径/Host 路由、重试、健康检查 |
+| 看不到 | 加密后的 HTTP Host | — |
+| 连接 | 转发或 NAT，不解析 HTTP | 终止客户端连接，再向后端建连接 |
+| 客户端 IP | 取决于是否 SNAT；可用 PROXY protocol | 可用 X-Forwarded-For |
+
+「L4 不能按域名分流」说得太满：Nginx 的 `stream` + `ssl_preread` 能读 ClientHello 里的 SNI，按域名选后端（1.11.5+）。它读不到的是 TLS 里面的 HTTP `Host`。如果 TLS 在 L4 就透传，L4 只能靠 SNI；如果 TLS 在这里终止、还要按 HTTP 内容分流，那就是 L7 的事。
+
+L7 的代价是连接语义变了：客户端到代理是一条 TCP，代理到后端是另一条。后端超时、重试、连接池都和客户端侧独立。客户端超时了，后端可能还在跑；反过来，代理超时了，后端可能已经处理完，客户端却只看到 502/504。排查时先把这两段分开。
+
+`x-envoy-upstream-service-time` 能证明这里有 L7：纯 L4 加不了 HTTP 响应头。应用的 `/headers` 回显里还有 `X-Forwarded-Proto: https`，说明链路上有人加了这个头；它说的是「客户端到加头的那一跳是 HTTPS」，不说明后面到源站用 HTTP 还是 HTTPS。应用如果不信这个头，强制跳 HTTPS 的中间件可能一直循环；如果信错了（内层代理又用 `$scheme` 覆盖成 `http`），也会循环或生成 `http://` 的绝对 URL。这两种症状不一样：一个是跳转循环，一个是降级/混合内容。
+
+CDN 也不只缓存静态文件。它可以在边缘终止 TLS、压缩、和客户端谈 HTTP/2 或 HTTP/3，动态请求可以走优化过的回源链路。动态请求可以不进缓存，但「不缓存」不等于「CDN 没参与」；它仍然在转发、加头、做防护。效果取决于路径和协议，我没做跨境对比，不给倍数。
+
+## 时间账：`first - tls` 不是某一跳的耗时
+
+对同一个 `/headers` 跑三次 `curl -w`：
+
+```text
+$ curl.exe -sS -o NUL -w 'dns=%{time_namelookup} tcp=%{time_connect} tls=%{time_appconnect} first=%{time_starttransfer} total=%{time_total}\n' https://postman-echo.com/headers
+dns=0.030091 tcp=0.187959 tls=0.364853 first=0.631447 total=0.631525
+dns=0.026153 tcp=0.176767 tls=0.344810 first=0.581119 total=0.581191
+dns=0.022129 tcp=0.173449 tls=0.349666 first=0.915761 total=0.915828
+```
+
+`time_appconnect` 包含 DNS 和 TCP；`tls - tcp` 才是 TLS 握手，这三次约 0.17–0.18 秒。`first - tls` 约 0.23–0.57 秒，里面是请求发出、Cloudflare、Envoy、应用、第一字节回程的总和。`x-envoy-upstream-service-time` 只有几毫秒，不能拿它和 `first - tls` 直接相减出「CDN 花了多少」，因为还隔着客户端到边缘的 RTT。三次样本，别把 0.58/0.92 秒当成这个服务的固定性能。
+
+## X-Forwarded-For：伪造的值在这条链路上没到应用
+
+还是这个 `/headers`，这次带三个头：
+
+```text
+$ curl.exe -sS https://postman-echo.com/headers -H "X-Forwarded-For: 1.2.3.4" -H "Forwarded: for=1.2.3.4" -H "X-Custom-Test: hello"
+{"headers":{"host":"postman-echo.com","accept-encoding":"gzip, br","forwarded":"for=1.2.3.4","x-custom-test":"hello","accept":"*/*","user-agent":"curl/8.0.1","x-forwarded-proto":"https"}}
+```
+
+`Forwarded` 和 `X-Custom-Test` 到了应用，`X-Forwarded-For` 没有出现在回显里。是谁删的，我从外部看不到：可能是 Cloudflare 的规则，也可能是应用不回显。这个负结果本身有用——别假设每一跳都会保留或追加 XFF；以你链路上的回显/日志为准。
+
+Nginx 的 `$proxy_add_x_forwarded_for` 是追加，不是校验。我在本机用一个玩具代理把规则跑出来（会占住一个终端，另开一个窗口跑 curl）：
+
+```text
+$ node -e 'const http=require("http");http.createServer((q,s)=>{const x=[q.headers["x-forwarded-for"],q.socket.remoteAddress].filter(Boolean).join(", ");s.end(x)}).listen(18080,"127.0.0.1")'
+$ curl.exe -sS -H "X-Forwarded-For: 1.2.3.4" http://127.0.0.1:18080/
+1.2.3.4, 127.0.0.1
+```
+
+伪造的 `1.2.3.4` 留在最左边，代理把自己的对端地址追加在后面。这就是 `$proxy_add_x_forwarded_for` 的语义：它只追加，不判断左边是谁。应用如果取第一个值做限流或审计，攻击者换个假 IP 就能绕过。
+
+正确的顺序是三层，不是一句「信任代理」：
+
+1. **入口代理覆盖**：`proxy_set_header X-Forwarded-For $remote_addr;`。如果入口前面还有 CDN/负载均衡，`$remote_addr` 是那一跳的地址；先把可信代理段配进 `real_ip`，让 `$remote_addr` 变成真实客户端，再覆盖。否则你会把 CDN 的 IP 写进去，真实 IP 反而丢了。
+2. **内层代理追加**：`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`。每一层只追加自己看到的对端，不修改左边。
+3. **应用从右往左信任**：只信任已知代理追加的那一段，取最后一个不可信地址。Nginx 的 `real_ip` 模块就是按这个规则做的：
 
 ```nginx
-set_real_ip_from 10.0.0.0/8;
+# 只信任这些地址发来的 XFF；换成你的入口/CDN 网段
 set_real_ip_from 203.0.113.0/24;
 real_ip_header X-Forwarded-For;
 real_ip_recursive on;
 ```
 
-配置后 `$remote_addr` 会被替换成真实客户端地址，日志和限流都跟着对。`real_ip_recursive on` 表示从右往左跳过可信代理，取第一个不可信地址。
+`set_real_ip_from` 是信任边界。写成 `0.0.0.0/0` 等于让任何人自选 IP；只写你确实控制的代理段。`real_ip_recursive on` 从右往左跳过可信地址，取第一个不可信的；如果入口把伪造值留在左边，它就会把伪造值当成客户端——所以第 1 步的覆盖顺序不能反。`ngx_http_realip_module` 不是默认编译进去的，装之前看 `nginx -V` 有没有 `--with-http_realip_module`。如果在 Cloudflare 后面，它可能用 `CF-Connecting-IP` 而不是 XFF；以你链路实际带的头和 CDN 文档为准。
 
-应用侧还要注意：日志里同时打 `remote_addr` 和原始 `X-Forwarded-For`，出问题时才能还原链路。只打一个，排查时经常缺证据。
+`X-Forwarded-Proto` 是另一个方向的坑。入口是 TLS 终止点时，`proxy_set_header X-Forwarded-Proto $scheme;` 是对的：`$scheme` 就是客户端用的 https。到了内层代理，`$scheme` 变成 CDN/入口到内层的 http；如果内层还写 `$scheme`，应用就会把 https 覆盖成 http。内层要么保留入口写的值，要么用 CDN 提供的字段：
 
-## CDN：把缓存推到离用户最近的地方
-
-CDN 的本质是**在离用户近的地方放一份缓存，并用 DNS 或 Anycast 把用户导到最近/最快的节点**。
-
-一次静态资源请求的路径：
-
-```text
-用户 → DNS 解析到最近边缘节点 → 边缘有缓存？ 
-        是 → 直接返回（HIT）
-        否 → 回源站取（MISS）→ 缓存 → 返回
+```nginx
+# map 放在 http {} 里
+map $http_x_forwarded_proto $upstream_proto {
+    default $http_x_forwarded_proto;
+    ''      $scheme;
+}
+# 放在 location/server 里
+proxy_set_header X-Forwarded-Proto $upstream_proto;
 ```
 
-几个关键概念：
+这个 map 不能放在公网入口：客户端可以自己带 `X-Forwarded-Proto: https`，入口再原样信任，就等于让客户端决定协议。入口用 `$scheme`，内层保留；应用只信任已知代理给的值。内层也不能直接暴露给客户端，否则客户端绕过入口，直接带这个头进来；应用侧如果直接可达（绕过代理），同样不要信这些头。
 
-| 概念 | 作用 |
-| --- | --- |
-| 边缘节点 | 直接服务用户，缓存内容 |
-| 回源 | 边缘没命中时向源站或上层节点取 |
-| 源站保护 / Origin Shield | 在边缘与源站之间加一层共享缓存，减少回源 |
-| 缓存键（cache key） | 决定"什么算同一个资源"，通常含 Host、路径、查询串、部分首部 |
-| TTL | 缓存能活多久，由 `Cache-Control`、`Expires` 或 CDN 规则决定 |
-| 刷新（purge） | 主动让缓存失效，通常有延迟 |
+## 负载均衡：开源 Nginx 没有这些开关
 
-CDN 不只服务静态文件。动态加速走的是"优化回源链路"：边缘节点与源站之间保持长连接、选更优路由，减少跨国丢包与握手。它不缓存动态内容，但能显著改善跨境访问的首字节时间。
+把「负载均衡」当成一个产品名，很容易写出不存在的配置。下面这张表只列我查过文档的差异：
 
-判断一个响应有没有被 CDN 缓存，看响应首部：
+| 能力 | Nginx 开源版 | Envoy | 备注 |
+| --- | --- | --- | --- |
+| 轮询 | 默认 | `ROUND_ROBIN` | |
+| 最少连接/请求 | `least_conn` | `LEAST_REQUEST` | Envoy 看活跃请求数，不是响应时间 |
+| 一致性哈希 | `hash $key consistent` | `RING_HASH` / `MAGLEV` | |
+| 随机二选一 | `random two`（1.15.1+） | `LEAST_REQUEST` 默认 `choice_count: 2` | P2C |
+| 最少响应时间 | Plus 的 `least_time` | 没有同名标准算法 | 开源版没有；这是 Plus 的 |
+| 主动 HTTP 健康检查 | Plus 的 `health_check` | 有 | 开源版只有被动 `max_fails`/`fail_timeout` |
 
-```text
-$ curl -sI https://static.example.com/app.js
-HTTP/2 200
-cache-control: public, max-age=31536000, immutable
-age: 1832
-x-cache: HIT
-```
+Nginx 开源版的被动检查默认是 `max_fails=1`、`fail_timeout=10s`：一次失败就摘 10 秒，之后用真实请求探活。它只在有流量时工作；一台没流量的后端挂了，它不会知道。要主动探 `/healthz`，Nginx 开源版得靠外部探针，或者换 Plus/Envoy/HAProxy。`health_check` 写进开源版不是「不生效」，是 `nginx -t` 直接报未知指令。
 
-`age` 是这份缓存已经存在了多少秒，`x-cache`（不同厂商名字不同，如 `cf-cache-status`、`x-cache-status`）告诉你命中与否。`age` 接近 `max-age` 时，说明快过期了。
+`proxy_next_upstream` 的默认值是 `error timeout`，但非幂等请求（POST/PATCH）在已经发给上游之后，默认不会再换一台；要开 `non_idempotent` 才会。Envoy 也一样，没配 `retry_policy` 就不重试。所以「L7 会重试 POST，可能重复下单」不是默认行为；是你打开重试、又没有幂等键时的风险。超时不等于第一台没处理，重发前先想清楚。
 
-## 缓存策略与常见坑
+会话保持也是配置出来的：Nginx 开源版没有内建 cookie `sticky`，常用 `ip_hash` 或 `hash $cookie_session consistent`；Plus 有 `sticky cookie`，Envoy 用 hash policy。它能解决「登录态在本机内存」，但扩容不均、故障丢会话、NAT 后集中这三个问题还在。能让会话不依赖本机（Redis、数据库、带撤销/轮换的签名令牌）就别开粘性。
 
-缓存的第一个问题不是"怎么快"，而是"**什么绝对不能缓存**"。
+## 两个令牌拿到同一份 body，先查什么
 
-| 响应特征 | 能否被共享缓存 | 正确做法 |
-| --- | --- | --- |
-| 带 `Authorization` 的接口 | 默认不应缓存 | `Cache-Control: private, no-store` |
-| 带 `Set-Cookie` 的页面 | 共享缓存里很危险 | 拆分静态与个性化，个性化不缓存 |
-| 用户个人数据 | 不能 | 按用户区分缓存键，或直接回源 |
-| 公共静态资源 | 可以，越长越好 | 文件名带哈希 + `immutable` |
-| HTML 入口 | 短缓存或协商缓存 | `no-cache` + ETag，发版可刷新 |
+我没有一个会串号的线上 CDN 可以复现。下面是最小验证顺序，`api.example.com` 和 `<TOKEN_A>` 都是占位，标准形态，未实跑。
 
-高频坑，按危害排序：
-
-1. **把带登录态的响应缓存到边缘**。用户 A 的 `/api/me` 被缓存，用户 B 命中同一份，直接数据泄露。这是最严重的一类，通常源于源站错误地返回 `Cache-Control: public`，或 CDN 默认忽略 `Authorization` 仍缓存。
-2. **缓存键没包含查询串**。`/list?page=1` 与 `/list?page=2` 被当成同一个资源，翻页拿到重复数据。
-3. **缓存键包含多余首部，或被未键控首部污染**。攻击者构造 `X-Forwarded-Host` 让缓存存下指向恶意域的资源，其他用户命中，这是缓存投毒。
-4. **发版后旧 HTML 还在**。入口 HTML 长缓存，用户仍加载旧页面，引用的旧 JS 已被删除，白屏。做法是 HTML 短缓存 + 静态资源文件名带内容哈希。
-5. **purge 不是瞬时**。刷新后全球节点陆续生效，期间新旧混杂。发版流程要给缓存留时间，或采用"新文件名 + 不改旧文件"的不可变发布。
-6. **`Vary` 漏了**。按 `Accept-Encoding` 缓存了 gzip 版本，却返回给不支持 gzip 的客户端；或者按 `User-Agent` 缓存了移动端页面给桌面端。
-
-一个实用原则：**能被缓存的资源和不能被缓存的资源，放在不同的域名或路径下。** 静态资源一个域名，长缓存；API 一个域名，默认不缓存。混在一起，规则迟早写错。
-
-## 一个具体例子：用户看到了别人的资料
-
-客服反馈：用户 A 打开个人中心，偶尔显示用户 B 的昵称和头像。刷新几次又正常。
-
-先看响应头：
+先用两个令牌各拿一次响应头和 body：
 
 ```text
-$ curl -sI https://api.example.com/api/me -H 'Authorization: Bearer <A 的令牌>'
-HTTP/2 200
-cache-control: public, max-age=600
-x-cache: HIT
-age: 240
-set-cookie: session=...
+curl.exe -sS -D headers-a.txt -o body-a.json https://api.example.com/api/me -H "Authorization: Bearer <TOKEN_A>"
+curl.exe -sS -D headers-b.txt -o body-b.json https://api.example.com/api/me -H "Authorization: Bearer <TOKEN_B>"
 ```
 
-三个信号同时出现：`Authorization` 请求、`Cache-Control: public`、`x-cache: HIT`。共享缓存把一个需要身份的内容当成了公共资源。
+先比 body。如果两份 body 不一样，优先查应用、会话、数据库，不要先怪 CDN。如果两份 body 一样，再看 `headers-a.txt` / `headers-b.txt` 里的四行：
 
-验证是不是缓存导致：
+- `Cache-Control`：有没有 `public`、`s-maxage`，还是 `private`/`no-store`；
+- `Age`：是不是大于 0；
+- `cf-cache-status` / `x-cache`：是 `HIT` 还是 `DYNAMIC`/`BYPASS`/`MISS`；
+- `Vary`：有没有把不该共享的维度算进缓存键。
 
-```text
-$ curl -s https://api.example.com/api/me -H 'Authorization: Bearer <A 的令牌>' | jq .name
-"用户A"
-$ curl -s https://api.example.com/api/me -H 'Authorization: Bearer <B 的令牌>' | jq .name
-"用户A"
-```
+如果 body 一样、`Age > 0`、`Cache-Control: public`，共享缓存是第一个嫌疑。但别急着下结论：`Age` 也可能来自源站自己写的头，或者上层缓存；要再用一个带随机查询串的 URL 请求一次。如果这个 CDN 把查询串算进缓存键，换 URL 就正常，缓存串号的可能性更大；如果查询串不在键里，这个对照无效，得用 purge 或不同路径再验。这个对照我没在真实环境跑过。
 
-B 的令牌拿到了 A 的数据，确认是边缘缓存串号。
+修复顺序：
 
-根因通常在源站：某个框架或中间件给所有响应加了 `Cache-Control: public`，或者 CDN 规则配置成"忽略 Authorization 与 Cookie，按 URL 缓存"。
+1. 源站认证接口统一返回 `Cache-Control: private, no-store`。`private` 允许浏览器存，`no-store` 连浏览器也不让存；两个一起写不冲突。不要用 `Vary: Authorization` 当默认方案：它把每个令牌变成独立变体，缓存命中率会很难看；认证响应直接 `no-store` 更省事。
+2. 在 CDN 上把 `/api/*` 配成绕过缓存，或者加一条「请求带 `Authorization`/响应带源站 `Set-Cookie` 就不缓存」的规则。规则要写出来、测出来，不要依赖「默认应该不会缓存」。
+3. purge 已污染的对象，然后用两个令牌再验一次：body 不同，`cf-cache-status` 是 `DYNAMIC`/`BYPASS`，没有 `Age`。
 
-修复分三层：
-
-1. **源站**：认证接口统一返回 `Cache-Control: private, no-store`；如果确实要缓存按用户区分的变体，再配合 `Vary: Authorization`；
-2. **CDN**：对 `/api/*` 默认绕过缓存，或在规则里"存在 `Authorization`/`Set-Cookie` 时不缓存"；
-3. **验证**：用不同令牌请求，确认 `x-cache: BYPASS` 或 `MISS`，且响应不同；再刷新 CDN 缓存，清理已污染的内容。
-
-```text
-$ curl -sI https://api.example.com/api/me -H 'Authorization: Bearer <B 的令牌>'
-HTTP/2 200
-cache-control: private, no-store
-x-cache: BYPASS
-```
-
-这类事故的教训不是"CDN 不可靠"，而是**缓存策略必须由最了解数据的人（源站）明确声明**。默认值不可怕，默认值被误解才可怕。
+RFC 9111 §3.5 说，共享缓存默认不能拿带 `Authorization` 请求的响应去满足后续请求，除非响应明确允许（`public`、`s-maxage`、`must-revalidate`）。但 CDN 的规则可以覆盖这个默认；标准是底线，不是配置的替代品。
 
 ## 检查一下
 
@@ -306,55 +277,31 @@ x-cache: BYPASS
   "title": "中间链路三问",
   "questions": [
     {
-      "question": "L4 负载均衡和 L7 最本质的区别是什么？",
-      "options": ["L4 更快所以更好", "L4 只看 IP 和端口，L7 能解析 HTTP 并按路径/域名路由", "L7 不能做 TLS", "L4 只能用于 UDP"],
+      "question": "响应头里的 Age: 12 表示什么？",
+      "options": ["这次请求花了 12 秒", "这份响应在缓存里已经存了约 12 秒", "CDN 节点启动了 12 秒", "TTL 还剩 12 秒"],
       "answer": 1,
-      "explain": "能看到哪一层，决定能做什么。L4 协议无关但无法按 HTTP 内容分流；L7 能改首部、做路由与重试，代价是性能与连接语义变化。"
+      "explain": "Age 是 RFC 9111 定义的缓存年龄，估算响应从源站生成或验证后经过了多久；不是请求耗时，也不是节点运行时间。"
     },
     {
-      "question": "X-Forwarded-For 最左边的地址为什么不能直接信？",
-      "options": ["格式不标准", "客户端可以自己伪造这个首部，代理只在后面追加", "它总是 IPv6", "它会被加密"],
-      "answer": 1,
-      "explain": "只有可信代理追加的那一段才可信；入口要剥掉客户端自带的值，应用从右往左数。"
+      "question": "Nginx 开源版怎么做 HTTP 健康检查？",
+      "options": ["只能靠 max_fails/fail_timeout 被动摘除", "health_check 指令直接可用", "least_time 就是主动检查", "sticky 就是主动检查"],
+      "answer": 0,
+      "explain": "主动 health_check 是 NGINX Plus 的能力；开源版只有被动检查，默认 max_fails=1、fail_timeout=10s。"
     },
     {
-      "question": "带 Authorization 的个人资料接口被 CDN 缓存，最可能造成什么？",
-      "options": ["请求变慢", "不同用户互相看到对方的数据", "证书过期", "DNS 解析失败"],
-      "answer": 1,
-      "explain": "共享缓存把需要身份的内容当成公共资源；源站应返回 private/no-store，CDN 对认证请求绕过缓存。"
+      "question": "入口 Nginx 用 proxy_add_x_forwarded_for 转发，客户端自带 X-Forwarded-For: 1.2.3.4，会发生什么？",
+      "options": ["伪造值被丢弃", "只剩 1.2.3.4", "请求被拒绝", "伪造值保留，Nginx 在后面追加真实对端地址"],
+      "answer": 3,
+      "explain": "proxy_add_x_forwarded_for 只追加 $remote_addr，不校验左边的值；所以入口要先覆盖成 $remote_addr，内层才追加。"
     }
   ]
 }
 ```
 
-## 常见误区
+## 还差的
 
-### 误区：加了负载均衡就等于高可用
-
-**你以为**：后端有多台，挂一台也没事。
-**其实**：负载均衡器自己可能是单点；健康检查可能只探端口，后端业务已经坏了仍然全绿；会话存在本机时，挂一台就丢一批登录态。
-**怎么验证**：主动摘掉一台后端，观察错误率与会话丢失；再模拟负载均衡入口故障，看是否有备用入口。
-
-### 误区：X-Forwarded-For 是可信的客户端 IP
-
-**你以为**：首部里第一个地址就是用户真实 IP。
-**其实**：客户端可以自带这个首部，代理默认只追加。直接取最左边等于让攻击者自选 IP，限流和审计都会失效。
-**怎么验证**：用 `curl -H 'X-Forwarded-For: 1.2.3.4'` 请求，看应用日志记录的是不是这个假地址。
-
-### 误区：CDN 只适合静态资源
-
-**你以为**：动态接口必须直连源站，CDN 帮不上忙。
-**其实**：CDN 的动态加速通过优化回源链路、长连接与就近接入降低延迟；边缘还可以做 TLS 终止、WAF、限流。只是动态内容通常不缓存。
-**怎么验证**：对比直连源站与走 CDN 的 `time_connect`、`time_starttransfer`，在跨境或移动网络下差异更明显。
-
-### 误区：会话保持是必须开的
-
-**你以为**：用户登录了，请求当然要落到同一台机器。
-**其实**：把会话放本机是架构选择，不是必然。它会让扩容不均、故障丢会话、NAT 后流量集中。把会话放 Redis 或用无状态令牌，负载均衡才能自由调度。
-**怎么验证**：手动重启一台后端，观察有多少用户被登出；再对比无状态方案下的同样操作。
-
-## 小结
-
-请求路上通常不止两个端点。正向代理代表客户端，反向代理代表服务端。L4 只看地址与端口，L7 能解析 HTTP 做路由与改写。负载均衡按算法把流量分给后端，CDN 把缓存放到离用户最近的地方。每加一跳，就多一个信任边界：`X-Forwarded-For` 只能信代理追加的那段，健康检查不能把依赖故障放大成全局摘除，缓存必须由源站明确声明什么能共享。排查这类问题时，先画出完整链路，再逐跳看首部、缓存状态和超时，比盯着应用代码有效。
-
-这条线到这里结束。十一篇从"敲下回车"讲到"请求路上的每一个中间人"。下一步建议挑一个你熟悉的线上域名，用 `curl -I` 和 `openssl s_client` 各看一遍，把响应头里的 `server`、`via`、`age`、`x-cache` 对上今天讲的角色。
+- 本机没有 Nginx、Docker 和 Linux 环境；上面的 Nginx 配置是标准形态，没跑过 `nginx -t`，也没起后端做联调。
+- 没有自己的 CDN 账号和源站，所有 CDN 观测都来自公开的 `postman-echo.com`；我看不到它的 Cloudflare 规则、源站配置和 purge 行为，`Cache-Control: no-cache` 为什么没回源只能从响应推断。
+- 没有复现认证响应串号；缓存投毒、`Vary` 漏项、`X-Forwarded-Host` 反射只写了成立条件，未实跑。
+- 没有跑 Envoy、Nginx Plus、HAProxy；主动健康检查、`least_time`、`slow_start`、`sticky` 的差异来自文档，未在本机验证。
+- 没有测 HTTP/3、动态加速和跨境回源；本文不给性能倍数，也不把一组 `curl -w` 当成服务基线。
