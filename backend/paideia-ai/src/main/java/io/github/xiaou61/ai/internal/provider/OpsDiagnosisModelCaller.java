@@ -15,7 +15,13 @@ import org.springframework.stereotype.Component;
 @Component
 public class OpsDiagnosisModelCaller extends SingleShotModelCaller {
 
-    private static final int MAX_TOKENS = 4096;
+    /**
+     * 4096 曾经够用，但 WORK-086 把证据撑长之后不够了：生产实测（2026-11-19 16:57）
+     * 注入 `<knowledge>` 的两次诊断连续以 {@code 模型输出被长度上限截断} 失败，
+     * 而同一窗口、同一模型的前一次成功诊断已经用掉 3748 个输出 token——离上限只剩 350。
+     * 截断是整份报告作废，代价远大于多给几千 token，所以翻倍到 8192。
+     */
+    private static final int MAX_TOKENS = 8192;
     private static final int TIMEOUT_SECONDS = 120;
 
     OpsDiagnosisModelCaller(AiProperties properties, GuardedHttpTransport transport) {
