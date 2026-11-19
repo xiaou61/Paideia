@@ -5,217 +5,287 @@ chapter: 容器
 level: intermediate
 category: spring-from-zero
 prerequisite: 04 · 返回值与状态码
-minutes: 34
+minutes: 20
 status: published
 ---
 
 # 05 · 手写一个 40 行的 IoC 容器
 
-## 这一课你要会
+## 加了第二个构造器，启动没报错，第一次调用才炸
 
-- 说清 IoC（控制反转）反转的到底是"谁决定 new 哪个实现"；
-- 用反射 + 构造器参数写一个能按类型取出实例的容器；
-- 解释"按接口注入"与"按具体类注入"的差别，以及 Spring 为什么两个都支持；
-- 知道容器启动慢在哪、以及为什么它只在启动时慢。
-
-## 为什么
-
-`@Autowired` 背后只有一个问题：**这个对象里的依赖，是谁塞进去的？**
-
-不用容器时，是代码自己 `new`：
+`TransferService` 原来只有一个构造器，跑得好好的。我想让它在单测里能直接 `new`，就加了一个无参的：
 
 ```java
-TransferService service = new TransferService(new AccountRepo());
-```
+public class TransferService {
+    private AccountRepository repository;      // 这里没有 final，这一点很关键
 
-用容器时，是"别人"在主流程之外把它造好塞进来。反转的就是这件事的决定权——从"用到的时候自己造"变成"启动时统一造好、按需要给你"。
+    public TransferService() {
+    }
 
-明白这一点之后，`@Autowired` 就只是一个标记，告诉容器"这个位置需要你填"。它没有创造任何能力。
+    public TransferService(AccountRepository repository) {
+        this.repository = repository;
+    }
 
-## 讲解
-
-### 一个容器最少要有两个能力
-
-1. **登记**：知道有哪些类型需要被管理；
-2. **取出**：按类型给出一个实例，并且同一个类型给同一个（单例）。
-
-要"按类型给实例"，就必须能自己造对象——而你不知道这个类有哪些构造器、需要哪些参数。这就是为什么容器一定要用**反射**：它在运行时才能读到别人的类。
-
-```sketch
-{
-  "title": "容器就两件事：登记，然后按类型取",
-  "rows": [
-    [
-      { "id": "reg", "title": "登记", "sub": "知道要管哪些类", "tone": "gray" },
-      { "id": "new", "title": "反射造对象", "sub": "构造器、参数都得运行时读", "tone": "blue" },
-      { "id": "get", "title": "按类型取到同一个", "sub": "单例，重复取还是它", "tone": "green" }
-    ]
-  ],
-  "arrows": [
-    { "from": "reg", "to": "new" },
-    { "from": "new", "to": "get" }
-  ]
+    public String ping() {
+        return "hello, " + repository.name();
+    }
 }
 ```
 
-### 手写版
+`InMemoryAccounts` 也注册了。Spring Framework 6.2.11 + JDK 25，用 `AnnotationConfigApplicationContext` 显式注册这两个类（省掉扫描），`refresh()` 之后：
 
-下面这 40 行就是容器的全部核心。注意它没有注解、没有 AOP、没有配置文件：
+```text
+context 起来了
+Exception in thread "main" java.lang.NullPointerException: Cannot invoke "AccountRepository.name()" because "this.repository" is null
+```
+
+启动没报错，`refresh()` 正常返回，第一次 `ping()` 才炸。我第一反应是 `InMemoryAccounts` 没被注册——查了，注册了，`context.getBean(AccountRepository.class)` 也确实拿得到实例。真正的解释是：**Spring 用的是那个无参构造器**，带参数的那个从头到尾没被调用过。
+
+我原来以为容器会挑「参数能填满的那个」。它不猜：一个类有多个构造器、又没有哪个标了 `@Autowired` 时，它只认无参构造器；连无参的都没有，就直接启动失败：
+
+```text
+Error creating bean with name 'transferService': Failed to instantiate [TransferService]: No default constructor found
+```
+
+而只要类里只剩一个构造器，不标 `@Autowired` 也能注入（Spring 4.3 起）——同样这两个类，只留带参数的那个构造器，输出是 `hello, in-memory`。
+
+三件事连起来看：注不注入跟注解没关系，跟**这个类有几个构造器、参数类型是什么**有关系。容器决定一个对象怎么造，靠的是读构造器签名，再拿参数类型去登记表里找候选。下面那 40 行就是把这件事写出来。
+
+| 你看到的 | 先看哪 |
+| --- | --- |
+| 启动成功，第一次调用 NPE，报「某个字段 is null」 | 类里有几个构造器；是不是有一个无参的在那里，把依赖绕过去了 |
+| `Failed to instantiate [...] No default constructor found` | 所有构造器都带参数，而其中没有哪个标 `@Autowired` |
+| `Unsatisfied dependency ... constructor parameter 0` | 这个参数类型在容器里没有对应 Bean，或者实现类没被扫到 |
+
+## 容器要回答的只有一句：这个参数谁来填
+
+`Container` 从 `static class Container {` 到它的闭合括号正好 40 行：`register` 边登记边造，`get` 按类型取，真正做事的是 `instantiate` 和它下面的两个小方法。没有注解、没有配置文件、没有 AOP。
 
 <!-- run -->
 ```java
 import java.lang.reflect.Constructor;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class Main {
 
-    interface Repo {
+    interface AccountRepository {
         String name();
     }
 
-    static class RepoImpl implements Repo {
+    static class InMemoryAccounts implements AccountRepository {
         public String name() {
             return "in-memory";
         }
     }
 
-    static class Greeter {
-        private final Repo repo;
+    static class TransferService {
+        private final AccountRepository repository;
 
-        Greeter(Repo repo) {
-            this.repo = repo;
+        TransferService(AccountRepository repository) {
+            this.repository = repository;
         }
 
-        String hello() {
-            return "hello, " + repo.name();
+        String ping() {
+            return "hello, " + repository.name();
         }
     }
 
     static class Container {
-        private final Map<Class<?>, Object> instances = new HashMap<>();
+        private final Map<Class<?>, Object> instances = new LinkedHashMap<>();
 
-        void register(Class<?>... types) {
+        void register(Class<?>... types) throws ReflectiveOperationException {
             for (Class<?> type : types) {
                 instances.put(type, instantiate(type));
             }
         }
 
-        // 注入时按"能不能赋值"找：要 Repo，手里有 RepoImpl，就给它
-        private Object resolve(Class<?> wanted) {
-            Object direct = instances.get(wanted);
-            if (direct != null) {
-                return direct;
-            }
-            for (Object candidate : instances.values()) {
-                if (wanted.isAssignableFrom(candidate.getClass())) {
-                    return candidate;
+        <T> T get(Class<T> type) {
+            return type.cast(instances.get(type));
+        }
+
+        private Object instantiate(Class<?> type) throws ReflectiveOperationException {
+            for (Constructor<?> constructor : type.getDeclaredConstructors()) {
+                Object[] arguments = fill(constructor.getParameterTypes());
+                if (arguments == null) {
+                    continue;
                 }
+                return constructor.newInstance(arguments);
+            }
+            throw new IllegalStateException("没有能填满的构造器: " + type.getSimpleName());
+        }
+
+        private Object[] fill(Class<?>[] parameters) {
+            Object[] arguments = new Object[parameters.length];
+            for (int i = 0; i < parameters.length; i++) {
+                arguments[i] = resolve(parameters[i]);
+                if (arguments[i] == null) return null;
+            }
+            return arguments;
+        }
+
+        private Object resolve(Class<?> wanted) {
+            for (Object bean : instances.values()) {
+                if (wanted.isAssignableFrom(bean.getClass())) return bean;
             }
             return null;
         }
-
-        private Object instantiate(Class<?> type) {
-            for (Constructor<?> constructor : type.getDeclaredConstructors()) {
-                Class<?>[] parameters = constructor.getParameterTypes();
-                Object[] arguments = new Object[parameters.length];
-                boolean satisfiable = true;
-                for (int i = 0; i < parameters.length; i++) {
-                    Object dependency = resolve(parameters[i]);
-                    if (dependency == null) {
-                        satisfiable = false;
-                        break;
-                    }
-                    arguments[i] = dependency;
-                }
-                if (!satisfiable) {
-                    continue;
-                }
-                try {
-                    constructor.setAccessible(true);
-                    return constructor.newInstance(arguments);
-                } catch (ReflectiveOperationException error) {
-                    throw new IllegalStateException("实例化失败: " + type.getSimpleName(), error);
-                }
-            }
-            throw new IllegalStateException("找不到可满足的构造器: " + type.getSimpleName());
-        }
-
-        @SuppressWarnings("unchecked")
-        <T> T get(Class<T> type) {
-            return (T) instances.get(type);
-        }
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         Container container = new Container();
-        container.register(RepoImpl.class, Greeter.class);
-        System.out.println(container.get(Greeter.class).hello());
-        System.out.println(container.get(RepoImpl.class) == container.get(RepoImpl.class));
-        System.out.println(container.get(Repo.class) == null ? "按接口取不到" : "按接口取到了");
+        container.register(InMemoryAccounts.class, TransferService.class);
+        System.out.println(container.get(TransferService.class).ping());
+        System.out.println(container.get(InMemoryAccounts.class) == container.get(InMemoryAccounts.class));
+        System.out.println(container.get(AccountRepository.class) == null ? "get(AccountRepository.class) 拿不到" : "取到了");
+
+        Container reversed = new Container();
+        try {
+            reversed.register(TransferService.class, InMemoryAccounts.class);
+        } catch (IllegalStateException error) {
+            System.out.println(error.getMessage());
+        }
     }
 }
 ```
 ```text
 hello, in-memory
 true
-按接口取不到
+get(AccountRepository.class) 拿不到
+没有能填满的构造器: TransferService
 ```
 
-三行输出对应三个关键事实：
+四行输出对应四件事：
 
-- **构造器注入是自动的**：`Greeter` 的构造器要一个 `Repo`（接口），容器从已登记的对象里找到了 `RepoImpl`——靠的是 `repo.isAssignableFrom(RepoImpl.class)` 为真，不是"类型相等"。
-- **单例是默认行为**：同一个类型两次 `get` 返回同一引用，因为 `instances` 就是一张缓存表。
-- **按接口取不到**：注意 `resolve` 与 `get` 是**两套查找方式**——注入时按"能不能赋值"宽松地找，取用时按"键相等"严格地查。所以 `get(Repo.class)` 返回了 `null`，因为登记表里的键是 `RepoImpl.class`。
+- **`hello, in-memory`**：`TransferService` 的构造器要一个 `AccountRepository`，容器从表里找到 `InMemoryAccounts`。判据是 `wanted.isAssignableFrom(bean.getClass())`——「这个 bean 能不能赋给 wanted」，不是「两个类相不相等」。
+- **`true`**：两次 `get` 是同一个对象。`instances` 就是缓存表，`register` 时造一次，之后只查表。
+- **`get(AccountRepository.class) 拿不到`**：取用时按精确相等查键，表里的键是 `InMemoryAccounts.class`。注入走得通、取用走不通，因为这是两套查找。
+- **`没有能填满的构造器: TransferService`**：我把登记顺序反过来（先 `TransferService`，后 `InMemoryAccounts`），造 `TransferService` 时表里还没有能赋给 `AccountRepository` 的对象。`instances.put(type, instantiate(type))` 是边登记边造，被依赖的类必须先进表。
 
-### Spring 补上的那一步：接口也算键
+最后一行不是一个错误文案的巧合，是这行登记代码的语义决定的。Spring 不是这么做的：它先把所有 Bean 的定义登记完，再按依赖顺序实例化，所以你不必操心 `@Service` 的书写顺序。这两层为什么分开，第 6 课讲。
 
-真实容器会把"这个对象实现了哪些接口"一并记成可查询的键。于是 `getBean(Repo.class)` 也能拿到那个 `RepoImpl`。加上这一条之后，"面向接口注入"才成立：
+## `get` 和 `resolve` 是两套查找：一个按精确相等，一个按能赋值
 
-```sketch
-{
-  "title": "接口也算键，面向接口注入才成立",
-  "rows": [
-    [
-      { "id": "impl", "title": "RepoImpl 实例", "sub": "真正造出来的对象", "tone": "blue" },
-      { "id": "keys", "title": "登记两个键", "sub": "RepoImpl 和 Repo 都指向它", "tone": "violet" },
-      { "id": "inject", "title": "按接口注入", "sub": "调用方只写 Repo", "tone": "green" }
-    ]
-  ],
-  "arrows": [
-    { "from": "impl", "to": "keys" },
-    { "from": "keys", "to": "inject" }
-  ]
-}
+上面第 3、4 行的失败是两个不同的坑，值得拆开：
+
+- `get` 是**你按类型要**：键必须精确相等，`get(AccountRepository.class)` 和 `get(InMemoryAccounts.class)` 是两次不同的查询。
+- `resolve` 是**容器给参数填**：只要候选能赋值给参数类型就行，所以接口参数能拿到实现类。
+
+同一张表、两个方向、两套规则。我的实现只让「宽松」活在注入侧，取用侧还是严格的——所以才出现「注入成功、`get` 拿不到」。
+
+真实的 Spring 两个方向都能走。同样两个类，单构造器的 `TransferService`，只打印两行：
+
+```text
+in-memory
+true
 ```
 
+`getBean(AccountRepository.class)` 直接拿到 `InMemoryAccounts` 的实例，而且和 `getBean(InMemoryAccounts.class)` 是同一个对象。
+
+要注意它**怎么**做到的：Spring 在按类型取 Bean 时，是对每个候选 Bean 的实际类型做一次「能不能赋值给目标类型」的判断，不是维护一张「接口 → 实例」的键表。我在玩具里用的是键表（把接口也塞成键），因为它好写、也够说明效果——但机制不同，别把玩具的结构当成 Spring 的结构。
+
+按键表补上这个效果，`Container` 从 40 行长到 49 行，改动只有两处：登记时把接口也写成键，以及多一个 `keys` 方法。
+
+<!-- run -->
 ```java
-@Service
-public class TransferService {
-    private final AccountRepository repository;   // 接口
+import java.lang.reflect.Constructor;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
-    public TransferService(AccountRepository repository) {
-        this.repository = repository;
+public class Main {
+
+    interface AccountRepository {
+        String name();
+    }
+
+    static class InMemoryAccounts implements AccountRepository {
+        public String name() {
+            return "in-memory";
+        }
+    }
+
+    static class TransferService {
+        private final AccountRepository repository;
+
+        TransferService(AccountRepository repository) {
+            this.repository = repository;
+        }
+
+        String ping() {
+            return "hello, " + repository.name();
+        }
+    }
+
+    static class Container {
+        private final Map<Class<?>, Object> instances = new LinkedHashMap<>();
+
+        void register(Class<?>... types) throws ReflectiveOperationException {
+            for (Class<?> type : types) {
+                Object instance = instantiate(type);
+                for (Class<?> key : keys(type)) {
+                    instances.put(key, instance);
+                }
+            }
+        }
+
+        <T> T get(Class<T> type) {
+            return type.cast(instances.get(type));
+        }
+
+        private Object instantiate(Class<?> type) throws ReflectiveOperationException {
+            for (Constructor<?> constructor : type.getDeclaredConstructors()) {
+                Object[] arguments = fill(constructor.getParameterTypes());
+                if (arguments == null) {
+                    continue;
+                }
+                return constructor.newInstance(arguments);
+            }
+            throw new IllegalStateException("没有能填满的构造器: " + type.getSimpleName());
+        }
+
+        private Object[] fill(Class<?>[] parameters) {
+            Object[] arguments = new Object[parameters.length];
+            for (int i = 0; i < parameters.length; i++) {
+                arguments[i] = resolve(parameters[i]);
+                if (arguments[i] == null) return null;
+            }
+            return arguments;
+        }
+
+        private Object resolve(Class<?> wanted) {
+            for (Object bean : instances.values()) {
+                if (wanted.isAssignableFrom(bean.getClass())) return bean;
+            }
+            return null;
+        }
+
+        private List<Class<?>> keys(Class<?> type) {
+            List<Class<?>> keys = new ArrayList<>(List.of(type));
+            keys.addAll(List.of(type.getInterfaces()));
+            return keys;
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        Container container = new Container();
+        container.register(InMemoryAccounts.class, TransferService.class);
+        System.out.println(container.get(AccountRepository.class).name());
+        System.out.println(container.get(AccountRepository.class) == container.get(InMemoryAccounts.class));
     }
 }
 ```
+```text
+in-memory
+true
+```
 
-`AccountRepository` 是一个接口，`@Repository` 标在 MyBatis 的 mapper 接口上——运行时真正被注入的是一个**代理对象**（第 10 课会看到它是怎么来的）。但注入这一步只关心"有没有一个对象能赋给这个接口"，不关心它是怎么造的。
-
-### 为什么"启动慢、运行快"
-
-容器在启动时做完两件重活：
-
-1. **扫描**：读所有类上的注解，判断哪些要被管理；
-2. **实例化与注入**：把整张依赖图从叶子往根造出来。
-
-这两件事的代价是固定的，与请求量无关。所以容器"启动要几秒、之后每个请求只花微秒"。反过来说，如果启动时间随请求量增长，说明把重活放到了请求路径上——那是设计错误，不是容器的锅。
-
-容器还有一件事值得知道：它默认**在启动时就把所有单例造完**（`spring.main.lazy-initialization=false`）。所以"某个 Bean 配置错了"会在启动时报出来，而不是等到第一次用到。这是好事——把错误提前到部署时，而不是用户点上来的那一刻。
+`keys` 只认直接实现的接口。父类上的接口、以及 `Object` 这种「所有候选都匹配」的情况，这里一概没处理——真实容器在按类型取时要求候选唯一，两个实现同时匹配就会报不唯一，第 6 课给了完整的说法。
 
 ## 动手
 
-把容器构造对象的步骤排成正确顺序：
+六行打乱了。排对之后，它描述的就是上面 `register` + `instantiate` 干的事：
 
 ```code-challenge
 {
@@ -223,19 +293,19 @@ public class TransferService {
   "kind": "order",
   "title": "容器造一个对象的六步",
   "lines": [
+    "把实例放进登记表（同一个类型只放一次）",
     "拿到目标类型的 Class 对象",
-    "遍历它的构造器，挑一个参数都能被满足的",
-    "对每个参数类型，去已登记的实例表里找对象",
     "参数全都找到，反射调用 newInstance 造出实例",
-    "把实例放进表里（单例只放一次）",
-    "按类型把实例交还给调用方"
+    "遍历它的构造器，挑一个参数都能被满足的",
+    "按构造器参数的个数准备好实参数组",
+    "对每个参数类型，去已登记的实例表里找对象"
   ],
-  "answer": [0, 1, 2, 3, 4, 5],
-  "explain": "第 2 步的顺序很容易反：必须先挑\"参数能满足的构造器\"，再去找参数。反过来写就会遇到\"找到参数了但构造器有五个、不知道该用哪个\"。Spring 的规则更复杂（多个候选时按 @Primary、@Qualifier、参数名匹配），但起点是这一步。"
+  "answer": [1, 3, 4, 5, 2, 0],
+  "explain": "顺序最容易反的是第 2 步和第 3 步：必须先挑构造器，再按它的参数列表去找对象。反过来做，你会先找到一堆对象，却不知道要往哪个构造器里塞。造完才入表也是硬约束——依赖它的类只能看见已经在表里的东西。注意「挑一个参数都能被满足的」是我这个玩具的贪心规则；Spring 对多构造器的处理不是这样，见正文第一节。"
 }
 ```
 
-**提示**：三个以上构造器的类，容器必须有一个确定的挑选规则。
+**提示**：造完再入表，不是入表再补造。
 
 ## 检查一下
 
@@ -245,49 +315,43 @@ public class TransferService {
   "title": "IoC 三问",
   "questions": [
     {
-      "question": "IoC 反转的是哪件事的决定权？",
-      "options": ["对象的方法由谁调用", "对象由谁创建、创建时依赖从哪来", "对象的方法在哪个线程执行"],
-      "answer": 1,
-      "explain": "\"控制\"指的是\"创建与装配\"。谁 new、依赖从哪来，这两件事从业务代码挪到了容器。"
+      "question": "手写容器里 get(AccountRepository.class) 返回 null，最直接的原因是什么？",
+      "options": [
+        "接口不能被实例化，所以永远取不到",
+        "因为没有在参数上写 @Autowired",
+        "取用时按精确相等查键，登记表里没有接口这个键"
+      ],
+      "answer": 2,
+      "explain": "接口不能实例化只说明它不会被当作目标类型去造；取不到的直接原因是键不存在。注入时走的是 resolve（按能赋值查），所以同一个容器里注入成功、取用失败可以同时发生。"
     },
     {
-      "question": "手写容器里 get(Repo.class) 返回 null，最直接的原因？",
-      "options": ["Repo 是接口不能实例化", "登记表的键是具体类 RepoImpl，没有接口这个键", "缺少 @Autowired"],
+      "question": "一个类有两个构造器，一个无参、一个带参数，都没标 @Autowired。Spring 会怎么造它？",
+      "options": [
+        "挑参数能全部填满的那个，所以带参数的会被用",
+        "用无参构造器造出来，带参数的那个不参与，依赖可能停在 null",
+        "两个构造器都不满足，启动直接失败"
+      ],
       "answer": 1,
-      "explain": "接口不能实例化只是它不会被当作目标类型去 new；取不到的直接原因是表里查不到这个键。真实容器会把实现的接口也记成可查询的键。"
+      "explain": "没有 @Autowired 时 Spring 只信无参构造器，它不会替你在多个构造器里挑一个填得满的。所以启动是成功的，字段却还是 null，要等第一次调用才炸。"
     },
     {
-      "question": "容器启动要几秒，处理请求却很快，原因是？",
-      "options": ["它用了缓存数据库", "扫描与装配的重活在启动时一次做完，之后只是查表", "它把请求放到了另一个线程"],
-      "answer": 1,
-      "explain": "启动时做扫描 + 建依赖图 + 造单例；请求路径上只剩\"按类型查表\"这一步。"
+      "question": "容器先 register(TransferService.class)、后 register(InMemoryAccounts.class)，会发生什么？",
+      "options": [
+        "造 TransferService 时表里还没有实现类，报没有能填满的构造器",
+        "两次都成功，后登记的实现类会自动补给前面那个对象",
+        "先返回一个依赖为 null 的 TransferService，下次 get 时再补上"
+      ],
+      "answer": 0,
+      "explain": "register 是边登记边造：实例化发生在 put 之前，被依赖的类必须已经在表里。真实 Spring 先把定义全部登记、再按依赖顺序实例化，所以书写顺序不影响结果——这是两者最直接的差别。"
     }
   ]
 }
 ```
 
-## 常见误区
+## 还差的
 
-### 误区：IoC 就是"用了 @Autowired"
-
-**你以为**：没有注解就没有 IoC。
-**其实**：上面那个手写容器没有任何注解，它照样在反转控制。注解只是告诉容器"这里要填"，是**配置手段**，不是机制本身。真实项目里可以完全用 Java 配置类（`@Bean` 方法）声明所有对象，一个 `@Autowired` 都不写。
-**怎么验证**：把某个类上的 `@Autowired` 删掉（构造器只有一个时它本来就可省），项目照常启动。
-
-### 误区：单例就是"全局唯一"
-
-**你以为**：单例 = 整个 JVM 只有一个。
-**其实**：Spring 的单例是**每个容器一个**。一个 JVM 里可以有两个 `ApplicationContext`（测试里很常见），它们各有一份单例。这也解释了为什么单例里放可变状态那么危险——它在整个应用生命周期内一直被复用，所有请求共享同一份。
-**怎么验证**：在单例里加一个 `int counter`，两个请求打同一个接口，看计数是不是从 1 变成 2。
-
-### 误区：构造器注入和字段注入差不多
-
-**你以为**：`@Autowired` 放字段上更省代码。
-**其实**：构造器注入让"依赖缺失"在**编译期就暴露**（构造器少一个参数就编译不过），也让对象在构造完成后一定是完整的。字段注入允许你造出一个"半成品对象"，只有在容器跑起来之后才知道缺东西。本项目一律用构造器注入。
-**怎么验证**：把某个 `@Service` 的字段注入改成构造器注入，编译一次——如果编译不过，说明有个依赖你其实没提供，而它现在之所以能跑，只是容器帮你填空了。
-
-## 小结
-
-IoC 反转的是"谁决定创建与装配"。容器的最小能力只有两个：登记、按类型取出；实现靠反射读构造器、按参数类型去表里找依赖。Spring 多做了两件事：把实现的接口也记成键（所以能按接口注入），以及在启动时就把整张依赖图造完。
-
-下一课：容器里装的东西其实有两层——描述（怎么造）与实例（造出来的），分开之后才解释得清"延迟初始化"。
+- 只在 JDK 25 + Spring Framework 6.2.11 上跑过，用 `AnnotationConfigApplicationContext` 显式注册，没走 Boot 的自动配置与扫描。Boot 的失败文案（第 2 课那种 `Parameter 0 ...`）这里没重跑，正文引用的是 Framework 层的异常原文。
+- 多候选没有规则。两个实现都实现 `AccountRepository` 时，我的 `resolve` 返回 `LinkedHashMap` 里第一个能赋值的那个；Spring 会抛 `NoUniqueBeanDefinitionException`。`@Primary`、`@Qualifier`、参数名匹配一个都没实现。
+- `getDeclaredConstructors()` 的返回顺序没有规范保证，所以「两个构造器都能填满」时我的容器挑谁是不确定的。我只跑了「恰好一个能填满」和「一个都填不满」两种情况，没跑前者；这也是我没让它去学 Spring 那套构造器规则的原因之一。
+- `keys` 只收直接实现的接口，父类上的接口没管，也没处理「按 `Object` 取」。代理对象（MyBatis mapper、AOP 代理）登记成什么类型没测，那要等第 10 课手写动态代理才有工具验证。
+- 单例是「一张表一份」：两个 `Container` 实例就是两套对象。多容器、父子容器的场景没测，作用域与生命周期在第 8 课。
