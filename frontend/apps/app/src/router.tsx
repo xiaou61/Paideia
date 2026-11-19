@@ -175,7 +175,7 @@ export const router = createHashRouter([
     ),
   },
 
-  // 源码精读（WORK-057）：独立入口，读第三方项目。slug 与 entryId 都放在地址里，
+  // 核心源码解析（WORK-057）：独立入口，读第三方项目。slug 与 entryId 都放在地址里，
   // 与书籍详解同形；章节正文仍是知识库条目。
   {
     path: '/source',

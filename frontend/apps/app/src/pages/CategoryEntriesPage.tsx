@@ -248,7 +248,7 @@ export function CategoryEntriesPage() {
    * <ul>
    *   <li><b>学习轨道</b>：真轨道（40 条）按主题分组，默认折叠——它是「从零开始」的镜像入口，不是主浏览目标；</li>
    *   <li><b>求职面经</b>：名里带面经 / 面试 / 八股 的分类；</li>
-   *   <li><b>精读·书籍·其他</b>：书籍详解、源码精读，以及剩下独立成篇的分类。</li>
+   *   <li><b>精读·书籍·其他</b>：书籍详解、核心源码解析，以及剩下独立成篇的分类。</li>
    * </ul>
    *
    * <p>纯容器（有子分类、自身没有独立条目）不再占一行——它们的子项已经各自出现在对应段里。
@@ -307,7 +307,7 @@ export function CategoryEntriesPage() {
     }
 
     const readingItems = Array.from(readingByParent.values()).flat()
-    const preferredParents = ['书籍详解', '源码精读']
+    const preferredParents = ['书籍详解', '核心源码解析']
     const readingGroups: RailGroup[] = []
     for (const label of preferredParents) {
       const items = readingByParent.get(label)

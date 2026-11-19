@@ -18,16 +18,16 @@ import {
   ErrorAlert,
   LoadingRow,
   PageHeader,
+  buttonVariants,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight, FileCode2 } from 'lucide-react'
+import { ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, FileCode2 } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link, useParams } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
 import { readSourceMeta } from './source-meta'
-import { errorMessage } from '@paideia/core'
 
 const knowledge = createKnowledgeApi(api)
 const learning = createLearningApi(api)
@@ -77,16 +77,24 @@ export function SourceProjectPage() {
     [progress.data],
   )
 
+  const done = chapters.filter((chapter) => passed.has(chapter.id)).length
+  // "接着读"落在第一个没读完的关上；全读完就回到第一关重读。
+  const resume = chapters.find((chapter) => !passed.has(chapter.id)) ?? chapters[0]
+
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
-      <Link
-        to="/source"
-        className="text-muted-foreground hover:text-foreground -my-1 mb-4 inline-flex items-center gap-1 py-1 text-sm transition-colors"
-        data-testid="back-to-source"
-      >
-        <ChevronLeft className="size-4" />
-        所有项目
-      </Link>
+      <nav className="text-muted-foreground mb-4 flex items-center gap-1.5 text-sm" aria-label="面包屑">
+        <Link
+          to="/source"
+          className="hover:text-foreground inline-flex items-center gap-1 transition-colors"
+          data-testid="back-to-source"
+        >
+          <ChevronLeft className="size-4" />
+          核心源码解析
+        </Link>
+        <span aria-hidden>/</span>
+        <span className="text-foreground truncate">{project?.name ?? slug}</span>
+      </nav>
 
       {categories.isPending ? (
         <LoadingRow label="加载…" testId="source-project-state" />
@@ -114,45 +122,91 @@ export function SourceProjectPage() {
             description={
               meta === null
                 ? '按顺序读，一关一个机制。'
-                : `${meta.repo} @ ${meta.ref} · ${meta.license} · commit ${meta.commit.slice(0, 7)}`
+                : `${chapters.length} 关，按顺序读；行号全部对得上 ${meta.commit.slice(0, 7)} 这个提交。`
+            }
+            actions={
+              resume === undefined ? undefined : (
+                <Link
+                  to={`/source/${slug}/${resume.id}`}
+                  data-testid="source-resume"
+                  className={buttonVariants({ size: 'sm' })}
+                >
+                  {done === 0 ? '从第 1 关开始' : done === chapters.length ? '从头重读' : `继续第 ${resume.sortOrder === 0 ? 1 : (resume.sortOrder ?? 0) + 1} 关`}
+                  <ArrowRight className="size-3.5" data-icon="inline-end" />
+                </Link>
+              )
             }
           />
 
-          <div className="mb-6 flex flex-wrap items-center gap-2">
-            <Badge variant="secondary">{chapters.length} 关</Badge>
+          <div className="mb-6 flex flex-wrap items-center gap-2" data-testid="source-project-meta">
+            <Badge variant="outline">{chapters.length} 关</Badge>
             {meta === null ? null : (
-              <a
-                href={`https://github.com/${meta.repo}/tree/${meta.commit}`}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="text-primary text-xs underline underline-offset-2"
-              >
-                查看仓库 ↗
-              </a>
+              <>
+                <Badge variant="outline" className="font-mono">{meta.repo}</Badge>
+                <Badge variant="outline" className="font-mono">@ {meta.ref}</Badge>
+                <Badge variant="outline">{meta.license}</Badge>
+                <Badge variant="outline" className="font-mono">commit {meta.commit.slice(0, 7)}</Badge>
+                <a
+                  href={`https://github.com/${meta.repo}/tree/${meta.commit}`}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="text-primary text-xs underline underline-offset-2"
+                >
+                  查看仓库 ↗
+                </a>
+              </>
             )}
-            <span className="text-muted-foreground text-xs">版本锁定，行号与原文对得上</span>
           </div>
+
+          {done > 0 ? (
+            <div className="mb-5 flex items-center gap-3">
+              <div
+                className="bg-muted h-1.5 w-40 overflow-hidden rounded-full"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={chapters.length}
+                aria-valuenow={done}
+                aria-label={`${project.name} 进度`}
+              >
+                <div
+                  className={`h-full rounded-full transition-all ${done === chapters.length ? 'bg-success' : 'bg-primary'}`}
+                  style={{ width: `${Math.round((done / chapters.length) * 100)}%` }}
+                />
+              </div>
+              <span className={done === chapters.length ? 'text-success text-xs' : 'text-muted-foreground text-xs'}>
+                已读 {done} / {chapters.length} 关
+              </span>
+            </div>
+          ) : null}
 
           {entries.isPending ? (
             <LoadingRow label="加载章节…" testId="source-project-state" />
           ) : null}
 
-          <ol className="divide-border divide-y" data-testid="source-chapters">
+          <ol
+            className="border-border bg-card divide-border divide-y overflow-hidden rounded-xl border"
+            data-testid="source-chapters"
+          >
             {chapters.map((chapter) => (
               <li key={chapter.id}>
                 <Link
                   to={`/source/${slug}/${chapter.id}`}
                   data-testid={`source-chapter-${chapter.id}`}
-                  className="hover:bg-muted/50 group flex items-center gap-4 px-1 py-4 transition-colors"
+                  className="hover:bg-muted/40 focus-ring group flex items-center gap-4 px-4 py-4 transition-colors"
                 >
                   <span className="text-muted-foreground w-8 shrink-0 text-right font-mono text-sm tabular-nums">
                     {typeof chapter.sortOrder === 'number' ? chapter.sortOrder + 1 : '·'}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="group-hover:text-primary block transition-colors">
-                      {chapter.title}
+                    <span className="flex items-center gap-2">
+                      <span className="group-hover:text-primary min-w-0 truncate transition-colors">
+                        {chapter.title}
+                      </span>
                       {passed.has(chapter.id) ? (
-                        <span className="text-success ml-2 text-xs font-normal">已读完</span>
+                        <span className="text-success flex shrink-0 items-center gap-1 text-xs">
+                          <CheckCircle2 className="size-3.5" />
+                          已读完
+                        </span>
                       ) : null}
                     </span>
                     {chapter.excerpt === null ? null : (
@@ -161,7 +215,7 @@ export function SourceProjectPage() {
                       </span>
                     )}
                   </span>
-                  <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+                  <ChevronRight className="text-muted-foreground group-hover:text-foreground size-4 shrink-0 transition-colors" />
                 </Link>
               </li>
             ))}

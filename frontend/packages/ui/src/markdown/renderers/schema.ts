@@ -681,7 +681,7 @@ function parseWalkControl(value: unknown, where: string, ids: Set<string>): Walk
 
 export function parseSourceWalk(code: string): ParseResult<SourceWalk> {
   return parseWith(code, (input) => {
-    const raw = asObject(input, '源码精读')
+    const raw = asObject(input, '核心源码解析')
     const repo = asText(raw['repo'], 'repo', LIMITS.repo)
     need(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo), 'repo 必须是 owner/name 形式')
     const commit = asText(raw['commit'], 'commit', 40)

@@ -28,7 +28,7 @@ export const SourceReadingChallenge = guard('动手练习', CodeChallenge)
 export const SourceReadingQuiz = guard('小测', Quiz)
 export const DocumentSketch = guard('手绘图', Sketch)
 /** 整文件源码走读（WORK-057）：步骤只声明行区间，代码取自静态快照。 */
-export const DocumentSourceWalk = guard('源码精读', SourceWalk)
+export const DocumentSourceWalk = guard('核心源码解析', SourceWalk)
 
 export const documentRenderers: CustomRenderer[] = [
   { language: ['code-tour', 'tour'], component: SourceReadingTour },

@@ -10,12 +10,13 @@ import {
 } from '@paideia/knowledge'
 import {
   AppShell,
+  Badge,
   ErrorAlert,
   LoadingRow,
   PageHeader,
 } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronLeft } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link, useParams } from 'react-router'
 
@@ -23,7 +24,6 @@ import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
 import { API_BASE_URL } from '../env'
 import { readSourceMeta } from './source-meta'
-import { errorMessage } from '@paideia/core'
 
 const knowledge = createKnowledgeApi(api)
 const learning = createLearningApi(api)
@@ -98,14 +98,29 @@ export function SourceChapterPage() {
 
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
-      <Link
-        to={`/source/${project}`}
-        className="text-muted-foreground hover:text-foreground -my-1 mb-4 inline-flex items-center gap-1 py-1 text-sm transition-colors"
-        data-testid="back-to-project"
-      >
-        <ChevronLeft className="size-4" />
-        {projectNode?.name ?? '回到项目'}
-      </Link>
+      <nav className="text-muted-foreground mb-4 flex items-center gap-1.5 text-sm" aria-label="面包屑">
+        <Link
+          to="/source"
+          className="hover:text-foreground inline-flex items-center gap-1 transition-colors"
+        >
+          <ChevronLeft className="size-4" />
+          核心源码解析
+        </Link>
+        <span aria-hidden>/</span>
+        <Link
+          to={`/source/${project}`}
+          className="hover:text-foreground truncate transition-colors"
+          data-testid="back-to-project"
+        >
+          {projectNode?.name ?? '回到项目'}
+        </Link>
+        {index >= 0 ? (
+          <>
+            <span aria-hidden>/</span>
+            <span className="text-foreground shrink-0">第 {index + 1} 关</span>
+          </>
+        ) : null}
+      </nav>
 
       {entry.isPending ? (
         <LoadingRow label="加载章节…" testId="source-chapter-state" />
@@ -119,9 +134,20 @@ export function SourceChapterPage() {
           <PageHeader
             title={entry.data.title}
             description={
-              meta === null
-                ? undefined
-                : `${meta.repo} @ ${meta.ref} · ${meta.license} · 第 ${index + 1} 关 / 共 ${chapters.length} 关`
+              <span className="flex flex-wrap items-center gap-2">
+                {index >= 0 ? (
+                  <Badge variant="secondary">
+                    第 {index + 1} 关 / 共 {chapters.length} 关
+                  </Badge>
+                ) : null}
+                {meta === null ? null : (
+                  <>
+                    <Badge variant="outline" className="font-mono">{meta.repo}</Badge>
+                    <Badge variant="outline" className="font-mono">@ {meta.ref}</Badge>
+                    <Badge variant="outline">{meta.license}</Badge>
+                  </>
+                )}
+              </span>
             }
           />
           <MarkdownBody
@@ -132,29 +158,39 @@ export function SourceChapterPage() {
             progress={progressPort}
           />
 
-          <nav className="border-border mt-10 flex items-center justify-between gap-4 border-t pt-6">
+          <nav className="border-border mt-10 grid gap-3 border-t pt-6 sm:grid-cols-2">
             {previous === undefined ? (
-              <span />
+              <span className="hidden sm:block" aria-hidden />
             ) : (
               <Link
                 to={`/source/${project}/${previous.id}`}
                 data-testid="source-prev"
-                className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-sm transition-colors"
+                className="border-border bg-card hover:border-primary/40 focus-ring group flex items-center gap-3 rounded-xl border p-4 transition-colors"
               >
-                <ChevronLeft className="size-4" />
-                上一关 · {previous.title}
+                <ArrowLeft className="text-muted-foreground group-hover:text-primary size-4 shrink-0 transition-colors" />
+                <span className="min-w-0">
+                  <span className="text-muted-foreground block text-xs">上一关</span>
+                  <span className="group-hover:text-primary block truncate text-sm transition-colors">
+                    {previous.title}
+                  </span>
+                </span>
               </Link>
             )}
             {next === undefined ? (
-              <span />
+              <span className="hidden sm:block" aria-hidden />
             ) : (
               <Link
                 to={`/source/${project}/${next.id}`}
                 data-testid="source-next"
-                className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-right text-sm transition-colors"
+                className="border-border bg-card hover:border-primary/40 focus-ring group flex items-center justify-end gap-3 rounded-xl border p-4 text-right transition-colors sm:col-start-2"
               >
-                下一关 · {next.title}
-                <ChevronRight className="size-4" />
+                <span className="min-w-0">
+                  <span className="text-muted-foreground block text-xs">下一关</span>
+                  <span className="group-hover:text-primary block truncate text-sm transition-colors">
+                    {next.title}
+                  </span>
+                </span>
+                <ArrowRight className="text-muted-foreground group-hover:text-primary size-4 shrink-0 transition-colors" />
               </Link>
             )}
           </nav>

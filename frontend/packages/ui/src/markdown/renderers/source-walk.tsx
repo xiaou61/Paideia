@@ -34,7 +34,7 @@ export function SourceWalk({ code }: CustomRendererProps) {
   const { entryTitle, progress, renderText } = useSourceReading()
 
   if (!parsed.ok) {
-    return <BlockFallback title="源码精读" error={parsed.error} raw={code} />
+    return <BlockFallback title="核心源码解析" error={parsed.error} raw={code} />
   }
   if (walk === null) {
     return null
@@ -160,7 +160,7 @@ function WalkBody({
 
   return (
     <BlockFrame
-      title={walk.title ?? `源码精读 · ${walk.repo}`}
+      title={walk.title ?? `核心源码解析 · ${walk.repo}`}
       testId="source-walk"
       actions={
         <>
@@ -183,7 +183,7 @@ function WalkBody({
           }
         }}
         role="group"
-        aria-label={`源码精读：${walk.title ?? walk.repo}`}
+        aria-label={`核心源码解析：${walk.title ?? walk.repo}`}
       >
         <div className="border-border flex min-w-0 flex-col border-b lg:border-r lg:border-b-0">
           {walk.map === undefined ? null : <WalkMap map={walk.map} active={step.nodes} />}

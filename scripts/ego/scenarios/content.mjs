@@ -32,12 +32,12 @@ export const cases = [
   },
   {
     id: 'content-source',
-    title: '源码精读：列表或空态二选一',
+    title: '核心源码解析：列表或空态二选一',
     write: false,
     async run(s) {
       await s.goto('/#/source')
       await s.step('确认源码页', async () => {
-        await s.expectText('源码精读')
+        await s.expectText('核心源码解析')
         const empty = await s.count('[data-testid="source-empty"]')
         const state = await s.count('[data-testid="source-state"]')
         const projects = await s.count('a[href*="/source/"]')

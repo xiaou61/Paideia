@@ -4,14 +4,14 @@ import { REMOTE } from './env'
 import { clickNav, signIn } from './session'
 
 /**
- * 源码精读的端到端检查（WORK-057）。
+ * 核心源码解析的端到端检查（WORK-057）。
  *
  * <p>断言**结构与交互**，不断言正文措辞：章节标题会改，但「开关变了步骤就变」不该改。
  *
  * <p>依赖内容已导入（`content/source/mybatis`）。本地库没有这些内容——那会让每条用例
  * 在等 18 秒后红，所以整组只在已导入的环境（线上）跑，与 `markdown-render` 同一口径。
  */
-test.describe('源码精读', () => {
+test.describe('核心源码解析', () => {
   test.skip(!REMOTE, '依赖 content/source/mybatis 已导入；本地 e2e 用的是空库')
   test.beforeEach(async ({ page }) => {
     await signIn(page)
@@ -22,7 +22,7 @@ test.describe('源码精读', () => {
     await clickNav(page, 'learner-nav-source')
 
     await expect(page).toHaveURL(/#\/source/)
-    await expect(page.getByRole('heading', { name: '源码精读', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '核心源码解析', exact: true })).toBeVisible()
     const card = page.getByTestId('source-project-mybatis-source')
     await expect(card).toBeVisible({ timeout: 15_000 })
     await expect(card).toContainText('MyBatis')
