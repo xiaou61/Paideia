@@ -1,0 +1,220 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by org.fusesource.jansi.internal.JansiLoader in an unnamed module (file:/E:/apache-maven-3.9.0/lib/jansi-2.4.0.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.google.common.util.concurrent.AbstractFuture$UnsafeAtomicHelper (file:/E:/apache-maven-3.9.0/lib/guava-30.1-jre.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.common.util.concurrent.AbstractFuture$UnsafeAtomicHelper
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+[INFO] Scanning for projects...
+[WARNING] 
+[WARNING] Some problems were encountered while building the effective model for io.github.xiaou61:paideia-persistence:jar:0.0.1-SNAPSHOT
+[WARNING] 'dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique: com.mysql:mysql-connector-j:jar -> duplicate declaration of version (?) @ line 52, column 17
+[WARNING] 
+[WARNING] It is highly recommended to fix these problems because they threaten the stability of your build.
+[WARNING] 
+[WARNING] For this reason, future Maven versions might no longer support building such malformed projects.
+[WARNING] 
+[WARNING] The requested profile "rdc" could not be activated because it does not exist.
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO] 
+[INFO] Paideia                                                            [pom]
+[INFO] paideia-platform                                                   [jar]
+[INFO] paideia-persistence                                                [jar]
+[INFO] paideia-security                                                   [jar]
+[INFO] paideia-knowledge                                                  [jar]
+[INFO] paideia-sandbox                                                    [jar]
+[INFO] paideia-ai                                                         [jar]
+[INFO] paideia-ops                                                        [jar]
+[INFO] 
+[INFO] ---------------------< io.github.xiaou61:paideia >----------------------
+[INFO] Building Paideia 0.0.1-SNAPSHOT                                    [1/8]
+[INFO]   from pom.xml
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] -----------------< io.github.xiaou61:paideia-platform >-----------------
+[INFO] Building paideia-platform 0.0.1-SNAPSHOT                           [2/8]
+[INFO]   from paideia-platform\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.5.0:resources (default-resources) @ paideia-platform ---
+[INFO] skip non existing resourceDirectory F:\Paideia\.agents\worktrees\work-085-aiops-patterns\backend\paideia-platform\src\main\resources
+[INFO] skip non existing resourceDirectory F:\Paideia\.agents\worktrees\work-085-aiops-patterns\backend\paideia-platform\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ paideia-platform ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.5.0:testResources (default-testResources) @ paideia-platform ---
+[INFO] skip non existing resourceDirectory F:\Paideia\.agents\worktrees\work-085-aiops-patterns\backend\paideia-platform\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ paideia-platform ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ paideia-platform ---
+[INFO] 
+[INFO] ---------------< io.github.xiaou61:paideia-persistence >----------------
+[INFO] Building paideia-persistence 0.0.1-SNAPSHOT                        [3/8]
+[INFO]   from paideia-persistence\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.5.0:resources (default-resources) @ paideia-persistence ---
+[INFO] skip non existing resourceDirectory F:\Paideia\.agents\worktrees\work-085-aiops-patterns\backend\paideia-persistence\src\main\resources
+[INFO] skip non existing resourceDirectory F:\Paideia\.agents\worktrees\work-085-aiops-patterns\backend\paideia-persistence\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ paideia-persistence ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.5.0:testResources (default-testResources) @ paideia-persistence ---
+[INFO] Copying 1 resource from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ paideia-persistence ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ paideia-persistence ---
+[INFO] 
+[INFO] -----------------< io.github.xiaou61:paideia-security >-----------------
+[INFO] Building paideia-security 0.0.1-SNAPSHOT                           [4/8]
+[INFO]   from paideia-security\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.5.0:resources (default-resources) @ paideia-security ---
+[INFO] skip non existing resourceDirectory F:\Paideia\.agents\worktrees\work-085-aiops-patterns\backend\paideia-security\src\main\resources
+[INFO] skip non existing resourceDirectory F:\Paideia\.agents\worktrees\work-085-aiops-patterns\backend\paideia-security\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ paideia-security ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.5.0:testResources (default-testResources) @ paideia-security ---
+[INFO] skip non existing resourceDirectory F:\Paideia\.agents\worktrees\work-085-aiops-patterns\backend\paideia-security\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ paideia-security ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ paideia-security ---
+[INFO] 
+[INFO] ----------------< io.github.xiaou61:paideia-knowledge >-----------------
+[INFO] Building paideia-knowledge 0.0.1-SNAPSHOT                          [5/8]
+[INFO]   from paideia-knowledge\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.5.0:resources (default-resources) @ paideia-knowledge ---
+[INFO] skip non existing resourceDirectory F:\Paideia\.agents\worktrees\work-085-aiops-patterns\backend\paideia-knowledge\src\main\resources
+[INFO] skip non existing resourceDirectory F:\Paideia\.agents\worktrees\work-085-aiops-patterns\backend\paideia-knowledge\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ paideia-knowledge ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.5.0:testResources (default-testResources) @ paideia-knowledge ---
+[INFO] Copying 1 resource from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ paideia-knowledge ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ paideia-knowledge ---
+[INFO] 
+[INFO] -----------------< io.github.xiaou61:paideia-sandbox >------------------
+[INFO] Building paideia-sandbox 0.0.1-SNAPSHOT                            [6/8]
+[INFO]   from paideia-sandbox\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.5.0:resources (default-resources) @ paideia-sandbox ---
+[INFO] Copying 0 resource from src\main\resources to target\classes
+[INFO] Copying 5 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ paideia-sandbox ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.5.0:testResources (default-testResources) @ paideia-sandbox ---
+[INFO] skip non existing resourceDirectory F:\Paideia\.agents\worktrees\work-085-aiops-patterns\backend\paideia-sandbox\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ paideia-sandbox ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ paideia-sandbox ---
+[INFO] 
+[INFO] --------------------< io.github.xiaou61:paideia-ai >--------------------
+[INFO] Building paideia-ai 0.0.1-SNAPSHOT                                 [7/8]
+[INFO]   from paideia-ai\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.5.0:resources (default-resources) @ paideia-ai ---
+[INFO] skip non existing resourceDirectory F:\Paideia\.agents\worktrees\work-085-aiops-patterns\backend\paideia-ai\src\main\resources
+[INFO] skip non existing resourceDirectory F:\Paideia\.agents\worktrees\work-085-aiops-patterns\backend\paideia-ai\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ paideia-ai ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.5.0:testResources (default-testResources) @ paideia-ai ---
+[INFO] Copying 4 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ paideia-ai ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ paideia-ai ---
+[INFO] 
+[INFO] -------------------< io.github.xiaou61:paideia-ops >--------------------
+[INFO] Building paideia-ops 0.0.1-SNAPSHOT                                [8/8]
+[INFO]   from paideia-ops\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.5.0:resources (default-resources) @ paideia-ops ---
+[INFO] skip non existing resourceDirectory F:\Paideia\.agents\worktrees\work-085-aiops-patterns\backend\paideia-ops\src\main\resources
+[INFO] skip non existing resourceDirectory F:\Paideia\.agents\worktrees\work-085-aiops-patterns\backend\paideia-ops\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ paideia-ops ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.5.0:testResources (default-testResources) @ paideia-ops ---
+[INFO] skip non existing resourceDirectory F:\Paideia\.agents\worktrees\work-085-aiops-patterns\backend\paideia-ops\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ paideia-ops ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ paideia-ops ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running io.github.xiaou61.ops.PatternAnomalyDetectorTest
+Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (C:\Users\Lenovo\.m2\repository\net\bytebuddy\byte-buddy-agent\1.18.11\byte-buddy-agent-1.18.11.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.143 s -- in io.github.xiaou61.ops.PatternAnomalyDetectorTest
+[INFO] Running io.github.xiaou61.ops.PatternControllerTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.130 s -- in io.github.xiaou61.ops.PatternControllerTest
+[INFO] Running io.github.xiaou61.ops.PatternQueryServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.034 s -- in io.github.xiaou61.ops.PatternQueryServiceTest
+[INFO] Running io.github.xiaou61.ops.PatternSyncServiceTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.403 s -- in io.github.xiaou61.ops.PatternSyncServiceTest
+[INFO] Running io.github.xiaou61.ops.PatternTriggerServiceTest
+10:56:36.855 [main] WARN io.github.xiaou61.ops.PatternTriggerService -- ops.pattern.trigger.failed anomalyId=11 kind=FREQ_SPIKE reason=java.lang.RuntimeException: TOO_MANY_REQUESTS
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.129 s -- in io.github.xiaou61.ops.PatternTriggerServiceTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for Paideia 0.0.1-SNAPSHOT:
+[INFO] 
+[INFO] Paideia ............................................ SUCCESS [  0.001 s]
+[INFO] paideia-platform ................................... SUCCESS [  0.713 s]
+[INFO] paideia-persistence ................................ SUCCESS [  0.392 s]
+[INFO] paideia-security ................................... SUCCESS [  0.298 s]
+[INFO] paideia-knowledge .................................. SUCCESS [  0.865 s]
+[INFO] paideia-sandbox .................................... SUCCESS [  0.360 s]
+[INFO] paideia-ai ......................................... SUCCESS [  0.692 s]
+[INFO] paideia-ops ........................................ SUCCESS [  8.200 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  12.107 s
+[INFO] Finished at: 2026-11-19T10:56:37+08:00
+[INFO] ------------------------------------------------------------------------
+[WARNING] The requested profile "rdc" could not be activated because it does not exist.
