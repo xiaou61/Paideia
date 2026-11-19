@@ -55,7 +55,7 @@ class EssayCollectionFailureKindTest {
         when(recorder.begin(any())).thenReturn(scope);
         service = new EssayCollectionService(properties, source,
                 new TechEssayFilter(text -> Optional.of(new ContentClassification(true, 0.9, "java"))),
-                extractor, knowledge, credentials, recorder);
+                extractor, mock(EssayVerificationService.class), knowledge, credentials, recorder);
     }
 
     @Test

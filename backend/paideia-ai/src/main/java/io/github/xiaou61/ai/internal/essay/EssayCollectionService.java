@@ -49,6 +49,7 @@ public class EssayCollectionService {
     private final EssaySource source;
     private final TechEssayFilter filter;
     private final EssayExtractor extractor;
+    private final EssayVerificationService verification;
     private final KnowledgeApi knowledge;
     private final CredentialService credentials;
     private final RunRecorder recorder;
@@ -57,6 +58,7 @@ public class EssayCollectionService {
                            EssaySource source,
                            TechEssayFilter filter,
                            EssayExtractor extractor,
+                           EssayVerificationService verification,
                            KnowledgeApi knowledge,
                            CredentialService credentials,
                            RunRecorder recorder) {
@@ -64,6 +66,7 @@ public class EssayCollectionService {
         this.source = source;
         this.filter = filter;
         this.extractor = extractor;
+        this.verification = verification;
         this.knowledge = knowledge;
         this.credentials = credentials;
         this.recorder = recorder;
@@ -78,10 +81,10 @@ public class EssayCollectionService {
 
     /** 一次运行的统计，供日志与测试断言。 */
     public record RunResult(int fetched, int skippedNonTechnical, FilterStats filter, int extracted,
-                            int created, int duplicated, int failed, String skipReason) {
+                            int created, int duplicated, int pendingReview, int failed, String skipReason) {
 
         static RunResult skipped(String reason) {
-            return new RunResult(0, 0, new FilterStats(0, 0, 0, 0), 0, 0, 0, 0, reason);
+            return new RunResult(0, 0, new FilterStats(0, 0, 0, 0), 0, 0, 0, 0, 0, reason);
         }
     }
 
@@ -109,6 +112,7 @@ public class EssayCollectionService {
         int extracted = 0;
         int created = 0;
         int duplicated = 0;
+        int pendingReview = 0;
         int failed = 0;
         int borderline = 0;
         int askedModel = 0;
@@ -118,6 +122,11 @@ public class EssayCollectionService {
         int sourcesFailed = 0;
         int sourcesMissingCategory = 0;
         int alreadyCollected = 0;
+
+        boolean verifyEnabled = properties.getVerify().isEnabled();
+        if (verifyEnabled) {
+            verification.beginRun();
+        }
 
         for (EssayProperties.SourceSpec spec : properties.effectiveSources()) {
             Long defaultCategoryId = categoryIdOf(spec.getCategorySlug());
@@ -195,12 +204,23 @@ public class EssayCollectionService {
                             duplicated++;
                             continue;
                         }
+                        String answer = question.answer();
+                        if (verifyEnabled) {
+                            VerificationOutcome checked = verification.judge(
+                                    question.title(), question.answer(), access.get(), categoryId,
+                                    fingerprint, post.url(), post.title());
+                            if (EssayVerificationService.REVISED.equals(checked.status())) {
+                                answer = checked.finalAnswer();
+                            } else if (!EssayVerificationService.AUTO_PASSED.equals(checked.status())) {
+                                // 存疑不进库，留档待复核。
+                                pendingReview++;
+                                continue;
+                            }
+                        }
                         KnowledgeApi.CreateOutcome outcome = knowledge.createCollected(
                                 new KnowledgeApi.CollectedEntry(
                                         question.title(),
-                                        EssayBodyRenderer.render(
-                                                question.title(), question.answer(),
-                                                post.url(), post.title()),
+                                        EssayBodyRenderer.render(question.title(), answer, post.url(), post.title()),
                                         categoryId,
                                         properties.isPublishDirectly() ? "published" : "draft",
                                         fingerprint,
@@ -231,18 +251,18 @@ public class EssayCollectionService {
             return RunResult.skipped("分类不存在：" + categorySlugs());
         }
         if (fetched == 0) {
-            return new RunResult(0, 0, new FilterStats(0, 0, 0, 0), 0, 0, 0, 0, "本次没有新帖");
+            return new RunResult(0, 0, new FilterStats(0, 0, 0, 0), 0, 0, 0, 0, 0, "本次没有新帖");
         }
 
         log.info("八股文抓取完成：源 {} 个（失败 {} / 缺分类 {}），抓 {} 篇，跳过非技术 {} 篇"
                         + "（边界 {} / 问模型 {} / 改判 {} / 分流 {}），抽出 {} 题，新建 {} 条，"
-                + "重复 {} 条，已入库跳过 {} 篇，失败 {} 篇",
+                + "重复 {} 条，转人工 {} 项，已入库跳过 {} 篇，失败 {} 篇",
                 sourcesRun, sourcesFailed, sourcesMissingCategory, fetched, skipped,
                 borderline, askedModel, changedByModel, routed,
-                extracted, created, duplicated, alreadyCollected, failed);
+                extracted, created, duplicated, pendingReview, alreadyCollected, failed);
         return new RunResult(fetched, skipped,
                 new FilterStats(borderline, askedModel, changedByModel, routed),
-                extracted, created, duplicated, failed, null);
+                extracted, created, duplicated, pendingReview, failed, null);
     }
 
     private String categorySlugs() {

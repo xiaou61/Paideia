@@ -269,8 +269,8 @@ class EssaySourceFanOutTest {
         TechEssayFilter filter = new TechEssayFilter(
                 text -> Optional.of(new ContentClassification(true, 0.9, "java")));
 
-        return new EssayCollectionService(properties, source, filter, extractor, knowledge,
-                credentials, recorder).runOnce();
+        return new EssayCollectionService(properties, source, filter, extractor,
+                mock(EssayVerificationService.class), knowledge, credentials, recorder).runOnce();
     }
 
     private static KnowledgeApi.CategoryNode node(long id, String slug) {

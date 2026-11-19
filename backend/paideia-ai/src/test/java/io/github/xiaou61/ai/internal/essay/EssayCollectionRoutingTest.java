@@ -137,7 +137,7 @@ class EssayCollectionRoutingTest {
         when(recorder.begin(any())).thenReturn(scope);
 
         return new EssayCollectionService(properties, source, new TechEssayFilter(classifier),
-                extractor, knowledge, credentials, recorder).runOnce();
+                extractor, mock(EssayVerificationService.class), knowledge, credentials, recorder).runOnce();
     }
 
     private static ContentClassifier classifierReturning(String topic) {

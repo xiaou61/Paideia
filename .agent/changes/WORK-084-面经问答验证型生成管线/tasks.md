@@ -32,7 +32,7 @@ approver_role: 技术
 | 失败模式 | 归属任务 | 测试 |
 | --- | --- | --- |
 | 校验调用抛异常时静默入库 | TASK-004 | `EssayVerificationServiceTest#verifyErrorGoesToPendingReview` |
-| 关闭开关后行为偏离现状 | TASK-004 | `EssayCollectionServiceTest#disabledVerifyMatchesLegacy` |
+| 关闭开关后行为偏离现状 | TASK-004 | `EssayCollectionServiceVerifyTest#verifyDisabledKeepsLegacyBodyAndNeverCallsVerifier` |
 | 调用预算用尽后继续放行 | TASK-004 | `EssayVerificationServiceTest#budgetExhaustedGoesPending` |
 | 非白名单域名被检索/抓取 | TASK-005 | `EssayReferenceRetrieverTest#nonWhitelistedHostDropped` |
 | 抓取失败阻塞入库 | TASK-005 | `EssayReferenceRetrieverTest#fetchFailureReturnsEmpty` |
@@ -109,7 +109,7 @@ void reject(long id, String note, long adminUserId);
 - 验证：`backend$ scripts/test-db.sh mvn -B -pl paideia-ai -Dtest=EssayBodyRendererTest test` → 1 passed。
 - 完成（2026-11-19）：`EssayBodyRenderer` 与 `EssayBodyRendererTest` 落盘，`EssayCollectionService:201` 改调并删除私有 `render`/`safeTitle`；实测 `Tests run: 3, Failures: 0, Errors: 0`，BUILD SUCCESS（命令加 `-am` 与引号后的 `-D` 参数）。
 
-### TASK-003 | pending | 建表 + mapper + verify 配置 + RunKind
+### TASK-003 | done | 建表 + mapper + verify 配置 + RunKind
 
 - 对应：`REQ-003`、`REQ-004`、`REQ-005`
 - 依赖：无
@@ -122,8 +122,9 @@ void reject(long id, String note, long adminUserId);
   2. 写 mapper 与 row；`EssayProperties.Verify` 加 getter/setter；`RunKind` 加两常量。
   3. 跑三条迁移测试。
 - 验证：`backend$ scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=MigrationVersionFormatTest,MigrationChecksumTest,MigrationSeedOverlapTest -Dsurefire.failIfNoSpecifiedTests=false test` → 全绿。
+- 完成（2026-11-19）：迁移 `V20261119103000__create_ai_essay_verifications.sql`、`EssayVerificationRow`、`EssayVerificationMapper`（insert/findById/findPage/count/markReviewed）、`EssayProperties.Verify`+`External`、`RunKind.ESSAY_VERIFY/ESSAY_REVISE` 落盘；`migration-checksums.txt` 已登记新迁移；三条迁移测试 `Tests run: 8, Failures: 0, Errors: 0`，BUILD SUCCESS。
 
-### TASK-004 | pending | 内部自检 + 分流 + 落库（external 关闭）
+### TASK-004 | done | 内部自检 + 分流 + 落库（external 关闭）
 
 - 对应：`REQ-001`、`REQ-002`、`REQ-003`、`REQ-004`、`REQ-005`、`AC-003`、`AC-004`
 - 依赖：TASK-002、TASK-003
@@ -135,7 +136,8 @@ void reject(long id, String note, long adminUserId);
   1. 写上述测试（用 fake `KnowledgeApi` + 假 verifier），当前应红。
   2. 实现 prompt/verifier/service 与接线，测试转绿。
   3. `EssayCollectionServiceTest` 断言 `verify.enabled=false` 时调用序列与现状一致。
-- 验证：`backend$ scripts/test-db.sh mvn -B -pl paideia-ai -Dtest='EssayVerificationServiceTest,EssayCollectionServiceTest' test` → 全绿。
+- 验证：`backend$ mvn -B -o -pl paideia-ai -am -Dtest='EssayVerificationServiceTest,EssayCollectionServiceVerifyTest,EssayCollectionRoutingTest,EssayCollectionFailureKindTest,EssaySourceFanOutTest,EssayBodyRendererTest' -Dsurefire.failIfNoSpecifiedTests=false test` → `Tests run: 29, Failures: 0, Errors: 0`，BUILD SUCCESS。
+- 完成（2026-11-19）：`FactCheck`/`Revision`/`ReferenceSnippet`/`VerificationOutcome`、`EssayVerificationPrompt`（`essay-verify-v1`/`essay-revise-v1`）、`EssayVerifier`（`checkFactual`/`revise`，温度 0、2048 tokens）、`EssayVerificationService`（auto_passed/revised/pending_review、预算、异常兜底）、`EssayCollectionService` 接线（`RunResult.pendingReview`、verify 关闭时零改动）落盘；新增 `EssayVerificationServiceTest`（6 例）与 `EssayCollectionServiceVerifyTest`（3 例：关闭时正文逐字 legacy、pending 不入库、revised 用修订答案）。
 
 ### TASK-005 | pending | 【本期不实施】外部依据检索 + 接入升级分支
 
