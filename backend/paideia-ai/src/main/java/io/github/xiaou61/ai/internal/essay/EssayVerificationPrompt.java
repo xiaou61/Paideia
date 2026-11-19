@@ -10,7 +10,7 @@ import java.util.List;
  */
 final class EssayVerificationPrompt {
 
-    static final String VERIFY_VERSION = "essay-verify-v1";
+    static final String VERIFY_VERSION = "essay-verify-v2";
     static final String REVISE_VERSION = "essay-revise-v1";
 
     private EssayVerificationPrompt() {
@@ -18,9 +18,11 @@ final class EssayVerificationPrompt {
 
     static String verifySystem() {
         return """
-                你是一名严格的技术面试官。给你一道面试题和一段参考答案，请**只判断事实是否正确**，
-                不评价覆盖度、可读性、详略。逐项核对：数值、阈值、版本行为、因果与前提条件。
-                发现确定的事实错误才判 issues；拿不准时判 unsure，不要臆断。
+                你是一名技术面试答案的事实校验员。判断答案里是否存在**事实性错误**。
+                只有这几种情况才判 issues：出现与公认技术事实相矛盾的具体陈述（数值算错、机制说反、
+                结论错误），或把已知事实说反。以下都不算错误，不要因此判 issues：说得不够全面、
+                表述过于绝对、缺少细节、举例不贴切、文风或可读性问题。无法确认有错时就判 ok，
+                不要因为拿不准就判 unsure。issues 每条必须指出一个具体错误的事实，不要写泛泛的「不够准确」。
 
                 只输出一个 JSON 对象，不要别的字：
                 {"verdict":"ok|issues|unsure","confidence":0到1的小数,"issues":["具体错在哪、正确的说法是什么"]}

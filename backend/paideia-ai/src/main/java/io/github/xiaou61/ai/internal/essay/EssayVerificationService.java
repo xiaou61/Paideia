@@ -17,8 +17,7 @@ import org.springframework.stereotype.Service;
  * <p>状态机（本期只做内部自检，不接外部检索）：
  * <ul>
  *   <li>自检 ok 且置信 ≥ accept → {@code auto_passed}（直接入库）。</li>
- *   <li>否则走一次内部修订：修订稿置信 ≥ revise-accept → {@code revised}（用修订稿入库）。</li>
- *   <li>其余（含判定存疑、修订被拒、异常、调用预算用尽）→ {@code pending_review}（不入库，留档待人工）。</li>
+ *   <li>其余（含判定存疑、异常、调用预算用尽）→ {@code pending_review}（不入库，留档待人工）。</li>
  * </ul>
  *
  * <p><b>异常一律不冒泡到抓取任务</b>：校验挂了不能把整批入库拖垮，转人工即可。
@@ -74,20 +73,8 @@ public class EssayVerificationService {
                 if ("ok".equals(check.verdict()) && confidence >= verify.getAcceptConfidence()) {
                     status = AUTO_PASSED;
                 } else {
-                    Revision revision = runRevise(title, answer, issues, access);
-                    if ("accept".equals(revision.action()) && confidence >= verify.getAcceptConfidence()) {
-                        status = AUTO_PASSED;
-                    } else if ("revise".equals(revision.action())
-                            && revision.confidence() >= verify.getReviseAcceptConfidence()
-                            && revision.answer() != null && !revision.answer().isBlank()) {
-                        status = REVISED;
-                        finalAnswer = revision.answer();
-                        confidence = revision.confidence();
-                        promptVersion = EssayVerificationPrompt.REVISE_VERSION;
-                    } else {
-                        status = PENDING_REVIEW;
-                        issues = merge(issues, revision.notes());
-                    }
+                    // 本期只做内部自检：不在无外部依据时改写答案，存疑一律隔离待人工。
+                    status = PENDING_REVIEW;
                 }
             }
         } catch (RuntimeException exception) {

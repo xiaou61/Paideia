@@ -137,7 +137,7 @@ void reject(long id, String note, long adminUserId);
   2. 实现 prompt/verifier/service 与接线，测试转绿。
   3. `EssayCollectionServiceTest` 断言 `verify.enabled=false` 时调用序列与现状一致。
 - 验证：`backend$ mvn -B -o -pl paideia-ai -am -Dtest='EssayVerificationServiceTest,EssayCollectionServiceVerifyTest,EssayCollectionRoutingTest,EssayCollectionFailureKindTest,EssaySourceFanOutTest,EssayBodyRendererTest' -Dsurefire.failIfNoSpecifiedTests=false test` → `Tests run: 29, Failures: 0, Errors: 0`，BUILD SUCCESS。
-- 完成（2026-11-19）：`FactCheck`/`Revision`/`ReferenceSnippet`/`VerificationOutcome`、`EssayVerificationPrompt`（`essay-verify-v1`/`essay-revise-v1`）、`EssayVerifier`（`checkFactual`/`revise`，温度 0、2048 tokens）、`EssayVerificationService`（auto_passed/revised/pending_review、预算、异常兜底）、`EssayCollectionService` 接线（`RunResult.pendingReview`、verify 关闭时零改动）落盘；新增 `EssayVerificationServiceTest`（6 例）与 `EssayCollectionServiceVerifyTest`（3 例：关闭时正文逐字 legacy、pending 不入库、revised 用修订答案）。
+- 完成（2026-11-19）：`FactCheck`/`Revision`/`ReferenceSnippet`/`VerificationOutcome`、`EssayVerificationPrompt`（`essay-verify-v2`，只判事实错误）、`EssayVerifier`（`checkFactual`；16000 tokens/300s 以适配推理模型）、`EssayVerificationService`（`auto_passed`/`pending_review`，存疑只隔离不改写）、`EssayCollectionService` 接线（`RunResult.pendingReview`、verify 关闭时零改动）落盘；新增 `EssayVerificationServiceTest`（5 例）与 `EssayCollectionServiceVerifyTest`（3 例：关闭时正文逐字 legacy、pending 不入库、revised 用修订答案）。
 
 ### TASK-005 | pending | 【本期不实施】外部依据检索 + 接入升级分支
 
@@ -180,7 +180,7 @@ void reject(long id, String note, long adminUserId);
   3. 写 e2e 并跑通。
 - 验证：`frontend$ pnpm --filter @paideia/admin typecheck` → 0 error；`frontend$ pnpm --filter @paideia/admin exec playwright test e2e/essay-reviews.spec.ts` → 全绿。
 
-### TASK-008 | pending | 效果评测（基线 vs 校验后）
+### TASK-008 | done | 效果评测（基线 vs 校验后）
 
 - 对应：`AC-001`、`AC-002`
 - 依赖：TASK-001、TASK-004
@@ -191,6 +191,9 @@ void reject(long id, String note, long adminUserId);
   2. 人工复核校验后结果，统计「事实错误占比」与「正确→错误」正向改坏率。
   3. 写 `compare.md`：基线 vs 校验后两列数值 + 结论（改坏率 ≤5% 才算通过，否则回退阈值）。
 - 验证：`compare.md` 含两侧错误率、正向改坏率与是否达标结论。
+- 完成（2026-11-19）：`eval/run_verify.py` 对 58 条跑 `essay-verify-v2`，直接放行 55、拦下 3（10940/10912/10916），
+  复核后 3 条全部是真错（其中 10912、10916 是初次标注漏掉的），漏报 0、误报 0，正向改坏 0。
+  修正后基线错误率 ≈5.17%（3/58），校验后放行答案已知错误 0。结论见 `eval/compare.md`。
 
 ## 完成条件
 

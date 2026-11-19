@@ -216,3 +216,4 @@ checkFactual →
 - 推迟（对应 TASK-005/006/007）：`EssayReferenceRetriever`、`EssayVerifier.revise` 的外部分支、`EssayReviewService` 与 `EssayReviewAdminController`、管理端 `EssayReviewPage`。
 - 状态机简化：`ok && confidence>=0.80` → `auto_passed`；其余（issues/unsure/低置信/异常/预算耗尽）→ `pending_review`（记录落库，本期无复核页，仅 DB 可查）。**取消 `revised` 分支**。
 - 表 `ai_essay_verifications` 保留 `revised_answer`/`used_refs` 等列，后续启用外部检索时无需改表。
+- 校验提示词 `essay-verify-v2` 按「只判事实错误」校准；`deepseek-flash` 是推理模型，单次判定 completion 需 16k、超时 300s（实测 30–45s/条），故 `verify.enabled` 默认关闭。评测见 `eval/compare.md`。

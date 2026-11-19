@@ -29,12 +29,13 @@ import org.springframework.stereotype.Component;
 @Component
 class EssayVerifier {
 
-    private static final int MAX_TOKENS = 2048;
+    /** deepseek-flash 是推理模型，判定过程的思维链也占 completion 额度，给小了会只出思维、正文为空。 */
+    private static final int MAX_TOKENS = 16000;
 
     /** 判定类任务用 0 度，尽量消除随机性。 */
     private static final double TEMPERATURE = 0.0;
 
-    private static final int TIMEOUT_SECONDS = 20;
+    private static final int TIMEOUT_SECONDS = 300;
 
     private static final ObjectMapper JSON = new ObjectMapper();
 

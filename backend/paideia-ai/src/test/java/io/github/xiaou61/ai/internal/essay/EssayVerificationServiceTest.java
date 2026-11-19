@@ -52,16 +52,15 @@ class EssayVerificationServiceTest {
     }
 
     @Test
-    void okLowConfidenceEscalatesToRevision() {
+    void okLowConfidenceGoesPendingWithoutRewriting() {
         when(verifier.checkFactual(anyString(), anyString(), any()))
                 .thenReturn(new FactCheck("unsure", 0.4, List.of("拿不准")));
-        when(verifier.revise(anyString(), anyString(), any(), any(), any()))
-                .thenReturn(new Revision("revise", "改好的答案", 0.8, List.of(), "修了数值"));
 
         VerificationOutcome outcome = judge();
 
-        assertThat(outcome.status()).isEqualTo(EssayVerificationService.REVISED);
-        assertThat(outcome.finalAnswer()).isEqualTo("改好的答案");
+        assertThat(outcome.status()).isEqualTo(EssayVerificationService.PENDING_REVIEW);
+        assertThat(outcome.finalAnswer()).isNull();
+        verify(verifier, never()).revise(anyString(), anyString(), any(), any(), any());
     }
 
     @Test
@@ -101,17 +100,6 @@ class EssayVerificationServiceTest {
         verify(verifier, never()).checkFactual(anyString(), anyString(), any());
     }
 
-    @Test
-    void lowConfidenceRevisionGoesPending() {
-        when(verifier.checkFactual(anyString(), anyString(), any()))
-                .thenReturn(new FactCheck("issues", 0.9, List.of("可能有错")));
-        when(verifier.revise(anyString(), anyString(), any(), any(), any()))
-                .thenReturn(new Revision("revise", "半信半疑的稿", 0.5, List.of(), ""));
-
-        VerificationOutcome outcome = judge();
-
-        assertThat(outcome.status()).isEqualTo(EssayVerificationService.PENDING_REVIEW);
-    }
 
     private VerificationOutcome judge() {
         return service.judge("题", "答案", ACCESS, 1L, "fp", "https://example.com/1", "某面经");
