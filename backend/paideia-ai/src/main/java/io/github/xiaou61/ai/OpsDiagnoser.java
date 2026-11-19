@@ -26,12 +26,13 @@ public interface OpsDiagnoser {
      * @param context   历史同类事件与同期其他 OPEN 事件（WORK-049）
      * @param alerts    当前 firing 的告警（已格式化）
      * @param logs      最近日志摘录（已脱敏）
+     * @param patterns  日志模板聚类与近期模板异常（WORK-085）
      * @param traces    错误/慢 trace 摘要（WORK-043；P2 起有值）
      * @param deploys   最近发版信息
      */
     record Evidence(String trigger, String alertName, String question,
                     String summary, String metrics, String baselines, String context,
-                    String alerts, String logs, String traces, String deploys) {
+                    String alerts, String logs, String patterns, String traces, String deploys) {
     }
 
     /** @param usage 上游没有返回用量时为 null（此时结算会全额退回预留） */

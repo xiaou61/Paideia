@@ -11,7 +11,9 @@ Group=loki
 ExecStart=/usr/local/bin/loki -config.file=/etc/loki/loki-config.yaml
 Restart=on-failure
 RestartSec=5
-MemoryMax=512M
+# 开启 pattern ingester 后常驻内存上浮（WORK-085 实测 1024M 有余量）；
+# 若主机吃紧按 .agent/notes/ops-pattern-ingester.md 的实测值回调。
+MemoryMax=1024M
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true

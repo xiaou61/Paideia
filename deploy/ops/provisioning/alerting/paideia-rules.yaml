@@ -499,3 +499,31 @@ groups:
         annotations:
           summary: 有定时任务上次执行失败（连续 30 分钟未恢复）
           description: 看运维页「定时任务」表定位是哪一个；再按手势清理/遥测保留/每日速递分别查日志。
+
+      # 日志模板异常（WORK-085）：应用侧检测出「新模板 / 频次突增 / 模板消失」后落库，
+      # 并把未处理异常数暴露成 paideia_ops_pattern_anomalies_open。这里只做一级提醒——
+      # 真正的根因分析由应用在检测到异常时自动触发一条 AI 诊断（复用 OpsDiagnosisService）。
+      # 用指标而不是日志：模板异常是"已经判断过的结论"，不该让 Grafana 重算一遍。
+      - uid: paideia-pattern-anomaly
+        title: 日志模板异常待处理
+        condition: A
+        for: 5m
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: paideia-prometheus
+            model:
+              refId: A
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 1
+              expr: paideia_ops_pattern_anomalies_open > bool 0
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        notification_settings:
+          receiver: paideia-ops
+        annotations:
+          summary: 存在未处理的日志模板异常（新模板 / 频次突增 / 模板消失）
+          description: 打开运维页「日志模板与异常」卡片；模板消失往往意味着服务静默，比报错更该先看。

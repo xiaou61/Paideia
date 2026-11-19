@@ -56,29 +56,38 @@ class OpsEvidenceCollector {
     private final PrometheusClient prometheus;
     private final LokiClient loki;
     private final TempoClient tempo;
+    private final PatternQueryService patterns;
 
     /** 生产构造器；其余带客户端的构造器只给测试用。 */
     @Autowired
-    OpsEvidenceCollector(OpsProperties properties, OpsSummaryService summary) {
+    OpsEvidenceCollector(OpsProperties properties, OpsSummaryService summary, PatternQueryService patterns) {
         this(properties, summary,
                 new PrometheusClient(properties.getPrometheusUrl(), properties.getQueryTimeoutMs()),
                 new LokiClient(properties.getLokiUrl(), properties.getQueryTimeoutMs()),
-                new TempoClient(properties.getTempoUrl(), properties.getQueryTimeoutMs()));
+                new TempoClient(properties.getTempoUrl(), properties.getQueryTimeoutMs()),
+                patterns);
     }
 
     OpsEvidenceCollector(OpsProperties properties, OpsSummaryService summary,
                          PrometheusClient prometheus, LokiClient loki) {
         this(properties, summary, prometheus, loki,
-                new TempoClient(properties.getTempoUrl(), properties.getQueryTimeoutMs()));
+                new TempoClient(properties.getTempoUrl(), properties.getQueryTimeoutMs()), null);
     }
 
     OpsEvidenceCollector(OpsProperties properties, OpsSummaryService summary,
                          PrometheusClient prometheus, LokiClient loki, TempoClient tempo) {
+        this(properties, summary, prometheus, loki, tempo, null);
+    }
+
+    OpsEvidenceCollector(OpsProperties properties, OpsSummaryService summary,
+                         PrometheusClient prometheus, LokiClient loki, TempoClient tempo,
+                         PatternQueryService patterns) {
         this.properties = properties;
         this.summary = summary;
         this.prometheus = prometheus;
         this.loki = loki;
         this.tempo = tempo;
+        this.patterns = patterns;
     }
 
     OpsDiagnoser.Evidence collect(String trigger, String alertName, String question) {
@@ -95,17 +104,20 @@ class OpsEvidenceCollector {
         String alertsText = firingAlerts();
         String deploysText = formatDeploy();
         String tracesText = formatTraces();
+        // 模板聚类证据读的是本地表（同步任务的产物），不额外打 Loki；为 null（测试/未装配）时留空。
+        String patternsText = patterns == null ? "" : patterns.evidenceText(Instant.now());
 
         int nonLogChars = summaryText.length() + metricsText.length() + baselinesText.length()
                 + contextText.length()
-                + alertsText.length() + tracesText.length() + deploysText.length();
+                + alertsText.length() + patternsText.length()
+                + tracesText.length() + deploysText.length();
         int logBudget = Math.max(0, config.getMaxEvidenceChars() - nonLogChars);
         String logsText = formatDiagnosisLogs(config.getMaxLogLines(), logBudget);
 
         return new OpsDiagnoser.Evidence(
                 trigger, alertName, question,
                 summaryText, metricsText, baselinesText, contextText,
-                alertsText, logsText, tracesText, deploysText);
+                alertsText, logsText, patternsText, tracesText, deploysText);
     }
 
     /** 工具用的固定指标名清单；名字即白名单。 */

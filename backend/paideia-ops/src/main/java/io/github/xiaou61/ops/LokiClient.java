@@ -66,6 +66,69 @@ class LokiClient {
     record LogLine(Instant at, String line) {
     }
 
+    record PatternSample(String pattern, long count, Instant at) {
+    }
+
+    /**
+     * 读取 Loki pattern ingester 的模板频次（WORK-085）。
+     *
+     * <p>端点 {@code /loki/api/v1/patterns} 属 Loki 较新的实验接口（由 pattern_ingester 提供），
+     * 返回每个模板在一段时间内的采样点。这里把采样点的 count 求和当作窗口内的条数：同步每轮
+     * 都会重算同一窗口并覆盖桶，所以求和是「重算」而不是「累加」。
+     *
+     * <p>接口不存在、返回体不认识、或 Loki 不可达 —— 一律返回空列表，调用方据此按「不可用」
+     * 降级，不要当成「没有模板」。
+     */
+    List<PatternSample> patterns(String query, Instant from, Instant to, int maxSamples) {
+        String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
+        String url = baseUrl + "/loki/api/v1/patterns?query=" + encoded
+                + "&start=" + from.getEpochSecond() + "000000000"
+                + "&end=" + to.getEpochSecond() + "000000000";
+        Optional<JsonNode> root = OpsHttp.getJson(http, url, timeout);
+        if (root.isEmpty() || !"success".equals(root.get().path("status").asText())) {
+            return List.of();
+        }
+        JsonNode data = root.get().path("data");
+        if (!data.isArray()) {
+            return List.of();
+        }
+        List<PatternSample> out = new ArrayList<>();
+        for (JsonNode item : data) {
+            String pattern = item.path("pattern").asText("");
+            if (pattern.isBlank()) {
+                continue;
+            }
+            long sum = 0;
+            Instant last = null;
+            for (JsonNode sample : item.path("samples")) {
+                if (!sample.isArray() || sample.size() < 2) {
+                    continue;
+                }
+                Double count = OpsHttp.parseDouble(sample.get(1).asText());
+                if (count != null) {
+                    sum += count.longValue();
+                }
+                last = parseSampleTime(sample.get(0).asText());
+            }
+            out.add(new PatternSample(pattern, sum, last));
+        }
+        out.sort(Comparator.comparingLong(PatternSample::count).reversed());
+        return out.size() > maxSamples ? out.subList(0, maxSamples) : out;
+    }
+
+    private static Instant parseSampleTime(String raw) {
+        try {
+            long nanos = Long.parseLong(raw);
+            // 秒级时间戳只有 10 位；收到 19 位就当纳秒，避免把 2026 年解析成 1970 年。
+            if (raw.length() >= 19) {
+                return Instant.ofEpochSecond(0, nanos);
+            }
+            return Instant.ofEpochSecond(nanos);
+        } catch (NumberFormatException broken) {
+            return null;
+        }
+    }
+
     /**
      * 即时指标查询（WORK-043）：用于“当前 5 分钟 ERROR 数 vs 上周同时段”。
      * 失败返回 null，调用方写“基线不足/无数据”，不把缺失当成 0。
