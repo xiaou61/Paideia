@@ -187,7 +187,7 @@ public class OpsProperties {
         private int maxLogLines = 60;
 
         /** 证据总字符上限（摘要 + 指标 + 告警 + 日志 + 发版）。 */
-        private int maxEvidenceChars = 12000;
+        private int maxEvidenceChars = 16000;
 
         private int listLimit = 20;
 
@@ -205,6 +205,12 @@ public class OpsProperties {
 
         /** 证据窗口总长上限（分钟，WORK-086）：事件再长也不把整个事故现场塞进提示词。 */
         private int evidenceWindowMaxMinutes = OpsEvidenceWindow.MAX_MINUTES;
+
+        /** 每个单元在证据里最多取多少行原始日志（WORK-086 三段查询各自的 limit）。 */
+        private int logsPerUnit = 30;
+
+        /** 每个单元最多保留多少个日志签名（WORK-086）；错误类签名不受此限。 */
+        private int signatureTop = 10;
 
         public boolean isEnabled() {
             return enabled;
@@ -292,6 +298,22 @@ public class OpsProperties {
 
         public void setEvidenceWindowMaxMinutes(int evidenceWindowMaxMinutes) {
             this.evidenceWindowMaxMinutes = evidenceWindowMaxMinutes;
+        }
+
+        public int getLogsPerUnit() {
+            return logsPerUnit;
+        }
+
+        public void setLogsPerUnit(int logsPerUnit) {
+            this.logsPerUnit = logsPerUnit;
+        }
+
+        public int getSignatureTop() {
+            return signatureTop;
+        }
+
+        public void setSignatureTop(int signatureTop) {
+            this.signatureTop = signatureTop;
         }
     }
 

@@ -32,7 +32,7 @@ approver_role:
 
 ## 任务
 
-### TASK-001 | pending | 证据窗口：按事件时间锚定
+### TASK-001 | done | 证据窗口：按事件时间锚定
 
 - 对应：`REQ-001`、`AC-001`
 - 依赖：无
@@ -50,8 +50,9 @@ approver_role:
   4. 加 `Diagnosis` 两个配置字段与默认值 30/60。
   5. 再跑测试确认绿。
 - 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-ops -Dtest=OpsEvidenceWindowTest test` → 期望 `Tests run: 3, Failures: 0, Errors: 0`
+- 完成（2026-11-19，提交 `9a706e3c`）：`OpsEvidenceWindowTest` 实测 `Tests run: 6, Failures: 0`（比计划多 3 例：夹到 `now`、超保留期标注、`withSource`）；`source` 之外另加了 `outOfRetention` 字段承载保留期事实。
 
-### TASK-002 | pending | 日志三段采集 + 签名聚合
+### TASK-002 | done | 日志三段采集 + 签名聚合
 
 - 对应：`REQ-002`、`REQ-004`、`AC-002`、`AC-004`
 - 依赖：TASK-001
@@ -69,6 +70,7 @@ approver_role:
   3. `collect` 把窗口写进 `Evidence.window`（本任务只加这一个字段，`knowledge` 见 TASK-012）。
   4. 再跑测试确认绿。
 - 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-ops -Dtest='OpsLogSignatureTest,OpsEvidenceCollectorTest' test` → 期望 0 failures
+- 完成（2026-11-19）：`OpsLogSignatureTest` 4 例 + `OpsEvidenceCollectorTest` 7 例全绿，`paideia-ops` 整模块 `mvn test` 亦 SUCCESS。实施与计划的差异：① 签名规则多了 `长哈希→<hash>`、`日期时间→<ts>`（`\d{2}:\d{2}:\d{2}` 的旧规则无法覆盖 ISO 时间）；② 数字匹配去掉了词边界，否则 `1234ms`（数字紧跟单位）不会被归约；③ `Evidence.window` 字段留给 TASK-004 一次性改 record 与提示词，本任务窗口只在 `collect` 内部生效；④ 上下文段固定 2 条、生命周期段 20 条，预算不够时先保异常与生命周期。
 
 ### TASK-003 | pending | 运行态指标与重启聚合
 

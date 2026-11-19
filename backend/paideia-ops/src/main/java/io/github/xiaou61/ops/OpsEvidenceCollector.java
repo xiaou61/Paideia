@@ -3,11 +3,17 @@ package io.github.xiaou61.ops;
 import io.github.xiaou61.ai.OpsDiagnoser;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -24,6 +30,24 @@ import org.springframework.stereotype.Service;
 class OpsEvidenceCollector {
 
     private static final DateTimeFormatter LOG_TIME = DateTimeFormatter.ISO_INSTANT;
+
+    /** 证据里的时间都用运维看到的本地钟点（服务器与使用方都在 +08:00）。 */
+    private static final DateTimeFormatter LOG_CLOCK =
+            DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.of("Asia/Shanghai"));
+
+    /**
+     * 三段日志查询（WORK-086）：异常 / 生命周期 / 上下文。顺序有意义——预算不够时
+     * 前两段先落地，上下文段是锦上添花。
+     */
+    private static final List<String> LOG_SEGMENTS = List.of(
+            " |~ \"(?i)(error|exception|failed|timeout)\"",
+            " |~ \"(?i)(started|starting|stopping|shutdown|restart|killed|oom|exit)\"",
+            "");
+
+    /** 生命周期段与上下文段的条数上限：它们是佐证，不参与"报了什么错"的主体。 */
+    private static final int LIFECYCLE_LOG_LIMIT = 20;
+    private static final int CONTEXT_LOG_LIMIT = 2;
+
     private static final String LOG_ERROR_QUERY =
             "sum(count_over_time({unit=\"paideia.service\"} |~ \"(?i)(error|exception|failed)\" [5m]))";
 
@@ -95,7 +119,17 @@ class OpsEvidenceCollector {
     }
 
     OpsDiagnoser.Evidence collect(String trigger, String alertName, String question, String context) {
+        return collect(trigger, alertName, question, context, null);
+    }
+
+    /**
+     * 采集证据。窗口为 null 时退回"从触发时刻往前一段"的默认窗口（WORK-086）：
+     * 调用方拿得到事件首末时间就该传进来，否则报告只能看到触发之后的那一小时。
+     */
+    OpsDiagnoser.Evidence collect(String trigger, String alertName, String question,
+                                  String context, OpsEvidenceWindow window) {
         OpsProperties.Diagnosis config = properties.getDiagnosis();
+        OpsEvidenceWindow evidenceWindow = window == null ? defaultWindow(config) : window;
 
         String summaryText = formatSummary(summary.summary());
         String metricsText = formatMetrics();
@@ -112,12 +146,18 @@ class OpsEvidenceCollector {
                 + alertsText.length() + patternsText.length()
                 + tracesText.length() + deploysText.length();
         int logBudget = Math.max(0, config.getMaxEvidenceChars() - nonLogChars);
-        String logsText = formatDiagnosisLogs(config.getMaxLogLines(), logBudget);
+        String logsText = formatDiagnosisLogs(
+                evidenceWindow, config.getLogsPerUnit(), config.getSignatureTop(), logBudget);
 
         return new OpsDiagnoser.Evidence(
                 trigger, alertName, question,
                 summaryText, metricsText, baselinesText, contextText,
                 alertsText, logsText, patternsText, tracesText, deploysText);
+    }
+
+    private OpsEvidenceWindow defaultWindow(OpsProperties.Diagnosis config) {
+        return OpsEvidenceWindow.of(null, null, Instant.now(),
+                config.getEvidenceWindowMinutes(), config.getEvidenceWindowMaxMinutes());
     }
 
     /** 工具用的固定指标名清单；名字即白名单。 */
@@ -375,23 +415,116 @@ class OpsEvidenceCollector {
         return out.toString();
     }
 
-    private String formatDiagnosisLogs(int maxLines, int maxChars) {
+    /**
+     * 诊断用的日志证据：窗口由事件首末时间决定，每个单元分三段捞（WORK-086）。
+     *
+     * <p>三段的意义不同：异常段回答"报了什么错"，生命周期段回答"进程是不是重启过"，
+     * 上下文段给"没有 error 关键字但发生在同一时刻"的行一个机会。只捞 error 会漏掉
+     * 系统级重启前的 Stopping、以及只为佐证时间线的普通行。
+     */
+    private String formatDiagnosisLogs(OpsEvidenceWindow window, int perUnitLines,
+                                      int signatureTop, int maxChars) {
         if (maxChars <= 0) {
             return "（证据预算已用完，未采集日志）";
         }
-        Instant to = Instant.now();
-        Instant from = to.minus(Duration.ofHours(1));
-        List<LokiClient.LogLine> lines = new ArrayList<>();
-        // 每个单元一条固定查询：unit 是标签值不是正则，值里的 `.` 不需要转义。
+        List<String> rows = new ArrayList<>();
+        rows.add("窗口 " + LOG_CLOCK.format(window.start()) + "–" + LOG_CLOCK.format(window.end())
+                + "（" + window.source() + "）");
         for (String unit : properties.getDiagnosis().getUnits()) {
-            lines.addAll(loki.queryRange(
-                    "{unit=\"" + unit + ".service\"} |~ \"(?i)(error|exception|failed|timeout)\"",
-                    from, to, maxLines));
+            rows.add("[" + unit + "]");
+            List<LokiClient.LogLine> lines = queryUnit(unit, window, perUnitLines);
+            if (lines.isEmpty()) {
+                rows.add("（该 unit 在窗口内无日志；可能未接入 Loki，alloy 白名单待核实）");
+                continue;
+            }
+            rows.addAll(renderSignatures(lines, signatureTop));
         }
-        if (lines.isEmpty()) {
-            return "无匹配日志（或 Loki 不可达）";
+        return OpsLogRedactor.joinRedacted(rows, rows.size(), maxChars);
+    }
+
+    /** 三段查询后按 (时间, 原文) 去重：上下文段几乎一定会把异常段的行再捞回来一次。 */
+    private List<LokiClient.LogLine> queryUnit(String unit, OpsEvidenceWindow window, int perUnitLines) {
+        String selector = "{unit=\"" + unit + ".service\"}";
+        List<LokiClient.LogLine> collected = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        List<Integer> limits = List.of(
+                perUnitLines,
+                Math.max(0, Math.min(LIFECYCLE_LOG_LIMIT, perUnitLines)),
+                Math.max(0, Math.min(CONTEXT_LOG_LIMIT, perUnitLines)));
+        for (int i = 0; i < LOG_SEGMENTS.size(); i++) {
+            int limit = limits.get(i);
+            if (limit <= 0) {
+                continue;
+            }
+            for (LokiClient.LogLine line : loki.queryRange(
+                    selector + LOG_SEGMENTS.get(i), window.start(), window.end(), limit)) {
+                if (seen.add(line.at() + "\u0000" + line.line())) {
+                    collected.add(line);
+                }
+            }
         }
-        return formatLogLines(lines, maxLines, maxChars);
+        return collected;
+    }
+
+    /**
+     * 按签名聚合后逐条渲染：同一签名只留"首次 … 末次 ×次数 + 一条样例"。
+     *
+     * <p>错误行不受 {@code signatureTop} 限制——按次数排序会把"只出现一次但正是原因"
+     * 的异常挤掉，那恰好是最该给模型看的那条。
+     */
+    static List<String> renderSignatures(List<LokiClient.LogLine> lines, int signatureTop) {
+        List<LokiClient.LogLine> sorted = new ArrayList<>(lines);
+        sorted.sort(Comparator.comparing(LokiClient.LogLine::at));
+
+        Map<String, Signature> bySignature = new LinkedHashMap<>();
+        for (LokiClient.LogLine line : sorted) {
+            String signature = OpsLogSignature.of(line.line());
+            if (signature.isEmpty()) {
+                continue;
+            }
+            Signature existing = bySignature.get(signature);
+            if (existing == null) {
+                bySignature.put(signature, new Signature(line.at(), line.at(), 1, line.line()));
+            } else {
+                bySignature.put(signature, existing.bumped(line.at(), line.line()));
+            }
+        }
+
+        List<String> rows = new ArrayList<>(bySignature.size());
+        int kept = 0;
+        for (Signature stat : bySignature.values()) {
+            if (kept >= signatureTop && !stat.isError()) {
+                continue;
+            }
+            kept++;
+            rows.add(stat.render());
+        }
+        if (kept < bySignature.size()) {
+            rows.add("（另有 " + (bySignature.size() - kept) + " 个非异常签名已省略）");
+        }
+        return rows;
+    }
+
+    /** 一个签名的聚合结果；样例取最后一次出现的那行（往往带最完整的错误上下文）。 */
+    private record Signature(Instant first, Instant last, int count, String sample) {
+
+        private static final Pattern ERROR_HINT =
+                Pattern.compile("(?i)(error|exception|failed|timeout|fatal)");
+
+        boolean isError() {
+            return ERROR_HINT.matcher(sample).find();
+        }
+
+        Signature bumped(Instant at, String line) {
+            return new Signature(first, at, count + 1, line);
+        }
+
+        String render() {
+            String head = count == 1
+                    ? LOG_CLOCK.format(first)
+                    : LOG_CLOCK.format(first) + " … " + LOG_CLOCK.format(last) + " ×" + count;
+            return head + " " + sample.strip();
+        }
     }
 
     private static String formatLogLines(List<LokiClient.LogLine> lines, int maxLines, int maxChars) {
