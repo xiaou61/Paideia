@@ -450,6 +450,25 @@ public class OpsProperties {
         /** 参与聚类的日志单元白名单。 */
         private List<String> units = List.of("paideia", "laya");
 
+        /**
+         * 异常超过该分钟数仍未关闭就自动归档（状态置 RESOLVED）。
+         *
+         * <p>异常是「某一窗口的观测」，不是持续态：诊断已经完成，或根本没人处理，都不该让它
+         * 一直以 OPEN 计数——{@code paideia_ops_pattern_anomalies_open} 长期大于 0 会让
+         * Grafana 规则永久 firing，重启一次重新触发一次告警（2026-11-19 实测踩到）。
+         */
+        private int autoResolveMinutes = 120;
+
+        /**
+         * 不参与异常判定的模板正则（大小写不敏感，任一条命中即忽略）。
+         *
+         * <p>健康探针这类「按计划刷 200」的日志既不是故障，停了也不代表服务静默，却会因为
+         * 低频场景下「首次出现」和「探针停止」各报一次。默认忽略探针与健康检查成功日志。
+         */
+        private List<String> ignorePatterns = List.of(
+                "(?i)\\bprobe\\b",
+                "(?i)\\bhealth(?:check)?\\b.*\\b(?:200|OK)\\b");
+
         public boolean isEnabled() {
             return enabled;
         }
@@ -576,6 +595,22 @@ public class OpsProperties {
 
         public void setUnits(List<String> units) {
             this.units = units == null ? List.of() : units;
+        }
+
+        public int getAutoResolveMinutes() {
+            return autoResolveMinutes;
+        }
+
+        public void setAutoResolveMinutes(int autoResolveMinutes) {
+            this.autoResolveMinutes = autoResolveMinutes;
+        }
+
+        public List<String> getIgnorePatterns() {
+            return ignorePatterns;
+        }
+
+        public void setIgnorePatterns(List<String> ignorePatterns) {
+            this.ignorePatterns = ignorePatterns == null ? List.of() : ignorePatterns;
         }
     }
 }

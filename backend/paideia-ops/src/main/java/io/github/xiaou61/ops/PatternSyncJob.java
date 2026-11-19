@@ -26,12 +26,15 @@ class PatternSyncJob {
     private final PatternSyncService syncService;
     private final PatternAnomalyDetector detector;
     private final PatternTriggerService triggerService;
+    private final PatternAnomalyCustody custody;
 
     PatternSyncJob(PatternSyncService syncService, PatternAnomalyDetector detector,
-                   PatternTriggerService triggerService, PatternMapper mapper, MeterRegistry registry) {
+                   PatternTriggerService triggerService, PatternAnomalyCustody custody,
+                   PatternMapper mapper, MeterRegistry registry) {
         this.syncService = syncService;
         this.detector = detector;
         this.triggerService = triggerService;
+        this.custody = custody;
         // 惰性求值：每次抓取时读一次 Open 异常数；DB 抖动时返回 0，绝不让 /metrics 失败。
         Gauge.builder("paideia_ops_pattern_anomalies_open", mapper, PatternSyncJob::openAnomalies)
                 .description("未处理的日志模板异常数（NEW_TEMPLATE + FREQ_SPIKE + DISAPPEARED）")
@@ -40,7 +43,7 @@ class PatternSyncJob {
 
     private static double openAnomalies(PatternMapper mapper) {
         try {
-            return mapper.countOpen("NEW_TEMPLATE") + mapper.countOpen("FREQ_SPIKE") + mapper.countOpen("DISAPPEARED");
+            return mapper.countOpenTotal();
         } catch (RuntimeException failure) {
             return 0;
         }
@@ -68,9 +71,10 @@ class PatternSyncJob {
 
         try {
             int triggered = triggerService.triggerAll(anomalies, now);
-            if (written > 0 || !anomalies.isEmpty()) {
-                log.info("ops.pattern.round synced={} anomalies={} triggered={}",
-                        written, anomalies.size(), triggered);
+            int closed = custody.close(now);
+            if (written > 0 || !anomalies.isEmpty() || closed > 0) {
+                log.info("ops.pattern.round synced={} anomalies={} triggered={} closed={}",
+                        written, anomalies.size(), triggered, closed);
             }
         } catch (RuntimeException failure) {
             log.warn("ops.pattern.trigger.round.failed reason={}", failure.toString());

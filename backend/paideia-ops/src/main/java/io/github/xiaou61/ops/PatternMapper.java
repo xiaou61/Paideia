@@ -154,9 +154,6 @@ interface PatternMapper {
                      @Param("unit") String unit,
                      @Param("since") Instant since);
 
-    @Select("SELECT COUNT(*) FROM ops_pattern_anomalies WHERE kind = #{kind} AND status = 'OPEN'")
-    long countOpen(@Param("kind") String kind);
-
     /** 最近一次触发该模板异常的时间；用于跨轮次的触发冷却。 */
     @Select("""
             SELECT MAX(created_at) FROM ops_pattern_anomalies
@@ -182,6 +179,30 @@ interface PatternMapper {
             WHERE id = #{id}
             """)
     int setDiagnosis(@Param("id") long id, @Param("diagnosisId") long diagnosisId);
+
+    /**
+     * 诊断已经跑完（DONE）的异常自动关闭：诊断报告就是处置结果，异常再挂 OPEN 只会让
+     * 「未处理异常」指标永远大于 0、告警无限重发（2026-11-19 事故）。
+     */
+    @Update("""
+            UPDATE ops_pattern_anomalies a
+            JOIN ops_diagnoses d ON d.id = a.diagnosis_id
+            SET a.status = 'RESOLVED', a.resolved_at = #{now}
+            WHERE a.status = 'OPEN' AND d.status = 'DONE'
+            """)
+    int resolveDiagnosed(@Param("now") Instant now);
+
+    /** 超过时限仍无人处理的异常自动归档；不是删除，账本与检索仍可查。 */
+    @Update("""
+            UPDATE ops_pattern_anomalies
+            SET status = 'RESOLVED', resolved_at = #{now},
+                detail = LEFT(CONCAT(COALESCE(detail, ''), '（超过自动关闭时限，已自动归档）'), 1024)
+            WHERE status = 'OPEN' AND created_at < #{before}
+            """)
+    int closeStale(@Param("before") Instant before, @Param("now") Instant now);
+
+    @Select("SELECT COUNT(*) FROM ops_pattern_anomalies WHERE status = 'OPEN'")
+    long countOpenTotal();
 
     @Select("""
             SELECT id, kind, template_hash, unit, ratio, z, baseline_count, current_count,

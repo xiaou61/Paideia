@@ -5,6 +5,10 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
@@ -18,6 +22,8 @@ import org.springframework.stereotype.Service;
  */
 @Service
 class PatternAnomalyDetector {
+
+    private static final Logger log = LoggerFactory.getLogger(PatternAnomalyDetector.class);
 
     private final OpsProperties properties;
     private final PatternMapper mapper;
@@ -42,6 +48,7 @@ class PatternAnomalyDetector {
         int dow = local.getDayOfWeek().getValue() % 7;
         int hour = local.getHour();
         Instant baselineSince = windowStart.minusSeconds(cfg.getBaselineWeeks() * 7L * 86_400L);
+        List<Pattern> ignores = compileIgnores(cfg.getIgnorePatterns());
 
         List<PatternMapper.AnomalyRow> out = new ArrayList<>();
         for (String unit : cfg.getUnits()) {
@@ -52,6 +59,10 @@ class PatternAnomalyDetector {
             List<PatternMapper.Template> templates =
                     mapper.recentTemplates(unit, now.minusSeconds(24 * 3600L), cfg.getMaxTemplates());
             for (PatternMapper.Template t : templates) {
+                // 探针/健康检查这类噪声模板不参与任何判定：既不该算「新模板」，停了也不该算「消失」。
+                if (ignored(ignores, t.pattern())) {
+                    continue;
+                }
                 long current = mapper.sumInWindow(t.templateHash(), unit, windowStart, windowEnd);
                 List<Integer> baseline = mapper.baselineCounts(
                         t.templateHash(), unit, dow, hour, baselineSince, windowStart);
@@ -84,6 +95,37 @@ class PatternAnomalyDetector {
             }
         }
         return out;
+    }
+
+    private static List<Pattern> compileIgnores(List<String> regexes) {
+        if (regexes == null || regexes.isEmpty()) {
+            return List.of();
+        }
+        List<Pattern> compiled = new ArrayList<>(regexes.size());
+        for (String regex : regexes) {
+            if (regex == null || regex.isBlank()) {
+                continue;
+            }
+            try {
+                compiled.add(Pattern.compile(regex));
+            } catch (PatternSyntaxException invalid) {
+                // 配错的忽略规则不该让整轮检测失败，只跳过这一条。
+                log.warn("ops.pattern.ignore.invalid regex={} reason={}", regex, invalid.getDescription());
+            }
+        }
+        return compiled;
+    }
+
+    private static boolean ignored(List<Pattern> ignores, String pattern) {
+        if (pattern == null || ignores.isEmpty()) {
+            return false;
+        }
+        for (Pattern ignore : ignores) {
+            if (ignore.matcher(pattern).find()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String classify(OpsProperties.Patterns cfg, boolean coldStart,

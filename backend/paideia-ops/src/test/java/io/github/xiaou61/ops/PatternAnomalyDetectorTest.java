@@ -103,4 +103,19 @@ class PatternAnomalyDetectorTest {
 
         assertThat(detector.detect(now)).isEmpty();
     }
+
+    @Test
+    @DisplayName("健康探针/200 日志被忽略：不报新模板")
+    void ignoresProbeTemplates() {
+        when(mapper.recentTemplates(anyString(), any(), anyInt()))
+                .thenReturn(List.of(new PatternMapper.Template("h9", "paideia",
+                        "11:30:00 INFO [laya] probe GET /api/laya/health -> 200 in <_>",
+                        now, now, 45, 45)));
+        when(mapper.countBucketsBefore(anyString(), any())).thenReturn(50L);
+        when(mapper.baselineCounts(anyString(), anyString(), anyInt(), anyInt(), any(), any()))
+                .thenReturn(List.of());
+        when(mapper.sumInWindow(eq("h9"), eq("paideia"), any(), any())).thenReturn(45L, 0L);
+
+        assertThat(detector.detect(now)).isEmpty();
+    }
 }
