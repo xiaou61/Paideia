@@ -2,112 +2,62 @@
 title: Dockerfile：把构建过程写下来
 category: docker
 order: 4
-minutes: 30
+minutes: 20
 level: beginner
 status: published
 ---
 
-## 这一关在解决什么
+## 改一行 Controller，依赖层又跑了三分钟
 
-镜像不是手工攒出来的，是**用 Dockerfile 描述出来的**。这一关讲四件事：
-
-```sketch
-{
-  "title": "指令顺序决定「改一行要不要等十分钟」",
-  "rows": [
-    [
-      { "id": "deps", "title": "先装依赖", "sub": "很少变，放前面", "tone": "gray" },
-      { "id": "copy", "title": "再拷源码", "sub": "天天变，放后面", "tone": "blue" },
-      { "id": "cache", "title": "缓存才命中", "sub": "前面不变就不用重跑", "tone": "green" }
-    ]
-  ],
-  "arrows": [
-    { "from": "deps", "to": "copy" },
-    { "from": "copy", "to": "cache" }
-  ]
-}
-```
-
-- 常用指令各自干什么、`CMD` 和 `ENTRYPOINT` 到底差在哪；
-- 为什么指令顺序决定了"改一行代码要不要等十分钟"；
-- 多阶段构建怎么把 500MB 的构建工具留在构建阶段、不进运行镜像；
-- `.dockerignore` 为什么是必须的。
-
-打个比方：Dockerfile 像一张菜谱——写清"先备什么料、再下什么锅"，谁照着做都能端出同一道菜。真实机制是：Docker 逐条执行 Dockerfile 指令，每条产生一个镜像层，同样的输入得到同样的镜像。
-
-## 为什么要写成文件
-
-因为**可复现**。手工改容器做出来的镜像没人说得清它是怎么来的；Dockerfile 是一份能被 review、被版本管理、被任何人一键重建的记录。
-
-它同时也是**唯一正确的改镜像方式**——`docker exec` 进去改的文件下次重建就没了（第 01 关）。
-
-## 讲解
-
-### 常用指令
-
-| 指令 | 作用 | 备注 |
-| --- | --- | --- |
-| `FROM` | 基础镜像 | 每个 Dockerfile 的第一条（`ARG` 除外） |
-| `WORKDIR` | 设置工作目录 | **之后的相对路径都以它为基准**，目录不存在会自动建 |
-| `COPY` | 复制文件进去 | 推荐用它传本地文件 |
-| `ADD` | 复制 + 自动解压 tar + 支持 URL | 除了解压 tar，一律用 `COPY` |
-| `RUN` | 构建时执行命令 | 每条产生一层（第 03 关） |
-| `ENV` | 设环境变量 | 运行期还在，会被 `docker inspect` 看到 |
-| `ARG` | 构建参数 | 只在构建期有效；`--build-arg` 传 |
-| `EXPOSE` | 声明端口 | **只是文档**，不做映射；映射靠 `-p` |
-| `USER` | 切到哪个用户运行 | 最后一条 `USER` 决定运行身份 |
-| `CMD` | 默认命令 | **可被 `docker run 镜像 命令` 覆盖** |
-| `ENTRYPOINT` | 入口程序 | 不被覆盖，`docker run` 后面的东西变成它的参数 |
-| `HEALTHCHECK` | 健康检查 | 让 `docker ps` 显示 `(healthy)` |
-| `VOLUME` | 声明匿名卷 | 容器删了卷还在（第 05 关） |
-
-### `CMD` 与 `ENTRYPOINT`
-
-这是最容易混的一对。规则只有一条：**`ENTRYPOINT` 是程序，`CMD` 是默认参数**。
+这是练手项目里典型的 Dockerfile 写法：
 
 ```dockerfile
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
-CMD ["--spring.profiles.active=prod"]
-```
-
-- `docker run 镜像` → `java -jar /app/app.jar --spring.profiles.active=prod`
-- `docker run 镜像 --spring.profiles.active=dev` → 后面的参数**替换 CMD**，变成 dev
-
-只写 `CMD` 时，`docker run 镜像 别的东西` 会把整个命令替换掉——所以"为什么我 run 的时候程序没启动、跑的去是 `bash`"通常是这个原因。
-
-**两种写法，差别很大**：
-
-```dockerfile
-CMD ["java", "-jar", "app.jar"]      # exec 形式（JSON 数组）：直接 exec，PID 1 是 java
-CMD java -jar app.jar                # shell 形式：被包成 /bin/sh -c "java -jar app.jar"
-```
-
-shell 形式下 **PID 1 是 `sh`**，它不会把 SIGTERM 转发给 java，于是 `docker stop` 要等 10 秒超时才强杀（第 01 关的 PID 1 问题）。**能用 exec 形式就用 exec 形式**——这也是本关动手题要抓的 bug。
-
-### 顺序决定构建速度
-
-`RUN`、`COPY`、`ADD` 每条产生一层，**只要某一层的输入没变，这一层和它之前的层全部命中缓存**。
-
-所以正确的顺序是：**变化越少的越靠前**。
-
-```dockerfile
-# ✗ 反例：源码先拷进去，改一行代码就要重新下载全部依赖
+FROM maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /src
 COPY . .
-RUN mvn -B dependency:go-offline
-RUN mvn -B package -DskipTests
+RUN mvn -B -q dependency:go-offline
+RUN mvn -B -q package -DskipTests
 ```
+
+改一行 `HelloController.java`，重新构建，BuildKit 的标准输出形态是这样：
+
+```text
+$ docker build --progress=plain -t app:v7 .
+#5 [build 2/6] COPY . .
+#5 DONE <耗时>
+#6 [build 3/6] RUN mvn -B -q dependency:go-offline
+#6 DONE <耗时>
+#7 [build 4/6] RUN mvn -B -q package -DskipTests
+#7 DONE <耗时>
+```
+
+（本机没装 Docker，节点号和 `DONE` 行是标准形态；节点号随 Dockerfile 和 Docker 版本变，哪些步骤会显示 `CACHED` 取决于你的改动，`<耗时>` 要你自己跑。这里没有一句是我这台机器上的回显。）
+
+我原来的判断是：`pom.xml` 没变，Maven 依赖应该直接复用。实际不是。Docker 不看你命令里的 `pom.xml`，它按 Dockerfile 从上到下匹配缓存；`COPY . .` 把源码目录的内容哈希带进了依赖步骤之前，源码一变，这一层和它后面的 `RUN` 全部重来。
+
+验证：按下一节把 `COPY . .` 拆成 `COPY pom.xml .` 和 `COPY src ./src`，再改一行源码，跑 `docker build --progress=plain`；看 `RUN mvn ... dependency:go-offline` 这一行下面有没有 `CACHED`。有，依赖层就复用了；没有，就继续找还有哪个输入在变。
+
+## 稳定的放前面，易变的放后面
+
+`RUN`、`COPY`、`ADD` 是真正往层里写文件内容的三条指令。缓存按层从前往后比：某一层的输入变了，这一层和它后面的所有层都不再命中。
+
+所以顺序应该是：
 
 ```dockerfile
-# ✓ 正例：先只拷依赖清单，依赖装完再拷源码
+# 依赖清单很少变，放前面
 COPY pom.xml .
-RUN mvn -B dependency:go-offline
+RUN mvn -B -q dependency:go-offline
+
+# 源码天天变，放后面
 COPY src ./src
-RUN mvn -B package -DskipTests
+RUN mvn -B -q package -DskipTests
 ```
 
-差别是"每次改代码重跑 3 分钟"和"只重跑最后 20 秒"。Node 项目里对应的是先 `COPY package.json pnpm-lock.yaml` 再 `RUN pnpm install`，最后才 `COPY . .`。
+改源码时，`COPY pom.xml` 和依赖安装仍然 `CACHED`，只有 `COPY src` 之后的层重建。Node 项目同理：先 `COPY package.json pnpm-lock.yaml`，再 `RUN pnpm install --frozen-lockfile`，最后 `COPY . .`。
 
-一个配套动作：**`.dockerignore`**。
+验证：连续构建两次，第二次只改一个 `.java` 文件；`docker build --progress=plain` 里 `dependency:go-offline` 那一步应该显示 `CACHED`，`package` 那一步不是。
+
+配套动作是 `.dockerignore`：
 
 ```text
 .git
@@ -117,9 +67,71 @@ target
 .env
 ```
 
-没有它，`COPY . .` 会把 `node_modules`（几百 MB）、`target`、`.git` 整个塞进构建上下文：构建变慢、镜像变大，最糟的是**本地的 `.env` 和密钥被烤进镜像**（第 12 关）。
+没有它，`COPY . .` 会把 `node_modules`、`target`、`.git` 整个送进构建上下文：上下文传输变慢、镜像变大，本地的 `.env` 也可能被拷进去。`.dockerignore` 只负责把文件挡在上下文外，不是密钥管理；已经进了某一层的密钥，后面再删文件也不会从镜像里消失，只能轮换。
 
-### 多阶段构建：构建工具不进运行镜像
+如果你的 Dockerfile 是 `COPY target/app.jar app.jar` 这种预构建路线，别把 `target` 写进 `.dockerignore`——那是另一条路线，ignore 掉就复制不进去了。
+
+验证：`docker build --progress=plain` 看 `[internal] load build context` 的 `transferring context` 大小；构建完再 `docker run --rm 镜像 ls -a /app`，看 `.git`、`node_modules` 在不在。
+
+## ENTRYPOINT 只是默认入口
+
+「`ENTRYPOINT` 不被覆盖」是错的。它只是镜像的默认入口，运行时可以用 `docker run --entrypoint` 换掉；换的时候还会清空镜像里的默认 `CMD`。
+
+三种组合先分清：
+
+- **exec 形式 `ENTRYPOINT` + `CMD`**：`docker run 镜像` 跑 `ENTRYPOINT + CMD`；`docker run 镜像 参数` 用参数替换 `CMD`；`docker run --entrypoint 新程序 镜像` 换掉 `ENTRYPOINT`，`CMD` 被清空，后面要自己给参数。
+- **只有 `CMD`**：`docker run 镜像 命令` 直接替换整个 `CMD`。这就是「我 run 的时候程序没启动、跑的是 bash」的经典原因。
+- **shell 形式 `ENTRYPOINT`**：Docker 把它包成 `/bin/sh -c "..."`；官方文档明确说，这种形式下 `CMD` 和 `docker run` 后面的参数都不会传给命令。
+
+推荐的组合写法是 `ENTRYPOINT` 放命令、`CMD` 放默认参数：
+
+```dockerfile
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=70", "-jar", "/app/app.jar"]
+CMD ["--spring.profiles.active=prod"]
+```
+
+- `docker run app` → `java ... -jar /app/app.jar --spring.profiles.active=prod`
+- `docker run app --spring.profiles.active=dev` → 后面的参数替换 `CMD`，profiles 变成 dev
+- `docker run --entrypoint sh app -c 'ls /app'` → `sh` 覆盖入口，`-c 'ls /app'` 是给 `sh` 的参数
+
+验证：`docker inspect app --format '{{json .Config.Entrypoint}} {{json .Config.Cmd}}'`，看 `Entrypoint` 是不是 JSON 数组、`Cmd` 是不是默认参数；再跑一次 `docker run --rm --entrypoint sh app -c 'echo override'`，能打印 `override` 就说明入口确实被覆盖了。
+
+### shell 形式为什么不推荐
+
+```dockerfile
+ENTRYPOINT java -jar app.jar
+```
+
+这行会被包成 `/bin/sh -c "java -jar app.jar"`。问题不是「PID 1 一定是 sh」——有些 shell 在 `-c` 只有一条简单命令时会直接 `exec`，PID 1 可能变成 java。问题是你不能依赖它：
+
+- 命令是复合命令、带管道或重定向时，shell 会多一层 fork/wait，PID 1 还是 sh；
+- sh 不保证把 SIGTERM 转发给子进程，`docker stop` 发的信号到不了 java；
+- 这时 Docker 只能等超时，再发 SIGKILL。
+
+准确的说法是：**shell 形式的信号转发不可靠**。要解决，优先用 exec 形式；确实需要 shell 做变量展开或拼命令时，写一个 entrypoint 脚本，最后一行用 `exec` 接 `$@`，或者给容器加 `--init`（Docker 会用 tini 当 PID 1，负责转发信号和回收僵尸进程）。
+
+超时不是固定 10 秒：`docker stop` 对 Linux 容器默认等 10 秒（Windows 容器 30 秒），`-t 30` / `--time 30` 可以改；镜像里的 `STOPSIGNAL` 可以换停止信号，运行时 `--stop-signal` 也能覆盖。
+
+验证：`docker run -d --name t app`，再 `docker exec t cat /proc/1/comm`，看是 `java` 还是 `sh`；`time docker stop t` 看是不是卡满默认的 10 秒；`docker inspect t --format '{{.Config.StopSignal}}'` 看镜像声明的停止信号。
+
+## 哪些指令真的产生层，「同输入同镜像」吗
+
+真正往层里写文件内容的只有 `RUN`、`COPY`、`ADD`；`ENV`、`CMD`、`EXPOSE`、`LABEL`、`ENTRYPOINT`、`USER` 这些只改镜像配置，`docker history` 里 `SIZE` 显示 `0B`。`WORKDIR` 是半个例外：目录不存在时它会建一个空目录，严格说也动了文件系统。
+
+但这不代表元数据指令可以随便改：改 `ENV` 会让它之后的步骤缓存键变化，后面的 `RUN` 可能全部重跑。
+
+验证：`docker history --no-trunc 镜像` 看每行的 `CREATED BY` 和 `SIZE`；`docker image inspect --format '{{len .RootFS.Layers}}' 镜像` 数内容层。`history` 的行数不等于层数，元数据行没有对应的文件系统层。
+
+「同样的 Dockerfile 得到同样的镜像」也不是 Docker 的保证。至少还有四个变量：
+
+1. **基础镜像的 tag 会动**。`FROM maven:3.9-eclipse-temurin-21` 今天和下周可能不是同一个 digest；要复现就写 `FROM maven:3.9-eclipse-temurin-21@sha256:...`。
+2. **依赖版本没锁**。`pom.xml` 里的范围版本、`apt-get install` 没写版本、`ADD` 一个 URL，都会让今天和明天拉到不同的东西；Node 用 lockfile 加 `--frozen-lockfile`，Maven 至少把插件版本和关键依赖钉死。
+3. **构建参数不同**。`--build-arg VERSION=1.0.1` 会改变镜像配置，也会改变 `RUN` 里看到的值；构建命令要跟 Dockerfile 一起记录。
+4. **时间戳**。镜像的 `Created`、jar/zip 里的文件时间、某些构建工具写进去的当前时间，都会让字节不同。BuildKit 支持用 `SOURCE_DATE_EPOCH` 固定镜像创建时间；要逐字节复现，还要让打包工具不写入当前时间。
+
+验证：同一个 Dockerfile 连跑两次 `docker build --no-cache`，比较 `docker image inspect --format '{{.Id}}'`；ID 不同就说明还有输入在变（时间戳、网络、版本或构建参数）。把基础镜像钉到 digest、依赖锁死、时间戳固定后再比，才有意义。
+
+## 多阶段构建：构建工具不进运行镜像
 
 Java 项目最典型的写法：
 
@@ -135,23 +147,25 @@ RUN mvn -B -q package -DskipTests
 # 第二阶段：运行（只有 JRE 和 jar）
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-COPY --from=build /src/target/app.jar app.jar
 RUN useradd --system --uid 10001 app
+COPY --from=build /src/target/app.jar app.jar
 USER 10001
 EXPOSE 8080
 ENTRYPOINT ["java", "-XX:MaxRAMPercentage=70", "-jar", "/app/app.jar"]
 ```
 
-`COPY --from=build` 只把产物从第一阶段搬过来，Maven、源码、`~/.m2` 全留在第一阶段然后被丢弃。结果是运行镜像从 800MB 降到 200MB 左右。
+`COPY --from=build` 只把产物从第一阶段搬过来，Maven、源码、`~/.m2` 都留在第一阶段然后被丢弃。`target/app.jar` 这个名字取决于 `pom.xml` 的 `finalName`，照抄前先对一下。
 
-四个细节值得注意：
+四个细节：
 
-- **`AS build`** 给阶段起名，后面才能 `--from=build`。也可以用数字 `--from=0`，但名字更好读。
-- **`USER 10001`** 让容器不以 root 运行（第 12 关）。
-- **`-XX:MaxRAMPercentage=70`** 让 JVM 按容器内存上限算堆，而不是按宿主的物理内存——不设的话容器给了 1G、JVM 却以为有 32G，然后被 OOM Killer 干掉（`ExitCode 137`）。
-- 构建期需要联网装依赖，**运行期不需要**。所以生产网络的出口策略可以只对构建机放开。
+- `AS build` 给阶段起名，后面才能 `--from=build`；也可以用数字 `--from=0`，但名字更好读。
+- `USER 10001` 让容器不以 root 运行（第 12 关）；`useradd` 在 `eclipse-temurin` 的 Ubuntu 基础镜像里有，换 Alpine 要改用 `adduser`。
+- `-XX:MaxRAMPercentage=70` 让 JVM 按容器内存上限的 70% 算堆；现代 JVM（8u191 及以后）默认能读 cgroup 限制，默认 `MaxRAMPercentage` 是 25%，不设只是堆偏小；8u191 之前的 JVM 读不到容器限制，才会按宿主内存算。堆太大加上其他内存超过 `--memory`，仍然会被 OOM Killer 干掉（`ExitCode 137`）。
+- 构建期需要联网装依赖，运行期不需要；生产网络的出口策略可以只对构建机放开。
 
-### `ARG` 与 `ENV`
+验证：`docker image ls` 看最终镜像大小；`docker run --rm 镜像 ls /` 看不到 `/src`；`docker history 镜像` 里没有 `mvn` 的 `RUN`。大小数字以你本机 `docker image ls` 为准，我不在这里编一个「从 800MB 降到 200MB」。
+
+## ARG、ENV 和 EXPOSE
 
 ```dockerfile
 ARG VERSION=1.0.0            # 构建期可覆盖：--build-arg VERSION=1.0.1
@@ -159,61 +173,46 @@ ENV APP_ENV=prod             # 运行期也在
 RUN echo "building $VERSION" # ARG 在 RUN 里可见
 ```
 
-**`ARG` 不能用来传密钥**：它会被记进镜像的构建历史（`docker history` 能看到 `--build-arg` 的值）。同理 `ENV` 里的口令也会被 `docker inspect` 读出来。密钥应该在运行时通过 `-e`/`--env-file`/密钥管理注入（第 12 关）。
+`ARG` 不能用来传密钥：它会出现在镜像构建历史里，BuildKit 的 `max` 模式 provenance 里也可能带着。`ENV` 里的口令会被 `docker inspect` 的 `Config.Env` 读出来。密钥应该在运行时通过 `-e`、`--env-file` 或密钥管理注入；BuildKit 还有 `RUN --mount=type=secret`，构建期用密钥但不留在层里。
 
-### 构建命令
+验证：`docker history --no-trunc 镜像` 看 `RUN` 那行的命令里有没有你的值；`docker inspect 镜像 --format '{{json .Config.Env}}'` 看 `ENV`。如果已经在层里，删 Dockerfile 里的行不够，镜像历史还在。
+
+`EXPOSE 8080` 只是声明，不映射端口。`docker run -P` 会把所有 `EXPOSE` 的端口发布到宿主随机端口；真正的固定映射是 `-p 8080:8080`。
+
+验证：`docker inspect 镜像 --format '{{json .Config.ExposedPorts}}'` 有 `8080/tcp`；只 `docker run` 不加 `-p` 时 `docker port 容器` 是空的；加了 `-p 8080:8080` 才有 `8080/tcp -> 0.0.0.0:8080`。
+
+## 跑一遍：只看两个字段
 
 ```text
-$ docker build -t myapp:v1 .
-$ docker build -t myapp:v1 --build-arg VERSION=1.0.2 .
-$ docker build --platform linux/amd64 -t myapp:v1 .
-$ docker build --progress=plain --no-cache -t myapp:v1 .
+$ docker build --progress=plain -t app:v1 .
+$ docker inspect app:v1 --format '{{json .Config.Entrypoint}} {{json .Config.Cmd}}'
+$ docker run --rm --entrypoint sh app:v1 -c 'echo override'
 ```
 
-`.` 是**构建上下文**（整个目录会被送给 daemon），不是 Dockerfile 的路径。`--platform` 在 Apple Silicon 上构建给 x86 服务器用的镜像时必须写，否则部署时报 `exec format error`（第 02 关）。
-
-`--no-cache` 只在真的需要"从零验证"时用；日常构建靠缓存，看到 `CACHED` 说明命中。
+第一行跑两遍，第二遍看依赖步骤有没有 `CACHED`；第二行看 `Entrypoint` 是不是 JSON 数组、`Cmd` 是不是默认参数；第三行能打印 `override`，说明 `--entrypoint` 覆盖生效。
 
 ## 动手
 
 ```code-challenge
-{"id":"docker-04-shell-form","kind":"bug","title":"这个镜像每次重启都要等 10 秒，问题在哪一行？","language":"dockerfile",
+{"id":"docker-04-shell-form","kind":"bug","title":"这个镜像重启时可能卡满 10 秒，问题在哪一行？","language":"dockerfile",
  "code":"FROM eclipse-temurin:21-jre\nWORKDIR /app\nCOPY target/app.jar app.jar\nENTRYPOINT java -jar app.jar","bugLine":4,
- "explain":"shell 形式会让 `/bin/sh -c \"java -jar app.jar\"` 成为 PID 1，sh 不转发 SIGTERM，Docker 等 10 秒超时后强杀。改成 exec 形式 `ENTRYPOINT [\"java\", \"-jar\", \"app.jar\"]`，java 直接成为 PID 1，优雅停机会生效。"}
+ "explain":"shell 形式会把命令交给 /bin/sh -c；sh 不保证把 SIGTERM 转给 java，Docker 只能等到超时再 SIGKILL。改成 exec 形式（JSON 数组）：ENTRYPOINT 后用方括号，每个参数单独加双引号。也可以用 entrypoint 脚本，最后一行用 exec 接 $@，或者给容器加 --init。"}
 ```
 
 ## 检查一下
 
 ```quiz
 {"id":"docker-04-quiz","title":"Dockerfile 三问","questions":[
- {"question":"`docker run 镜像 bash` 能覆盖的是哪一条指令？","options":["CMD","ENTRYPOINT","RUN"],"answer":0,"explain":"run 后面的命令替换 CMD；ENTRYPOINT 固定为程序本身，后面的内容会变成它的参数。"},
- {"question":"为什么要把 `COPY pom.xml` 放在 `COPY src` 之前？","options":["依赖层能命中缓存，改代码时不用重装依赖","先拷小文件更安全","pom 必须在 src 里"],"answer":0,"explain":"构建缓存按层从前往后匹配；依赖清单不变，依赖层就复用，只重建源码之后的层。"},
- {"question":"`EXPOSE 8080` 做了什么？","options":["只声明文档用途，不映射端口","把容器 8080 映射到宿主 8080","开放防火墙"],"answer":0,"explain":"EXPOSE 只是元信息和给 -P 用的提示。真正映射必须 `-p 宿主:容器`。"}
+ {"question":"`docker run --entrypoint sh 镜像` 会怎样？","options":["只是把 sh 追加到原 ENTRYPOINT 后面","覆盖 ENTRYPOINT，并清空镜像里的默认 CMD","覆盖 CMD，ENTRYPOINT 不变"],"answer":1,"explain":"`--entrypoint` 覆盖 ENTRYPOINT；Docker 文档明确它还会清空默认 CMD，所以后面要自己给参数。传空字符串可以清空入口，再在镜像名后面写命令。"},
+ {"question":"哪种写法能让 java 直接成为 PID 1？","options":["`ENTRYPOINT java -jar app.jar`（shell 形式）","`CMD java -jar app.jar`","`ENTRYPOINT` 的 JSON 数组形式，每个参数单独加双引号"],"answer":2,"explain":"shell 形式会包一层 /bin/sh -c；CMD 只是默认命令，不解决 shell 形式的信号转发。exec 形式让 java 直接成为 PID 1。"},
+ {"question":"只改 `ENV` 会增加一个内容层吗？","options":["不会，它只改镜像配置；但仍会影响后续步骤的缓存","会，每条指令都一层","不会，而且完全不影响缓存"],"answer":0,"explain":"内容层由 RUN/COPY/ADD 写文件；ENV 是元数据。但改 ENV 会让它之后的步骤缓存键变化，后面的 RUN 可能重跑。"}
 ]}
 ```
 
-## 常见误区
+## 还差的
 
-### 误区：`RUN apt-get update` 和 `RUN apt-get install` 分两条写更清楚
-
-**你以为**：分开写可读性好。
-**其实**：`update` 那一层会被缓存。几个月后 `install` 层重新构建时用的是**过期的索引**，于是装到旧版本，甚至报 404（包已经被仓库下架）。正确写法是合成一条：
-
-```dockerfile
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/*
-```
-
-**怎么验证**：`docker build --no-cache` 与带缓存的构建对比；或者等一个月再看，两条分开写的版本会开始报 `404 Not Found`。
-
-### 误区：镜像里要装 `vim`、`curl` 方便排查
-
-**你以为**：进去能改能查，方便。
-**其实**：每个工具都是体积和攻击面（`curl` 还能当下载器用）。正确做法是**排查时用 `docker cp` 或临时起一个工具容器共享网络**（第 10 关），不要往生产镜像里塞调试工具。真要进容器，用 `docker exec` 加上 `nsenter` 或直接用宿主的 `ss`/`tcpdump` 看。
-**怎么验证**：`docker run --rm --network container:目标容器 nicolaka/netshoot ss -lntp` 能在同一个网络命名空间里看端口，完全不动目标镜像。
-
-### 误区：`ADD` 比 `COPY` 更强，用 `ADD` 就行
-
-**你以为**：功能多是好事。
-**其实**：`ADD` 会自动解压本地 tar，还会从 URL 下载。这两条"自动"都是隐式行为：从 URL 下载的文件**权限是 600**、不会校验哈希、每次构建都重新下载（缓存失效）。除了"确实要解压 tar 包"这一种情况，`COPY` 更可预测。
-**怎么验证**：`ADD https://example.com/x.sh /x.sh` 之后 `docker run --rm 镜像 ls -l /x.sh`，会看到 `-rw-------`，与 `COPY` 的权限不同。
+- 本机没装 Docker，所有 `docker build`/`docker run` 回显都是标准形态，没有实跑；`<耗时>` 没有数字。
+- 依赖层缓存的实际耗时没有测；「3 分钟」是你描述的场景，不是这台机器上的测量值。
+- `SOURCE_DATE_EPOCH` / `rewrite-timestamp` 只按 BuildKit 文档写，没有真的构建出两个逐字节相同的镜像。
+- 没有验证不同 `sh`（dash/bash/busybox）在 `-c` 下是否 `exec` 简单命令；正文只说「可能」，没有把它当保证。
+- 没有验证老 builder 与 BuildKit 在你那版 Docker 上的差异；`DOCKER_BUILDKIT=0` 在新版本可能已经不可用。
