@@ -87,3 +87,17 @@ evidence: required
 - `minClusterSize = 30` 是 Loki 写死的：本项目约 7 行/分钟的日志量，单模板在短窗口内凑不到 30 条就查不到。
   因此模板表可能长时间为空/很少，这是**正常现象**，不代表同步故障。要更多模板只能拉长 `lookback-minutes`（上限受 Loki `retain_for` 3h 约束）。
 - 检测窗口锚定「上一个完整桶」，所以异常从发生到入库最多延迟一个窗口（15m）+ 一个同步周期（5m）。
+
+### 端到端实测（2026-11-19 11:33，线上）
+
+修正版重新发版（`release.ps1 -SkipWeb`，163.1s / 0 error，从 `c6948197` 的干净工作树打包，避免混入主树里他人未提交的改动）后：
+
+| 检查项 | 命令/位置 | 结果 |
+| --- | --- | --- |
+| Loki 能返回模板 | `curl 'http://127.0.0.1:3100/loki/api/v1/patterns?query={unit="laya.service"}&start=<ns>&end=<ns>'` | 返回 `INFO:     <_> - "GET /health HTTP/1.1" 200 OK`，48 个 10 秒采样点 |
+| 模板落库 | `SELECT unit,pattern,last_count,total_count FROM ops_log_templates` | `laya / INFO:     <_> - "GET /health HTTP/1.1" 200 OK / 48 / 48` |
+| 桶落库 | `SELECT COUNT(*) FROM ops_log_template_buckets` | 1（该模板 48 个采样点 = 约 8 分钟，正好落在同一个 15 分钟桶，符合预期） |
+| 异常检测未误报 | `SELECT COUNT(*) FROM ops_pattern_anomalies` | 0（首次数据属冷启动，NEW_TEMPLATE/FREQ_SPIKE/DISAPPEARED 全部按设计跳过） |
+| 应用健康 | `/actuator/health` | `UP` |
+
+结论：**聚类落点（Loki）→ 同步 → 分桶 → 检测**这条链路在线上真实数据上跑通。`paideia.service` 因为单模板凑不到 30 条暂时没有模板，属已知限制而非故障。
