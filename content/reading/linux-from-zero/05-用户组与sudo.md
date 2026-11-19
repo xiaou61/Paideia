@@ -2,154 +2,170 @@
 title: 用户、组与 sudo
 category: linux-from-zero
 order: 5
-minutes: 20
+minutes: 18
 level: beginner
 status: published
 ---
 
-## 这一关在解决什么
-
-为什么服务器上不直接用 root？`sudo` 和 `su` 差在哪？`id` 输出里那些组是怎么来的？这一关把"谁是这台机器上的谁"讲清楚。顺带解释一个很常见的怪现象：**同样的命令，别人能跑你跑不了**。
-
-打个比方：用户和组像公司里的工牌与部门，工牌写你是谁，部门决定你刷得开哪几扇门。真实机制是内核只认 uid、gid 两个数字，`/etc/passwd`、`/etc/group` 只是把数字翻译成名字给人看。
-
-```sketch
-{
-  "title": "你是谁，由用户和组一起决定",
-  "rows": [
-    [
-      { "id": "uid", "title": "用户", "sub": "一个 uid 加一个名字", "tone": "gray" },
-      { "id": "grp", "title": "所属组", "sub": "决定能碰哪些文件", "tone": "blue" },
-      { "id": "sudo", "title": "sudo", "sub": "借一次 root 的权限", "tone": "green" },
-      { "id": "su", "title": "su", "sub": "整个人换成另一个身份", "tone": "violet" }
-    ]
-  ],
-  "arrows": []
-}
-```
-
-## 为什么要有普通用户
-
-因为 **root 不受权限约束**。`rm -rf /` 在 root 身份下会真的开始删，而系统不会问一句。用普通用户 + `sudo` 的组合，是为了在两件事上留出一道闸：
-
-- **误操作**：绝大多数破坏性命令在普通用户下会直接失败（"Permission denied"），你多了一次反悔机会。
-- **可追溯**：`sudo` 执行的每条命令都会进日志，带上是谁、什么时候、跑了什么。共用 root 口令时，日志里只有一个 `root`，出事查不到人。
-
-## 讲解
-
-### 用户是谁：uid 与 gid
-
-内核不认识用户名，只认识数字：**uid**（用户编号）和 **gid**（组编号）。`/etc/passwd` 是"名字 → 数字"的对照表。
+## 同一个 `600`，root 能读，服务读不到
 
 ```text
-$ getent passwd lzf
-lzf:x:1000:1000:LZF,,,:/home/lzf:/bin/bash
+$ sudo -u mysqld_exporter cat /etc/paideia-backup/exporter.cnf
+cat: /etc/paideia-backup/exporter.cnf: Permission denied
+
+$ sudo cat /etc/paideia-backup/exporter.cnf
+[client]
+user=paideia
+password=（省略）
 ```
 
-七个字段用冒号分隔：
+同一个文件，同一个 `600`。root 读得到，`mysqld_exporter` 读不到。
 
-| 字段 | 例子 | 含义 |
-| --- | --- | --- |
-| 用户名 | `lzf` | 登录名 |
-| 口令占位 | `x` | 真正的哈希在 `/etc/shadow`，这里只是占位 |
-| **uid** | `1000` | 用户编号，**root 固定是 0** |
-| **gid** | `1000` | 主组编号（还有附加组，见 `id`） |
-| 描述 | `LZF,,,` | 全名、房间号之类，可空 |
-| 家目录 | `/home/lzf` | 登录后的默认目录 |
-| 登录 shell | `/bin/bash` | 登录时启动的程序；`/usr/sbin/nologin` 表示**禁止登录** |
+我原先的理解是「`600` 就是只有 root 能读」——按这个理解，上面两行应该都成功。错的。
 
-uid 的分布有个惯例，值得知道：
+`600` 是三个人的三个位：属主 `rw-`、组 `---`、其他人 `---`。**能不能读，取决于属主那一栏写的是谁**，跟「这文件重不重要」没关系。而 root 能读，跟这三位也没关系：euid 为 0 的进程带 `CAP_DAC_OVERRIDE`，DAC 检查整个被绕过（执行位是例外——root 执行一个文件，仍要求三个 x 位里至少有一个）。
 
-| 范围 | 谁 | 常见例子 |
-| --- | --- | --- |
-| `0` | root | 只有它 |
-| `1–999` | 系统账号 | `www-data`、`mysql`、`sshd`，用来跑服务，通常不能登录 |
-| `1000+` | 普通用户 | 你 |
+这一段是**标准形态**：本机是 Windows，我没有 Linux 可跑，命令形状和 `cat:` 那行报错是按 coreutils 的输出写的，不是实测。下同，凡是 Linux 回显都只说形态。
 
-所以看到 `cat /etc/passwd` 里一长串 `nologin` 的账号不要惊讶——那是各个服务自己的身份。
+我没见过这台机器上 `mysqld_exporter` 自己的日志原文，所以不编它的报错行。能确定的是内核那一层：同一个 inode，root 的 `open(2)` 成功，`mysqld_exporter` 的 `open(2)` 拿到 `EACCES`。
 
-三个查身份的命令：
+「属主该写谁」这件事，仓库里有一份现成的对照。`deploy/ops/install-ops.sh` 里四个 `chmod 600`，只有一个配了 `chown`：
+
+```bash
+# :140  备份脚本里的 mysqldump 用
+chmod 600 /etc/paideia-backup/client.cnf
+# :147-148  给 mysqld_exporter 进程自己用
+chmod 600 /etc/paideia-backup/exporter.cnf
+chown mysqld_exporter:mysqld_exporter /etc/paideia-backup/exporter.cnf
+# :162  给 systemd 读
+chmod 600 /etc/grafana/grafana.env
+```
+
+三个文件都装着口令，敏感程度没有差别。差别在**谁打开它**。
+
+这两个数我用 PowerShell 数过（真跑，不是照着注释复述）：
 
 ```text
-$ whoami            # 我是谁（名字）
+$ (Get-ChildItem deploy\ops\*.service).Count
+11
+$ (Get-ChildItem deploy\ops\*.service | Select-String -Pattern '^User=').Count
+9
+```
+
+11 个 unit，9 个写了 `User=`；4 处 `chmod 600`，1 处 `chown`。两个数一摆，问题就从「口令文件怎么保护」变成「另外三个为什么不换属主」。
+
+## 先问「谁打开它」，再问「要不要 chown」
+
+同一台机器上的四个 600 文件，答案不一样，因为打开它们的进程不一样：
+
+| 文件 | 谁打开 | 打开时的身份 | 属主该是谁 |
+| --- | --- | --- | --- |
+| `client.cnf` | `paideia-backup.sh` 里的 `mysqldump --defaults-extra-file` | `paideia-backup.service` 没写 `User=`，所以是 root | root，`chmod 600` 就够 |
+| `exporter.cnf` | `mysqld_exporter` 进程自己（`--config.my-cnf`） | unit 的 `User=mysqld_exporter` | 必须是 `mysqld_exporter`，否则 `EACCES` |
+| `grafana.env` | systemd（PID 1）读 `EnvironmentFile=` | root，读完之后才切到 `User=grafana` | root，`chmod 600` 就够 |
+| `hook.token` | 安装脚本里 root 的 `tr` | root | root，`chmod 600` 就够 |
+
+第二行是全文那个坑，第三行是最容易误判的一行：`grafana.service` 里写着 `User=grafana`，但 `EnvironmentFile=` 不是 grafana 读的，是 systemd 在主进程里以 root 读进来、再把变量塞给服务的。所以 `grafana.env` 属主留在 root 没问题——**这一点在 `deploy/ops/grafana.service:10` 和 `:7` 这两行之间就能读出来，不需要试**。
+
+判断顺序因此是反的：不是「文件敏感 → `chmod 600`」，而是「谁打开 → 它当时的 uid 是谁 → 属主是不是它」。
+
+## uid 是数字，名字只是翻译
+
+内核不认识 `mysqld_exporter` 这个字符串，只认 uid/gid。名字来自 `passwd` 数据库：
+
+```text
+$ getent passwd mysqld_exporter
+mysqld_exporter:x:997:997::/home/mysqld_exporter:/usr/sbin/nologin
+```
+
+（`997` 是占位，真实值由 `/etc/login.defs` 的 `SYS_UID_MIN`/`SYS_UID_MAX` 决定，`install-ops.sh:53` 用 `useradd --system` 从那个区间取号。别背区间——它写在文件里，而且 Debian 与 RHEL 系的默认文件不一样。）
+
+七段用冒号分开，跟这篇有关的是四段。按「看到什么现象去读哪一段」排：
+
+| 现象 | 去读哪一段 |
+| --- | --- |
+| unit 里写了 `User=mysqld_exporter` 却起不来，`status=217/USER` | 第 1 段，名字不存在（第 12 关有这张表） |
+| `ls -l` 的属主栏显示成一串数字 | 第 3 段，这个 uid 没有对应名字 |
+| `su - mysqld_exporter` 一句话不说就直接退出 | 第 7 段，shell 是 `/usr/sbin/nologin` |
+| 第 6 段写着 `/home/mysqld_exporter`，目录却不存在 | `--no-create-home` 只跳过建目录，不改这个字段 |
+
+第 2 段的 `x` 也不是密码，只是占位，哈希在 `/etc/shadow`——`/etc/passwd` 是全局可读的，正因为里面没有哈希。
+
+顺带一句：`getent` 走 NSS，`cat /etc/passwd` 只读本地文件。账号在 LDAP/sssd 里时，`cat` 找不到、`id` 能解析，这不是文件坏了。
+
+三个查身份的命令，注意哪个说谁：
+
+```text
+$ whoami
 lzf
-$ id                # 我是谁（uid/gid/所有组）
+$ id
 uid=1000(lzf) gid=1000(lzf) groups=1000(lzf),27(sudo),100(users)
-$ groups            # 只列组
-lzf : lzf sudo users
+$ id mysqld_exporter
+uid=997(mysqld_exporter) gid=997(mysqld_exporter) groups=997(mysqld_exporter)
 ```
 
-`id` 里的 `groups=` 是**主组 + 所有附加组**。判断"我有没有权限"时看这一行，而不是 `/etc/passwd` 里的 gid。附加组也生效。
+`id` 不带参数说的是**我**，带参数说的是**它**。这两个人的组列表可以完全不同，而「我能不能读这个文件」跟「它能不能读」是两个问题——`id mysqld_exporter` 不需要提权，因为 `passwd`/`group` 本来就全局可读；能查到一个人的 uid，不等于能读他的文件。
 
-### 组：一次给一批人授权
+`groups=` 那一串是主组加所有附加组。授权时内核按这个顺序判：euid 等于文件属主就只看属主位；否则看 egid 和附加组是否命中文件所属组；都不命中才看其他人位。
 
-组的用处是**按组授权**，而不是按人。文件的属组是 `devs`、权限是 `rw-rw----`，那么 `devs` 组里所有人都有写权限。新来一个人只要 `usermod -aG devs`，不用改文件。
+## 加组救不了 `600`
+
+按上面这个判定顺序，`600` 的组位是 0，所以**加进多少个组都拿不到权限**——没有可授予的位。这就是 `install-ops.sh:148` 选择 `chown` 而不是 `chgrp` 的原因：对着一个 `600` 的文件，`chgrp` 是空操作。
+
+想让「一组进程读同一个文件」，位得先改：`640`（组可读）或 `660`（组可读写），并且那个进程的组列表里确实有它。这是第 04 关讲过的事，这里只补一句它在这种场景下的后果：**`chmod` 和 `chown` 不是两种风格的写法，它们在回答两个不同的问题**。
+
+组在别处是真的管用的。同一份脚本第 56 行：
+
+```bash
+# Alloy 读 journald 必须在这两个组里；缺了不会报错，只是**一条日志都采不到**。
+usermod -aG adm,systemd-journal alloy
+```
+
+这里组能用，因为 `/var/log/journal` 的位给了组读权限，而 alloy 进程直接去读那些文件。失效形态也写在那行注释里：不报错、不退出，只是什么都采不到。这是组授权和属主授权最大的体验差别——属主不对会当场 `EACCES`，组不对可以安静地空转。
+
+两个操作上的坑：
+
+- `-aG` 里的 `-a` 不能省。只写 `-G` 是「把附加组设置成这些」，会覆盖原列表；如果被改的账号原来在 `sudo` 组里，这一下就没了提权能力。
+- 新的组关系对**已经在跑的会话**和**已经在跑的服务**都不生效。当前 shell 要 `newgrp` 或重新登录，服务要 `systemctl restart`。改完 `usermod` 立刻 `id`，看到的还是旧的。
+
+服务最终拿到的身份 = unit 里的 `User=`/`Group=` 加上 `/etc/group` 里给这个账号列的附加组。想验证又不改 unit，就用 `sudo -u mysqld_exporter id`（下一节说它为什么比 `su -` 好用）。
+
+## `umask 077` 在 `printf` 前，`chmod 600` 在 `if` 后
+
+那两行不是重复，它们管的是两个分支：
+
+```bash
+if [ ! -f /etc/paideia-backup/exporter.cnf ]; then
+    umask 077
+    printf '[client]\nuser=paideia\npassword=%s\nhost=127.0.0.1\n' ... > /etc/paideia-backup/exporter.cnf
+fi
+chmod 600 /etc/paideia-backup/exporter.cnf
+chown mysqld_exporter:mysqld_exporter /etc/paideia-backup/exporter.cnf
+```
+
+文件不存在时，`umask 077` 让它在**创建的那一瞬间**就是 `600`。少了这一行，默认 `umask 022` 会给它 `644`，从 `open(2)` 到后面那句 `chmod 600` 之间有一个窗口，另一个用户在这段时间里打得开。
+
+文件已存在时（脚本是幂等的，重跑就是这条分支），`if` 里那几行根本不执行，只剩 `chmod 600` 兜底。所以 `umask` 管新建、`chmod` 管重跑，两条都留着才覆盖全。
+
+`chmod` 和 `chown` 谁写前面不影响结果——root 改属主、改位都不受限制。真正要守的顺序是「两条都在服务启动之前」。
+
+## 验证要换成那个身份，不然你验的是 root
+
+这正是 `install-ops.sh` 那种脚本最容易骗人的地方：`sudo chmod 600` 之后，`sudo cat` 一定成功，而你刚验的是 root 能不能读。
 
 ```text
-$ sudo groupadd devs
-$ sudo usermod -aG devs lzf        # -a 是追加！不加 -a 会覆盖掉其他附加组
-$ id lzf
+$ su - mysqld_exporter
+This account is currently not available.
+
+$ sudo -u mysqld_exporter cat /etc/paideia-backup/exporter.cnf
+[client]
+user=paideia
+password=（省略）
 ```
 
-**`-aG` 里的 `-a` 必须写。** 只写 `-G` 会把用户的附加组**整组替换**掉。如果你在 `sudo` 组里，这一下就把自己从 `sudo` 组踢出去，从此提不了权（救法：单用户模式或另一台机器上改）。
+`su -` 要启动一个登录 shell，撞上 `nologin` 就被挡住——`install-ops.sh:53` 建账号时正是用 `/usr/sbin/nologin` 禁交互登录。`sudo -u` 只 `exec` 那一条命令，不起登录 shell，所以 `nologin` 拦不住它。**「shell 是 nologin」不等于「这个账号不能借来验证」**。
 
-新的组关系在**下次登录**生效。当前会话里 `id` 还看不到，要 `newgrp devs` 或重新登录。
-
-### `su` 还是 `sudo`
-
-两个都能让你变成 root 或别人，但机制完全不同：
-
-| | `su` | `sudo` |
-| --- | --- | --- |
-| 全称 | substitute user | superuser do |
-| 要谁的密码 | **目标用户**的（切 root 就要 root 口令） | **自己的**密码 |
-| 生效范围 | 开一个完整的 shell | 只执行一条命令 |
-| 日志 | 只记"某人 su 成了 root" | 记下**每一条**执行的命令 |
-| 环境变量 | `su -` 载入目标用户的环境 | 默认保留大部分当前环境 |
-
-所以人工运维正确姿势是 `sudo 命令`，而不是 `su -` 之后在里面泡一天。`su -`（带减号）才载入目标用户的环境变量。不带减号的 `su` 会让你带着自己的 `PATH` 和 `HOME` 干 root 的活。这是各种"为什么文件跑到我家里了"的来源。
-
-`sudo -i` 等价于 `su -` 但用你自己的密码：拿到一个 root 的登录 shell。**注意它的副作用**：
-
-```text
-$ echo $HOME
-/home/lzf
-$ sudo -i
-# echo $HOME
-/root
-```
-
-进去以后 `~` 变成了 `/root`，之前 `cd ~/app` 会跑到 `/root/app`。这就是"用 sudo -i 干了半天活，文件全在 /root 下"的成因。
-
-### `sudoers`：谁能用 sudo 干什么
-
-不想每次敲密码，或者想只允许某人执行某几条命令，改 `/etc/sudoers`。**永远用 `visudo` 改**，因为它在保存时检查语法。写错一行 `sudoers` 会让**所有人**都无法提权，包括 root 账号的 sudo。
-
-```text
-$ sudo visudo
-```
-
-里面常见的一行：
-
-```text
-%sudo   ALL=(ALL:ALL) ALL
-```
-
-四段读作：**`%sudo` 组** 在 **`ALL` 主机** 上 可以以 **`ALL` 用户:组** 身份 执行 **`ALL` 命令**。
-
-几个真实需求对应的写法：
-
-```text
-# 只允许 deploy 重启一个服务，不用密码
-deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart paideia
-
-# 允许运维组看日志、看进程
-%ops ALL=(root) /usr/bin/journalctl, /usr/bin/ps
-```
-
-`NOPASSWD` 只该给**范围极窄**的命令。给 `NOPASSWD: ALL` 等于这个账号可以无密码提权，和把 root 口令给它没区别。
-
-想确认自己有哪些 sudo 权限：
+`sudo -u` 依赖 sudoers 里允许 Runas（把自己放在 `sudo` 组里的默认配置是 `(ALL : ALL) ALL`，就不用管）。这台机器上 `sudo -l` 能看自己有什么：
 
 ```text
 $ sudo -l
@@ -157,72 +173,67 @@ User lzf may run the following commands on web-01:
     (ALL : ALL) ALL
 ```
 
-### 服务用哪个身份跑
-
-**每个进程都有一个 uid**，就是启动它的那个用户。所以：
-
-- `systemctl start paideia` 起的服务，默认以 **root** 跑（单元里没写 `User=`）。
-- 用 root 跑服务意味着一旦服务被攻破，攻击者直接是 root。正确做法是建一个专用系统账号，在 unit 里写 `User=paideia`（第 12 关有完整例子）。
-- 服务账号的典型建法：
+能不能把「只允许重启这一个服务」写窄？能，这与本文的场景对得上：
 
 ```text
-$ sudo useradd --system --no-create-home --shell /usr/sbin/nologin paideia
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart paideia
 ```
 
-`--system` 让 uid 落在 1–999，`nologin` 让它不能被交互登录，`--no-create-home` 表示不需要家目录。
+它只匹配这一条命令加这一个 unit；`systemctl restart sshd` 不匹配。但有两点要说清，否则「写窄了」会变成错觉：
 
-### 谁登录过
+- 通配符的 `*` 能吃掉多个参数。写成 `/usr/bin/systemctl restart *` 就等于允许重启**任意** unit；写成整个 `/usr/bin/systemctl` 更糟——`systemctl edit`/`link` 能落下一个你写的 unit 文件，再启动它就是 root 进程。`sudo vi` 同理（`:!sh` 就是 root shell）。规则放宽到能启动任意程序时，等价于把 root 交出去，`NOPASSWD` 只是让它更方便。
+- 规则必须用 `visudo` 改，因为它在保存时校验语法。写坏一行不是「那条规则失效」，是 `sudo` 整体拒绝执行——包括 root 自己用 `sudo`。
 
-排查"这台机器上现在谁在"：
+还有两个与「借身份」有关的默认值，别当保证：
 
 ```text
-$ who            # 当前登录的会话
-$ w              # 同上，多显示他们在干什么
-$ last | head    # 最近的登录历史（含来源 IP）
-$ lastb | head   # 登录失败记录（需要 root）
+$ sudo env | grep -E '^(HOME|PATH)='
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+HOME=/home/lzf
 ```
 
-这些都读 `/var/log/wtmp`、`/var/log/btmp`。登录失败次数突然变多，通常意味着有人在爆破 SSH（第 16 关讲防护）。
+- `sudo 命令` 要的是**自己**的密码（`sudoers` 里可以改成 `rootpw`/`targetpw`，那就变），密码在默认 15 分钟（`timestamp_timeout`，可改）内不重复问。
+- Debian/Ubuntu 的默认 sudoers 带 `Defaults env_reset` 和 `secure_path=`，所以 `PATH` 会被换成上面那串，不是「继承你的环境」。这就是「我 `~/.local/bin` 里的命令在 `sudo` 下找不到」的原因——把「sudo 保留环境变量」当结论，位置就找错了。
+- `sudo -i` 换的是登录 shell，`HOME` 变 `/root`：进去干半小时活，`~/app` 指的是 `/root/app`。只想借身份改一个文件，用 `sudo 命令`；要连续几条，用 `sudo -s` 比 `-i` 少一个 `HOME` 的意外。
+
+## 跑一遍
+
+以下全部是标准形态，我没有 Linux 可跑，逐条按顺序在你自己机器上执行即可（前提：`mysqld_exporter` 账号已存在、`exporter.cnf` 已存在）。
+
+1. `getent passwd mysqld_exporter` —— 有输出就说明名字能解析；第 7 段是 `nologin` 属正常。
+2. `getent group mysqld_exporter` —— unit 里写了 `Group=mysqld_exporter`，这个组必须存在，否则服务起不来。
+3. `sudo -u mysqld_exporter cat /etc/paideia-backup/exporter.cnf` —— 这一步就是结论。成功则后面不用做；`Permission denied` 才继续。
+4. `sudo ls -l /etc/paideia-backup/exporter.cnf` 和 `sudo -u mysqld_exporter id` —— 前者的属主栏和后者的 uid 对不上，就是属主问题；对得上却仍拒，去看第 04 关的目录 `x` 位。
+5. `sudo chown mysqld_exporter:mysqld_exporter /etc/paideia-backup/exporter.cnf`，然后重跑第 3 步。
+6. `sudo systemctl restart mysqld-exporter`，`systemctl status mysqld-exporter --no-pager` —— 第 3 步通过之后再启动，起失败时你已经排掉了权限这一层。
 
 ## 动手
 
 ```code-challenge
-{"id":"linux-05-user-order","kind":"order","title":"建一个能部署但不能乱来的账号","lines":[
- "sudo useradd -m -s /bin/bash deploy",
- "sudo passwd deploy",
- "sudo usermod -aG sudo deploy",
- "su - deploy",
- "id"
-],"answer":[0,1,2,3,4],
- "explain":"先建用户（-m 建家目录），再设密码，再给附加组，最后用 `su -` 以该用户身份登录验证；`id` 输出里能看到 sudo 组才算成功。注意 `-aG` 的 -a 不能省。"}
+{"id":"linux-05-user-order","kind":"order","title":"把一次「600 文件属主不对」的修复顺序排对","lines":[
+  "sudo -u mysqld_exporter cat /etc/paideia-backup/exporter.cnf",
+  "sudo systemctl start mysqld-exporter",
+  "sudo systemctl stop mysqld-exporter",
+  "sudo chmod 600 /etc/paideia-backup/exporter.cnf",
+  "sudo chown mysqld_exporter:mysqld_exporter /etc/paideia-backup/exporter.cnf"
+],"answer":[2,4,3,0,1],
+ "explain":"先停服务，再换属主、确认位仍是 600，然后用 sudo -u 以目标身份读一次——这一步是唯一有意义的验证，用 root 读不算；最后才启动。换属主放在权限位之前或之后都行（root 不受位限制），但两件都要在重启之前做完。"}
 ```
 
 ## 检查一下
 
 ```quiz
-{"id":"linux-05-quiz","title":"用户与提权","questions":[
- {"question":"`sudo` 要输入的密码是谁的？","options":["自己的","root 的","目标用户的"],"answer":0,"explain":"sudo 校验的是执行者本人的密码，这也是它比 su 更适合多人运维的原因：不用把 root 口令发给每个人。"},
- {"question":"`usermod -G devs lzf`（没写 -a）的后果是什么？","options":["lzf 的附加组被替换成只有 devs","devs 被删掉","没有任何效果"],"answer":0,"explain":"不带 -a 的 -G 是「设置附加组」，会覆盖原有列表。若 lzf 原来在 sudo 组里，这一下就失去了提权能力。"},
- {"question":"为什么服务不该用 root 跑？","options":["服务被攻破时攻击者直接拿到 root","root 跑的服务更慢","systemd 不支持 root"],"answer":0,"explain":"进程的权限等于启动它的用户。用专用低权限账号跑服务，即使被攻破也只损失那部分权限。"}
+{"id":"linux-05-quiz","title":"身份与提权","questions":[
+ {"question":"一个文件是 600、属主是 root，由 User=mysqld_exporter 的服务去读，结果是什么？","options":["能读，因为服务由 systemd 启动","读不到，因为 600 的组位和其他位都是 0，属主也不是它","第一次能读，之后被缓存拒绝"],"answer":1,"explain":"600 只给属主 rw 两种权限，组位与其他位都是 0。属主是 root，所以只有 euid 为 0 的进程能过——mysqld_exporter 既不在属主位置，也没有可用的组位。"},
+ {"question":"要让 mysqld_exporter 读到那个 600 文件，改动最小且不削弱保护的做法是？","options":["把 mysqld_exporter 加进 root 组","把文件改成 644","把属主 chown 成 mysqld_exporter，位保持 600"],"answer":2,"explain":"组位是 0 时加组不产生任何权限；644 会把口令给全机器读。换属主之后仍然只有「一个账号」能读，只是那个账号换了。"},
+ {"question":"为什么 sudo cat 能读、sudo -u mysqld_exporter cat 读不到？","options":["root 的 euid 0 带 CAP_DAC_OVERRIDE，绕过了 DAC 检查","root 这个用户名被写进了文件的属主栏","sudo 会在执行前临时把文件属主改成自己"],"answer":0,"explain":"属主栏只有一个值，写的是 root 的 uid 或者别的数字，跟「用户名在不在」无关。root 能过是因为用了 euid 0 的能力位，不是因为它在这个文件的三个位里排上了位置；sudo -u 换成了目标 uid，能力位就没了。"}
 ]}
 ```
 
-## 常见误区
+## 还差的
 
-### 误区：`sudo` 就是"以 root 跑"
-
-**你以为**：`sudo` 等价于切到 root。
-**其实**：`sudo` 是按 `sudoers` 里的授权规则执行，可以限定成"只允许重启某个服务"。而且默认保留大部分自己的环境变量，`$HOME` 还是自己的（`sudo -i` 才会变成 `/root`）。很多"sudo 之后行为不一样"的怪事都源于环境差异。
-**怎么验证**：`sudo env | grep -E 'HOME|PATH'` 与 `env` 对比；`sudo -i` 后再跑一次，`HOME` 会变成 `/root`。
-
-### 误区：`/etc/passwd` 里有密码
-
-**你以为**：这个文件名叫 passwd，应该存着口令。
-**其实**：为了安全，密码哈希早搬到 `/etc/shadow` 了，`passwd` 第二位只是 `x`。`shadow` 只有 root 可读、`passwd` 全世界可读。所以"谁能读 passwd"不需要担心泄露密码。
-**怎么验证**：`ls -l /etc/passwd /etc/shadow` 对比权限（644 vs 640 或 000）；`sudo cat /etc/shadow | head -2` 看真正的哈希字段。
-
-### 误区：删用户会把它的文件一起删掉
-
-**你以为**：`userdel deploy` 就干净了。
-**其实**：`userdel` 默认**保留家目录和所有属于该 uid 的文件**。它们的属主会变成一串 uid 数字（因为没有对应名字），以后清理起来很麻烦。要一起删用 `userdel -r deploy`，而且执行前先 `find / -uid <uid>` 确认没有别的文件归属这个 uid。**uid 会被复用**，新用户可能继承旧文件的属主。
-**怎么验证**：`userdel` 后跑 `ls -ln /home`，会看到数字 uid 的目录；`find / -xdev -uid 1001 2>/dev/null` 列出所有遗留文件。
+1. 这篇里所有 Linux 回显都是标准形态，一条都没有实跑（本机 Windows，没有 `/etc/passwd`，没有 `sudo`）。`systemctl` 提示行的措辞随 systemd 版本变，`sudo -l` 的块状输出随 sudo 版本变，我按当前版本的形态写的，没逐版本核。
+2. ACL 完全没写。真要「两个不同的服务账号读同一个 600」，`setfacl` 是一条路，但它和 `600`、和打包/备份时 ACL 会不会丢，以及 `getfacl` 输出的正确读法，我都没验证。
+3. SELinux / AppArmor 没写。enforcing 状态下，属主和三位都对也可能被策略拒（去读 `/etc` 下的东西就是典型），仓库这套装机脚本也没有处理策略这一步。
+4. 容器和 NFS 的 uid 映射没写。容器里的 root 落到宿主机是另一个 uid，`chown` 出来的属主对不上；NFS 上 `chown` 会被 `root_squash` 直接拒。这两处「uid 不是 uid」的情况，本文的判定顺序要重来一遍。
+5. `useradd --system` 是否连带建同名组，取决于 `/etc/login.defs` 的 `USERGROUPS_ENAB` 和发行版。我只写了用 `getent group` 去验，没在两种发行版上各确认一次；而 unit 里既然写了 `Group=`，组不存在就是起不来，这个缺口值得自己补测。
