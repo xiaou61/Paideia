@@ -2,7 +2,7 @@
 work_id: WORK-086
 work: 运维诊断复盘与知识自进化
 artifact: requirements
-status: draft
+status: approved
 mode: strict
 mode_reason: 改动诊断证据采集（跨 Loki/Prometheus 查询语义与截断预算）、AI 提示词与证据契约（OpsDiagnoser.Evidence）、邮件发送通道、新增持久化表与 ADMIN 端点，并决定「哪次 AI 判断可以沉淀成知识」——同时触及数据、接口、安全与部署，且错误会直接影响线上排障判断。
 workflow: full
@@ -10,6 +10,9 @@ depends_on: [WORK-085]
 related_to: [WORK-028, WORK-042, WORK-043, WORK-049]
 created: 2026-11-19
 updated: 2026-11-19
+approved_by: 李子凡
+approved_at: 2026-11-19 15:05:22 +0800
+approver_role: 
 ---
 
 # 运维诊断复盘与知识自进化 需求
@@ -118,6 +121,8 @@ updated: 2026-11-19
 - 结构：标题、告警名、事件/诊断引用、根因、影响、时间线、处置动作、待办、完整 Markdown 正文。
 - 一个 incident 可有多个复盘，但**只有一个 APPROVED 作为当前有效版本**；再次确认时旧的自动 ARCHIVED。
 - 提供 Markdown 下载（鉴权 + 审计日志），供本地归档；**不写入 Git 仓库**（公开仓库，复盘含内部信息）。
+- **支持贴图**：复盘正文可插入截图。图片走**既有知识附件通道**（上传 `POST /api/v1/knowledge/admin/files`，读取 `GET /api/v1/knowledge/files/{id}`），正文只存本站路径 `![说明](/api/v1/knowledge/files/<uuid>)`；**不新建图片存储、不引入对象存储新配置**。
+- **诊断完成后自动起草**：仅当 `trigger=alert` 且关联了 incident 时，诊断 `DONE` 后自动生成一条 `DRAFT` 复盘（`origin=auto`），不发送通知、不发邮件；同一 incident 已存在 `DRAFT`/`APPROVED` 时不重复起草；人工编辑保存后 `origin` 不变，审批仍必须人工。
 
 ### REQ-007 自进化（闸门制）
 
@@ -152,7 +157,7 @@ updated: 2026-11-19
 - AC-003 指标段含 `hikaricp_connections_pending/timeout_total`、`process_start_time_seconds`、`node_vmstat_oom_kill` 及基线。
 - AC-004 在 `<patterns>` 为空的窗口，签名兜底段非空且带计数与样例。
 - AC-005 邮件客户端收到 HTML 版本（标题/表格/代码块可读），纯文本客户端仍可读；附件 `.md` 可下载；渲染失败时仍收到纯文本。
-- AC-006 诊断 → 生成复盘 → 编辑 → 确认入库全链路可用；未确认（DRAFT）的复盘不出现在知识检索结果中。
+- AC-006 诊断 → 生成复盘 → 编辑（含插入一张截图并渲染出来）→ 确认入库全链路可用；未确认（DRAFT）的复盘不出现在知识检索结果中；`alert` 触发诊断 `DONE` 后自动出现一条 `origin=auto` 的 DRAFT，且同一 incident 不会重复起草。
 - AC-007 下一次同类告警的诊断证据含 `<knowledge>`，且 `ops_diagnoses.knowledge_ids` 有值。
 - AC-008 非 ADMIN 访问复盘端点返回 403；下载有审计记录。
 - AC-009 Loki/Prometheus 同时不可达时，诊断仍完成并明确写出「无数据」。
@@ -164,6 +169,7 @@ updated: 2026-11-19
 - **不做**自动修复、自动重启、自动改 prompt、自动入库。
 - **不做**跨主机日志采集；不扩大 Loki 采集面（只核实既有白名单）。
 - **不替换** WORK-085 的模板聚类能力。
+- **不新建**图片存储或对象存储配置：复盘截图复用知识附件通道（同一套 `paideia.knowledge.storage`）。
 - 不把复盘导出到 Git 仓库。
 
 ## 约束

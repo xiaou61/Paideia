@@ -2,9 +2,12 @@
 work_id: WORK-086
 work: 运维诊断复盘与知识自进化
 artifact: design
-status: draft
+status: approved
 mode: strict
 updated: 2026-11-19
+approved_by: 李子凡
+approved_at: 2026-11-19 15:05:22 +0800
+approver_role: 
 ---
 
 # 运维诊断复盘与知识自进化 设计
@@ -122,6 +125,7 @@ CREATE TABLE ops_postmortems (
     actions_md    MEDIUMTEXT   NULL,
     body_md       MEDIUMTEXT   NOT NULL,
     evidence_refs VARCHAR(500) NULL COMMENT '诊断 id / traceId / 日志签名，逗号分隔',
+    origin        VARCHAR(16)  NOT NULL DEFAULT 'manual' COMMENT 'manual / auto（诊断完成后自动起草）',
     created_by    BIGINT       NULL,
     approved_by   BIGINT       NULL,
     approved_at   DATETIME(3)  NULL,
@@ -137,6 +141,8 @@ CREATE TABLE ops_postmortems (
 - `status` 状态机：`DRAFT → APPROVED → ARCHIVED`；`ARCHIVED → APPROVED` 允许重新启用。
 - 同一 `incident_id` 出现第二个 APPROVED 时，前者自动 ARCHIVED（Service 内事务处理，DB 不建唯一索引——避免历史数据冲突导致迁移失败）。
 - 正文由后端用固定模板拼 `body_md`（标题/时间线/根因/影响/处置/待办/证据），前端只编辑各字段，避免前后端两套渲染。
+- **自动起草**：`OpsDiagnosisService.run` 在 `markDone` 之后、且 `trigger=alert` 且 `incidentId != null` 时调用 `postmortemService.createDraftIfAbsent(diagnosisId)`：该 incident 已有 `DRAFT`/`APPROVED` 则直接返回（`origin=auto`），异常只 warn 不影响诊断落地。起草本身不再触发任何邮件或通知。
+- **图片**：正文 `body_md` 里的图片就是 Markdown 图片语法，指向**既有**知识附件路径 `/api/v1/knowledge/files/<uuid>`；上传由管理端直接调 `POST /api/v1/knowledge/admin/files`（ADMIN），后端 ops 模块因此**零新增存储代码、零新依赖**。已知权衡：该读取端点按 UUID 公开可读（与知识库附件同一裁决，uuid 不可枚举），所以编辑器里固定提示「截图请遮盖口令与连接串」；复盘一旦 `APPROVED`，其中的图片路径也随正文进知识检索证据，不做额外处理。
 
 ## 6. 知识召回与注入
 
@@ -184,6 +190,8 @@ LIMIT ?
 | GET | `/api/v1/ops/admin/postmortems/{id}` | 详情 |
 | GET | `/api/v1/ops/admin/postmortems/{id}/download` | `text/markdown; charset=utf-8` + `Content-Disposition: attachment` |
 
+图片不新增端点：管理端编辑器直接 `POST /api/v1/knowledge/admin/files`（既有 ADMIN 上传，`FileService` 嗅探类型、限大小），把返回的 `url` 插进正文；读取走既有 `GET /api/v1/knowledge/files/{id}`。
+
 ## 8. 配置项
 
 ```yaml
@@ -218,6 +226,19 @@ paideia:
 
 ## 10. 测试计划
 
+### 评审焦点（失败模式 → 任务 → 测试）
+
+| 失败模式 | 归属任务 | 测试 |
+| --- | --- | --- |
+| 事件窗口与诊断触发错位；窗口超出 Loki 720h 保留期 | TASK-001 | `OpsEvidenceWindowTest#prefers_incident_first_seen`、`#out_of_retention_is_marked` |
+| 日志重复 40 次淹没信息；unit 未接入被当成「无异常」；Loki 不可达拖垮诊断 | TASK-002 | `OpsLogSignatureTest#collapses_repeated_lines`、`OpsEvidenceCollectorTest#unit_not_ingested_is_stated`、`#loki_down_degrades` |
+| `changes(process_start_time_seconds)` 与日志重启次数不一致 | TASK-003 | `OpsEvidenceCollectorTest#restart_count_cross_checks_logs` |
+| 邮件里仍是 `**` 与管道符；渲染异常或超大报告发不出 | TASK-005 | `OpsDiagnosisEmailTest#html_has_no_raw_markdown`、`#html_failure_falls_back_to_plain` |
+| 附件失败或 25MB 超限导致正文丢失 | TASK-006 | `OpsDiagnosisMailerTest#attachment_failure_keeps_body` |
+| 同一事件两份 APPROVED；草稿被当知识用；正文含口令 | TASK-008、011 | `PostmortemServiceTest#approve_archives_previous`、`#redacts_secrets`、`PostmortemKnowledgeTest#only_approved_returned` |
+| 学习者令牌调动复盘端点；空关键词扫全表 | TASK-009、011 | `AuthorizationIsolationTest#learner_cannot_touch_postmortems`、`PostmortemKnowledgeTest#empty_keyword_returns_empty` |
+| 前端无导航入口；自动起草重复或该起草没起草 | TASK-010、015 | `e2e/postmortems.spec.ts` 断言导航可见；`PostmortemServiceTest#autoDraft_skipsWhenIncidentAlreadyHasOne` |
+
 - 单测：窗口工厂、签名归一化、三段查询拼装（MockWebServer 断言语义）、重启聚合、邮件 HTML/降级、复盘状态机、知识 SQL 参数绑定。
 - 集成：`ApiContractTest`（新端点必须声明访问级别）、`AuthorizationIsolationTest`（学习者 403）。
 - 真实验证：拿 2026-11-19 14:10–14:30 窗口跑一次手动诊断，断言「重启 4 次 + PID + Hikari 关闭」出现在证据里（AC-001/002）。
@@ -226,5 +247,5 @@ paideia:
 ## 11. 待定
 
 - `mysql.service`/`redis-server.service` 为何没进 Loki：实现时在服务器 `systemctl list-units | grep -Ei 'mysql|redis'` 核实真名，再决定改 alloy 白名单还是仅标注「未接入」。**不在本工作项扩大采集面**。
-- 复盘正文是否允许手工粘贴截图：本期只支持文本与 Markdown 链接，图片不支持（避免对象存储与鉴权面）。
+- ~~复盘正文是否允许手工粘贴截图~~：**已定，支持**（用户 2026-11-19 裁决「支持贴图」）。复用知识附件通道，见 §5「图片」。
 - 是否在事件页直接展示「本事件已确认复盘」：本期列表页足够，事件页只放链接。

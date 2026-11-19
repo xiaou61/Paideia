@@ -2,8 +2,11 @@
 work_id: WORK-086
 work: 运维诊断复盘与知识自进化
 artifact: proposal
-status: draft
+status: approved
 updated: 2026-11-19
+approved_by: 李子凡
+approved_at: 2026-11-19 15:05:22 +0800
+approver_role: 
 ---
 
 # 运维诊断复盘与知识自进化 提案

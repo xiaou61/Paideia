@@ -2,9 +2,12 @@
 work_id: WORK-086
 work: 运维诊断复盘与知识自进化
 artifact: tasks
-status: draft
+status: approved
 mode: strict
 updated: 2026-11-19
+approved_by: 李子凡
+approved_at: 2026-11-19 15:05:22 +0800
+approver_role: 
 ---
 
 # 运维诊断复盘与知识自进化实施任务
@@ -12,7 +15,7 @@ updated: 2026-11-19
 ## 依据
 
 - `requirements.md`、`proposal.md`、`design.md`（均为草案，待批准）。
-- 已核对的现状：`OpsEvidenceCollector.java` 日志窗口固定 `now-1h`（`:378-395`）、`OpsDiagnosisMailer.java:88` 用 `new MimeMessageHelper(message, false, "UTF-8")`、`OpsDiagnoser.Evidence` 12 组件、迁移目录 `backend/paideia-app/src/main/resources/db/migration/`、管理端 `OpsPage.tsx:494` 已用 `<Markdown>`。
+- 已核对：`OpsEvidenceCollector.java` 日志窗口固定 `now-1h`（`:378-395`）；`OpsDiagnosisMailer.java:88` `multipart=false`；`Evidence` 12 组件；管理端 `OpsPage.tsx:494` 已是 `<Markdown>`。
 - 生产实测：该窗口 4 次重启；Loki 仅 3 个 unit；`minClusterSize=30` 凑不满。
 
 ## 全局约束
@@ -20,29 +23,12 @@ updated: 2026-11-19
 - 不改模型调用方式；不引入向量库/RAG；检索只用 MySQL FULLTEXT ngram（`always.md:29`）。
 - 新端点必须 `ADMIN` + 回环（同 `PatternController`），由 `ApiContractTest`/`AuthorizationIsolationTest` 覆盖。
 - 报告与复盘落库前过 `OpsLogRedactor`；凭据/连接串/服务器地址不进代码与文档（`always.md:86`）。
-- 迁移用 14 位时间戳；动 schema 前先 `git log --all --oneline -- <迁移目录>` 查并行改动。
-- 测试一律走 `scripts/test-db.sh`（`backend/` 下执行）不跑全量；前端只跑 admin typecheck 与目标 spec。
-- 每个任务独立提交；`push` 不自动执行。
+- 迁移用 14 位时间戳，动 schema 前 `git log --all --oneline -- <迁移目录>` 查并行改动。
+- 测试走 `scripts/test-db.sh`（`backend/` 下）不跑全量；前端只跑 admin typecheck 与目标 spec。每个任务独立提交，`push` 不自动执行。
 
 ## 评审焦点
 
-| 失败模式 | 归属任务 | 测试 |
-| --- | --- | --- |
-| 事件窗口与诊断触发错位（诊断晚到，取到新日志） | TASK-001 | `OpsEvidenceWindowTest#prefers_incident_first_seen` |
-| 窗口超出 Loki 720h 保留期（历史事件补诊断） | TASK-001 | `OpsEvidenceWindowTest#out_of_retention_is_marked` |
-| 同一行日志重复 40 次淹没有效信息 | TASK-002 | `OpsLogSignatureTest#collapses_repeated_lines` |
-| 某 unit 根本没接入 Loki，被静默当成「无异常」 | TASK-002 | `OpsEvidenceCollectorTest#unit_not_ingested_is_stated` |
-| Loki 5xx/超时导致整次诊断失败 | TASK-002 | `OpsEvidenceCollectorTest#loki_down_degrades` |
-| `changes(process_start_time_seconds)` 与日志重启次数不一致 | TASK-003 | `OpsEvidenceCollectorTest#restart_count_cross_checks_logs` |
-| 报告里出现 `**` 与表格管道符（当前邮件就是这个症状） | TASK-005 | `OpsDiagnosisEmailTest#html_has_no_raw_markdown` |
-| commonmark 渲染异常或超大报告导致邮件发不出 | TASK-005 | `OpsDiagnosisEmailTest#html_failure_falls_back_to_plain` |
-| 附件失败或 25MB 超限导致正文丢失 | TASK-006 | `OpsDiagnosisMailerTest#attachment_failure_keeps_body` |
-| 同一事件确认两份复盘，知识库里出现互相矛盾的结论 | TASK-008 | `PostmortemServiceTest#approve_archives_previous` |
-| 草稿被直接当知识使用（未经人工确认） | TASK-011 | `PostmortemKnowledgeTest#only_approved_returned` |
-| 复盘正文含数据库口令被写入库与邮件 | TASK-008 | `PostmortemServiceTest#redacts_secrets` |
-| 学习者令牌调复盘端点拿到 200 | TASK-009 | `AuthorizationIsolationTest#learner_cannot_touch_postmortems` |
-| 知识召回 SQL 在空关键词时扫全表或语法报错 | TASK-011 | `PostmortemKnowledgeTest#empty_keyword_returns_empty` |
-| 前端未加导航入口，页面直达但没人找得到 | TASK-010 | `e2e/postmortems.spec.ts` 断言导航可见 |
+风险矩阵与对应测试见 `design.md` §10「评审焦点」（随设计一起评审，避免两处各留一份）。
 
 ## 任务
 
@@ -149,7 +135,7 @@ updated: 2026-11-19
 - 对应：`REQ-006`、`AC-006`
 - 依赖：无
 - 新建/修改：
-  - 新建 `backend/paideia-app/src/main/resources/db/migration/V<时间戳>__create_ops_postmortems.sql`（DDL 见 design §5，含 `FULLTEXT ... WITH PARSER ngram`）
+  - 新建 `backend/paideia-app/src/main/resources/db/migration/V<时间戳>__create_ops_postmortems.sql`（DDL 见 design §5，含 `origin VARCHAR(16) NOT NULL DEFAULT 'manual'` 与 `FULLTEXT ... WITH PARSER ngram`）
   - 新建 `backend/paideia-app/src/main/resources/db/migration/V<时间戳>__ops_diagnoses_knowledge.sql`（`ADD COLUMN knowledge_ids VARCHAR(255) NULL`）
 - 步骤：
   1. `cd backend && git log --all --oneline -- paideia-app/src/main/resources/db/migration | head -5`，确认无人正在改这两张表；确认后取当下时间戳命名。
@@ -167,6 +153,7 @@ updated: 2026-11-19
   - 新建 `PostmortemService.java`（草稿生成、编辑、审批、归档；正文模板拼接；redactor）
 - 接口：
   - `long PostmortemService.createDraft(long diagnosisId, Long actorUserId)`（读 `ops_diagnoses` + 关联 incident，套模板生成 `body_md`，写 DRAFT）
+  - `Optional<Long> PostmortemService.createDraftIfAbsent(long diagnosisId)`（`origin=auto`；同 incident 已有 DRAFT/APPROVED 时返回空）
   - `void PostmortemService.update(long id, PostmortemDraft draft, long actorUserId)`（APPROVED 编辑后退回 DRAFT）
   - `void PostmortemService.approve(long id, long actorUserId)`（同 incident 旧的 APPROVED → ARCHIVED）
   - `void PostmortemService.archive(long id, long actorUserId)`
@@ -193,9 +180,10 @@ updated: 2026-11-19
 - 依赖：TASK-009
 - 新建/修改：新建 `frontend/apps/admin/src/pages/PostmortemsPage.tsx`；改 `OpsPage.tsx:492-494`（诊断详情加「生成复盘」与已关联复盘链接）；改 `router.tsx`（`/ops/postmortems`）；导航/账号菜单加入口（AGENTS 规则：只在首页快捷卡不算）。
 - 步骤：
-  1. 页面：列表（状态筛选）→ 详情编辑（复用 `@paideia/ui` 的 `<Markdown>` 预览）→ 审批/归档/下载按钮。
+  1. 页面：列表（状态筛选、`origin=auto` 标「自动起草」）→ 详情编辑（复用 `@paideia/ui` 的 `<Markdown>` 预览）→ 审批/归档/下载按钮。
+  1a. 编辑器贴图：粘贴/拖拽/选择文件 ⇒ `POST /api/v1/knowledge/admin/files`（multipart `file`，只放行 `image/*`）⇒ 光标处插入 `![文件名](url)`；旁注固定提示「截图请遮盖口令与连接串」；上传失败只提示不改正文。
   2. `OpsPage` 诊断详情加按钮，调用 `POST /postmortems` 后跳转编辑页。
-  3. 写 `frontend/apps/admin/e2e/postmortems.spec.ts`：断言导航可见、打开列表、创建草稿后出现 DRAFT 徽标。
+  3. 写 `frontend/apps/admin/e2e/postmortems.spec.ts`：断言导航可见、打开列表、创建草稿后出现 DRAFT 徽标、`origin=auto` 草稿带「自动起草」标记。
   4. 跑 typecheck 与单 spec。
 - 验证：`pnpm -C frontend --filter @paideia/admin typecheck` → 0 errors；`pnpm -C frontend --filter @paideia/admin exec playwright test e2e/postmortems.spec.ts` → 期望 passed
 
@@ -253,6 +241,19 @@ updated: 2026-11-19
   5. 登录管理端，走一遍列表/审批/归档/下载。
   6. 把命令、截图路径、响应片段写入 `testing/report.md`。
 - 验证：`ssh codenest-online "journalctl -u paideia.service --since '2026-11-19 14:10' --until '2026-11-19 14:30'"` 与诊断证据逐项对照，4 次重启全部对上
+
+### TASK-015 | pending | 诊断完成后自动起草复盘
+
+- 对应：`REQ-006`、`AC-006`
+- 依赖：TASK-008（服务）、TASK-009（无，仅服务层）
+- 新建/修改：改 `backend/paideia-ops/src/main/java/io/github/xiaou61/ops/OpsDiagnosisService.java`（`run` 里 `markDone` 之后、邮件发送之后挂钩）；`OpsDiagnosisService` 新增构造依赖 `PostmortemService`（可选注入 `ObjectProvider` 以免测试上下文缺 bean 时炸）。
+- 接口：
+  - `Optional<Long> PostmortemService.createDraftIfAbsent(long diagnosisId)`（已在 TASK-008 声明）
+- 步骤：
+  1. 写测试 `PostmortemServiceTest#autoDraft_skipsWhenIncidentAlreadyHasOne`（同 incident 二次调用返回空）与 `OpsDiagnosisServiceTest#alertDiagnosisAutoDrafts`（`incidentId != null` 时被调用一次）、`#manualDiagnosisDoesNotAutoDraft`（`incidentId == null` 不调用）。
+  2. 在 `run(...)` 成功路径末尾接入：条件 `incidentId != null`；异常 `catch (RuntimeException e)` 只 `log.warn`，不得让诊断状态回滚或邮件重发。
+  3. 确认自动起草**不发送**任何邮件/通知（复用现有 `incidentId != null` 才发邮件的分支，起草发生在其后且独立 try）。
+- 验证：`cd backend && scripts/test-db.sh mvn -B -pl paideia-ops -Dtest='PostmortemServiceTest,OpsDiagnosisServiceTest' test` → 期望 0 failures
 
 ## 完成条件
 
