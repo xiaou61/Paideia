@@ -37,3 +37,104 @@ export function stripDuplicateTitle(markdown: string, entryTitle?: string): stri
   }
   return markdown.slice(match[0].length).replace(/^\n+/, '')
 }
+
+/**
+ * 看起来已经排好版的 markdown（有换行、列表、标题、加粗、行内代码或引用）。
+ *
+ * <p>命中就整段原样返回——这些答案是模型按结构化要求写的，再加工只会把排版搞坏。
+ */
+const HAS_BLOCK_MARKDOWN = /\n|(^|\s)([-*+]|\d+\.)\s|^#{1,6}\s|\*\*|`|^>\s/
+
+/** 句末标点。分号也算：面经解析里常用「；」并排几个并列点。 */
+const SENTENCE_END = '。！？；'
+
+/** 只按句末标点断句，保留标点，避免依赖正则后行断言（老引擎不认）。 */
+function splitSentences(text: string): string[] {
+  const out: string[] = []
+  let buffer = ''
+  for (const char of text) {
+    buffer += char
+    if (SENTENCE_END.includes(char)) {
+      const sentence = buffer.trim()
+      if (sentence !== '') {
+        out.push(sentence)
+      }
+      buffer = ''
+    }
+  }
+  const tail = buffer.trim()
+  if (tail !== '') {
+    out.push(tail)
+  }
+  return out
+}
+
+/**
+ * 段首形如 `结论：……` 的短标签加粗，突出要点。
+ *
+ * <p>标签限制在 14 字内、且不含「，、」——含逗号的多半是完整句子，加粗整句反而更乱。
+ */
+function boldLabel(sentence: string): string {
+  const match = /^([^。！？；：:]{1,14})[：:]\s*(.+)$/.exec(sentence)
+  if (match === null) {
+    return sentence
+  }
+  const label = match[1]?.trim() ?? ''
+  const rest = match[2]?.trim() ?? ''
+  if (label === '' || rest === '' || label.includes('，') || label.includes('、')) {
+    return sentence
+  }
+  return `**${label}：** ${rest}`
+}
+
+/**
+ * 把「一整段纯文本」的面经解析排成便于阅读的 markdown 段落（无损）。
+ *
+ * <p>背景（2026-11-19）：面经管线 v3 之前生成的 answer 大多是一整段，句间只用
+ * 「。」「；」，渲染出来就是一大坨，用户反馈"没人想看这种"。这里做一次**不增删任何文字**的
+ * 轻量整理：
+ * <ul>
+ *   <li>已有块级 markdown（换行/列表/标题/加粗/代码/引用）的答案原样返回，不破坏模型排好的版；</li>
+ *   <li>只对没有换行的单段文本按句末标点断成多段，每段一行，读起来不再是一堵墙；</li>
+ *   <li>每段开头形如 `结论：` 的短标签加粗，让要点更醒目。</li>
+ * </ul>
+ * 纯函数，不做任何语义改写——引号、术语、标点全都保留。
+ */
+export function formatAnswerParagraphs(answer: string): string {
+  const text = answer.trim()
+  if (text === '' || HAS_BLOCK_MARKDOWN.test(text)) {
+    return answer
+  }
+  const sentences = splitSentences(text)
+  if (sentences.length === 0) {
+    return answer
+  }
+  const formatted = sentences.map(boldLabel)
+  if (formatted.length === 1) {
+    // 单句也允许把段首「标签：」加粗，但不多造空段
+    return formatted[0] === sentences[0] ? answer : (formatted[0] ?? answer)
+  }
+  return formatted.join('\n\n')
+}
+
+/**
+ * 面经管线的渲染尾注：`---` 分隔线 + `> 题目来源：[标题](url)`。
+ *
+ * <p>见 `EssayCollectionService.render()`：正文永远是 `<answer>\n\n---\n\n> 题目来源：...`。
+ * 条目页顶部已经单独渲染了来源链接，这段尾注是重复的，而且它自带换行会让整篇"看起来像
+ * 已经是 markdown"，把段落化逻辑挡在外面。这里把它切掉。
+ */
+const ESSAY_SOURCE_NOTE = /\n*\s*-{3,}\s*\n+\s*>\s*题目来源[:：][\s\S]*$/
+
+/**
+ * 面经条目正文的展示预处理：切掉重复的来源尾注，只把答案部分做段落化。
+ *
+ * <p>与 {@link formatAnswerParagraphs} 的区别是它**认识面经的尾注结构**——整篇 body 里一定
+ * 有 `---` 与 `>` 的换行块，直接丢给段落化函数会因为"已含块级 markdown"而原样返回，等于没做事。
+ * 所以先按尾注切开，只对 answer 那一段排版。
+ */
+export function formatEssayAnswer(markdown: string): string {
+  const match = ESSAY_SOURCE_NOTE.exec(markdown)
+  const answer = match === null ? markdown : markdown.slice(0, match.index)
+  return formatAnswerParagraphs(answer)
+}

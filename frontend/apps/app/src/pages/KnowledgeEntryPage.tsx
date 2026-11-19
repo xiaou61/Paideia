@@ -8,6 +8,7 @@ import {
   createLearningApi,
   createServerProgressPort,
   findCategoryPath,
+  formatEssayAnswer,
   stripDuplicateTitle,
 } from '@paideia/knowledge'
 import type { EntryRef, SelfAssessmentLevel } from '@paideia/knowledge'
@@ -39,6 +40,9 @@ import { errorMessage } from '@paideia/core'
 
 const knowledge = createKnowledgeApi(api)
 const learning = createLearningApi(api)
+
+/** 「查看 / 背题」模式记在本地，下次进任意一条面经沿用上次的选择。 */
+const RECITE_STORAGE_KEY = 'paideia:entry-recite-mode'
 
 /**
  * 条目详情：**一栏阅读正文 + 右侧常驻目录**。
@@ -276,6 +280,52 @@ export function KnowledgeEntryPage() {
 
   const practice = useMemo(() => extractQuizzes(body), [body])
 
+  /**
+   * 面经条目（WORK-025）的两种阅读模式（2026-11-19）：
+   * - 查看模式：直接显示题目与参考答案；
+   * - 背题模式：默认只显示题目，答案要点「查看答案」才展开，用来自查。
+   *
+   * <p>判定"是不是面经"用两条：分类 slug 以 `essay-` 开头，或分类名里带「八股文／面经」。
+   * 只有面经才出模式开关与「参考答案」抬头，其它条目（课程、书籍等）行为完全不变。
+   */
+  const isEssay = useMemo(
+    () =>
+      categoryPath.some((node) => node.slug.startsWith('essay-')) ||
+      /八股文|面经/.test(entry.data?.categoryName ?? ''),
+    [categoryPath, entry.data?.categoryName],
+  )
+
+  const [reciteMode, setReciteMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(RECITE_STORAGE_KEY) === 'recite'
+    } catch {
+      return false
+    }
+  })
+  const [answerShown, setAnswerShown] = useState(false)
+
+  // 换条目或切换模式时把答案收回去，避免"上一题已展开"的状态漏到下一题
+  useEffect(() => {
+    setAnswerShown(false)
+  }, [entryId, reciteMode])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(RECITE_STORAGE_KEY, reciteMode ? 'recite' : 'read')
+    } catch {
+      // 本地存储不可用（隐私模式等）时只是不记忆，不影响阅读
+    }
+  }, [reciteMode])
+
+  /**
+   * 面经解析可能是"一整段纯文本"（老数据），交给 `formatAnswerParagraphs` 断成多段再渲染；
+   * 新数据本身已是结构化 markdown，函数会原样返回。非面经条目不做任何加工。
+   */
+  const displayBody = useMemo(
+    () => (isEssay ? formatEssayAnswer(practice.body) : practice.body),
+    [isEssay, practice.body],
+  )
+
   // 把"当前在读哪一条"交给悬浮壳：它是唯一知道这件事的地方。
   // 离开页面时清空，壳随即回到"打开一条内容后可用"的状态。
   /**
@@ -331,7 +381,7 @@ export function KnowledgeEntryPage() {
         只在 <md 出现；桌面端沿用正文里那一块（视线本来就在正文里，浮条反而挡字）。
         正文末尾还留了一段等高占位，否则最后一块内容会被这条压住。
       */}
-      {entry.isSuccess ? (
+      {entry.isSuccess && !(isEssay && reciteMode && !answerShown) ? (
         <div
           data-testid="entry-mobile-actions"
           className="border-border bg-background/95 fixed inset-x-0 bottom-0 z-30 border-t px-4 py-2.5 backdrop-blur md:hidden print:hidden"
@@ -475,6 +525,79 @@ export function KnowledgeEntryPage() {
             ) : null}
 
             {/*
+              面经的「查看 / 背题」模式开关（2026-11-19）。只有面经条目出现，
+              其它条目连这个开关都不渲染，行为与从前完全一致。
+            */}
+            {isEssay ? (
+              <div className="mb-6 flex flex-wrap items-center gap-3" data-testid="entry-mode-switch">
+                <div className="border-border bg-muted/40 inline-flex rounded-lg border p-0.5 text-sm">
+                  <button
+                    type="button"
+                    data-testid="entry-mode-read"
+                    aria-pressed={!reciteMode}
+                    onClick={() => setReciteMode(false)}
+                    className={`rounded-md px-3 py-1.5 transition-colors ${
+                      !reciteMode
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    查看模式
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="entry-mode-recite"
+                    aria-pressed={reciteMode}
+                    onClick={() => setReciteMode(true)}
+                    className={`rounded-md px-3 py-1.5 transition-colors ${
+                      reciteMode
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    背题模式
+                  </button>
+                </div>
+                <span className="text-muted-foreground text-xs">
+                  {reciteMode ? '先自己作答，再点「查看答案」对照' : '直接阅读题目与参考答案'}
+                </span>
+              </div>
+            ) : null}
+
+            {isEssay && reciteMode && !answerShown ? (
+              <div
+                data-testid="entry-recite-panel"
+                className="border-border bg-card rounded-2xl border px-6 py-12 text-center"
+              >
+                <p className="text-muted-foreground text-sm">先在心里过一遍答案，想好了再展开对照。</p>
+                <Button
+                  type="button"
+                  className="mt-5"
+                  data-testid="entry-reveal-answer"
+                  onClick={() => setAnswerShown(true)}
+                >
+                  查看答案
+                </Button>
+              </div>
+            ) : (
+              <>
+                {isEssay ? (
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <h2 className="text-muted-foreground text-xs font-medium tracking-wide">参考答案</h2>
+                    {reciteMode ? (
+                      <button
+                        type="button"
+                        data-testid="entry-hide-answer"
+                        onClick={() => setAnswerShown(false)}
+                        className="text-muted-foreground hover:text-foreground text-xs underline-offset-4 hover:underline"
+                      >
+                        收起答案
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+
+            {/*
               窄屏的目录（WORK-016）：原来 `<lg` 直接不渲染，等于长文在手机上完全没有"我在哪"。
               改成折叠面板放进正文列里 —— 默认收起不占地方，要跳章节时展开即可。
               `EntryToc` 自带"少于两个标题就不渲染"，所以这里不需要再判一次。
@@ -494,7 +617,7 @@ export function KnowledgeEntryPage() {
             </details>
 
             <MarkdownBody
-              markdown={practice.body}
+              markdown={displayBody}
               mediaBaseUrl={API_BASE_URL}
               entryId={entry.data.id}
               entryTitle={entry.data.title}
@@ -570,6 +693,8 @@ export function KnowledgeEntryPage() {
                 onChange={(next) => assess.mutate(next)}
               />
             </div>
+              </>
+            )}
 
             <nav className="border-border mt-12 grid gap-4 border-t pt-8 sm:grid-cols-2">
               <NeighborCard side="previous" entry={entry.data.previous} testId="entry-previous" />

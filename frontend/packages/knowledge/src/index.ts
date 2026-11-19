@@ -36,7 +36,7 @@ export type {
   SandboxStatus,
   ViewedEntry,
 } from './client'
-export { stripDuplicateTitle } from './entry-body'
+export { formatAnswerParagraphs, formatEssayAnswer, stripDuplicateTitle } from './entry-body'
 export { EntryToc } from './entry-toc'
 export { PracticeEntry } from './practice-entry'
 export { findCategoryBySlug, findCategoryPath } from './category-tree'
