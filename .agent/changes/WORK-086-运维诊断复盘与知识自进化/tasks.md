@@ -289,7 +289,7 @@ approver_role:
 - 实测：`mvn -pl paideia-ops -am test` **82 例 0 failures**（`OpsEvidenceCollectorTest` 12、
   `OpsDiagnosisMailerTest` 4、`PostmortemServiceTest` 11）。
 
-### TASK-014 | pending | 生产实测：重放 2026-11-19 14:10–14:30 窗口
+### TASK-014 | done | 生产实测：重放 2026-11-19 14:10–14:30 窗口
 
 - 对应：`AC-001`~`AC-010`
 - 依赖：TASK-001~013
@@ -302,6 +302,22 @@ approver_role:
   5. 登录管理端，走一遍列表/审批/归档/下载。
   6. 把命令、截图路径、响应片段写入 `testing/report.md`。
 - 验证：`ssh codenest-online "journalctl -u paideia.service --since '2026-11-19 14:10' --until '2026-11-19 14:30'"` 与诊断证据逐项对照，4 次重启全部对上
+
+完成（2026-11-19）：证据全部落在 `testing/report.md` §2–§4。
+
+- 精确重放 14:10–14:30 在本代码上做不到，原因与替代证据写在 report §5.1：`OpsIncidentMapper.upsertFiring`
+  的重启分支只更新 `last_seen = VALUES(last_seen)`，而 `OpsHookController:105` 传的 `lastSeen` 恒为 `now`；
+  手动诊断端点又不接受 `incidentId`，所以任何 HTTP 重放都会把窗口拉回「此刻往前 60 分钟」。
+  改为「同一组 LogQL 直查该窗口」+「线上真实诊断验证窗口逻辑」，前者证明数据在库里（30 行生命周期、
+  4 行异常、100 行上下文，含 PID 479850/488984/496699 与 `HikariPool-1 - Shutdown initiated`）。
+- 线上跑了三次诊断：#24 manual（4446 字符）、#27 manual（5082 字符、6235 tokens）、
+  #28 由 Grafana webhook 触发（4149 字符，`ops.mail.sent ... recipients=1`，
+  `created postmortem #2 from diagnosis #28 (auto)`）。
+- 复盘链路走通：#1 创建→编辑→APPROVED；#2 自动起草为 DRAFT（`origin=auto`）；
+  `ops_diagnoses.knowledge_ids` 在 #27 上为 `1`，报告正文引用「`<knowledge>` 复盘 #1」。
+- 管理端 e2e 在线上真实数据下 2 passed。
+- 生产顺带发现并修复两个缺陷（`23ecdd24` 指标 job 限定、`eaac292f` 输出上限 4096→8192），
+  已在 report §4 记录复现方式与修复验证。
 
 ### TASK-015 | done | 诊断完成后自动起草复盘
 
