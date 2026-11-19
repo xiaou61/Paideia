@@ -65,6 +65,9 @@ function lineSpecOf(language, lessons) {
     // 轨道列表卡片上的一句话介绍（WORK-024）
     summary: meta.line_summary ?? null,
     kind: meta.line_kind ?? 'course',
+    // 有没有显式声明 line_kind = 这条线算不算学习轨道（见 desiredLineKindOf）。
+    // 与 `kind` 分开：`kind` 有兜底值，缺省不等于"我声明了 course"。
+    declaredKind: meta.line_kind ?? null,
     sortOrder: Number(meta.line_sort ?? 100),
     parent,
     parentName: meta.line_parent_name ?? null,
@@ -233,6 +236,20 @@ function findCategory(nodes, slug) {
 }
 
 /**
+ * 这条线在库里落成什么 line_kind。null = 不是轨道。
+ *
+ * <p>判据是**总览里有没有写 line_kind**，不是命令行开关：以前靠 `--no-track`（一次性的
+ * 全局开关）区分，`--dir content/reading` 会把整批线一起降成无轨道；而书籍、简讲这些
+ * "只有阅读顺序"的线本来就是不写 line_kind 的，声明即语义（WORK-046 REQ-004）。
+ *
+ * <p>挂在父分类下不等于不是轨道：dsh-core / pi 这类核心源码解析既是 `/source` 里的一关，
+ * 也仍在 `/learn` 有进度与关卡地图。两种入口共用同一份进度，不冲突。
+ */
+function desiredLineKindOf(spec, options) {
+  return options.track === false ? null : spec.declaredKind
+}
+
+/**
  * 父分类（WORK-046）。只在 `line_parent` 声明时才有事做，返回要用的 parentId。
  *
  * <p>**绝不带 lineKind**：父分类只是一个分组容器，带了它就会变成一条没有正文的学习线
@@ -244,6 +261,23 @@ async function ensureParent(client, tree, spec, options) {
   }
   const existing = findCategory(tree, spec.parent)
   if (existing) {
+    // 父分类的名字跟着 frontmatter 走：改名（源码精读 → 核心源码解析）不用再去后台点一遍。
+    // PUT 是整体替换，所以把 parentId 固定成 null、lineKind 固定成 null——父分类只是容器。
+    const name = spec.parentName ?? spec.parent
+    if (existing.name !== name) {
+      if (options.dryRun) {
+        console.log(`  [dry-run] 将改父分类名 ${existing.name} → ${name}`)
+      } else {
+        await client.put(`/api/v1/knowledge/admin/categories/${existing.id}`, {
+          parentId: null,
+          name,
+          slug: existing.slug,
+          sortOrder: existing.sortOrder ?? 0,
+          lineKind: null,
+        })
+        console.log(`  ~ 父分类名 ${existing.name} → ${name}`)
+      }
+    }
     return existing.id
   }
   const name = spec.parentName ?? spec.parent
@@ -263,28 +297,55 @@ async function ensureParent(client, tree, spec, options) {
 }
 
 /**
+ * 从分类树里反推某个分类现在挂在谁下面：根分类返回 null，树里没有返回 undefined。
+ *
+ * <p>管理端返回的节点只有 id / name / slug / lineKind / children，没有 parentId，
+ * 只能靠树形结构反查。
+ */
+function currentParentSlug(tree, slug) {
+  const walk = (nodes, parentSlug) => {
+    for (const node of nodes) {
+      if (node.slug === slug) return { found: true, parent: parentSlug }
+      const hit = walk(node.children ?? [], node.slug)
+      if (hit.found) return hit
+    }
+    return { found: false, parent: undefined }
+  }
+  const hit = walk(tree, null)
+  return hit.found ? hit.parent : undefined
+}
+
+/**
  * 已经建过的分类要和 frontmatter 对齐：改线名 / 补 line_kind 不用再去后台点一遍。
  *
- * <p>比 `name` 和 `lineKind` 两项——管理端返回的分类树里没有 sortOrder / parentId，
+ * <p>比 `name`、`lineKind`、**父分类**三项——管理端返回的分类树里没有 sortOrder / parentId，
  * 拿不准的字段一律原样带回去（PUT 是整体替换，parentId 传错会把子分类挪出去）。
+ * 父分类从树里反推（`currentParentSlug`）：只看名字和 line_kind 的话，一条线新增
+ * `line_parent` 时会因为"名字没变"被跳过，永远留在一级目录。
  *
  * <p>`lineKind` 以前写死 `existing.lineKind ?? null`，导致早先建过、当时漏写 line_kind 的
  * 分类永远补不上（实测操作系统/算法/人工智能/开源项目简讲 4 条轨道在库里 line_kind 为 NULL，
  * 前端只能靠 /learn/tracks 兜底）。这里改成按 frontmatter 的期望值对齐：简讲（--no-track
  * 或 books 这类父分类下的线）仍写 null，其余写 spec.kind（course / reading）。
  */
-async function syncCategoryName(client, existing, spec, parentId, options) {
-  const desiredLineKind = options.track === false ? null : spec.kind
+async function syncCategoryName(client, existing, spec, parentId, options, currentParent) {
+  const desiredLineKind = desiredLineKindOf(spec, options)
   const currentLineKind = existing.lineKind ?? null
   const nameChanged = existing.name !== spec.name
   const lineKindChanged = currentLineKind !== desiredLineKind
-  if (!nameChanged && !lineKindChanged) {
+  // 只在**声明了** line_parent 时纠正层级：没声明的线可能被手工挂在某个容器下
+  // （如「操作系统」在「计算机基础」里），把"没写"当成"要移到根"会把它连人带内容挪走。
+  const parentChanged = spec.parent !== null && (currentParent ?? null) !== spec.parent
+  if (!nameChanged && !lineKindChanged && !parentChanged) {
     return
   }
   if (options.dryRun) {
     if (nameChanged) console.log(`  [dry-run] 将改分类名 ${existing.name} → ${spec.name}`)
     if (lineKindChanged) {
       console.log(`  [dry-run] 将改 ${spec.slug} 的 line_kind ${currentLineKind} → ${desiredLineKind}`)
+    }
+    if (parentChanged) {
+      console.log(`  [dry-run] 将把 ${spec.slug} 挂到 ${spec.parent ?? '根分类'} 下`)
     }
     return
   }
@@ -297,29 +358,31 @@ async function syncCategoryName(client, existing, spec, parentId, options) {
   })
   if (nameChanged) console.log(`  ~ 分类名 ${existing.name} → ${spec.name}`)
   if (lineKindChanged) console.log(`  ~ ${spec.slug} 的 line_kind ${currentLineKind} → ${desiredLineKind}`)
+  if (parentChanged) console.log(`  ~ ${spec.slug} 挂到 ${spec.parent ?? '根分类'} 下`)
 }
 
 async function ensureCategory(client, language, lessons, options) {
   const spec = lineSpecOf(language, lessons)
-  // 挂在父分类下的线（书籍详解）不是学习轨道：带了 lineKind 它就会以"一条线"的身份
-  // 出现在 /learn，而书只有阅读顺序、没有通关概念（WORK-046 REQ-004）。
-  if (spec.parent !== null && options.track !== false) {
-    throw new Error(
-      `${language}/ 声明了 line_parent=${spec.parent}，导入时必须加 --no-track（书籍不建学习轨道）`,
-    )
-  }
+  // 是不是学习轨道由总览的 line_kind 决定（书籍、简讲这类不写，见 desiredLineKindOf）。
   const tree = await client.get('/api/v1/knowledge/admin/categories')
   // 先建父分类再找自己：否则"分类手工建过、父分类没建"会留下一个游离的子分类
   const parentId = await ensureParent(client, tree, spec, options)
   const existing = findCategory(tree, spec.slug)
   if (existing) {
-    await syncCategoryName(client, existing, spec, parentId, options)
+    const currentParent = currentParentSlug(tree, spec.slug)
+    // 没声明 line_parent 的线保持现状：PUT 是整体替换，把 parentId 写成 null 等于"移到根"。
+    // 所以把它现在就挂着的容器 id 原样带回去。
+    const keptParentId =
+      spec.parent === null && currentParent != null
+        ? (findCategory(tree, currentParent)?.id ?? null)
+        : parentId
+    await syncCategoryName(client, existing, spec, keptParentId, options, currentParent)
     return existing
   }
   if (options.dryRun) {
     console.log(
       `  [dry-run] 将创建分类 ${spec.name}（${spec.slug}, ` +
-        `${options.track === false ? '无 line_kind' : spec.kind}）`,
+        `${desiredLineKindOf(spec, options) ?? '无 line_kind'}）`,
     )
     return { id: -1, slug: spec.slug, name: spec.name, children: [] }
   }
@@ -328,9 +391,7 @@ async function ensureCategory(client, language, lessons, options) {
     name: spec.name,
     slug: spec.slug,
     sortOrder: spec.sortOrder,
-    // 简讲（--no-track）**不打 line_kind**：带 lineKind 的分类会被当成一条学习线出现在 /learn，
-    // 而简讲只有查阅用途、没有通关概念（WORK-040 REQ-003）。
-    lineKind: options.track === false ? null : spec.kind,
+    lineKind: desiredLineKindOf(spec, options),
   })
   console.log(`  + 分类 ${spec.name}（id=${id}）`)
   return { id, slug: spec.slug, name: spec.name, children: [] }
@@ -449,6 +510,11 @@ async function importLanguage(client, language, lessons, options, allEntries) {
   //
   // **导读（order 0）不是关卡**：它没有小测也没有动手，永远无法通关。以前把它也登记成
   // seq 0，于是每条线的"下一关"永远停在导读、进度永远到不了 100%，地图上还多出一格。
+  if (desiredLineKindOf(spec, options) === null) {
+    // 不是轨道（书籍详解、开源项目简讲、MyBatis 源码精读）：连关卡都不登记，
+    // 否则 /learn 会多出一条没有 line_kind 的线，点进去也没有通关概念。
+    return { created: created.length, updated: updates, relations, stages: 0 }
+  }
   const stageLessons = lessons.filter((lesson) => Number(lesson.meta.order) !== 0)
   if (stageLessons.length === 0) {
     console.warn(`  ! ${spec.slug} 没有可登记的关卡（只有导读）`)
@@ -475,7 +541,7 @@ async function importLanguage(client, language, lessons, options, allEntries) {
 
   if (options.dryRun) {
     console.log(`  [dry-run] 将登记轨道 ${spec.slug}（${stages.length} 关，${spec.mode}）`)
-  } else if (options.track !== false) {
+  } else {
     // 配对引用指向不存在的轨道时只警告不阻断：内容可以先写、后导入（WORK-038 已知限制）
     if (spec.theoryTrackSlug) {
       const known = await client.get('/api/v1/learn/tracks')

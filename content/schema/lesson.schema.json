@@ -28,7 +28,7 @@
     },
     "verify": { "type": "string", "enum": ["project", "run", "sql"] },
     "line_parent": { "type": "string", "enum": ["books", "source"] },
-    "line_parent_name": { "type": "string", "enum": ["书籍详解", "源码精读"] }
+    "line_parent_name": { "type": "string", "enum": ["书籍详解", "核心源码解析"] }
   },
   "blocks": [
     "text",
