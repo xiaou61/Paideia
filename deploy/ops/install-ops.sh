@@ -215,9 +215,14 @@ systemctl daemon-reload
 # enable 它自己的单元，而本脚本用的是自写的 grafana.service。两个单元抢 127.0.0.1:3000，
 # 后启动的那个 bind 失败并进入 `Restart=on-failure` 重启循环（半小时内 66 次），
 # 而先启动的那个只是"看着正常"——`systemctl restart grafana-server` 更是完全改不了真正在跑的那个。
+#
+# 2026-11-19→21 又复发一次（disable 只挡开机自启，挡不住有人 `systemctl start grafana-server`）：
+# 那次循环跑了 26040 次、每次烧 8~10s CPU，主机 CPU 从 24% 顶到 70%，直接刷出 7 封
+# 「CPU 相对 7 天基线异常」。所以这里改成 **mask**：任何人都起不来，要恢复得先 unmask。
 if systemctl list-unit-files grafana-server.service >/dev/null 2>&1; then
     systemctl disable --now grafana-server.service 2>/dev/null || true
     systemctl reset-failed grafana-server.service 2>/dev/null || true
+    systemctl mask grafana-server.service 2>/dev/null || true
 fi
 
 say "启动"
