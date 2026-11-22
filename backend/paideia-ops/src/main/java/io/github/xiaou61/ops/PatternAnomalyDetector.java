@@ -27,10 +27,23 @@ class PatternAnomalyDetector {
 
     private final OpsProperties properties;
     private final PatternMapper mapper;
+    private final java.util.function.Predicate<String> unitUsable;
 
     PatternAnomalyDetector(OpsProperties properties, PatternMapper mapper) {
+        this(properties, mapper, unit -> true);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    PatternAnomalyDetector(OpsProperties properties, PatternMapper mapper,
+                           PatternSyncService syncService) {
+        this(properties, mapper, syncService::isUnitUsable);
+    }
+
+    PatternAnomalyDetector(OpsProperties properties, PatternMapper mapper,
+                           java.util.function.Predicate<String> unitUsable) {
         this.properties = properties;
         this.mapper = mapper;
+        this.unitUsable = unitUsable;
     }
 
     /** 检测一轮；返回本轮新写入（未被去重挡掉）的异常行。 */
@@ -53,6 +66,12 @@ class PatternAnomalyDetector {
         List<PatternMapper.AnomalyRow> out = new ArrayList<>();
         for (String unit : cfg.getUnits()) {
             if (unit == null || unit.isBlank()) {
+                continue;
+            }
+            // Loki 不可达/取不到数据时，本窗口计数一律为 0，而基线仍来自历史桶——
+            // 这时任何「消失」判定都是假的，整轮跳过这个 unit（2026-11-22 修复）
+            if (!unitUsable.test(unit)) {
+                log.debug("ops.pattern.detect.skip unit={} reason=loki-unusable", unit);
                 continue;
             }
             boolean coldStart = mapper.countBucketsBefore(unit, windowStart) == 0;

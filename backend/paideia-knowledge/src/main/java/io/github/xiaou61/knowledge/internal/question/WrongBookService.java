@@ -33,17 +33,21 @@ public class WrongBookService {
         for (QuestionAttemptMapper.ConceptRow row : mapper.findAllConcepts()) {
             names.put(row.id(), row.name());
         }
+        List<QuestionAttemptMapper.WrongRow> rows = mapper.findWrongLatest(userId, categoryId, conceptId, n);
+        // 按条目分组：一个条目的正文只解析一次，概念关联一条 SQL 取完（原先每题各一次）
+        Map<Long, Map<String, QuestionIndexService.QuestionSnapshot>> snapshots = snapshotsByEntry(rows);
+        Map<String, List<QuestionAttemptMapper.KeyedLinkRow>> links = linksByQuestion(rows);
         List<WrongQuestionView> result = new ArrayList<>();
-        for (QuestionAttemptMapper.WrongRow row : mapper.findWrongLatest(userId, categoryId, conceptId, n)) {
+        for (QuestionAttemptMapper.WrongRow row : rows) {
             QuestionIndexService.QuestionSnapshot snapshot =
-                    indexService.snapshot(row.entryId(), row.questionKey());
+                    snapshots.getOrDefault(row.entryId(), Map.of()).get(row.questionKey());
             if (snapshot == null) {
                 continue;
             }
             List<Long> conceptIds = new ArrayList<>();
             List<String> conceptNames = new ArrayList<>();
-            for (QuestionAttemptMapper.LinkRow link :
-                    mapper.findLinks(row.entryId(), row.blockKey(), row.questionKey())) {
+            for (QuestionAttemptMapper.KeyedLinkRow link :
+                    links.getOrDefault(identity(row.entryId(), row.blockKey(), row.questionKey()), List.of())) {
                 conceptIds.add(link.conceptId());
                 conceptNames.add(names.getOrDefault(link.conceptId(), ""));
             }
@@ -52,5 +56,38 @@ public class WrongBookService {
                     conceptIds, conceptNames));
         }
         return result;
+    }
+
+    private Map<Long, Map<String, QuestionIndexService.QuestionSnapshot>> snapshotsByEntry(
+            List<QuestionAttemptMapper.WrongRow> rows) {
+        Map<Long, Map<String, QuestionIndexService.QuestionSnapshot>> grouped = new HashMap<>();
+        for (QuestionAttemptMapper.WrongRow row : rows) {
+            grouped.computeIfAbsent(row.entryId(), entryId -> {
+                Map<String, QuestionIndexService.QuestionSnapshot> byKey = new HashMap<>();
+                for (QuestionIndexService.QuestionSnapshot snapshot : indexService.snapshots(entryId)) {
+                    byKey.put(snapshot.questionKey(), snapshot);
+                }
+                return byKey;
+            });
+        }
+        return grouped;
+    }
+
+    private Map<String, List<QuestionAttemptMapper.KeyedLinkRow>> linksByQuestion(
+            List<QuestionAttemptMapper.WrongRow> rows) {
+        List<Long> entryIds = rows.stream().map(QuestionAttemptMapper.WrongRow::entryId).distinct().toList();
+        if (entryIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, List<QuestionAttemptMapper.KeyedLinkRow>> grouped = new HashMap<>();
+        for (QuestionAttemptMapper.KeyedLinkRow link : mapper.findLinksForEntries(entryIds)) {
+            grouped.computeIfAbsent(identity(link.entryId(), link.blockKey(), link.questionKey()),
+                    ignored -> new ArrayList<>()).add(link);
+        }
+        return grouped;
+    }
+
+    private static String identity(long entryId, String blockKey, String questionKey) {
+        return entryId + "/" + blockKey + "/" + questionKey;
     }
 }

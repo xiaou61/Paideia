@@ -131,6 +131,9 @@ export function PostmortemsPage() {
   const [page, setPage] = useState(1)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  // 正文是否被人手改过：后端只在 bodyMd 为空时按结构化字段重渲染，若总是回传非空正文，
+  // 改了根因/影响面之后正文（预览、下载、召回用的都是它）会一直是旧的。
+  const [bodyTouched, setBodyTouched] = useState(false)
   const areas = useRef(new Map<string, HTMLTextAreaElement | null>())
   const filePicker = useRef<HTMLInputElement | null>(null)
 
@@ -154,6 +157,7 @@ export function PostmortemsPage() {
   useEffect(() => {
     if (detail.data !== undefined) {
       setForm(toForm(detail.data))
+      setBodyTouched(false)
     }
   }, [detail.data])
 
@@ -168,6 +172,8 @@ export function PostmortemsPage() {
     title: form.title.trim(),
     severity: form.severity.trim(),
     alertName: form.alertName.trim(),
+    // 没手改过正文就送空串，让后端按结构化字段重新渲染，避免正文与字段长期不一致
+    bodyMd: bodyTouched ? form.bodyMd : '',
   })
 
   const save = useMutation({
@@ -185,10 +191,34 @@ export function PostmortemsPage() {
   })
 
   const approve = useMutation({
-    mutationFn: (id: number) =>
-      api.requestEnvelope<Postmortem>(`/api/v1/ops/admin/postmortems/${id}/approve`, { method: 'POST' }),
+    mutationFn: async (id: number) => {
+      // 先落库再确认：approve 只读库里现存内容，不先 PUT 会把编辑器里没保存的改动静默丢掉
+      await api.requestEnvelope<Postmortem>(`/api/v1/ops/admin/postmortems/${id}`, {
+        method: 'PUT',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(payload()),
+      })
+      return api.requestEnvelope<Postmortem>(`/api/v1/ops/admin/postmortems/${id}/approve`, { method: 'POST' })
+    },
     onSuccess: () => {
       toast.success('已确认，后续诊断会把它当作历史经验召回')
+      invalidate()
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+
+  // 正文与结构化字段打架时的显式出路：丢掉手写正文，让后端按字段重渲染一遍。
+  const regenerate = useMutation({
+    mutationFn: (id: number) =>
+      api.requestEnvelope<Postmortem>(`/api/v1/ops/admin/postmortems/${id}`, {
+        method: 'PUT',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ ...payload(), bodyMd: '' }),
+      }),
+    onSuccess: (data) => {
+      setBodyTouched(false)
+      setForm(toForm(data))
+      toast.success('正文已按结构化字段重新生成')
       invalidate()
     },
     onError: (error) => toast.error(errorMessage(error)),
@@ -234,6 +264,8 @@ export function PostmortemsPage() {
   })
 
   const insertAtCursor = (text: string) => {
+    // 程序化插入（截图）也算"手改过正文"，否则保存时会被当成未改动而丢掉
+    setBodyTouched(true)
     const area = areas.current.get('bodyMd')
     if (area === null || area === undefined) {
       setForm((prev) => ({ ...prev, bodyMd: `${prev.bodyMd}${text}` }))
@@ -400,6 +432,16 @@ export function PostmortemsPage() {
                   </Button>
                   <Button
                     size="sm"
+                    variant="outline"
+                    disabled={!editable || regenerate.isPending}
+                    onClick={() => regenerate.mutate(current.id)}
+                    data-testid="postmortem-regenerate"
+                    title="按上面的结构化字段重写正文，丢掉手写正文"
+                  >
+                    按字段重新生成正文
+                  </Button>
+                  <Button
+                    size="sm"
                     variant="ghost"
                     disabled={download.isPending}
                     onClick={() => download.mutate(current)}
@@ -519,7 +561,10 @@ export function PostmortemsPage() {
                       }}
                       className="border-border bg-background min-h-80 w-full rounded-md border p-2 font-mono text-xs"
                       value={form.bodyMd}
-                      onChange={(event) => setForm({ ...form, bodyMd: event.target.value })}
+                      onChange={(event) => {
+                        setBodyTouched(true)
+                        setForm({ ...form, bodyMd: event.target.value })
+                      }}
                       onPaste={onPasteImage}
                       data-testid="postmortem-body"
                     />

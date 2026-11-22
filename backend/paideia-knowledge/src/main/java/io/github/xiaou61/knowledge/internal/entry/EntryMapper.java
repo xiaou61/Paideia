@@ -96,9 +96,15 @@ public interface EntryMapper {
             """)
     Optional<Entry> findPublishedById(@Param("id") Long id);
 
-    /** RAG 索引使用的全量已发布正文（WORK-072）。 */
+    /**
+     * RAG 索引使用的全量已发布正文（WORK-072）。
+     *
+     * <p>投影里必须带 {@code category_id}：{@code QuestionIndexService.refreshAll()} 用它
+     * 回填 {@code question_index.category_id}，少了这一列全量重建会把分类刷成 NULL，
+     * 按分类刷题/组卷就全部查不到（WORK-083 回归）。
+     */
     @Select("""
-            SELECT id, title, body, updated_at
+            SELECT id, category_id, title, body, updated_at
             FROM knowledge_entries
             WHERE status = 'published'
             ORDER BY id

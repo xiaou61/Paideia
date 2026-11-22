@@ -113,6 +113,7 @@ public interface PaperMapper {
               </if>
             </where>
             ORDER BY qi.entry_id, qi.block_key, qi.question_key
+            LIMIT 5000
             </script>
             """)
     List<CandidateRow> findCandidates(@Param("categoryId") Long categoryId,
@@ -125,6 +126,26 @@ public interface PaperMapper {
             """)
     List<Long> findConceptIds(@Param("entryId") long entryId, @Param("blockKey") String blockKey,
                               @Param("questionKey") String questionKey);
+
+    /**
+     * 批量取一批条目的题目—概念关联（组卷避免逐题一次 SQL 的 N+1）。
+     *
+     * <p>按 {@code entry_id} 批量，是因为候选题目本来就成片落在同几个条目里；
+     * 调用方按 {@code entryId|blockKey|questionKey} 分组即可。
+     */
+    @Select("""
+            <script>
+            SELECT entry_id, block_key, question_key, concept_id
+            FROM question_concepts
+            WHERE entry_id IN
+            <foreach collection="entryIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+            ORDER BY entry_id, block_key, question_key, concept_id
+            </script>
+            """)
+    List<ConceptLinkRow> findConceptLinks(@Param("entryIds") List<Long> entryIds);
+
+    record ConceptLinkRow(long entryId, String blockKey, String questionKey, long conceptId) {
+    }
 
     record PaperRow(long id, long userId, String title, String status, Instant submittedAt,
                     Integer correctCount, Integer totalCount, Instant createdAt) {

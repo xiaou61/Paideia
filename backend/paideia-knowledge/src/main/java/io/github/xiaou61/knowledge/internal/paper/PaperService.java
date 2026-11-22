@@ -61,11 +61,13 @@ public class PaperService {
             throw new BizException(ErrorCode.INVALID_ARGUMENT, "题量必须大于 0");
         }
         List<PaperMapper.CandidateRow> rows = paperMapper.findCandidates(rule.categoryId(), rule.conceptIds());
+        Map<String, List<Long>> conceptsByKey = conceptIdsByKey(rows);
         List<PaperAssembler.Candidate> candidates = new ArrayList<>();
         for (PaperMapper.CandidateRow row : rows) {
-            List<Long> conceptIds = paperMapper.findConceptIds(row.entryId(), row.blockKey(), row.questionKey());
             candidates.add(new PaperAssembler.Candidate(row.entryId(), row.blockKey(), row.questionKey(),
-                    row.fingerprint(), row.optionCount(), row.difficultyLabel(), conceptIds));
+                    row.fingerprint(), row.optionCount(), row.difficultyLabel(),
+                    conceptsByKey.getOrDefault(questionKey(row.entryId(), row.blockKey(), row.questionKey()),
+                            List.of())));
         }
 
         PaperAssembler.AssemblyResult assembled = PaperAssembler.assemble(candidates, rule);
@@ -74,11 +76,14 @@ public class PaperService {
         paperMapper.insertPaper(userId, title, toJson(rule), "ready", now);
         long paperId = paperMapper.lastInsertId();
 
+        // 快照按条目分组，一个条目只查一次、只解析一次正文（原先每个题目都要一次 DB + 整篇解析）
+        Map<Long, Map<String, QuestionIndexService.QuestionSnapshot>> snapshotsByEntry =
+                snapshotsByEntry(assembled.items());
         int seq = 1;
         List<PaperItemView> items = new ArrayList<>();
         for (PaperAssembler.Candidate candidate : assembled.items()) {
-            QuestionIndexService.QuestionSnapshot snapshot =
-                    indexService.snapshot(candidate.entryId(), candidate.questionKey());
+            QuestionIndexService.QuestionSnapshot snapshot = snapshotsByEntry
+                    .getOrDefault(candidate.entryId(), Map.of()).get(candidate.questionKey());
             if (snapshot == null) {
                 continue;
             }
@@ -135,10 +140,24 @@ public class PaperService {
         Map<Long, Integer> picked = answers == null ? Map.of() : answers;
 
         List<PaperScorer.PaperItemSnapshot> snapshots = new ArrayList<>();
+        Map<Long, Integer> optionCounts = new HashMap<>();
         for (PaperMapper.ItemRow item : items) {
+            int optionCount = parseOptions(item.optionsJson()).size();
+            optionCounts.put(item.id(), optionCount);
             snapshots.add(new PaperScorer.PaperItemSnapshot(item.id(), item.entryId(), item.blockKey(),
                     item.questionKey(), item.fingerprint(), item.conceptId(), item.difficultyLabel(),
-                    item.answerIndexSnapshot(), parseOptions(item.optionsJson()).size()));
+                    item.answerIndexSnapshot(), optionCount));
+        }
+        // 入口校验：作答项必须属于本卷，选项下标必须在范围内（对照 QuestionAttemptService 的 400）
+        for (Map.Entry<Long, Integer> answer : picked.entrySet()) {
+            Integer optionCount = optionCounts.get(answer.getKey());
+            if (optionCount == null) {
+                throw new BizException(ErrorCode.INVALID_ARGUMENT, "作答项不属于本卷");
+            }
+            Integer choice = answer.getValue();
+            if (choice != null && (choice < 0 || choice >= optionCount)) {
+                throw new BizException(ErrorCode.INVALID_ARGUMENT, "选项下标越界");
+            }
         }
         PaperScorer.ScoreResult score = PaperScorer.score(snapshots, picked);
         Instant now = Instant.now();
@@ -146,7 +165,12 @@ public class PaperService {
             PaperMapper.ItemRow item = items.get(i);
             PaperScorer.PaperItemSnapshot snap = snapshots.get(i);
             Integer choice = picked.get(item.id());
-            boolean correct = choice != null && choice == item.answerIndexSnapshot();
+            if (choice == null) {
+                // 未作答：不落 paper_answers（choice_index NOT NULL），也不计入学习侧数据，
+                // 否则「没点选」的题会进错题本并污染 Elo/BKT 与复习排期
+                continue;
+            }
+            boolean correct = choice == item.answerIndexSnapshot();
             paperMapper.insertAnswer(paperId, userId, item.id(), choice, correct, now);
             List<Long> conceptIds = item.conceptId() == null ? List.of() : List.of(item.conceptId());
             questionAttemptService.recordJudged(userId, item.entryId(), item.blockKey(),
@@ -199,6 +223,41 @@ public class PaperService {
         } catch (Exception failure) {
             throw new IllegalStateException("序列化失败", failure);
         }
+    }
+
+    /** 题目身份：{@code questionKey} 只在条目内唯一，跨条目必须带 entryId + blockKey。 */
+    private static String questionKey(long entryId, String blockKey, String questionKey) {
+        return entryId + "/" + blockKey + "/" + questionKey;
+    }
+
+    /** 一次查出这批条目下的全部题目—概念关联，避免逐候选一次 SQL。 */
+    private Map<String, List<Long>> conceptIdsByKey(List<PaperMapper.CandidateRow> rows) {
+        List<Long> entryIds = rows.stream().map(PaperMapper.CandidateRow::entryId).distinct().toList();
+        if (entryIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, List<Long>> grouped = new HashMap<>();
+        for (PaperMapper.ConceptLinkRow link : paperMapper.findConceptLinks(entryIds)) {
+            grouped.computeIfAbsent(questionKey(link.entryId(), link.blockKey(), link.questionKey()),
+                    ignored -> new ArrayList<>()).add(link.conceptId());
+        }
+        return grouped;
+    }
+
+    /** 按条目分组取快照：同一 entry 的正文只解析一次。 */
+    private Map<Long, Map<String, QuestionIndexService.QuestionSnapshot>> snapshotsByEntry(
+            List<PaperAssembler.Candidate> selected) {
+        Map<Long, Map<String, QuestionIndexService.QuestionSnapshot>> grouped = new HashMap<>();
+        for (PaperAssembler.Candidate candidate : selected) {
+            grouped.computeIfAbsent(candidate.entryId(), entryId -> {
+                Map<String, QuestionIndexService.QuestionSnapshot> byKey = new HashMap<>();
+                for (QuestionIndexService.QuestionSnapshot snapshot : indexService.snapshots(entryId)) {
+                    byKey.put(snapshot.questionKey(), snapshot);
+                }
+                return byKey;
+            });
+        }
+        return grouped;
     }
 
     private static List<String> parseOptions(String json) {

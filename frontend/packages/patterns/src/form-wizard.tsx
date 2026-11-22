@@ -82,15 +82,15 @@ export function FormWizard({
       </Card>
 
       <div className="mt-5 flex justify-between">
-        <Button variant="outline" onClick={onPrev} disabled={isFirst || busy}>
+        <Button type="button" variant="outline" onClick={onPrev} disabled={isFirst || busy}>
           {prevLabel}
         </Button>
         {isLast ? (
-          <Button onClick={onSubmit} disabled={busy}>
+          <Button type="button" onClick={onSubmit} disabled={busy}>
             {submitLabel}
           </Button>
         ) : (
-          <Button onClick={onNext} disabled={busy}>
+          <Button type="button" onClick={onNext} disabled={busy}>
             {nextLabel}
           </Button>
         )}

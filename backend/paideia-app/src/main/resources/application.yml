@@ -196,6 +196,8 @@ paideia:
       # **部署时必须在服务器上的 application.yml 里显式配置**（发版不覆盖服务器配置）。
       # 留空会退回请求的 Host 头：那样伪造 Host 头就能把邮件里的链接指向别人的站点，
       # 只适合本地开发与测试。
+      # 校验是**启动期硬失败**（PasswordResetConfiguration.StartupCheck）：除 dev/test/local
+      # 三个 profile 外，缺这项配置应用直接起不来，不再只是打一条 warn。
       # base-url: http://localhost:5173
   mail:
     # 未配置 host 时**不会自动降级**：验证码写进日志等于注册后门，装配层会让应用直接启动失败。

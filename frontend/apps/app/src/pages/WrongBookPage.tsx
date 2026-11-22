@@ -43,7 +43,11 @@ export function WrongBookPage() {
 
         <ul className="mt-4 space-y-3" data-testid="wrong-list">
           {questions.map((question) => (
-            <li key={question.questionKey} className="rounded-lg border border-border bg-card p-4">
+            // questionKey 只在条目内唯一（如 quiz1#0），错题本会跨条目聚合，必须用复合 key
+            <li
+              key={`${question.entryId}/${question.blockKey}/${question.questionKey}`}
+              className="rounded-lg border border-border bg-card p-4"
+            >
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>条目 #{question.entryId}</span>
                 {difficultyText(question.difficultyLabel) ? (

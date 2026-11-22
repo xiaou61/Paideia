@@ -35,6 +35,13 @@ class PatternSyncService {
     private final OpsProperties properties;
     private final PatternMapper mapper;
     private final LokiClient loki;
+    /**
+     * 每个 unit 本轮 Loki 数据是否可信（不可达/取不到数据时为 false）。
+     *
+     * <p>检测端据此跳过「消失」判定：Loki 抖两个窗口就会让全部模板看起来「一条都没有」，
+     * 而基线仍来自历史桶，会把整批模板误判成服务静默（2026-11-22 修复）。
+     */
+    private final Map<String, Boolean> unitUsable = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.concurrent.atomic.AtomicBoolean running =
             new java.util.concurrent.atomic.AtomicBoolean(false);
 
@@ -71,6 +78,9 @@ class PatternSyncService {
                 String selector = "{unit=\"" + unit + ".service\"}";
                 List<LokiClient.PatternSeries> series =
                         loki.patterns(selector, from, now, cfg.getMaxTemplates());
+                // 空列表既可能是「Loki 挂了/接口不存在」也可能是「窗口内没有模板」，
+                // 只有再探一次才知道能不能拿这一轮的数据做「消失」判定
+                unitUsable.put(unit, !series.isEmpty() || loki.reachable());
                 for (LokiClient.PatternSeries one : series) {
                     if (writeSeries(unit, one, windowMinutes, now)) {
                         written++;
@@ -82,6 +92,11 @@ class PatternSyncService {
         } finally {
             running.set(false);
         }
+    }
+
+    /** 该 unit 本轮 Loki 数据是否可信（未同步过的一律 false，宁可漏报也不误报）。 */
+    boolean isUnitUsable(String unit) {
+        return unitUsable.getOrDefault(unit, false);
     }
 
     /** 把一个模板的采样点按窗口折算成桶并落库；返回是否写入。 */

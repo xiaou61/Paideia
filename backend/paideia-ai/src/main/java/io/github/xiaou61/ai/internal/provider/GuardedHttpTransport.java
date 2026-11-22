@@ -10,6 +10,8 @@ import io.github.xiaou61.ai.internal.billing.BillingProperties;
 import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -26,6 +28,8 @@ import reactor.core.publisher.Flux;
  */
 @Component
 public class GuardedHttpTransport implements HttpTransport {
+
+    private static final Logger log = LoggerFactory.getLogger(GuardedHttpTransport.class);
 
     private final UpstreamGuard guard;
     /** 平台上游要求的固定请求头；仅在请求目标 host 与平台 baseUrl 一致时才附带。 */
@@ -73,12 +77,16 @@ public class GuardedHttpTransport implements HttpTransport {
                 .readTimeout(java.time.Duration.ofMinutes(5))
                 .writeTimeout(java.time.Duration.ofMinutes(1))
                 .callTimeout(java.time.Duration.ofMinutes(6));
-        if (!platformHeaders.isEmpty()) {
+        if (!platformHeaders.isEmpty() && platformHost == null) {
+            // fail-closed：解析不出平台 host 时宁可不装配请求头，也不要把会话/配额标识发给任意上游
+            log.warn("ai.billing.platform-credential.headers dropped: base-url 解析不出 host（baseUrl={}）",
+                    billing.getPlatformCredential().getBaseUrl());
+        } else if (!platformHeaders.isEmpty()) {
             final String targetHost = platformHost;
             final Map<String, String> extra = platformHeaders;
             builder.addInterceptor(chain -> {
                 okhttp3.Request request = chain.request();
-                if (targetHost == null || targetHost.equalsIgnoreCase(request.url().host())) {
+                if (targetHost.equalsIgnoreCase(request.url().host())) {
                     okhttp3.Request.Builder mutated = request.newBuilder();
                     for (Map.Entry<String, String> entry : extra.entrySet()) {
                         if (request.header(entry.getKey()) == null) {

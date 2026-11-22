@@ -122,7 +122,7 @@ interface PostmortemMapper {
     @Update("""
             UPDATE ops_postmortems
             SET status = 'ARCHIVED', updated_at = #{at}
-            WHERE incident_id = #{incidentId} AND status = 'APPROVED' AND id &lt;&gt; #{keepId}
+            WHERE incident_id = #{incidentId} AND status = 'APPROVED' AND id <> #{keepId}
             """)
     int archiveOthersOfIncident(@Param("incidentId") long incidentId,
                                 @Param("keepId") long keepId,

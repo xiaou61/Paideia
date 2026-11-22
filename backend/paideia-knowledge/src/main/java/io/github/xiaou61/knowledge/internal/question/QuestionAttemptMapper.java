@@ -55,6 +55,26 @@ public interface QuestionAttemptMapper {
     int deleteLinks(@Param("entryId") long entryId, @Param("blockKey") String blockKey,
                     @Param("questionKey") String questionKey);
 
+    /**
+     * 批量取一批条目的题目—概念关联（错题本避免逐题一次 SQL）。
+     *
+     * <p>行里带上 {@code entry_id/block_key/question_key}，调用方按三者组合分组。
+     */
+    @Select("""
+            <script>
+            SELECT entry_id, block_key, question_key, concept_id, weight
+            FROM question_concepts
+            WHERE entry_id IN
+            <foreach collection="entryIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+            ORDER BY entry_id, block_key, question_key, id
+            </script>
+            """)
+    List<KeyedLinkRow> findLinksForEntries(@Param("entryIds") List<Long> entryIds);
+
+    record KeyedLinkRow(long entryId, String blockKey, String questionKey, long conceptId,
+                        double weight) {
+    }
+
     @Insert("""
             INSERT INTO question_concepts
                 (entry_id, block_key, question_key, concept_id, weight, source, confidence, created_at)

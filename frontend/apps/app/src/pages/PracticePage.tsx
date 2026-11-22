@@ -6,6 +6,14 @@ import { Button } from '@paideia/ui'
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
 
+/**
+ * 题目的全局身份：`questionKey` 形如 `quiz1#0`，只在条目内唯一（后端唯一约束是
+ * entry_id + block_key + question_key），跨条目同名块必须靠三者组合区分。
+ */
+function questionIdentity(question: PracticeQuestion): string {
+  return `${question.entryId}/${question.blockKey}/${question.questionKey}`
+}
+
 /** 刷题页（WORK-083 TASK-006）：按标签筛题、逐题作答即时反馈，不生成试卷。 */
 export function PracticePage() {
   const exam = useMemo(() => createExamApi(api), [])
@@ -18,6 +26,8 @@ export function PracticePage() {
   const [index, setIndex] = useState(0)
   const [picked, setPicked] = useState<Record<string, number>>({})
   const [verdict, setVerdict] = useState<Record<string, boolean>>({})
+  // 请求进行中标记：作答状态要等响应回来才写入，期间连点会重复提交（后端无幂等键）
+  const [submitting, setSubmitting] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -45,10 +55,12 @@ export function PracticePage() {
   }, [load])
 
   const current = questions[index]
-  const answered = current ? picked[current.questionKey] !== undefined : false
+  const currentIdentity = current ? questionIdentity(current) : ''
+  const answered = current ? picked[currentIdentity] !== undefined : false
 
   async function choose(optionIndex: number) {
-    if (!current || answered) return
+    if (!current || answered || submitting) return
+    setSubmitting(true)
     try {
       const result = await exam.attempt({
         entryId: current.entryId,
@@ -56,10 +68,12 @@ export function PracticePage() {
         questionKey: current.questionKey,
         choice: optionIndex,
       })
-      setPicked((prev) => ({ ...prev, [current.questionKey]: optionIndex }))
-      setVerdict((prev) => ({ ...prev, [current.questionKey]: result.correct }))
+      setPicked((prev) => ({ ...prev, [currentIdentity]: optionIndex }))
+      setVerdict((prev) => ({ ...prev, [currentIdentity]: result.correct }))
     } catch (cause) {
       setError(errorMessage(cause))
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -117,12 +131,12 @@ export function PracticePage() {
             <p className="mt-3 text-base font-medium text-foreground">{current.stem}</p>
             <ul className="mt-3 space-y-2">
               {current.options.map((option, optionIndex) => {
-                const chosen = picked[current.questionKey] === optionIndex
+                const chosen = picked[currentIdentity] === optionIndex
                 return (
                   <li key={optionIndex}>
                     <button
                       type="button"
-                      disabled={answered}
+                      disabled={answered || submitting}
                       onClick={() => void choose(optionIndex)}
                       className={
                         'w-full rounded border px-3 py-2 text-left text-sm transition ' +
@@ -138,8 +152,8 @@ export function PracticePage() {
               })}
             </ul>
             {answered ? (
-              <p className={'mt-3 text-sm font-medium ' + (verdict[current.questionKey] ? 'text-green-600' : 'text-destructive')} data-testid="practice-verdict">
-                {verdict[current.questionKey] ? '答对了' : '答错了'}
+              <p className={'mt-3 text-sm font-medium ' + (verdict[currentIdentity] ? 'text-green-600' : 'text-destructive')} data-testid="practice-verdict">
+                {verdict[currentIdentity] ? '答对了' : '答错了'}
               </p>
             ) : null}
             <div className="mt-4 flex justify-end">

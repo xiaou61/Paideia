@@ -263,4 +263,61 @@ class PaperIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         assertThat(result).contains("\"correct\":2");
     }
+
+    @Test
+    @DisplayName("漏答：只落已答题，漏答既不写空选项也不记作答")
+    void partialAnswersAccepted() throws Exception {
+        mockMvc.perform(post("/api/v1/learning/papers")
+                        .header("Authorization", token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(3, 3)))
+                .andExpect(status().isOk());
+        long paperId = latestPaperId();
+        List<java.util.Map<String, Object>> items = jdbcTemplate.queryForList(
+                "SELECT id, answer_index_snapshot FROM paper_items WHERE paper_id = ? ORDER BY seq", paperId);
+        long firstItem = ((Number) items.get(0).get("id")).longValue();
+        int firstAnswer = ((Number) items.get(0).get("answer_index_snapshot")).intValue();
+
+        String content = mockMvc.perform(post("/api/v1/learning/papers/{id}/submit", paperId)
+                        .header("Authorization", token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"" + firstItem + "\":" + firstAnswer + "}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(content).contains("\"correct\":1").contains("\"total\":3");
+        // paper_answers.choice_index 是 NOT NULL：漏答题不能落一行 null，否则整卷交卷回滚成 500
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM paper_answers WHERE paper_id = ?", Integer.class, paperId)).isEqualTo(1);
+        // 漏答也不记作答，否则错题本与复习排期会把"没答"算成"答错"
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM question_attempts WHERE user_id = ? AND entry_id = ?",
+                Integer.class, subject, entryId)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("作答项不属于本卷、选项越界一律 400")
+    void invalidAnswersRejected() throws Exception {
+        mockMvc.perform(post("/api/v1/learning/papers")
+                        .header("Authorization", token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(2, 2)))
+                .andExpect(status().isOk());
+        long paperId = latestPaperId();
+        long itemId = jdbcTemplate.queryForObject(
+                "SELECT id FROM paper_items WHERE paper_id = ? ORDER BY seq LIMIT 1", Long.class, paperId);
+
+        mockMvc.perform(post("/api/v1/learning/papers/{id}/submit", paperId)
+                        .header("Authorization", token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"999999999\":0}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/v1/learning/papers/{id}/submit", paperId)
+                        .header("Authorization", token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"" + itemId + "\":5}"))
+                .andExpect(status().isBadRequest());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM paper_answers WHERE paper_id = ?", Integer.class, paperId)).isZero();
+    }
 }

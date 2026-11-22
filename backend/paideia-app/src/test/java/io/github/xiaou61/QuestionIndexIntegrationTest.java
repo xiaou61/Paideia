@@ -2,6 +2,8 @@ package io.github.xiaou61;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.xiaou61.knowledge.internal.entry.Entry;
+import io.github.xiaou61.knowledge.internal.entry.EntryMapper;
 import io.github.xiaou61.knowledge.internal.question.QuestionIndexService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,6 +42,9 @@ class QuestionIndexIntegrationTest {
 
     @Autowired
     QuestionIndexService indexService;
+
+    @Autowired
+    EntryMapper entryMapper;
 
     @Autowired
     JdbcTemplate jdbcTemplate;
@@ -142,5 +147,32 @@ class QuestionIndexIntegrationTest {
                 SELECT difficulty_label FROM question_index
                 WHERE entry_id = ? AND question_key = ?
                 """, String.class, entryId, BLOCK + "#0")).isEqualTo("hard");
+    }
+
+    @Test
+    @DisplayName("全量正文投影带 category_id，否则全量重建会把索引分类刷成 NULL")
+    void publishedWithBodyProjectionCarriesCategoryId() {
+        String slug = "it-index-cat-" + System.nanoTime();
+        jdbcTemplate.update("""
+                INSERT INTO knowledge_categories (name, slug, sort_order) VALUES (?, ?, 0)
+                """, "索引集成测试分类", slug);
+        long categoryId = jdbcTemplate.queryForObject(
+                "SELECT id FROM knowledge_categories WHERE slug = ?", Long.class, slug);
+        try {
+            jdbcTemplate.update("UPDATE knowledge_entries SET category_id = ? WHERE id = ?", categoryId, entryId);
+
+            // refreshAll() 的条目来自这个投影：少了 category_id，question_index.category_id 就全是 NULL，
+            // 按分类刷题与组卷的 qi.category_id 过滤会一条都查不到。这里只验投影，不跑全量重建——
+            // 重建会把整个库的已发布条目都写进 question_index，污染其它测试的候选集。
+            assertThat(entryMapper.findAllPublishedWithBody())
+                    .filteredOn(entry -> entry.getId() != null && entry.getId() == entryId)
+                    .singleElement()
+                    .extracting(Entry::getCategoryId)
+                    .isEqualTo(categoryId);
+        } finally {
+            // 先摘掉外键再删分类：@AfterEach 删条目发生在测试方法之后，这里直接删会撞 FK
+            jdbcTemplate.update("UPDATE knowledge_entries SET category_id = NULL WHERE id = ?", entryId);
+            jdbcTemplate.update("DELETE FROM knowledge_categories WHERE id = ?", categoryId);
+        }
     }
 }
