@@ -1,6 +1,6 @@
 # MCP 接入说明
 
-Paideia 通过 **MCP（Model Context Protocol）** 把平台能力暴露给外部 AI 助手。本文只讲怎么接、有哪些视图、注意什么；设计依据见 [WORK-019](../changes/WORK-019-MCP网关与工具目录/design.md)。
+Paideia 通过 **MCP（Model Context Protocol）** 把平台能力暴露给外部 AI 助手。本文只讲怎么接、有哪些视图、注意什么；设计依据见 [WORK-019](../changes/archive/2026-11-22-WORK-019-MCP网关与工具目录/design.md)。
 
 > 本文档**不含任何真实 token**。token 在你自己的「设置 → MCP 接入」页签发。
 

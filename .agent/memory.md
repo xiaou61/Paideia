@@ -14,7 +14,7 @@
 - 摘要：Boot 4 把测试切片拆成了独立 artifact，包名也变了。`@WebMvcTest` / `@AutoConfigureMockMvc` 在 `spring-boot-webmvc-test` 的 `org.springframework.boot.webmvc.test.autoconfigure`，不再是 `spring-boot-test-autoconfigure` 下的 `...autoconfigure.web.servlet`；按技术各自成 artifact，按需引入。
 - 标签：`spring-boot-4` `testing` `webmvc`
 - 范围：`backend/**` 的测试
-- 依据：`.agent/changes/WORK-001-架构选型与项目骨架/design.md`（测试策略的实施期确认）；实测 `spring-boot-webmvc-test-4.1.1.jar` 内的类路径
+- 依据：`.agent/changes/archive/2026-11-22-WORK-001-架构选型与项目骨架/design.md`（测试策略的实施期确认）；实测 `spring-boot-webmvc-test-4.1.1.jar` 内的类路径
 - 记录：2026-10-09
 - 复核：2026-10-09
 - 失效条件：升级到把切片合并回单一 artifact 的 Boot 版本。
@@ -24,7 +24,7 @@
 - 摘要：模块内的 `@WebMvcTest` 需要一份**同包**的启动配置类，且必须用 `@SpringBootApplication` 而不是 `@SpringBootConfiguration`——后者不含组件扫描，表现为所有控制器都注册不上、请求一律 404。也不要用 `@ContextConfiguration` 显式指定配置类，那会关掉切片自己的组件过滤。
 - 标签：`spring-boot-4` `testing` `webmvc` `modulith`
 - 范围：`backend/paideia-*/src/test/**`
-- 依据：`.agent/changes/WORK-001-架构选型与项目骨架/design.md`（测试策略的实施期确认）；`backend/paideia-web/src/test/java/io/github/xiaou61/web/WebSliceTestApplication.java`
+- 依据：`.agent/changes/archive/2026-11-22-WORK-001-架构选型与项目骨架/design.md`（测试策略的实施期确认）；`backend/paideia-web/src/test/java/io/github/xiaou61/web/WebSliceTestApplication.java`
 - 记录：2026-10-09
 - 复核：2026-10-09
 - 失效条件：模块不再需要切片测试，或转而全部使用 `@SpringBootTest`。
@@ -46,7 +46,7 @@
   **一次失败可直接重试**：2026-10-10 首次推送报 `Failed to connect to 127.0.0.1 port 7897`，而端口未变、监听正常，重试即成功——属瞬时抖动。**不要**因此改代理配置；确认端口与监听后先重试一次，再考虑其他原因。**直连不可用**：把代理覆盖为空直连 github 会得到 `Recv failure: Connection was reset`（TCP 握手过、TLS 被 reset），所以"直连也能连上"的探测会骗人。
 - 标签：`build` `electron` `pnpm` `network` `git`
 - 范围：`frontend/**`
-- 依据：`.agent/rules/always.md` 的构建命令段；`.agent/changes/WORK-001-架构选型与项目骨架/testing/logs/desktop-packaged.txt`；2026-10-10 推送 WORK-003 时的实测
+- 依据：`.agent/rules/always.md` 的构建命令段；`.agent/changes/archive/2026-11-22-WORK-001-架构选型与项目骨架/testing/logs/desktop-packaged.txt`；2026-10-10 推送 WORK-003 时的实测
 - 记录：2026-10-09
 - 复核：2026-10-10
 
