@@ -2,13 +2,16 @@
 artifact: requirements
 work_id: WORK-082
 work: 图谱页性能与交互重构
-status: done
+status: approved
 mode: managed
 mode_reason: 前端图谱页渲染与交互改造，跨多个前端文件、直接影响用户可见的性能与体验，需要持久追踪与前后对比证据；不改后端接口、数据模型、安全、迁移或公共契约，故按 managed / compact 执行。
 workflow: compact
 created: 2026-11-18
 updated: 2026-11-18
 related_to: [WORK-079, WORK-080]
+approved_by: xiaou61
+approved_at: 2026-11-22 14:45:44 +0800
+approver_role: owner
 ---
 
 # 图谱页性能与交互重构 — 需求

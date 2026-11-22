@@ -2,11 +2,14 @@
 artifact: tasks
 work_id: WORK-080
 work: 图版皮肤：结构层与排版层（三个激进样板）
-status: draft
+status: approved
 created: 2026-11-13
 updated: 2026-11-15
 mode: managed
 workflow: compact
+approved_by: xiaou61
+approved_at: 2026-11-22 14:45:17 +0800
+approver_role: owner
 ---
 
 # 实施任务：图版皮肤（结构层与排版层）

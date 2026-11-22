@@ -87,6 +87,15 @@ Paideia 的产品定位是「千人千面的 AI 个性化学习平台」。截�
 | 音视频与大体积媒体、PDF 之外的文档预览 | 推迟 | WORK-004「非目标」 | 内容形态扩到媒体时 |
 | 知识内容的外部批量导入 | 推迟 | WORK-004「非目标」 | 首批内容要成规模迁入时 |
 | 细粒度权限（内容编辑与发布者分离） | 推迟 | WORK-004「假设」 | 管理员多于一人且职责要分离时 |
+| **面经答案的外部依据检索**（WORK-084 TASK-005） | 推迟（2026-11-19 范围裁决，2026-11-22 从 `tasks.md` 摘出） | `WORK-084-面经问答验证型生成管线/tasks.md` 的范围变更说明 + `requirements.md` 文末「范围变更」 | 内部自检的漏报率回升，或需要「有依据的修订稿」而不只是「隔离待复核」时 |
+
+WORK-084 TASK-005 的原始设计（摘出时原样保留，重启时照此建任务）：
+
+- 新建 `EssayReferenceRetriever.java`：白名单检索 → 取前 3 → `UpstreamGuard.assertAllowed` → `HttpClient` GET https（禁重定向、8s 超时、≤200KB）→ 去标签 → 截 `snippet-chars`；进程内 LRU 500 / TTL 7 天；失败返回空列表。
+- 修改 `EssayVerifier.revise(...)` 实现「有依据的修订」；`EssayVerificationService` 的升级分支先 `retrieve` 再 `revise`。
+- 接口：`EssayReferenceRetriever.retrieve(String title, String answer) : List<ReferenceSnippet>`；`EssayVerifier.revise(...) : Revision`。
+- 测试：`EssayReferenceRetrieverTest`（`nonWhitelistedHostDropped`、`fetchFailureReturnsEmpty`、`snippetTruncated`）、`EssayVerificationServiceTest#reviseUsesSnippetsWhenAvailable`。
+- 为什么当时不做：58 条抽样里内部自检已拦下全部真错（3/3，误报 0、漏报 0），外部检索的边际收益撑不起白名单 + 抓取 + 缓存 + `UpstreamGuard` 的链路成本；且 `verify.external=false` 已写进需求。
 
 ### 三、暂缓或已否决，但有项目级归处
 

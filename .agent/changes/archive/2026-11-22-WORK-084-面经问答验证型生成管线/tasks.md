@@ -81,7 +81,9 @@ void reject(long id, String note, long adminUserId);
 
 ## 任务
 
-> **范围变更（2026-11-19）**：基线 1.72% 后缩范围，TASK-005/006/007 标记「本期不实施」，本期不做；TASK-008 只对比内部自检效果（依赖 TASK-001、TASK-004）。
+> **范围变更（2026-11-19）**：基线 1.72% 后缩范围，只做内部自检（TASK-002/003/004）；外部依据检索（TASK-005）转后续，见
+> `.agent/notes/deferred-scope.md`「WORK-084 外部依据检索」。TASK-006/007（复核队列后端与页面）**已完成**——复核队列是本期内部自检的隔离出口，
+> 不依赖外部检索；TASK-008 只对比内部自检效果（依赖 TASK-001、TASK-004）。
 
 ### TASK-001 | done | 建立现状基线标注集
 
@@ -139,19 +141,11 @@ void reject(long id, String note, long adminUserId);
 - 验证：`backend$ mvn -B -o -pl paideia-ai -am -Dtest='EssayVerificationServiceTest,EssayCollectionServiceVerifyTest,EssayCollectionRoutingTest,EssayCollectionFailureKindTest,EssaySourceFanOutTest,EssayBodyRendererTest' -Dsurefire.failIfNoSpecifiedTests=false test` → `Tests run: 29, Failures: 0, Errors: 0`，BUILD SUCCESS。
 - 完成（2026-11-19）：`FactCheck`/`Revision`/`ReferenceSnippet`/`VerificationOutcome`、`EssayVerificationPrompt`（`essay-verify-v2`，只判事实错误）、`EssayVerifier`（`checkFactual`；16000 tokens/300s 以适配推理模型）、`EssayVerificationService`（`auto_passed`/`pending_review`，存疑只隔离不改写）、`EssayCollectionService` 接线（`RunResult.pendingReview`、verify 关闭时零改动）落盘；新增 `EssayVerificationServiceTest`（5 例）与 `EssayCollectionServiceVerifyTest`（3 例：关闭时正文逐字 legacy、pending 不入库、revised 用修订答案）。
 
-### TASK-005 | pending | 【本期不实施】外部依据检索 + 接入升级分支
-
-- 对应：`REQ-001`、`REQ-002`
-- 依赖：TASK-004
-- 新建：`EssayReferenceRetriever.java`（白名单检索→前 3 → `UpstreamGuard.assertAllowed` → `HttpClient` GET https、禁重定向、8s、≤200KB → 去标签 → 截 `snippet-chars`；进程内 LRU 500/TTL 7 天；失败返回空列表）。
-  修改：`EssayVerifier.revise(...)` 实现有依据版本；`EssayVerificationService` 升级分支调 `retrieve` 后 `revise`。
-- 接口：`EssayReferenceRetriever.retrieve(String title, String answer) : List<ReferenceSnippet>`；`EssayVerifier.revise(...) : Revision`（见接口块）。
-- 测试：`EssayReferenceRetrieverTest`（`nonWhitelistedHostDropped`、`fetchFailureReturnsEmpty`、`snippetTruncated`）；`EssayVerificationServiceTest#reviseUsesSnippetsWhenAvailable`。
-- 步骤：
-  1. 写三条检索测试（打桩 HTTP，不真联网），红。
-  2. 实现检索器与缓存，绿。
-  3. 接进 service 升级分支；`revise` 输出 `revise` 且置信≥阈值时状态为 `revised`。
-- 验证：`backend$ scripts/test-db.sh mvn -B -pl paideia-ai -Dtest='EssayReferenceRetrieverTest,EssayVerificationServiceTest' test` → 全绿。
+> **TASK-005（外部依据检索 + 接入升级分支）已移出本期任务清单**（2026-11-19 范围裁决，2026-11-22 收尾时从 `tasks.md` 摘出，
+> 原文与启动条件见 `.agent/notes/deferred-scope.md`「WORK-084 外部依据检索」）。它不是「没做完」，而是**本期决定不做**：
+> 58 条抽样里内部自检已拦下全部真错（3/3，误报 0），外部检索的边际收益不足以支撑白名单、抓取、缓存与
+> `UpstreamGuard` 那一整条链路的成本，转后续按需启动。摘出的原因：留着一条 `pending` 会让工作项永远停在「实现中」，
+> 而它对应的验收项（AC-003 复核队列）已由 requirements 的范围变更明确「本期不验收」。
 
 ### TASK-006 | done | 复核队列后端（列表/采纳/驳回）
 

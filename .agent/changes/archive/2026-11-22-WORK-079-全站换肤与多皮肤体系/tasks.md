@@ -2,11 +2,14 @@
 artifact: tasks
 work_id: WORK-079
 work: 全站换肤与多皮肤体系
-status: draft
+status: approved
 created: 2026-11-13
 updated: 2026-11-13
 mode: managed
 workflow: compact
+approved_by: xiaou61
+approved_at: 2026-11-22 14:44:33 +0800
+approver_role: owner
 ---
 
 # 实施任务：全站换肤与多皮肤体系
@@ -153,19 +156,34 @@ workflow: compact
   重建会重跑力导向布局，等于每次换肤都"换一张图"，节点坐标是用户的空间记忆。
 - 验证：`pnpm --filter @paideia/app typecheck` 0 error。**图谱用例未跑**（见 TASK-012 的阻塞）
 
-### TASK-012 | pending | e2e：入口 / 切换 / 持久化 / 首屏不闪 / print
+### TASK-012 | done | e2e：入口 / 切换 / 持久化 / 首屏不闪 / print / 图谱跟随换肤
 
-- 对应：`AC-004`、`AC-005`、`AC-006`、`AC-008`、`AC-009`
+- 对应：`AC-004`、`AC-005`、`AC-006`、`AC-007`、`AC-008`、`AC-009`
 - 依赖：TASK-004、TASK-006、TASK-011
-- 新建：`apps/app/e2e/appearance.spec.ts`
-- 已写：五条用例（入口/切换+刷新保持/首屏不闪/筛选与空状态/打印）
-- **未执行**，本机有两个环境阻塞（都不是代码问题）：
-  1. `scripts/test-db.sh` 拒绝当前配置：`backend/config/remote-db.local.env` 指向远程 MySQL，
-     远端账号不能建新库；要跑得把 `PAIDEIA_TEST_DB_URL` 指到本机 MySQL。
-  2. Playwright 的 `chromium_headless_shell-1248` 缺失，`playwright install chromium-headless-shell` 只下到 ffmpeg。
-- 替代证据：用系统 Chrome + CDP 直接验了同一批行为（见 `testing/report.md` 的「运行时行为证据」），
-  只有"账号菜单入口"与"页面级 reload"没有跑到
-- 待验证：`bash ../scripts/test-db.sh pnpm --filter @paideia/app test:e2e e2e/appearance.spec.ts`（在能连本机测试库的机器上）
+- 新建：`apps/app/e2e/appearance.spec.ts`、`apps/app/e2e/graph-fixture.ts`（把 `graph.spec.ts` 里现造概念的
+  夹具抽出来共用）
+- 六条用例（入口/切换+刷新保持/首屏不闪/筛选与空状态/打印/**图谱节点跟随换肤**）
+- 结果记录（2026-11-22 14:36）：`scripts/test-db.sh pnpm --filter @paideia/app test:e2e e2e/appearance.spec.ts`
+  → `6 passed (43.9s)`，退出码 0，六条分别 2.5 / 3.0 / 2.6 / 2.6 / 2.6 / 4.8 秒。
+  日志 `testing/logs/e2e-appearance.log`；AC-007 单跑过一次 `1 passed (37.4s)`，日志
+  `testing/logs/e2e-appearance-graph-skin.log`。
+- AC-007 那条是 2026-11-22 新写的：管理员造一条概念 → 进图谱读节点计算 `fill`（来自 `var(--tier-*)`）→
+  经账号菜单进外观页换到 `brutal` → **只改 hash** 回图谱（不重载文档，这才叫"不刷新页面"）→ 同一节点
+  `fill` 必须变，且四个 `--tier-*` 互不相同。中途踩过的坑：皮肤 id 不是族名，图版族是
+  `brutal`/`editorial`/`win98`，没有 `graphic` 这个 id（`skin-card-graphic` 永远点不到 → 60s 超时）。
+- 当时记的两个阻塞都已消失或已绕过：
+  1. `test-db.sh` 现在**不派生库**、直接共用远程库 `paideia_e2e`（脚本已改），所以「远端账号建不了库」不再是阻塞，
+     代价是同一时刻只能跑一轮。
+  2. `chromium_headless_shell-1248` 已完整安装（`%LOCALAPPDATA%\ms-playwright\chromium_headless_shell-1248\`）。
+  3. **新发现的第三个阻塞（已在仓库里修掉）**：本机 vite 8.3.4 的 dev server 默认只绑 `[::1]:5173`，而
+     `playwright.config.ts` 的 app `url` 是 `http://127.0.0.1:5173`，webServer 探活必然 60s 超时。
+     已在 `apps/app/vite.config.ts` 的 `server` 里写死 `host: '127.0.0.1'`，现在直接 `pnpm dev` 就能被探活到，
+     不必再手动预起 dev server。
+- 跑通过程中修了用例自身两处过期断言（都不是产品缺陷）：
+  1. 皮肤卡片数硬编码 `17`，注册表现在是 `20`（新增 graphic / 家族皮肤）→ 改为 `SKINS.length`（从
+     `packages/ui/src/theme/skins.ts` 导入），以后加皮肤不再让这条用例变红。
+  2. `getByTestId('theme-toggle')` 现在解析到 2 个（顶栏与外观页页头各一个）→ strict mode 冲突，改为按
+     `#main-content` 限定到页头那个。
 
 ### TASK-013 | done | 规格文档与收尾
 

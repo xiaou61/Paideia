@@ -1,10 +1,15 @@
 ---
-artifact: testing_report
+artifact: test-report
 work_id: WORK-080
 work: 图版皮肤：结构层与排版层（三个激进样板）
-status: in_progress
-updated: 2026-11-15
-commit: 本分支首个提交 work/WORK-080（含本文件）
+status: passed
+evidence: required
+mode: managed
+workflow: compact
+created: 2026-11-15
+updated: 2026-11-22
+accepted_by: xiaou61
+accepted_at: 2026-11-22 14:47:14 +0800
 ---
 
 # 验证报告
@@ -42,6 +47,11 @@ commit: 本分支首个提交 work/WORK-080（含本文件）
 
 ## 未覆盖与遗留
 
-1. **Playwright e2e 未执行**：`apps/app/e2e/appearance.spec.ts`（WORK-079 写的五条）在本机跑不了——`chromium_headless_shell-1248` 缺失（`playwright install chromium-headless-shell` 只下到 ffmpeg）、`scripts/test-db.sh` 拒绝 `backend/config/remote-db.local.env` 里的远程库（远端账号建不了派生库）。本项的运行时证据全部来自 CDP，属于脚本证据，不等同于 e2e 证据。
+1. ~~**Playwright e2e 未执行**~~ → **2026-11-22 已补齐**：`chromium_headless_shell-1248` 已装好，
+   `test-db.sh` 现在直接共用远程库 `paideia_e2e`（不派生），`e2e/appearance.spec.ts` 跑通
+   `5 passed (40.1s)`（日志在 `WORK-079-全站换肤与多皮肤体系/testing/logs/e2e-appearance.log`）。
+   注意：那五条验的是**入口 / 切换 / 持久化 / 首屏不闪 / 筛选 / 打印**，**不验三个图版皮肤各自的观感**——
+   本项的视觉结论仍以 `graphic-report.json` 与 18 张 CDP 截图为准，e2e 只补上了"运行时行为"这一层。
+   另：本机 vite 8.3.4 默认只绑 `[::1]:5173`，跑 e2e 前要先起 `vite --host 127.0.0.1`。
 2. **其余候选皮肤未做**：`mac-classic` / `swiss` / `notebook` / `cel` / `cyber` / `typewriter` / `bauhaus` / `highlighter` / `compact` 九个已列出但未实现（本项只证明机制可行）。
 3. **`apps/admin` / `apps/public` 未逐个截图**：两者共用同一份 `@paideia/ui/styles.css`，样式代码同源，风险来自"某组件在管理端排得更密"——留到批量扩皮肤时连同 `admin` 一起抽查。

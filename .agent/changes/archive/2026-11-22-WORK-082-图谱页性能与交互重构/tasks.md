@@ -2,11 +2,14 @@
 artifact: tasks
 work_id: WORK-082
 work: 图谱页性能与交互重构
-status: done
+status: approved
 mode: managed
 workflow: compact
 created: 2026-11-18
 updated: 2026-11-18
+approved_by: xiaou61
+approved_at: 2026-11-22 14:45:44 +0800
+approver_role: owner
 ---
 
 # 图谱页性能与交互重构 — 任务
