@@ -96,6 +96,15 @@ export default defineConfig(({ mode }) => ({
   ].filter(Boolean),
   server: {
     port: PORT,
+    /**
+     * 显式绑 IPv4 回环。Vite 8 的默认 `localhost` 在 Windows 上只解析到 `[::1]`，
+     * 而 Playwright 的 `webServer.url` 与 `baseURL` 都是 `http://127.0.0.1:<port>`
+     * （见 playwright.config.ts）——探活连不上就报 `Timed out waiting 60000ms from
+     * config.webServer`，看起来像后端没起来，实际是绑在了另一族地址上。
+     * 2026-11-22 实测：`netstat` 只有 `TCP [::1]:5173 LISTENING`，`http://127.0.0.1:5173/`
+     * 拒绝连接、`http://localhost:5173/` 返回 200。绑 127.0.0.1 后两边一致。
+     */
+    host: '127.0.0.1',
     // 开发期由 Vite 代理转发到后端，省去跨域配置。
     // 桌面壳没有代理，那时必须把它的来源加入后端的 CORS 允许列表。
     proxy: {
@@ -104,4 +113,3 @@ export default defineConfig(({ mode }) => ({
     },
   },
 }))
-

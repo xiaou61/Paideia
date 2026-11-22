@@ -1,5 +1,6 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
+import { createConceptFixture } from './graph-fixture'
 import { signIn } from './session'
 
 /**
@@ -11,58 +12,6 @@ import { signIn } from './session'
  * <p>不验掌握度数值：它由服务端纯函数算出，单测与集成测试已经覆盖；这里只验用户能看到的
  * 三件事——能进、有节点时能看图、没有 WebGL 时不白屏。
  */
-
-const ADMIN = {
-  identifier: process.env.E2E_ADMIN_IDENTIFIER ?? 'seed-admin',
-  password: process.env.E2E_ADMIN_PASSWORD ?? 'seed-admin-password',
-}
-
-/** 用管理员身份拿一个令牌。**只用于造/删夹具**，不参与被测页面。 */
-async function adminToken(request: APIRequestContext): Promise<string> {
-  const response = await request.post('/api/v1/auth/login', {
-    data: { identifier: ADMIN.identifier, password: ADMIN.password },
-  })
-  expect(response.ok(), '管理员登录失败：夹具没法造').toBeTruthy()
-  const body = (await response.json()) as { data: { accessToken: string } }
-  return `Bearer ${body.data.accessToken}`
-}
-
-interface Fixture {
-  cleanup: () => Promise<void>
-}
-
-async function createConceptFixture(request: APIRequestContext): Promise<Fixture> {
-  const bearer = await adminToken(request)
-  const name = `e2e 图谱概念 ${Date.now()}`
-
-  const created = await request.post('/api/v1/knowledge/admin/concepts', {
-    headers: { Authorization: bearer },
-    data: { name, summary: 'e2e 自动创建，跑完删除' },
-  })
-  expect(created.ok()).toBeTruthy()
-  const id = ((await created.json()) as { data: number }).data
-
-  // 挂一个已发布条目，让节点带载体（也顺带走了"挂条目"这条写路径）
-  const entries = await request.get('/api/v1/knowledge/entries?size=1', {
-    headers: { Authorization: bearer },
-  })
-  const list = (await entries.json()) as { data: { items: { id: number }[] } }
-  const entryId = list.data.items[0]?.id
-  if (entryId !== undefined) {
-    await request.post(`/api/v1/knowledge/admin/concepts/${id}/entries`, {
-      headers: { Authorization: bearer },
-      data: { entryId },
-    })
-  }
-
-  return {
-    cleanup: async () => {
-      await request.delete(`/api/v1/knowledge/admin/concepts/${id}`, {
-        headers: { Authorization: bearer },
-      })
-    },
-  }
-}
 
 async function openGraph(page: Page) {
   await page.goto('/#/graph')
