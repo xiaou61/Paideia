@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import type { CaptchaChallenge } from './auth-api'
 import { messageOf, useAuth } from './auth-context'
 import { CaptchaImage } from './captcha-image'
+import { useResendCooldown } from './use-resend-cooldown'
 
 /** 发信后的重发冷却秒数，与后端的"同邮箱 60 秒间隔"对齐。 */
 const RESEND_SECONDS = 60
@@ -23,9 +24,9 @@ export function RegisterForm({ onSuccess }: { onSuccess?: () => void }) {
   const [code, setCode] = useState('')
   const [captcha, setCaptcha] = useState<CaptchaChallenge | null>(null)
   const [sent, setSent] = useState(false)
-  const [cooldown, setCooldown] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const cooldown = useResendCooldown(RESEND_SECONDS)
 
   const refreshCaptcha = useCallback(async () => {
     try {
@@ -40,21 +41,13 @@ export function RegisterForm({ onSuccess }: { onSuccess?: () => void }) {
     void refreshCaptcha()
   }, [refreshCaptcha])
 
-  useEffect(() => {
-    if (cooldown <= 0) {
-      return
-    }
-    const timer = globalThis.setInterval(() => setCooldown((value) => value - 1), 1000)
-    return () => globalThis.clearInterval(timer)
-  }, [cooldown])
-
   async function sendCode() {
     setBusy(true)
     setError(null)
     try {
       await api.sendEmailCode(email, captcha?.captchaId ?? '', captchaAnswer)
       setSent(true)
-      setCooldown(RESEND_SECONDS)
+      cooldown.start()
       // 验证码已用过一次，图形验证码作废，换一张备下次重发
       await refreshCaptcha()
     } catch (failure) {
@@ -145,11 +138,11 @@ export function RegisterForm({ onSuccess }: { onSuccess?: () => void }) {
           type="button"
           variant="outline"
           onClick={() => void sendCode()}
-          disabled={busy || cooldown > 0 || captcha === null}
+        disabled={busy || cooldown.remaining > 0 || captcha === null}
           data-testid="register-send-code"
           className="h-10"
         >
-          {cooldown > 0 ? `${cooldown} 秒后可重发` : '发送邮箱验证码'}
+        {cooldown.remaining > 0 ? `${cooldown.remaining} 秒后可重发` : '发送邮箱验证码'}
         </Button>
       </div>
 

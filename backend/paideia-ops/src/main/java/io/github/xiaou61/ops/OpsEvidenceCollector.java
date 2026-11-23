@@ -36,13 +36,20 @@ class OpsEvidenceCollector {
             DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.of("Asia/Shanghai"));
 
     /**
-     * 三段日志查询（WORK-086）：异常 / 生命周期 / 上下文。顺序有意义——预算不够时
-     * 前两段先落地，上下文段是锦上添花。
+     * 主查询段（WORK-086）：异常 / 生命周期。顺序有意义——预算不够时异常段先落地。
+     *
+     * <p>上下文段不在这里：它必须锚定到「异常发生的时刻附近」才有意义。早先它是空 selector，
+     * 而 {@code queryRange} 固定 {@code direction=backward} 并按 limit 截断，于是拿到的是
+     * <b>窗口里最新的两行</b>——正常流量下几乎恒为同两条无关 INFO 行，既占签名名额，也会被
+     * {@code countRestarts} 当候选扫描。现在改为在拿到异常行之后再补一次窄查询
+     * （见 {@link #queryUnit}），窗口取最早一条异常前后 {@code CONTEXT_WINDOW_SECONDS} 秒。
      */
     private static final List<String> LOG_SEGMENTS = List.of(
             " |~ \"(?i)(error|exception|failed|timeout)\"",
-            " |~ \"(?i)(started|starting|stopping|shutdown|restart|killed|oom|exit)\"",
-            "");
+            " |~ \"(?i)(started|starting|stopping|shutdown|restart|killed|oom|exit)\"");
+
+    /** 上下文段的时间半宽：以最早一条异常行为中心，前后各取这么多秒。 */
+    private static final long CONTEXT_WINDOW_SECONDS = 30;
 
     /** 生命周期段与上下文段的条数上限：它们是佐证，不参与"报了什么错"的主体。 */
     private static final int LIFECYCLE_LOG_LIMIT = 20;
@@ -176,7 +183,7 @@ class OpsEvidenceCollector {
         String contextText = context == null ? "" : context.strip();
         String alertsText = firingAlerts();
         String deploysText = formatDeploy();
-        String tracesText = formatTraces();
+        String tracesText = formatTraces(evidenceWindow);
         // 模板聚类证据读的是本地表（同步任务的产物），不额外打 Loki；为 null（测试/未装配）时留空。
         String patternsText = patterns == null ? "" : patterns.evidenceText(Instant.now());
 
@@ -420,11 +427,15 @@ class OpsEvidenceCollector {
         return value == null || !Double.isFinite(value) ? "—" : trimmed(value, 2) + unit;
     }
 
-    /** 最近 1 小时的错误/慢 trace；最多 3 条，每条只带最慢 span 与白名单属性。 */
-    private String formatTraces() {
-        Instant to = Instant.now();
-        Instant from = to.minus(Duration.ofHours(1));
-        List<TempoClient.TraceSummary> traces = tempo.search(from, to, 3);
+    /**
+     * 与日志/指标共用同一窗口的错误/慢 trace；最多 3 条，每条只带最慢 span 与白名单属性。
+     *
+     * <p>窗口必须来自 {@link OpsEvidenceWindow}，不能在方法内部重新取 {@code Instant.now()}：
+     * 事后补跑的诊断（事件 14:17、14:41 才跑）拿到的 trace 会落在错误的时段，
+     * 报告就会引用与日志/指标对不上的调用链。
+     */
+    private String formatTraces(OpsEvidenceWindow window) {
+        List<TempoClient.TraceSummary> traces = tempo.search(window.start(), window.end(), 3);
         if (traces.isEmpty()) {
             return "无匹配 trace（或 Tempo 不可达）";
         }
@@ -548,15 +559,19 @@ class OpsEvidenceCollector {
         return out.toString();
     }
 
-    /** 三段查询后按 (时间, 原文) 去重：上下文段几乎一定会把异常段的行再捞回来一次。 */
+    /**
+     * 主段查询 + 锚定到异常时刻的上下文段，最后按 (时间, 原文) 去重。
+     *
+     * <p>上下文段刻意排在主段之后、且用它自己的窄窗口：没有异常行就没有上下文可补，
+     * 硬查只会给证据里塞固定噪声。
+     */
     private List<LokiClient.LogLine> queryUnit(String unit, OpsEvidenceWindow window, int perUnitLines) {
         String selector = "{unit=\"" + unit + ".service\"}";
         List<LokiClient.LogLine> collected = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         List<Integer> limits = List.of(
                 perUnitLines,
-                Math.max(0, Math.min(LIFECYCLE_LOG_LIMIT, perUnitLines)),
-                Math.max(0, Math.min(CONTEXT_LOG_LIMIT, perUnitLines)));
+                Math.max(0, Math.min(LIFECYCLE_LOG_LIMIT, perUnitLines)));
         for (int i = 0; i < LOG_SEGMENTS.size(); i++) {
             int limit = limits.get(i);
             if (limit <= 0) {
@@ -569,7 +584,39 @@ class OpsEvidenceCollector {
                 }
             }
         }
+        collectContext(selector, collected, seen, perUnitLines);
         return collected;
+    }
+
+    /**
+     * 在最早一条异常行前后 {@code CONTEXT_WINDOW_SECONDS} 秒内补几行「非异常」日志，
+     * 让模型看到异常发生瞬间在发生什么。
+     *
+     * <p>用 {@code !~} 排除异常关键字：否则这段只会把异常段的行再捞一遍（去重后等于没补）。
+     */
+    private void collectContext(String selector, List<LokiClient.LogLine> collected, Set<String> seen,
+                                int perUnitLines) {
+        int limit = Math.max(0, Math.min(CONTEXT_LOG_LIMIT, perUnitLines));
+        if (limit <= 0 || collected.isEmpty()) {
+            return;
+        }
+        Instant earliest = collected.stream()
+                .map(LokiClient.LogLine::at)
+                .min(Comparator.naturalOrder())
+                .orElse(null);
+        if (earliest == null) {
+            return;
+        }
+        String contextSelector = selector + " !~ \"(?i)(error|exception|failed|timeout)\"";
+        for (LokiClient.LogLine line : loki.queryRange(
+                contextSelector,
+                earliest.minusSeconds(CONTEXT_WINDOW_SECONDS),
+                earliest.plusSeconds(CONTEXT_WINDOW_SECONDS),
+                limit)) {
+            if (seen.add(line.at() + "\u0000" + line.line())) {
+                collected.add(line);
+            }
+        }
     }
 
     /**

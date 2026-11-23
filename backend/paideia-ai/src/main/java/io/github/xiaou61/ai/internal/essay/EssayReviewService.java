@@ -10,6 +10,7 @@ import io.github.xiaou61.platform.PageResult;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 面经「待复核」记录的处理（WORK-084 TASK-006）。
@@ -29,6 +30,14 @@ public class EssayReviewService {
 
     static final String APPROVED = "approved";
     static final String REJECTED = "rejected";
+
+    /**
+     * 标题上限与 `knowledge_entries.title VARCHAR(200)` 对齐。
+     *
+     * <p>不在这里挡，超长标题会撞列宽 → SQL 异常 → 500，而这条复核记录的状态不会变，
+     * 管理员反复点「采纳」永远失败，只能手工改库。
+     */
+    private static final int MAX_TITLE = 200;
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -75,6 +84,7 @@ public class EssayReviewService {
      * @param publish true → 直接发布，false → 存草稿
      * @return 生成的（或已存在的）知识条目 id
      */
+    @Transactional
     public long approve(long id, String titleOverride, String answerOverride, boolean publish, long reviewerId) {
         EssayVerificationRow row = requireRow(id);
         if (APPROVED.equals(row.getStatus()) && row.getEntryId() != null) {
@@ -89,14 +99,22 @@ public class EssayReviewService {
         if (isBlank(title)) {
             throw new BizException(ErrorCode.INVALID_ARGUMENT, "题目不能为空");
         }
+        if (title.length() > MAX_TITLE) {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT, "题目过长（上限 " + MAX_TITLE + " 字符）");
+        }
         if (isBlank(answer)) {
             throw new BizException(ErrorCode.INVALID_ARGUMENT, "答案不能为空");
         }
+        requireCategory(row.getCategoryId());
         String body = EssayBodyRenderer.render(title, answer, row.getSourceUrl(), row.getSourceTitle());
         KnowledgeApi.CreateOutcome outcome = knowledge.createCollected(new KnowledgeApi.CollectedEntry(
                 title, body, row.getCategoryId(), publish ? "published" : "draft",
                 row.getFingerprint(), row.getSourceUrl()));
-        mapper.markReviewed(id, APPROVED, outcome.entryId(), reviewerId, null);
+        // 状态守卫在 SQL 里（WHERE status IN ('pending_review','revised')）：并发点两次「采纳」时
+        // 只有第一条能改到行，第二条拿到 0 行 → 回滚刚建的条目并报冲突，而不是各建一条。
+        if (mapper.markReviewed(id, APPROVED, outcome.entryId(), reviewerId, null) == 0) {
+            throw new BizException(ErrorCode.CONFLICT, "这条记录已被其他人处理，请刷新后重试");
+        }
         return outcome.entryId();
     }
 
@@ -115,6 +133,22 @@ public class EssayReviewService {
     private EssayVerificationRow requireRow(long id) {
         return mapper.findById(id)
                 .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "复核记录不存在"));
+    }
+
+    /**
+     * 分类必须仍然存在：待复核的行可能放了好几天，期间分类被删掉，采纳时会撞
+     * `knowledge_entries.category_id` 的外键。null（未分类）是合法值。
+     */
+    private void requireCategory(Long categoryId) {
+        if (categoryId == null) {
+            return;
+        }
+        boolean exists = knowledge.listCategories().stream()
+                .anyMatch(node -> node.id() == categoryId);
+        if (!exists) {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT,
+                    "分类已不存在（id=" + categoryId + "），请先在知识库里选一个分类再采纳");
+        }
     }
 
     private static String effectiveAnswer(EssayVerificationRow row) {

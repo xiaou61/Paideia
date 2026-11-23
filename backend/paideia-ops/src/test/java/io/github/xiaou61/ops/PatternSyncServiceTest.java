@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -107,7 +108,9 @@ class PatternSyncServiceTest {
         int written = service.syncOnce(now);
 
         assertThat(written).isEqualTo(1);
-        verify(mapper).upsertTemplate(anyString(), anyString(), anyString(), anyString(), any(), any(),
+        // 第 4 个参数是 sample_line：Loki 的 pattern 接口不给真实样例，以前把 pattern 再截一段塞进去，
+        // 结果 sample_line 与 pattern 两列恒等。现在明确传 null，别让"看起来有样例"再回来。
+        verify(mapper).upsertTemplate(anyString(), anyString(), anyString(), isNull(), any(), any(),
                 anyInt(), anyLong(), any(), any());
         // 单个采样点落一个桶：桶边界就是它所在的 15 分钟窗口。
         verify(mapper).upsertBucket(anyString(), anyString(),

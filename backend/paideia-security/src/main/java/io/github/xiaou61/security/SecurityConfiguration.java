@@ -133,7 +133,10 @@ public class SecurityConfiguration {
                         .cacheControl(cache -> cache.disable())
                         .addHeaderWriter((request, response) -> {
                             String path = request.getRequestURI();
-                            if (path != null && path.startsWith("/assets/")) {
+                            // 管理端产物落在 /admin/assets/**（admin 的 vite base 是 './'），
+                            // 文件名同样带内容哈希，漏掉它管理端每次刷新仍会整包重下
+                            if (path != null && (path.startsWith("/assets/")
+                                    || path.startsWith("/admin/assets/"))) {
                                 response.setHeader("Cache-Control", "public, max-age=31536000, immutable");
                             } else if (path != null
                                     && (path.equals("/") || path.endsWith(".html")
@@ -248,6 +251,9 @@ public class SecurityConfiguration {
                                 "/admin",
                                 "/admin/**",
                                 "/favicon.ico",
+                                // SVG 图标（三端 index.html 都引了 /favicon.svg）。少了这一行浏览器取图标
+                                // 会拿到 401——图标是匿名请求，且它和 .ico 是同一份资源的不同格式。
+                                "/favicon.svg",
                                 // PWA：清单、Service Worker 及其运行时、图标
                                 "/manifest.webmanifest",
                                 "/sw.js",

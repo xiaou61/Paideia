@@ -16,7 +16,11 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -37,8 +41,8 @@ import org.springframework.transaction.annotation.Transactional;
  *       与注册验证码那套是同一条理由：没有它们，这个接口就是替别人烧发信配额的工具。</li>
  * </ol>
  *
- * <p>剩下的差别只有耗时（查不到邮箱时更快、发信那一路还要等 SMTP）。这不构成可用的
- * 枚举手段：拿到"是/否"仍需要先过图形验证码与限流，而这条信息本身也只够让他多发几封邮件。
+ * <p><b>耗时也不能泄漏"是/否"</b>：发信走后台线程、请求路径只剩几条 SQL，快慢两条路再用一个
+ * 统一的耗时下限兜平（{@link #MIN_RESPONSE_NANOS}），响应时间因此不构成可用的枚举手段。
  *
  * <p><b>改口令会吊销该用户全部 refresh 令牌</b>：重置口令的典型场景就是"账号可能被别人
  * 动过"，此时把所有已登录会话踢下线是必须的，否则改完口令对方照样能用旧的 refresh 续期。
@@ -59,6 +63,14 @@ public class PasswordResetService {
     private static final int TOKEN_BYTES = 32;
     /** 前端路由。加参数时注意 HashRouter：路径在 # 之后，查询串也在 # 之后。 */
     private static final String RESET_PATH = "/#/reset-password?token=";
+    /**
+     * 请求路径的耗时下限。
+     *
+     * <p>「邮箱没注册」这条分支本来只查一次库就返回，而「注册过」要写令牌、发信，两者耗时差
+     * 三个数量级——返回体完全一样，光看响应时间就能判断邮箱是否存在。发信挪到后台线程之后
+     * 剩下的差别只有几条 SQL，再用一个下限把快的那条兜平，两条路径就分不出来了。
+     */
+    private static final long MIN_RESPONSE_NANOS = TimeUnit.MILLISECONDS.toNanos(250);
 
     private final PasswordResetTokenMapper tokens;
     private final UserMapper userMapper;
@@ -70,6 +82,12 @@ public class PasswordResetService {
     private final AccountWebProperties webProperties;
     private final SecureRandom random = new SecureRandom();
     private final AtomicBoolean fallbackWarningLogged = new AtomicBoolean();
+    /** 发信专用单线程：请求线程不再等 SMTP，耗时与邮箱是否存在无关。 */
+    private final ExecutorService mailSender = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "password-reset-mail");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     PasswordResetService(PasswordResetTokenMapper tokens,
                          UserMapper userMapper,
@@ -98,6 +116,7 @@ public class PasswordResetService {
      */
     public void request(String email, String captchaId, String captchaAnswer,
                         String sourceAddress, String requestBaseUrl) {
+        long startedAt = System.nanoTime();
         captchaService.verifyAndConsume(captchaId, captchaAnswer);
 
         String emailKey = hashOf(email);
@@ -108,19 +127,48 @@ public class PasswordResetService {
 
         Optional<User> found = userMapper.findByEmail(email.trim());
         if (found.isEmpty()) {
+            // 与「注册过」那条路走到同一个耗时下限，否则响应时间本身就是枚举信号
+            awaitResponseFloor(startedAt);
             return;
         }
         User user = found.get();
         Instant now = Instant.now();
 
-        // 先作废旧令牌再发新的：否则申请 N 次就有 N 个可用链接
-        tokens.invalidateActiveForUser(user.getId(), now);
-
         String rawToken = newToken();
-        tokens.insert(user.getId(), Digest.sha256Hex(rawToken), now.plus(TOKEN_TTL));
+        String tokenHash = Digest.sha256Hex(rawToken);
+        tokens.insert(user.getId(), tokenHash, now.plus(TOKEN_TTL));
 
-        // 发信失败按异常向上抛：与注册同一条理由——静默成功会让用户永远等一封不会来的邮件
-        mailPort.sendPasswordReset(user.getEmail(), link(requestBaseUrl, rawToken), TOKEN_TTL);
+        // 发信挪到后台：① 请求耗时不再随 SMTP 快慢浮动（否则仍可用响应时间判断邮箱是否存在）；
+        // ② 旧令牌在发信成功之后才作废——发信失败时用户手上还有一条能用的旧链接，
+        //    而不是"旧的被作废、新的没收到"。
+        mailSender.execute(() -> {
+            try {
+                mailPort.sendPasswordReset(user.getEmail(), link(requestBaseUrl, rawToken), TOKEN_TTL);
+                tokens.invalidateOthersForUser(user.getId(), tokenHash, Instant.now());
+            } catch (RuntimeException failure) {
+                log.error("密码重置邮件发送失败（userId={}）：旧链接保持可用，用户可稍后重新申请",
+                        user.getId(), failure);
+            }
+        });
+        awaitResponseFloor(startedAt);
+    }
+
+    /** 把快路径兜到统一耗时下限（SMTP 已挪出请求路径，剩下的只有几条 SQL 的差异）。 */
+    private static void awaitResponseFloor(long startedAtNanos) {
+        long remaining = MIN_RESPONSE_NANOS - (System.nanoTime() - startedAtNanos);
+        if (remaining <= 0) {
+            return;
+        }
+        try {
+            TimeUnit.NANOSECONDS.sleep(remaining);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    @PreDestroy
+    void shutdownMailSender() {
+        mailSender.shutdown();
     }
 
     /**

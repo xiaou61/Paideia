@@ -30,7 +30,6 @@ import org.springframework.stereotype.Service;
 class PatternSyncService {
 
     private static final int PATTERN_COLUMN_MAX = 500;
-    private static final int SAMPLE_COLUMN_MAX = 1000;
 
     private final OpsProperties properties;
     private final PatternMapper mapper;
@@ -81,8 +80,18 @@ class PatternSyncService {
                 // 空列表既可能是「Loki 挂了/接口不存在」也可能是「窗口内没有模板」，
                 // 只有再探一次才知道能不能拿这一轮的数据做「消失」判定
                 unitUsable.put(unit, !series.isEmpty() || loki.reachable());
+                // 同一段 pattern 文本很可能以多条 series 返回（选择器没按 level 过滤，每个 level 一条），
+                // 逐条落桶会被 ON DUPLICATE KEY UPDATE 互相覆盖、频次只等于其中一个 level 的条数。
+                // 先按 template_hash 合并（同桶累加）再落库。
+                Map<String, PatternAggregate> byHash = new LinkedHashMap<>();
                 for (LokiClient.PatternSeries one : series) {
-                    if (writeSeries(unit, one, windowMinutes, now)) {
+                    String pattern = OpsLogRedactor.redactDocument(one.pattern());
+                    PatternAggregate aggregate =
+                            byHash.computeIfAbsent(sha256(pattern), key -> new PatternAggregate(pattern));
+                    aggregate.add(one, windowMinutes);
+                }
+                for (Map.Entry<String, PatternAggregate> entry : byHash.entrySet()) {
+                    if (writeAggregate(unit, entry.getKey(), entry.getValue(), now)) {
                         written++;
                     }
                 }
@@ -99,45 +108,64 @@ class PatternSyncService {
         return unitUsable.getOrDefault(unit, false);
     }
 
-    /** 把一个模板的采样点按窗口折算成桶并落库；返回是否写入。 */
-    private boolean writeSeries(String unit, LokiClient.PatternSeries series,
-                                int windowMinutes, Instant now) {
-        Map<Instant, Long> perBucket = new LinkedHashMap<>();
-        Instant first = null;
-        Instant last = null;
-        long lastCount = 0;
-        long total = 0;
-        for (LokiClient.PatternSample sample : series.samples()) {
-            Instant at = sample.at();
-            if (at == null) {
-                continue;
-            }
-            int count = (int) Math.min(Integer.MAX_VALUE, Math.max(0, sample.count()));
-            perBucket.merge(bucketStart(at, windowMinutes), (long) count, Long::sum);
-            if (first == null || at.isBefore(first)) {
-                first = at;
-            }
-            if (last == null || !at.isBefore(last)) {
-                last = at;
-                lastCount = count;
-            }
-            total += count;
-        }
-        if (perBucket.isEmpty()) {
+    /** 把一个模板（已按 template_hash 合并过 level）的采样点按窗口折算成桶并落库；返回是否写入。 */
+    private boolean writeAggregate(String unit, String hash, PatternAggregate aggregate, Instant now) {
+        if (aggregate.perBucket.isEmpty()) {
             return false;
         }
-        String hash = sha256(series.pattern());
-        String pattern = truncate(series.pattern(), PATTERN_COLUMN_MAX);
-        String sampleLine = truncate(series.pattern(), SAMPLE_COLUMN_MAX);
-        mapper.upsertTemplate(hash, unit, pattern, sampleLine, first, last,
-                (int) Math.min(Integer.MAX_VALUE, lastCount), total, now, now);
-        for (Map.Entry<Instant, Long> entry : perBucket.entrySet()) {
+        String pattern = truncate(aggregate.pattern, PATTERN_COLUMN_MAX);
+        // Loki 的 pattern 接口不返回真实样例行；早先这里把 pattern 再截一段塞进 sample_line，
+        // 两列内容恒等（只在 pattern 超长时才不同），既没有信息量又白占 1KB 宽度。留 NULL。
+        mapper.upsertTemplate(hash, unit, pattern, null, aggregate.first, aggregate.last,
+                (int) Math.min(Integer.MAX_VALUE, aggregate.lastCount), aggregate.total, now, now);
+        for (Map.Entry<Instant, Long> entry : aggregate.perBucket.entrySet()) {
             ZonedDateTime local = entry.getKey().atZone(ZoneId.systemDefault());
             int dow = local.getDayOfWeek().getValue() % 7; // 0=周日，与 buckets.dow 约定一致
             mapper.upsertBucket(hash, unit, entry.getKey(), dow, local.getHour(),
                     (int) Math.min(Integer.MAX_VALUE, entry.getValue()), now);
         }
         return true;
+    }
+
+    /**
+     * 同一 template_hash 下多条 series（不同 level）的累加器。
+     *
+     * <p>桶按时间对齐后累加，{@code total} 与 {@code lastCount} 同样累加——否则频次被系统性低估，
+     * 连带影响 {@code FREQ_SPIKE}（突增达不到倍数）与基线均值，进而影响 {@code DISAPPEARED} 判定。
+     */
+    private static final class PatternAggregate {
+
+        private final String pattern;
+        private final Map<Instant, Long> perBucket = new LinkedHashMap<>();
+        private Instant first;
+        private Instant last;
+        private long lastCount;
+        private long total;
+
+        private PatternAggregate(String pattern) {
+            this.pattern = pattern;
+        }
+
+        private void add(LokiClient.PatternSeries series, int windowMinutes) {
+            for (LokiClient.PatternSample sample : series.samples()) {
+                Instant at = sample.at();
+                if (at == null) {
+                    continue;
+                }
+                int count = (int) Math.min(Integer.MAX_VALUE, Math.max(0, sample.count()));
+                perBucket.merge(bucketStart(at, windowMinutes), (long) count, Long::sum);
+                if (first == null || at.isBefore(first)) {
+                    first = at;
+                }
+                if (last == null || at.isAfter(last)) {
+                    last = at;
+                    lastCount = count;
+                } else if (at.equals(last)) {
+                    lastCount += count;
+                }
+                total += count;
+            }
+        }
     }
 
     private void purge(Instant now, int retentionDays) {

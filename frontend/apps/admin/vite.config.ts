@@ -19,6 +19,10 @@ export default defineConfig({
   plugins: [react(), tailwindcss(), themeInitPlugin()],
   server: {
     port: PORT,
+    // 显式绑 IPv4 回环：Vite 8 的默认 `localhost` 在 Windows 上只解析到 `[::1]`，
+    // 而 Playwright 的 webServer.url / baseURL 都是 `http://127.0.0.1:<port>`，
+    // 不绑就会等到 60s 超时。可覆写以便手机/局域网调试。
+    host: process.env.PAIDEIA_ADMIN_HOST ?? '127.0.0.1',
     proxy: {
       '/api': { target: BACKEND, changeOrigin: true },
       '/actuator': { target: BACKEND, changeOrigin: true },

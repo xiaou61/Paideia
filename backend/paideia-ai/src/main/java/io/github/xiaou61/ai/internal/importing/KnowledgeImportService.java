@@ -8,6 +8,7 @@ import io.github.xiaou61.ai.RunOutcome;
 import io.github.xiaou61.ai.RunRecorder;
 import io.github.xiaou61.ai.RunSpec;
 import io.github.xiaou61.ai.internal.credential.CredentialService;
+import io.github.xiaou61.ai.internal.provider.DocumentDistillPrompt;
 import io.github.xiaou61.ai.internal.resume.ResumeTextExtractor;
 import io.github.xiaou61.knowledge.KnowledgeApi;
 import io.github.xiaou61.platform.BizException;
@@ -137,8 +138,11 @@ public class KnowledgeImportService {
                 return;
             }
 
-            try (RunRecorder.RunScope run = recorder.begin(RunSpec.of(RunKind.KNOWLEDGE_IMPORT, job.getOperatorId())
-                    .withModel(access.get().model()))) {
+        try (RunRecorder.RunScope run = recorder.begin(RunSpec.of(RunKind.KNOWLEDGE_IMPORT, job.getOperatorId())
+                .withModel(access.get().model())
+                // 文档蒸馏用哪版提示词要能查：`DocumentDistillPrompt.VERSION` 定义了一直没人记，
+                // ai_runs 里所有 KNOWLEDGE_IMPORT 行的 prompt_version 都是空的，出问题无从对账。
+                .withPromptVersion(DocumentDistillPrompt.VERSION))) {
                 try {
                     DistilledDocument document = distiller.distill(file.originalName(), text, access.get());
                     Long categoryId = resolveCategory(job);

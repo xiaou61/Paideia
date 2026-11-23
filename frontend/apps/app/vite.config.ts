@@ -104,7 +104,8 @@ export default defineConfig(({ mode }) => ({
      * 2026-11-22 实测：`netstat` 只有 `TCP [::1]:5173 LISTENING`，`http://127.0.0.1:5173/`
      * 拒绝连接、`http://localhost:5173/` 返回 200。绑 127.0.0.1 后两边一致。
      */
-    host: '127.0.0.1',
+    // 允许覆写：硬绑 IPv4 会让手机/局域网调试失效，默认仍取回环以保证 e2e 探活一致。
+    host: process.env.PAIDEIA_APP_HOST ?? '127.0.0.1',
     // 开发期由 Vite 代理转发到后端，省去跨域配置。
     // 桌面壳没有代理，那时必须把它的来源加入后端的 CORS 允许列表。
     proxy: {

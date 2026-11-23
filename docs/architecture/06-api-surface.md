@@ -6,7 +6,7 @@
 
 # API 端点清单
 
-由后端 53 个 Controller 生成：**212 个端点**，分布在 9 个模块。
+由后端 54 个 Controller 生成：**219 个端点**，分布在 9 个模块。
 
 这是**结构性的清单**，不是手写文档——端点加一个这里就多一行，
 所以它不会像手写的接口文档那样过期。真正的授权规则在 `SecurityConfiguration`，
@@ -62,6 +62,7 @@
 | `paideia-ops` | `/api/v1/ops/admin/content-import` | `ContentImportController` | 仅管理员 | 2 |
 | `paideia-ops` | `/api/v1/ops/admin/diagnoses` | `OpsDiagnosisController` | 仅管理员 | 5 |
 | `paideia-ops` | `/api/v1/ops/admin/incidents` | `OpsIncidentController` | 仅管理员 | 4 |
+| `paideia-ops` | `/api/v1/ops/admin/postmortems` | `PostmortemController` | 仅管理员 | 7 |
 | `paideia-ops` | `/api/v1/ops/hooks` | `OpsHookController` | 登录即可 | 1 |
 | `paideia-sandbox` | `/api/v1/sandbox` | `SandboxController` | 登录即可 | 5 |
 | `paideia-sandbox` | `/api/v1/sandbox/admin/sql-datasets` | `SqlDatasetAdminController` | 仅管理员 | 4 |
@@ -72,8 +73,8 @@
 
 | 方法 | 数量 |
 | --- | --- |
-| `GET` | 98 |
-| `POST` | 79 |
+| `GET` | 101 |
+| `POST` | 82 |
 | `DELETE` | 20 |
-| `PUT` | 12 |
+| `PUT` | 13 |
 | `PATCH` | 3 |

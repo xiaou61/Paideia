@@ -9,6 +9,8 @@ import io.github.xiaou61.ai.RunRecorder;
 import io.github.xiaou61.ai.RunSpec;
 import java.math.BigDecimal;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
@@ -24,6 +26,8 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class EssayVerificationService {
+
+    private static final Logger log = LoggerFactory.getLogger(EssayVerificationService.class);
 
     static final String AUTO_PASSED = "auto_passed";
     static final String REVISED = "revised";
@@ -140,7 +144,10 @@ public class EssayVerificationService {
             mapper.insert(row);
         } catch (RuntimeException exception) {
             // 记录写失败不该影响主流程：最坏是这条没留下复核痕迹，正文仍按判定结果处理。
-            // 由抓取任务日志暴露；这里吞掉并保留原异常信息不打印敏感内容。
+            // **必须留日志**：被拦下的题本来就靠这张表等人工，落库失败等于永久丢失，
+            // 静默吞掉会让「今天一条待复核都没有」看起来像正常结果。
+            log.error("面经验证记录落库失败（status={} title={}）：{}",
+                    row.getStatus(), row.getQuestionTitle(), exception.getMessage());
         }
     }
 

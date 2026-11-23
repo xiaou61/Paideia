@@ -43,18 +43,30 @@ export function stripDuplicateTitle(markdown: string, entryTitle?: string): stri
  *
  * <p>命中就整段原样返回——这些答案是模型按结构化要求写的，再加工只会把排版搞坏。
  */
-const HAS_BLOCK_MARKDOWN = /\n|(^|\s)([-*+]|\d+\.)\s|^#{1,6}\s|\*\*|`|^>\s/
+// 列表标记必须锚在行首：`(^|\s)` 会把行内算术当成列表——「时间复杂度 O(n + m)」
+// 「a * b」里的 ` + `、` * ` 都会命中，于是最常见的单段技术答案被当成"已排好版"原样返回，
+// 段落化静默失效。
+const HAS_BLOCK_MARKDOWN = /\n|(^|\n)\s*([-*+]|\d+\.)\s|^#{1,6}\s|\*\*|`|^>\s/
 
 /** 句末标点。分号也算：面经解析里常用「；」并排几个并列点。 */
 const SENTENCE_END = '。！？；'
+
+/** 紧跟句末标点的收尾引号/括号，要一起算作句末，否则会把引号拆散。 */
+const CLOSERS = '」』”’)）'
 
 /** 只按句末标点断句，保留标点，避免依赖正则后行断言（老引擎不认）。 */
 function splitSentences(text: string): string[] {
   const out: string[] = []
   let buffer = ''
-  for (const char of text) {
+  const chars = [...text]
+  for (let i = 0; i < chars.length; i += 1) {
+    const char = chars[i] ?? ''
     buffer += char
-    if (SENTENCE_END.includes(char)) {
+    // 「他提醒「先看文档。」再动手。」这种句子必须在 `」` 之后才断，
+    // 否则第一段是 `他提醒「先看文档。`、第二段以孤立的 `」` 开头。
+    const endsSentence =
+      SENTENCE_END.includes(char) || (CLOSERS.includes(char) && SENTENCE_END.includes(chars[i - 1] ?? ''))
+    if (endsSentence) {
       const sentence = buffer.trim()
       if (sentence !== '') {
         out.push(sentence)
@@ -81,7 +93,17 @@ function boldLabel(sentence: string): string {
   }
   const label = match[1]?.trim() ?? ''
   const rest = match[2]?.trim() ?? ''
-  if (label === '' || rest === '' || label.includes('，') || label.includes('、')) {
+  // 冒号可能是 URL 协议的一部分（`文档在 https://…`）或时间/比例（`12:30`），
+  // 这两种都不是"段首标签"，加粗会把链接拆断或把时间改成全角。
+  if (
+    label === '' ||
+    rest === '' ||
+    label.includes('，') ||
+    label.includes('、') ||
+    /https?$/.test(label) ||
+    rest.startsWith('//') ||
+    /^\d+$/.test(label)
+  ) {
     return sentence
   }
   return `**${label}：** ${rest}`

@@ -59,11 +59,14 @@
         "label": "运维与数据",
         "focus": [
           "prometheus",
+          "loki",
+          "tempo",
+          "smtp",
           "ops",
           "mysql",
           "obj"
         ],
-        "note": "运维面全部绑回环，不开新公网端口；对象存储走 302 预签名直读"
+        "note": "运维面全部绑回环，不开新公网端口；ops 主动查 Prometheus/Loki/Tempo，诊断结果走 SMTP 发信"
       },
       {
         "id": "core-kernel",
@@ -298,6 +301,33 @@
       "tag": "隔离边界",
       "row": 4,
       "col": 6
+    },
+    {
+      "id": "smtp",
+      "type": "external",
+      "label": "SMTP 出口",
+      "sublabel": "诊断邮件",
+      "tag": "外部依赖",
+      "row": 3,
+      "col": 6
+    },
+    {
+      "id": "loki",
+      "type": "external",
+      "label": "Loki",
+      "sublabel": "日志聚合 · 模板异常",
+      "tag": "运维面",
+      "row": 3,
+      "col": 7
+    },
+    {
+      "id": "tempo",
+      "type": "external",
+      "label": "Tempo",
+      "sublabel": "链路追踪 · 按 traceId 取",
+      "tag": "运维面",
+      "row": 3,
+      "col": 8
     }
   ],
   "boundaries": [
@@ -366,10 +396,42 @@
       "labelDy": 24
     },
     {
-      "from": "prometheus",
-      "to": "ops",
-      "label": "拉指标",
+      "from": "ops",
+      "to": "prometheus",
+      "label": "查询指标",
       "variant": "dashed",
+      "labelDy": 24
+    },
+    {
+      "from": "ops",
+      "to": "loki",
+      "label": "查日志 / 模板",
+      "variant": "dashed",
+      "labelDy": 24
+    },
+    {
+      "from": "ops",
+      "to": "tempo",
+      "label": "查调用链",
+      "variant": "dashed",
+      "labelDy": 24
+    },
+    {
+      "from": "ops",
+      "to": "smtp",
+      "label": "发诊断邮件",
+      "variant": "dashed",
+      "labelDy": 24
+    },
+    {
+      "from": "ops",
+      "to": "ai",
+      "label": "调用诊断模型"
+    },
+    {
+      "from": "ops",
+      "to": "persistence",
+      "label": "读写复盘 / 模板 / 诊断",
       "labelDy": 24
     },
     {
@@ -462,7 +524,7 @@
       "title": "运维面与常见误判",
       "items": [
         "Prometheus / Grafana / exporter 全绑回环，不开新公网端口；Grafana 只能经应用反代进管理端 iframe。",
-        "Redis 跑着、被探活着，但应用没有一行 Redis 代码——看到它别以为要配。",
+        "Redis 是真在用的：知识库分类树与条目摘要走 KnowledgeRedisCache，paideia.knowledge.cache.enabled 默认 true；连不上时自动回退 MySQL，没部署 Redis 的部署应显式置 false。",
         "RabbitMQ 已被裁决引入（outbox 中继），但代码里既无 amqp 依赖也无 outbox 表：已裁决 ≠ 已实现。"
       ]
     }

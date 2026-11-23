@@ -66,7 +66,9 @@ load_env
 # 权限，建不了新库，所以直接共用库上跑，并把"必须串行"这件事说清楚。
 RUN_DB=""
 case "$PAIDEIA_TEST_DB_URL" in
-  *//127.0.0.1:*|*//localhost:*)
+  # 本机主机名匹配**不依赖端口**：`jdbc:mysql://127.0.0.1/paideia_test` 这种省略端口的写法
+  # 以前会掉进下面的远程分支，于是丢掉"一人一库"隔离，两个会话互相删数据、得到假红。
+  *//127.0.0.1|*//127.0.0.1[:/?]*|*//localhost|*//localhost[:/?]*)
     RUN_DB="paideia_run_$(date +%m%d%H%M%S)_$$"
     URL_NO_QUERY="${PAIDEIA_TEST_DB_URL%%\?*}"
     QUERY="${PAIDEIA_TEST_DB_URL#*\?}"
@@ -76,6 +78,17 @@ case "$PAIDEIA_TEST_DB_URL" in
     echo "[test-db] 本次独占库：$RUN_DB"
     ;;
   *)
+    # 共用库上跑意味着**测试会删数据**（见文件头的警告）。误把生产/开发库配进来时，
+    # 表现是"测试跑完业务数据少了一半"——所以库名不像测试库就直接拒绝，不去赌运气。
+    REMOTE_DB="$(echo "$PAIDEIA_TEST_DB_URL" | sed -E 's#.*//[^/]+/([^?]+).*#\1#')"
+    case "$REMOTE_DB" in
+      *_test|*_e2e|*_test_*) ;;
+      *)
+        echo "[test-db] 拒绝在疑似非测试库上跑：$REMOTE_DB（库名需以 _test 或 _e2e 结尾）。" >&2
+        echo "[test-db] 测试会删数据；确要在这个库上跑，请先显式改成测试库名或导出 PAIDEIA_TEST_DB_URL。" >&2
+        exit 2
+        ;;
+    esac
     echo "[test-db] 远程库 $(echo "$PAIDEIA_TEST_DB_URL" | sed -E 's#(//[^/]+/)[^?]+#\1<db>#')：不派生独占库，直接在共用库上跑。"
     echo "[test-db] 同一时刻只跑一轮：共用库会被彼此的测试删数据，单类全绿、全量跑红那种红不算证据。"
     ;;

@@ -39,6 +39,16 @@ class PatternTriggerService {
         if (!cfg.isEnabled() || anomalies == null || anomalies.isEmpty()) {
             return 0;
         }
+        // 冷却不能等于窗口宽度：异常每窗口重记一条，900s 冷却 + 15 分钟窗口意味着
+        // 持续异常每 15~20 分钟就重跑一次完整诊断（证据采集 + 模型调用 + 落库）。
+        // 至少取两倍窗口，让「持续异常」变成隔窗口才诊断一次。
+        long cooldownSeconds = Math.max(cfg.getTriggerCooldownSeconds(), cfg.getWindowMinutes() * 60L * 2);
+        long requestedBy = properties.getDiagnosis().getUserId();
+        if (requestedBy <= 0) {
+            // 与 OpsDiagnosisService.catchUp 同一守卫：没有配置请求人时不触发（诊断记录需要归属）。
+            log.debug("ops.pattern.trigger.skip reason=no-requested-by");
+            return 0;
+        }
         int triggered = 0;
         for (PatternMapper.AnomalyRow row : anomalies) {
             if (row.getId() == null) {
@@ -46,13 +56,13 @@ class PatternTriggerService {
             }
             try {
                 Instant last = mapper.lastTriggeredAt(row.getKind(), row.getTemplateHash(), row.getUnit());
-                if (last != null && Duration.between(last, now).getSeconds() < cfg.getTriggerCooldownSeconds()) {
+                if (last != null && Duration.between(last, now).getSeconds() < cooldownSeconds) {
                     markSkipped(row, "同模板同类型在冷却窗口内，已跳过诊断");
                     continue;
                 }
                 String question = buildQuestion(row);
                 long diagnosisId = diagnosisService.start(
-                        TRIGGER, null, ALERT_NAME, question, cfg.getUnits().isEmpty() ? 0 : properties.getDiagnosis().getUserId());
+                        TRIGGER, null, ALERT_NAME, question, requestedBy);
                 if (diagnosisId > 0) {
                     mapper.setDiagnosis(row.getId(), diagnosisId);
                     triggered++;

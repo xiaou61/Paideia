@@ -22,7 +22,13 @@ public class OpsDiagnosisModelCaller extends SingleShotModelCaller {
      * 截断是整份报告作废，代价远大于多给几千 token，所以翻倍到 8192。
      */
     private static final int MAX_TOKENS = 8192;
-    private static final int TIMEOUT_SECONDS = 120;
+
+    /**
+     * 与 {@link #MAX_TOKENS} 一起抬到 300 秒：8192 个输出 token 在实测速率下要 100 秒以上
+     * （2026-11-19 那次成功诊断 3748 token），120 秒的窗口会把"输出更长"变成超时失败——
+     * 失败形态从「被截断」换成「超时」，报告照样作废。
+     */
+    private static final int TIMEOUT_SECONDS = 300;
 
     OpsDiagnosisModelCaller(AiProperties properties, GuardedHttpTransport transport) {
         super(properties, transport);

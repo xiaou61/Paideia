@@ -184,7 +184,9 @@ class OpsEvidenceCollectorTest {
 
         String logs = collector.collect("alert", "磁盘告警", null).logs();
 
-        assertThat(logs).contains("无匹配日志（或 Loki 不可达）");
+        // Loki 不可达时按 unit 明说（"（Loki 不可达，窗口内日志无法获取；其余证据不受影响）"），
+        // 不再退化成笼统的"无匹配日志（或 Loki 不可达）"——这条用例只关心"说清楚了不可达"。
+        assertThat(logs).contains("Loki 不可达");
     }
 
     @Test

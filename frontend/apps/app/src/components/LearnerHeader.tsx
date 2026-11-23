@@ -118,8 +118,21 @@ export function LearnerHeader() {
       return { ...group, items, rank: ranks.length === 0 ? Number.MAX_SAFE_INTEGER : Math.min(...ranks) }
     }).sort((left, right) => left.rank - right.rank)
   }, [])
-  /** 条目页的地址是 /knowledge/entries/:id，所以前缀匹配也算在那一项里。 */
-  const isActive = (to: string) => pathname === to || pathname.startsWith(`${to}/`)
+  /**
+   * 当前路径点亮哪一项：取**最长**前缀匹配。
+   *
+   * <p>前缀匹配是必要的（条目页是 /knowledge/entries/:id），但 `/practice` 恰好是
+   * `/practice/sql` 的前缀，纯前缀判断会让「刷题」和「SQL 练习」同时点亮。
+   * 取最长匹配即可，不需要维护例外表。
+   */
+  const activeTo = useMemo(() => {
+    const matches = NAV.filter((item) => pathname === item.to || pathname.startsWith(`${item.to}/`))
+    if (matches.length === 0) {
+      return null
+    }
+    return matches.reduce((longest, item) => (item.to.length > longest.to.length ? item : longest)).to
+  }, [pathname])
+  const isActive = (to: string) => activeTo === to
   const navigate = useNavigate()
   const [deleting, setDeleting] = useState(false)
   const [password, setPassword] = useState('')

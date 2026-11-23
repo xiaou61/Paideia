@@ -47,6 +47,7 @@ class PasswordResetConfiguration {
         @Override
         public void afterPropertiesSet() {
             if (properties.configured()) {
+                requireAbsoluteUrl(properties.baseUrl());
                 return;
             }
             for (String profile : environment.getActiveProfiles()) {
@@ -60,6 +61,20 @@ class PasswordResetConfiguration {
                     未配置 paideia.account.web.base-url（站点对外地址，形如 https://paideia.example.com）。
                     留空时邮件里的重置链接会回退到请求的 Host 头：伪造 Host 即可把链接指向攻击者站点，
                     受害者点开就把一次性令牌交出去。请在服务器上的 application.yml 里显式配置该地址。""");
+        }
+
+        /**
+         * 配了但没写 scheme 的值会拼出 mail 客户端不可点的相对链接（{@code paideia.example.com/#/reset-password}），
+         * 用户点开是 404 而不是重置页；这里把格式错误提前到启动期。
+         */
+        private static void requireAbsoluteUrl(String baseUrl) {
+            String normalized = baseUrl.toLowerCase(Locale.ROOT);
+            if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
+                return;
+            }
+            throw new IllegalStateException("""
+                    paideia.account.web.base-url 必须是 http:// 或 https:// 开头的绝对地址（当前：%s）。
+                    缺 scheme 时拼出来的重置链接在邮件客户端里点不开。""".formatted(baseUrl));
         }
     }
 }

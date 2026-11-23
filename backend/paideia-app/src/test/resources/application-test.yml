@@ -10,7 +10,11 @@ spring:
     # 于是建表默认值 `CURRENT_TIMESTAMP(3)` 写进去的是**本地钟点**，驱动又按 UTC 转成 `Instant`，
     # 接口返回的时间就比真实时刻快 8 小时。加上它之后驱动会把会话也设成 UTC（它会自己折算成
     # `+00:00` 的偏移形式，所以没有时区表也能用）。
-    url: ${PAIDEIA_TEST_DB_URL:jdbc:mysql://127.0.0.1:3306/paideia_test?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=utf8}
+    # 兜底库名与兜底账号**必须同一个库**（`paideia_e2e`）：以前库名写 `paideia_test`、账号写
+    # `paideia_e2e`，本机既没有那个库、账号也没被授权时，报的是"Access denied"而不是"库不存在"，
+    # 排查方向会被带偏；更糟的是本机恰好有同名库时，测试会对着一个没人维护的库跑迁移（含 devdata 种子）。
+    # 真要连本机库，显式导出 PAIDEIA_TEST_DB_URL，不要依赖这里的兜底值。
+    url: ${PAIDEIA_TEST_DB_URL:jdbc:mysql://127.0.0.1:3306/paideia_e2e?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=utf8}
     username: ${PAIDEIA_TEST_DB_USER:paideia_e2e}
     password: ${PAIDEIA_TEST_DB_PASSWORD:}
     hikari:

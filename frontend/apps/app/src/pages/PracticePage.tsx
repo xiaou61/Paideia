@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { errorMessage } from '@paideia/core'
 import { createExamApi, difficultyText, type PracticeQuestion } from '@paideia/knowledge'
 import { Button } from '@paideia/ui'
@@ -28,8 +28,12 @@ export function PracticePage() {
   const [verdict, setVerdict] = useState<Record<string, boolean>>({})
   // 请求进行中标记：作答状态要等响应回来才写入，期间连点会重复提交（后端无幂等键）
   const [submitting, setSubmitting] = useState(false)
+  // 连续切换筛选时先发后到的旧响应会覆盖新结果，用递增序号只认最新一次请求
+  const requestSeq = useRef(0)
 
   const load = useCallback(async () => {
+    const seq = requestSeq.current + 1
+    requestSeq.current = seq
     setLoading(true)
     setError(null)
     try {
@@ -39,14 +43,16 @@ export function PracticePage() {
         difficultyLabel: difficulty || undefined,
         limit: 20,
       })
+      if (seq !== requestSeq.current) return
       setQuestions(list)
       setIndex(0)
       setPicked({})
       setVerdict({})
     } catch (cause) {
+      if (seq !== requestSeq.current) return
       setError(errorMessage(cause))
     } finally {
-      setLoading(false)
+      if (seq === requestSeq.current) setLoading(false)
     }
   }, [exam, onlyWrong, onlyUndone, difficulty])
 
@@ -86,11 +92,26 @@ export function PracticePage() {
 
         <div className="mt-4 flex flex-wrap items-center gap-4 rounded-lg border border-border bg-card p-3 text-sm">
           <label className="flex items-center gap-1">
-            <input type="checkbox" checked={onlyUndone} onChange={(e) => setOnlyUndone(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={onlyUndone}
+              onChange={(e) => {
+                // 后端两个条件取交集：未做过与做错过不可能同时成立，同时勾上永远是空列表
+                setOnlyUndone(e.target.checked)
+                if (e.target.checked) setOnlyWrong(false)
+              }}
+            />
             只刷未做
           </label>
           <label className="flex items-center gap-1">
-            <input type="checkbox" checked={onlyWrong} onChange={(e) => setOnlyWrong(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={onlyWrong}
+              onChange={(e) => {
+                setOnlyWrong(e.target.checked)
+                if (e.target.checked) setOnlyUndone(false)
+              }}
+            />
             只刷错题
           </label>
           <label className="flex items-center gap-1">
@@ -106,15 +127,12 @@ export function PracticePage() {
               <option value="hard">难</option>
             </select>
           </label>
-          <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
-            重新筛选
-          </Button>
         </div>
 
         {error ? <p className="mt-4 text-sm text-destructive">{error}</p> : null}
         {loading ? <p className="mt-6 text-sm text-muted-foreground">加载中…</p> : null}
 
-        {!loading && questions.length === 0 ? (
+        {!loading && !error && questions.length === 0 ? (
           <p className="mt-6 text-sm text-muted-foreground" data-testid="practice-empty">没有符合条件的题目，换个筛选试试。</p>
         ) : null}
 

@@ -56,11 +56,14 @@ class AnalyticsInstrumentationTest {
 
         assertThat(countClicks(itemId)).isEqualTo(before + 1);
 
-        // 不存在的条目同样 200：这条埋点对用户没有价值，报错只是噪音
+        // 不存在的条目同样 200：这条埋点对用户没有价值，报错只是噪音。
+        // 用 before+1 而不是写死 1：测试库是**共用**的（远程 paideia_e2e，不派生独占库），
+        // 同一个哨兵 id 每跑一轮就多一行，写死期望值会在第二轮开始永远红。
+        long beforeMissing = countClicks(8_881_999L);
         mockMvc.perform(post("/api/v1/digest/items/{id}/click", 8_881_999L)
                         .header("Authorization", tokenFor("learner")))
                 .andExpect(status().isOk());
-        assertThat(countClicks(8_881_999L)).isEqualTo(1);
+        assertThat(countClicks(8_881_999L)).isEqualTo(beforeMissing + 1);
     }
 
     @Test

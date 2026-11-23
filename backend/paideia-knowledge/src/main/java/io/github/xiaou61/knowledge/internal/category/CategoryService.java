@@ -16,7 +16,14 @@ import tools.jackson.core.type.TypeReference;
 @Service
 public class CategoryService {
 
-    private static final String TREE_CACHE_KEY = "knowledge:category-tree:v1";
+    /**
+     * 缓存键带版本号：节点结构变了就换一版，而不是让旧格式在 TTL 内继续被读出来。
+     *
+     * <p>v1 → v2 是因为 {@link CategoryTree.Node} 加了 {@code parentId} 与 {@code sortOrder}
+     * （写路径要原样带回这两个值）。旧 JSON 里没有这两项，反序列化后是 null/0——
+     * 恰好就是"改个名把排序重置成 0、把分类挪回根"那个 bug 的形态，所以不能让它们继续命中。
+     */
+    private static final String TREE_CACHE_KEY = "knowledge:category-tree:v2";
 
     private final CategoryMapper categoryMapper;
     private final KnowledgeRedisCache cache;

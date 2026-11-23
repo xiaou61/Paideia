@@ -610,6 +610,9 @@ function PatternSection() {
             <Badge variant="destructive" data-testid="ops-pattern-anomaly-count">
               {anomalies.length} 条异常
             </Badge>
+          ) : overview.data === undefined ? (
+            // 取不到数据必须与"一切正常"看起来不同：加载中/失败时不能说「无异常」
+            <Badge variant="outline" data-testid="ops-pattern-anomaly-unknown">异常数未知</Badge>
           ) : (
             <Badge variant="outline">无异常</Badge>
           )}
@@ -634,7 +637,12 @@ function PatternSection() {
                 </p>
               ) : (
                 <ul className="divide-border divide-y" data-testid="ops-pattern-top-list">
-                  {top.slice(0, 10).map((item) => (
+                  {/* 后端 top() 是按 unit 顺序逐单元拼接的（每单元各取 topN），
+                      直接 slice 只能看到第一个单元，所以这里先全局按频次排序。 */}
+                  {[...top]
+                    .sort((left, right) => right.count - left.count)
+                    .slice(0, 10)
+                    .map((item) => (
                     <li key={`${item.unit}-${item.templateHash}`} className="flex items-start gap-3 py-2 text-sm">
                       <Badge variant="outline" className="shrink-0">
                         {item.unit}

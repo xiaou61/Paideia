@@ -21,6 +21,19 @@ public final class SearchQuery {
     /** MySQL ngram 解析器的默认分词长度。短于此长度的查询走 LIKE。 */
     public static final int NGRAM_TOKEN_SIZE = 2;
 
+    /**
+     * 单个短语最多保留多少个码点（2026-11-22）。
+     *
+     * <p>MySQL 对短语检索里的词数有上限，超了不是"没结果"而是直接报错
+     * `SQLException: Too many words in a FTS phrase or proximity search`，接口 500。
+     * ngram 解析器把一串中文切成二字词元，所以一个 150 字的长串就有 ~150 个词元——
+     * 用户从别处粘一段话进来搜索，或者前端把整段正文当关键词发过来，就会踩到。
+     *
+     * <p>实测（`paideia_e2e`，ngram_token_size=2）：128 字正常返回，150 字即报错。
+     * 这里取 100 留足余量：粘进来的长串仍然按它的前 100 字检索，不会整个请求失败。
+     */
+    public static final int MAX_PHRASE_CODE_POINTS = 100;
+
     private SearchQuery() {
     }
 
@@ -66,6 +79,7 @@ public final class SearchQuery {
         int terms = 0;
         for (String raw : normalized.split("[\\s\\u3000]+")) {
             String term = sanitizeTerm(raw);
+            term = capCodePoints(term, MAX_PHRASE_CODE_POINTS);
             if (term.codePointCount(0, term.length()) < NGRAM_TOKEN_SIZE) {
                 continue;
             }
@@ -76,6 +90,15 @@ public final class SearchQuery {
             terms++;
         }
         return terms == 0 ? null : out.toString();
+    }
+
+    /** 按码点截断（不能按 char 截：一个 emoji 是两个 char，截断会留下半个代理对）。 */
+    private static String capCodePoints(String value, int maxCodePoints) {
+        int count = value.codePointCount(0, value.length());
+        if (count <= maxCodePoints) {
+            return value;
+        }
+        return value.substring(0, value.offsetByCodePoints(0, maxCodePoints));
     }
 
     /** 去掉 BOOLEAN 语法里有特殊含义的字符（短语定界引号与转义反斜杠）。 */

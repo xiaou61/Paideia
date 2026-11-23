@@ -72,4 +72,31 @@ class SearchQueryTest {
         assertThat(SearchQuery.booleanMode("-并发")).isEqualTo("+\"-并发\"");
         assertThat(SearchQuery.booleanMode("a\\\\b_c")).isEqualTo("+\"ab_c\"");
     }
+
+    /**
+     * 超长短语必须被截断（2026-11-22）。
+     *
+     * <p>MySQL 对短语里的词数有上限，超了直接抛 `SQLException: Too many words in a FTS
+     * phrase or proximity search`，整个搜索接口 500。实测 128 字正常、150 字报错，所以这里
+     * 钉住"每条短语不超过上限"，并且按**码点**截断（按 char 截会把 emoji 劈成半个代理对）。
+     */
+    @Test
+    void booleanModeCapsOverlongPhrase() {
+        String long_ = "长".repeat(150);
+        String built = SearchQuery.booleanMode(long_);
+        assertThat(built).isNotNull();
+        String phrase = built.substring(2, built.length() - 1);
+        assertThat(phrase.codePointCount(0, phrase.length()))
+                .isEqualTo(SearchQuery.MAX_PHRASE_CODE_POINTS);
+        // 截断之后仍然是一条合法短语，前后引号与 + 号都在
+        assertThat(built).startsWith("+\"").endsWith("\"");
+
+        // emoji 也是按码点算：100 个 emoji 保留 100 个，不会留下半个代理对
+        String emoji = "🙂".repeat(150);
+        String emojiPhrase = SearchQuery.booleanMode(emoji);
+        assertThat(emojiPhrase).isNotNull();
+        String kept = emojiPhrase.substring(2, emojiPhrase.length() - 1);
+        assertThat(kept.codePointCount(0, kept.length())).isEqualTo(SearchQuery.MAX_PHRASE_CODE_POINTS);
+        assertThat(Character.isHighSurrogate(kept.charAt(kept.length() - 1))).isFalse();
+    }
 }

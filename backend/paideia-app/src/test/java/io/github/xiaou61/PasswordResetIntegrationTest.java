@@ -136,6 +136,7 @@ class PasswordResetIntegrationTest {
         // 限流键与发信服务内部一致；清掉它只是省掉 60 秒等待，不改变被测逻辑
         rateLimiter.clear("password-reset:" + Digest.sha256Hex(email.toLowerCase(Locale.ROOT)));
         String second = tokenOf(requestResetAndReadLink(email));
+        awaitTokenInvalidated(first);
 
         assertThat(codeOf(confirm(first, NEW_PASSWORD)))
                 .as("旧链接没有被作废")
@@ -207,8 +208,36 @@ class PasswordResetIntegrationTest {
     private String requestResetAndReadLink(String email) throws Exception {
         String response = requestReset(email);
         assertThat(codeOf(response)).as("申请重置失败：%s", response).isZero();
-        return mailbox.latestPasswordResetFor(email)
-                .orElseThrow(() -> new AssertionError("没有收到重置邮件：" + email));
+        // 发信在后台线程（请求耗时不能随 SMTP 浮动，否则响应时间就能判断邮箱是否注册），
+        // 所以这里要等它落进内存邮箱，而不是请求返回后立刻读
+        return awaitResetLink(email);
+    }
+
+    private String awaitResetLink(String email) throws InterruptedException {
+        for (int attempt = 0; attempt < 100; attempt++) {
+            var link = mailbox.latestPasswordResetFor(email);
+            if (link.isPresent()) {
+                return link.get();
+            }
+            Thread.sleep(20);
+        }
+        throw new AssertionError("没有收到重置邮件：" + email);
+    }
+
+    /** 旧令牌的作废发生在发信成功之后，同样要等它落库。 */
+    private void awaitTokenInvalidated(String rawToken) throws InterruptedException {
+        String hash = Digest.sha256Hex(rawToken);
+        for (int attempt = 0; attempt < 100; attempt++) {
+            Integer invalidated = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*) FROM password_reset_tokens
+                    WHERE token_hash = ? AND used_at IS NOT NULL
+                    """, Integer.class, hash);
+            if (invalidated != null && invalidated > 0) {
+                return;
+            }
+            Thread.sleep(20);
+        }
+        throw new AssertionError("旧链接没有被作废：" + rawToken);
     }
 
     private static String tokenOf(String link) {

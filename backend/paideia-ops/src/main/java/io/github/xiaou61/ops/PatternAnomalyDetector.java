@@ -25,6 +25,11 @@ class PatternAnomalyDetector {
 
     private static final Logger log = LoggerFactory.getLogger(PatternAnomalyDetector.class);
 
+    private static final String DISAPPEARED = "DISAPPEARED";
+
+    /** DISAPPEARED 的去重窗口（小时）：与 {@code recentTemplates} 的 24 小时扫描范围对齐。 */
+    private static final int DISAPPEARED_DEDUPE_HOURS = 24;
+
     private final OpsProperties properties;
     private final PatternMapper mapper;
     private final java.util.function.Predicate<String> unitUsable;
@@ -92,8 +97,16 @@ class PatternAnomalyDetector {
                 if (kind == null) {
                     continue;
                 }
-                // 同一模板同一类型在同一个窗口里只记一条，重复同步不追加。
-                if (mapper.countRecent(kind, t.templateHash(), unit, windowStart) > 0) {
+                // 同一模板同一类型只记一条，重复同步不追加。
+                //
+                // 去重窗口按类型区分：普通异常只看当前窗口（下一窗口是新证据，该重记）；
+                // 但 DISAPPEARED 的模板会在 recentTemplates(24h) 里继续被扫到——模板停写后
+                // 每个窗口都会再判一次「消失」，如果按窗口去重就会每天追加几十条，
+                // 每条都可能触发一次完整诊断。消失是持续性状态，一天一条足够。
+                Instant dedupeSince = DISAPPEARED.equals(kind)
+                        ? now.minusSeconds(DISAPPEARED_DEDUPE_HOURS * 3600L)
+                        : windowStart;
+                if (mapper.countRecent(kind, t.templateHash(), unit, dedupeSince) > 0) {
                     continue;
                 }
                 PatternMapper.AnomalyRow row = new PatternMapper.AnomalyRow();

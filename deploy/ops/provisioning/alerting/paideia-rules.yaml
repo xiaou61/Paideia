@@ -211,17 +211,24 @@ groups:
               instant: true
               intervalMs: 1000
               maxDataPoints: 1
+              # 绝对下限与相对判据是"或"：低于 90% 但相对基线异常也要报。
+              # 之前写成相乘（AND），于是 80~89% 的持续高占用只有在也超 90% 时才可能触发，
+              # 相对判据实际从未单独生效。
               expr: >-
-                (paideia:baseline_cpu:current > bool 90)
-                * (paideia:baseline_cpu:samples7d > bool 100)
-                * (((paideia:baseline_cpu:ratio > bool 2)
-                    + ((paideia:baseline_cpu:z or vector(0)) > bool 3)) > bool 0)
+                (paideia:baseline_cpu:samples7d > bool 100)
+                * (
+                    ((paideia:baseline_cpu:current > bool 90)
+                     + (paideia:baseline_cpu:current > bool 60)
+                       * (((paideia:baseline_cpu:ratio > bool 2)
+                           + ((paideia:baseline_cpu:z or vector(0)) > bool 3)) > bool 0)
+                    ) > bool 0
+                  )
         noDataState: OK
         execErrState: Error
         notification_settings:
           receiver: paideia-ops
         annotations:
-          summary: CPU 高于 90% 且（超过 7 天同时段基线 2 倍或 z 大于 3）
+          summary: CPU 高于 90%，或高于 60% 且超过 7 天同时段基线 2 倍 / z 大于 3
           description: 打开运维页的 AI 诊断；诊断证据会带当前值、1h/24h/7d 基线、比值、z 与样本数。
 
       - uid: paideia-baseline-5xx

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import type { CaptchaChallenge } from './auth-api'
 import { messageOf, useAuth } from './auth-context'
 import { CaptchaImage } from './captcha-image'
+import { useResendCooldown } from './use-resend-cooldown'
 
 /** 发信后的重发冷却秒数，与后端的"同邮箱 60 秒间隔"对齐。 */
 const RESEND_SECONDS = 60
@@ -24,9 +25,9 @@ export function ForgotPasswordForm() {
   const [captchaAnswer, setCaptchaAnswer] = useState('')
   const [captcha, setCaptcha] = useState<CaptchaChallenge | null>(null)
   const [sent, setSent] = useState(false)
-  const [cooldown, setCooldown] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const cooldown = useResendCooldown(RESEND_SECONDS)
 
   const refreshCaptcha = useCallback(async () => {
     try {
@@ -41,22 +42,16 @@ export function ForgotPasswordForm() {
     void refreshCaptcha()
   }, [refreshCaptcha])
 
-  useEffect(() => {
-    if (cooldown <= 0) {
-      return
-    }
-    const timer = globalThis.setInterval(() => setCooldown((value) => value - 1), 1000)
-    return () => globalThis.clearInterval(timer)
-  }, [cooldown])
-
   async function submit(event: FormEvent) {
     event.preventDefault()
     setBusy(true)
     setError(null)
+    // 每次提交只保留本次结果：否则换邮箱失败时，上一次的成功提示会与本次错误同时出现
+    setSent(false)
     try {
       await api.requestPasswordReset(email, captcha?.captchaId ?? '', captchaAnswer)
       setSent(true)
-      setCooldown(RESEND_SECONDS)
+      cooldown.start()
       // 图形验证码已被消费，换一张备下次重发
       await refreshCaptcha()
     } catch (failure) {
@@ -116,12 +111,12 @@ export function ForgotPasswordForm() {
 
       <Button
         type="submit"
-        disabled={busy || cooldown > 0 || captcha === null}
+        disabled={busy || cooldown.remaining > 0 || captcha === null}
         data-testid="forgot-submit"
         className="h-10 w-full"
       >
         {busy ? <Spinner /> : null}
-        {cooldown > 0 ? `${cooldown} 秒后可重发` : '发送重置链接'}
+        {cooldown.remaining > 0 ? `${cooldown.remaining} 秒后可重发` : '发送重置链接'}
       </Button>
     </form>
   )

@@ -87,7 +87,8 @@ class OpsDiagnosisService {
             throw new BizException(ErrorCode.CONFLICT, "运维诊断已关闭");
         }
 
-        boolean alert = "alert".equals(trigger) && alertName != null && !alertName.isBlank();
+        boolean named = alertName != null && !alertName.isBlank();
+        boolean alert = "alert".equals(trigger) && named;
         Instant now = Instant.now();
 
         if (!running.compareAndSet(false, true)) {
@@ -132,7 +133,10 @@ class OpsDiagnosisService {
             OpsDiagnosisRow row = new OpsDiagnosisRow();
             row.setTriggerType(trigger);
             row.setIncidentId(incidentId);
-            row.setAlertName(alert ? alertName : null);
+            // 告警名只要传了就要落库：复盘召回（PostmortemKnowledgeRecall）按 alert_name 精确命中排序，
+            // 「同一个告警的复盘更有用」；模板异常（trigger=pattern）以前因为 alert=false 被写成 NULL，
+            // 那批诊断永远召回不到复盘。alert 只用于告警级冷却，不再兼作「要不要记名字」的开关。
+            row.setAlertName(named ? alertName : null);
             row.setQuestion(trim(question, 2000));
             row.setStatus(OpsDiagnosisRow.STATUS_PENDING);
             row.setRequestedBy(requestedBy);
@@ -278,8 +282,14 @@ class OpsDiagnosisService {
                 incidents.markDone(incidentId, id, diagnosis.model());
                 // 把"答案"送出去：报告只落库等于没送达运维（见 OpsDiagnosisMailer 说明）。
                 // 顺带带上 traceId，让邮件成为「告警 → 日志 → 调用链」的全链路入口。
-                mailer.sendDiagnosis(id, alertName, diagnosis.report(),
-                        traceIds(collected.traces()));
+                // 邮件是旁路：报告此刻已经落库为 DONE，发信失败（缺 from 地址抛 NPE、模板渲染异常…）
+                // 绝不能让下面的 catch 把它改写成 FAILED——那会让前端看不到报告，还可能触发重复诊断。
+                try {
+                    mailer.sendDiagnosis(id, alertName, diagnosis.report(),
+                            traceIds(collected.traces()));
+                } catch (RuntimeException mailFailure) {
+                    log.warn("ops.mail.failed-outside id={} error={}", id, mailFailure.toString());
+                }
                 autoDraftPostmortem(id, trigger, incidentId);
             }
             log.info("ops.diagnosis.done id={} trigger={} model={}", id, trigger, diagnosis.model());
@@ -372,8 +382,10 @@ class OpsDiagnosisService {
                 }
                 int times = line.indexOf('×');
                 String text = times >= 0 ? line.substring(times + 1) : line;
-                text = text.replaceFirst("^\\s*\\d+\\s*", "")
-                        .replaceFirst("^\\d{2}:\\d{2}:\\d{2}\\s*", "")
+                // 先剥时间戳再兜底剥数字：签名渲染成「HH:mm:ss 正文」（只出现一次时没有 ×），
+                // 反过来先剥数字会把 "14:07:22" 吃成 ":07:22"，时间戳残片就进了检索关键词。
+                text = text.replaceFirst("^\\d{2}:\\d{2}:\\d{2}\\s*", "")
+                        .replaceFirst("^\\s*\\d+\\s*", "")
                         .replaceFirst("^…\\s*", "")
                         .strip();
                 if (text.length() >= 8) {

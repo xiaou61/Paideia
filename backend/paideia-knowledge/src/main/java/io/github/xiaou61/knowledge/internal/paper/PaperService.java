@@ -97,9 +97,14 @@ public class PaperService {
                     candidate.difficultyLabel(), conceptId));
             seq++;
         }
-        paperMapper.updateTotals(paperId, seq - 1);
-        return new PaperView(paperId, title, "ready", assembled.shortfall(), List.copyOf(items),
-                null, seq - 1, null);
+        // 快照取不到的题不会落库：只报配额不足的 shortfall 会让前端看到「不缺题但总题数变少」。
+        // 所以这里按实际落库数补齐 shortfall（含"全取不到"时 shortfall=全部），把缺题如实交给前端提示，
+        // 而不是抛错——题库为空时组一张 0 题的卷至少还能进作答页看到"少 N 题"，比 400 更可解释。
+        int stored = seq - 1;
+        int shortfall = assembled.shortfall() + (assembled.items().size() - stored);
+        paperMapper.updateTotals(paperId, stored);
+        return new PaperView(paperId, title, "ready", shortfall, List.copyOf(items),
+                null, stored, null);
     }
 
     public List<PaperSummary> list(long userId) {
@@ -139,13 +144,21 @@ public class PaperService {
         List<PaperMapper.ItemRow> items = paperMapper.findItems(paperId);
         Map<Long, Integer> picked = answers == null ? Map.of() : answers;
 
+        // 一题多概念：题目的全部关联概念都在 question_concepts 里，批量取一次即可，
+        // 不必为 paper_items 只存一个 concept_id 而丢掉其余概念的 BKT/Elo 更新。
+        Map<String, List<Long>> conceptsByQuestion = conceptsByQuestion(items);
         List<PaperScorer.PaperItemSnapshot> snapshots = new ArrayList<>();
         Map<Long, Integer> optionCounts = new HashMap<>();
         for (PaperMapper.ItemRow item : items) {
             int optionCount = parseOptions(item.optionsJson()).size();
             optionCounts.put(item.id(), optionCount);
+            List<Long> conceptIds = conceptsByQuestion.get(
+                    questionKey(item.entryId(), item.blockKey(), item.questionKey()));
+            if (conceptIds == null || conceptIds.isEmpty()) {
+                conceptIds = item.conceptId() == null ? List.of() : List.of(item.conceptId());
+            }
             snapshots.add(new PaperScorer.PaperItemSnapshot(item.id(), item.entryId(), item.blockKey(),
-                    item.questionKey(), item.fingerprint(), item.conceptId(), item.difficultyLabel(),
+                    item.questionKey(), item.fingerprint(), conceptIds, item.difficultyLabel(),
                     item.answerIndexSnapshot(), optionCount));
         }
         // 入口校验：作答项必须属于本卷，选项下标必须在范围内（对照 QuestionAttemptService 的 400）
@@ -161,6 +174,7 @@ public class PaperService {
         }
         PaperScorer.ScoreResult score = PaperScorer.score(snapshots, picked);
         Instant now = Instant.now();
+        List<QuestionAttemptService.JudgedAttempt> judged = new ArrayList<>();
         for (int i = 0; i < items.size(); i++) {
             PaperMapper.ItemRow item = items.get(i);
             PaperScorer.PaperItemSnapshot snap = snapshots.get(i);
@@ -172,10 +186,12 @@ public class PaperService {
             }
             boolean correct = choice == item.answerIndexSnapshot();
             paperMapper.insertAnswer(paperId, userId, item.id(), choice, correct, now);
-            List<Long> conceptIds = item.conceptId() == null ? List.of() : List.of(item.conceptId());
-            questionAttemptService.recordJudged(userId, item.entryId(), item.blockKey(),
-                    item.questionKey(), item.fingerprint(), snap.optionCount(), correct, conceptIds, null, now);
+            judged.add(new QuestionAttemptService.JudgedAttempt(item.entryId(), item.blockKey(),
+                    item.questionKey(), item.fingerprint(), snap.optionCount(), correct,
+                    snap.conceptIds(), null));
         }
+        // 整卷一次落作答：逐题调用会每题重复全表读概念名、并做一份没人用的补课诊断
+        questionAttemptService.recordJudgedBatch(userId, judged, now);
         paperMapper.markSubmitted(paperId, "submitted", score.correct(), score.total(), now);
         return new ResultView(paperId, paper.title(), score.correct(), score.total(),
                 score.concepts(), score.difficulties(), score.weakConceptIds());
@@ -190,10 +206,16 @@ public class PaperService {
             throw new BizException(ErrorCode.CONFLICT, "试卷尚未交卷");
         }
         List<PaperMapper.ItemRow> items = paperMapper.findItems(paperId);
+        Map<String, List<Long>> conceptsByQuestion = conceptsByQuestion(items);
         List<PaperScorer.PaperItemSnapshot> snapshots = new ArrayList<>();
         for (PaperMapper.ItemRow item : items) {
+            List<Long> conceptIds = conceptsByQuestion.get(
+                    questionKey(item.entryId(), item.blockKey(), item.questionKey()));
+            if (conceptIds == null || conceptIds.isEmpty()) {
+                conceptIds = item.conceptId() == null ? List.of() : List.of(item.conceptId());
+            }
             snapshots.add(new PaperScorer.PaperItemSnapshot(item.id(), item.entryId(), item.blockKey(),
-                    item.questionKey(), item.fingerprint(), item.conceptId(), item.difficultyLabel(),
+                    item.questionKey(), item.fingerprint(), conceptIds, item.difficultyLabel(),
                     item.answerIndexSnapshot(), parseOptions(item.optionsJson()).size()));
         }
         Map<Long, Integer> picked = new HashMap<>();
@@ -233,6 +255,20 @@ public class PaperService {
     /** 一次查出这批条目下的全部题目—概念关联，避免逐候选一次 SQL。 */
     private Map<String, List<Long>> conceptIdsByKey(List<PaperMapper.CandidateRow> rows) {
         List<Long> entryIds = rows.stream().map(PaperMapper.CandidateRow::entryId).distinct().toList();
+        if (entryIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, List<Long>> grouped = new HashMap<>();
+        for (PaperMapper.ConceptLinkRow link : paperMapper.findConceptLinks(entryIds)) {
+            grouped.computeIfAbsent(questionKey(link.entryId(), link.blockKey(), link.questionKey()),
+                    ignored -> new ArrayList<>()).add(link.conceptId());
+        }
+        return grouped;
+    }
+
+    /** 已落库试卷的题目—概念关联（交卷与查成绩都要用，按题目身份分组）。 */
+    private Map<String, List<Long>> conceptsByQuestion(List<PaperMapper.ItemRow> items) {
+        List<Long> entryIds = items.stream().map(PaperMapper.ItemRow::entryId).distinct().toList();
         if (entryIds.isEmpty()) {
             return Map.of();
         }

@@ -39,7 +39,13 @@ export function PaperListPage() {
         count,
         difficultyDistribution: { [difficulty]: count },
       })
-      navigate(`/papers/${paper.id}`)
+      // 组卷配额不足时后端会少放题；shortfall 只在创建响应里（GET /papers/{id} 恒返回 0），
+      // 所以带着它跳到作答页由作答页提示，而不是停在本页（停在本页会让用户以为没组卷成功）。
+      await load()
+      navigate(
+        `/papers/${paper.id}`,
+        paper.shortfall > 0 ? { state: { shortfall: paper.shortfall, totalCount: paper.totalCount ?? 0 } } : undefined,
+      )
     } catch (cause) {
       setError(errorMessage(cause))
     } finally {
@@ -48,8 +54,13 @@ export function PaperListPage() {
   }
 
   async function remove(id: number) {
+    // 后端是硬删除（连同题目快照与作答记录），必须二次确认。
+    if (!window.confirm('删除这份试卷？作答记录会一并删除，无法恢复。')) {
+      return
+    }
     try {
       await exam.deletePaper(id)
+      setError(null)
       await load()
     } catch (cause) {
       setError(errorMessage(cause))

@@ -13,6 +13,7 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 运维复盘（WORK-086）。
@@ -38,6 +39,10 @@ class PostmortemService {
     static final int MAX_BODY = 60000;
     static final int MAX_FIELD = 20000;
     static final int MAX_TIMELINE_LINES = 60;
+    /** 与 ops_postmortems.severity VARCHAR(16) 一致。 */
+    static final int MAX_SEVERITY = 16;
+    /** 与 ops_postmortems.alert_name VARCHAR(128) 一致。 */
+    static final int MAX_ALERT_NAME = 128;
 
     /** 报告里章节标题的两种层级（模型用 `##`，人工补写时常写 `###`）。 */
     private static final Pattern HEADING = Pattern.compile("^#{2,3}\\s+(.+?)\\s*$");
@@ -123,14 +128,16 @@ class PostmortemService {
         if (PostmortemRow.STATUS_ARCHIVED.equals(row.getStatus())) {
             throw new BizException(ErrorCode.CONFLICT, "已归档的复盘不能编辑");
         }
+        String previousStatus = row.getStatus();
         if (draft.title() != null) {
             row.setTitle(limit(draft.title().strip(), MAX_TITLE));
         }
         if (draft.severity() != null) {
-            row.setSeverity(draft.severity().strip());
+            // 列宽 VARCHAR(16)：不截断的话超长值在严格模式下整条 UPDATE 失败，用户刚编辑的内容全丢
+            row.setSeverity(limit(draft.severity().strip(), MAX_SEVERITY));
         }
         if (draft.alertName() != null) {
-            row.setAlertName(draft.alertName().strip());
+            row.setAlertName(limit(draft.alertName().strip(), MAX_ALERT_NAME));
         }
         if (draft.rootCause() != null) {
             row.setRootCause(limit(OpsLogRedactor.redactDocument(draft.rootCause()), MAX_FIELD));
@@ -158,14 +165,21 @@ class PostmortemService {
             row.setApprovedAt(null);
         }
         row.setUpdatedAt(Instant.now());
-        postmortems.updateFields(row);
+        if (postmortems.updateFields(row, id, previousStatus) == 0) {
+            // 乐观锁未命中：读完之后别人改了状态（归档/确认），本次编辑作废
+            throw new BizException(ErrorCode.CONFLICT, "复盘已被其他人修改，请刷新后重试");
+        }
         log.info("updated postmortem #{} by user {}, status={}", id, actorUserId, row.getStatus());
     }
 
     /**
      * 人确认后放行。同一事件旧的 APPROVED 被置为 ARCHIVED——一个事件只有一份生效复盘，
      * 否则下次召回时同一件事会以两种说法同时出现。
+     *
+     * <p>两条 UPDATE 必须同事务：并发确认同一事件的两份复盘时，分开提交会出现
+     * "两份都 APPROVED"或"互相归档后一份 APPROVED 都没有"，破坏上面那条约束。
      */
+    @Transactional
     void approve(long id, long actorUserId) {
         PostmortemRow row = postmortems.findById(id)
                 .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "复盘不存在"));
@@ -390,4 +404,3 @@ class PostmortemService {
     record Page(List<PostmortemDetail> items, long total, int pageSize, int offset) {
     }
 }
-

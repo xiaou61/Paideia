@@ -750,6 +750,58 @@ class ApiWalkthroughTest {
         // 点击埋点（数据大屏的阅读量来源）。同样用不存在的 id：只要求端点到。
         bestEffort("POST", "/api/v1/digest/items/999999999/click", bearer);
 
+        // ---- 补齐 2026-11 陆续上线、但一直没被走到的那批端点（2026-11-22）----
+        // 这些端点此前不在自查清单里，于是「全接口自查」长期是红的——守卫红着就等于没有守卫。
+        // 读接口给 200 的期望；需要真实 id / 请求体的写接口用 bestEffort：只要求端点被走到，
+        // 4xx 不影响结论（它们各自的集成测试才是验语义的地方）。
+        String admin = adminToken();
+
+        // 试卷与刷题（WORK-083）
+        call("试卷列表", "GET", "/api/v1/learning/papers", bearer, null);
+        bestEffort("GET", "/api/v1/learning/papers/999999999", bearer);
+        bestEffort("GET", "/api/v1/learning/papers/999999999/result", bearer);
+        bestEffort("DELETE", "/api/v1/learning/papers/999999999", bearer);
+        bestEffort("POST", "/api/v1/learning/papers", bearer);
+        bestEffort("POST", "/api/v1/learning/papers/999999999/submit", bearer);
+        call("错题本", "GET", "/api/v1/learning/wrong-questions", bearer, null);
+        bestEffort("POST", "/api/v1/learning/practice/sessions", bearer);
+
+        // 知识库计数与浏览记录
+        // 这两个接口把查询参数声明成必填（`ids` / `q`），不带参数是 400 而不是空结果
+        call("分类条目计数", "GET", "/api/v1/knowledge/categories/counts?ids=1", bearer, null);
+        call("条目浏览记录", "GET", "/api/v1/knowledge/entry-views", bearer, null);
+
+        // 管理端：面经验证队列（WORK-084）
+        call("管理端面经验证队列", "GET", "/api/v1/ai/admin/essay-verifications", admin, null);
+        bestEffort("POST", "/api/v1/ai/admin/essay-verifications/999999999/approve", admin);
+        bestEffort("POST", "/api/v1/ai/admin/essay-verifications/999999999/reject", admin);
+
+        // 管理端：知识导入与分块修订
+        call("管理端知识导入清单", "GET", "/api/v1/ai/admin/knowledge-imports", admin, null);
+        bestEffort("POST", "/api/v1/ai/admin/knowledge-imports", admin);
+        bestEffort("POST", "/api/v1/ai/admin/knowledge-imports/999999999/retry", admin);
+        bestEffort("GET", "/api/v1/ai/admin/knowledge-entries/999999999/chunks", admin);
+        bestEffort("PUT", "/api/v1/ai/admin/knowledge-entries/999999999/chunks/0", admin);
+        bestEffort("GET", "/api/v1/ai/admin/knowledge-entries/999999999/chunks/0/revisions", admin);
+        bestEffort("POST", "/api/v1/ai/admin/knowledge-entries/999999999/chunks/0/rollback", admin);
+
+        // 管理端：运维面（内容导入、知识检索、模板异常、复盘）
+        call("管理端内容导入清单", "GET", "/api/v1/ops/admin/content-import", admin, null);
+        bestEffort("POST", "/api/v1/ops/admin/content-import", admin);
+        call("管理端知识检索", "GET", "/api/v1/ops/admin/knowledge/search?q=concurrency", admin, null);
+        call("管理端模板清单", "GET", "/api/v1/ops/admin/patterns", admin, null);
+        call("管理端模板异常", "GET", "/api/v1/ops/admin/patterns/anomalies", admin, null);
+        call("管理端复盘清单", "GET", "/api/v1/ops/admin/postmortems", admin, null);
+        bestEffort("GET", "/api/v1/ops/admin/postmortems/999999999", admin);
+        bestEffort("GET", "/api/v1/ops/admin/postmortems/999999999/download", admin);
+        bestEffort("POST", "/api/v1/ops/admin/postmortems", admin);
+        bestEffort("PUT", "/api/v1/ops/admin/postmortems/999999999", admin);
+        bestEffort("POST", "/api/v1/ops/admin/postmortems/999999999/approve", admin);
+        bestEffort("POST", "/api/v1/ops/admin/postmortems/999999999/archive", admin);
+
+        // 找回密码（公开端点）：没有请求体时应当是 400/429，不参与断言
+        bestEffort("POST", "/api/v1/auth/password-reset/request", null);
+        bestEffort("POST", "/api/v1/auth/password-reset/confirm", null);
 
         } catch (RuntimeException | AssertionError failure) {
             // 单步异常不中断整轮：把这一条记下来，最后连同其余失败一起报
@@ -907,12 +959,16 @@ class ApiWalkthroughTest {
                 if (before.isEmpty() && !now.isEmpty()) {
                     diffs.add("+ 新端点 " + key);
                 } else if (!before.isEmpty() && now.isEmpty()) {
-                    diffs.add("- 端点消失 " + key);
+                    // 这一轮没有拿到 2xx 样本（典型是 `DELETE /api/v1/digest/admin/items/{id}`：
+                    // 库里恰好没有速递条目时只能打 404，形状无从采集），不算契约变更。
+                    // 「端点还在不在」由 assertFullCoverage 负责——那是运行时注册表的比对，
+                    // 不依赖这轮有没有造出数据。
                 } else if (!now.equals(before)) {
                     java.util.Set<String> added = new java.util.TreeSet<>(now);
                     added.removeAll(before);
                     java.util.Set<String> removed = new java.util.TreeSet<>(before);
                     removed.removeAll(now);
+                    withoutNullabilityNoise(added, removed);
                     added.forEach(line -> diffs.add("+ " + key + " -> " + line));
                     removed.forEach(line -> diffs.add("- " + key + " -> " + line));
                 }
@@ -967,6 +1023,42 @@ class ApiWalkthroughTest {
         return lines.stream()
                 .filter(line -> empties.stream().noneMatch(prefix -> line.startsWith(prefix + "[]")))
                 .toList();
+    }
+
+    /**
+     * 可空字段「这轮是 null、下轮有值」不是契约变更。
+     *
+     * <p>快照是在某一次运行的数据上生成的：共用测试库里同一个字段今天为空、明天有值
+     * （典型是 {@code approvedAt}/{@code approvedBy} 这类只在流程走到某一步才写的列），
+     * 逐字比就会让快照每次换一边红——2026-11-22 全量并行跑里就是这么红的：
+     * 生成快照时库里没有「已确认」的复盘（{@code null}），并行跑时别的测试造出了已确认复盘
+     * （{@code string}/{@code number}）。同一路径两侧只要有一边是 {@code null}，
+     * 就把该路径的两种形状一起剔掉再比；**代价**是那一轮不校验这个字段的类型
+     * （两侧都非 {@code null} 时仍然逐字段比）。
+     */
+    private static void withoutNullabilityNoise(java.util.Set<String> added,
+                                                java.util.Set<String> removed) {
+        java.util.Set<String> addedPaths = added.stream().map(ApiWalkthroughTest::shapePath)
+                .collect(java.util.stream.Collectors.toCollection(java.util.TreeSet::new));
+        java.util.Set<String> removedPaths = removed.stream().map(ApiWalkthroughTest::shapePath)
+                .collect(java.util.stream.Collectors.toCollection(java.util.TreeSet::new));
+        addedPaths.retainAll(removedPaths);
+        for (String path : addedPaths) {
+            boolean nullable = added.stream()
+                    .anyMatch(line -> shapePath(line).equals(path) && line.endsWith(": null"))
+                    || removed.stream()
+                    .anyMatch(line -> shapePath(line).equals(path) && line.endsWith(": null"));
+            if (nullable) {
+                added.removeIf(line -> shapePath(line).equals(path));
+                removed.removeIf(line -> shapePath(line).equals(path));
+            }
+        }
+    }
+
+    /** {@code "data.items[].approvedAt: string"} → {@code "data.items[].approvedAt"}。 */
+    private static String shapePath(String line) {
+        int split = line.lastIndexOf(": ");
+        return split < 0 ? line : line.substring(0, split);
     }
 
     /**

@@ -37,23 +37,38 @@ try {
   fail(`读取 component-meta.json 失败：${err.message}`)
 }
 
-// 解析形如 export { A, type B } from './x' 的语句（含跨行）
-const re = /export\s+(?:type\s+)?\{([\s\S]*?)\}\s+from\s+['"]([^'"]+)['"]/g
+// 解析形如 export { A, type B } from './x' 的语句（含跨行）。
+// `^` + `m` 锚到语句行首：不加锚点时 `[\s\S]*?` 会跨语句扫，遇到不带 from 的本地
+// `export { x }` 就一路吃到下一条 `} from './y'`，拼出 `a }`、`export { b` 这类假符号名。
+// 语句级 `type` 单独捕获：`export type { X } from './x'` 整条都是类型，不该进值清单。
+const re = /^export\s+(type\s+)?\{([\s\S]*?)\}\s+from\s+['"]([^'"]+)['"]/gm
 const modules = new Map() // specifier -> { symbols: [{ name, isType }] }
 let match
 while ((match = re.exec(indexSrc))) {
-  const namesRaw = match[1]
-  const specifier = match[2]
+  const statementIsTypeOnly = match[1] !== undefined
+  const namesRaw = match[2]
+  const specifier = match[3]
   if (IGNORE_MODULES.has(specifier)) continue
+  if (statementIsTypeOnly) continue
   if (!modules.has(specifier)) modules.set(specifier, { symbols: [] })
   const bucket = modules.get(specifier)
   for (const raw of namesRaw.split(',')) {
     const piece = raw.trim()
     if (!piece) continue
+    // `export { default as X }` 会被记成名为 "default as X" 的假符号，直接失败更诚实
+    if (/^default\s+as\s+/.test(piece)) {
+      fail(`index.ts 里有 \`export { ${piece} } from '${specifier}'\`，清单解析不支持这种别名写法；请改成具名导出，或扩展本脚本。`)
+    }
     const isType = /^type\s+/.test(piece)
     const name = piece.replace(/^type\s+/, '').trim()
     if (name) bucket.symbols.push({ name, isType })
   }
+}
+
+// `export *` / `export * as ns` 这类正则覆盖不到的语句必须显式失败：
+// 它们会被整条跳过却仍然报「一致」，清单静默少条目。
+if (/^\s*export\s*\*\s*(?:as\s+\w+\s*)?from\s+['"]/m.test(indexSrc)) {
+  fail('index.ts 里出现了 export * 语句，清单解析不支持；请改成显式命名导出，或扩展本脚本。')
 }
 
 if (modules.size === 0) fail('index.ts 里没有解析到任何 re-export，正则可能过期了。')

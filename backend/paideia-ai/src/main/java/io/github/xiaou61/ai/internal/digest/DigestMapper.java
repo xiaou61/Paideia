@@ -71,6 +71,46 @@ public interface DigestMapper {
                @Param("createdAt") Instant createdAt);
 
     /**
+     * 入库一条，**当天已有同指纹的行就地覆盖**（`(edition_date, fingerprint)` 唯一键）。
+     *
+     * <p>专门用来处理「兜底来源 → 热榜」的接管：页面通路早上挂掉时先入库的是「GitHub 新项目」，
+     * 热榜恢复后同一个仓库的指纹完全相同。旧实现是先物理删掉兜底行再插，中间隔着一次 AI 调用，
+     * 失败就是当天这个仓库彻底消失；改成原地覆盖后不存在「删了还没写」的窗口。
+     *
+     * @return 1 = 新插入，2 = 覆盖了已有行，0 = 值完全没变（MySQL 的 affected rows 语义）
+     */
+    @Insert("""
+            INSERT INTO digest_items (edition_date, group_key, source_key, source_name, title,
+                                      summary, url, fingerprint, heat, stars_day, stars_week,
+                                      meta, language, published_at, summary_state, created_at)
+            VALUES (#{editionDate}, #{groupKey}, #{sourceKey}, #{sourceName}, #{title},
+                    #{summary}, #{url}, #{fingerprint}, #{heat}, #{starsDay}, #{starsWeek},
+                    #{meta}, #{language}, #{publishedAt}, #{summaryState}, #{createdAt})
+            ON DUPLICATE KEY UPDATE
+                group_key = VALUES(group_key),
+                source_key = VALUES(source_key),
+                source_name = VALUES(source_name),
+                title = VALUES(title),
+                summary = VALUES(summary),
+                heat = VALUES(heat),
+                stars_day = VALUES(stars_day),
+                stars_week = VALUES(stars_week),
+                meta = VALUES(meta),
+                language = VALUES(language),
+                published_at = VALUES(published_at),
+                summary_state = VALUES(summary_state)
+            """)
+    int upsert(@Param("editionDate") LocalDate editionDate, @Param("groupKey") String groupKey,
+               @Param("sourceKey") String sourceKey, @Param("sourceName") String sourceName,
+               @Param("title") String title, @Param("summary") String summary,
+               @Param("url") String url, @Param("fingerprint") String fingerprint,
+               @Param("heat") Integer heat, @Param("starsDay") Integer starsDay,
+               @Param("starsWeek") Integer starsWeek, @Param("meta") String meta,
+               @Param("language") String language,
+               @Param("publishedAt") Long publishedAt, @Param("summaryState") String summaryState,
+               @Param("createdAt") Instant createdAt);
+
+    /**
      * 某天的全部条目。
      *
      * <p>排序：`heat` 降序，`heat` 为空的排后面（MySQL 里 `NULL` 在 `DESC` 中排最后，
@@ -111,6 +151,15 @@ public interface DigestMapper {
             """)
     int deleteBySource(@Param("date") LocalDate date, @Param("groupKey") String groupKey,
                        @Param("sourceName") String sourceName);
+
+    /** 某天某组某来源的指纹清单（判断「哪些兜底行会被本轮热榜接管」用）。 */
+    @Select("""
+            SELECT fingerprint FROM digest_items
+            WHERE edition_date = #{date} AND group_key = #{groupKey} AND source_name = #{sourceName}
+            """)
+    List<String> findFingerprintsBySource(@Param("date") LocalDate date,
+                                          @Param("groupKey") String groupKey,
+                                          @Param("sourceName") String sourceName);
 
     /** 周报 upsert：同周重跑只留一条（AC-016）。 */
     @Insert("""

@@ -78,13 +78,50 @@ public class QuestionAttemptService {
     public void recordJudged(long userId, long entryId, String blockKey, String questionKey,
                              String fingerprint, int optionCount, boolean correct,
                              List<Long> conceptIds, Integer latencyMs, Instant now) {
-        QuestionCatalog.Question question = new QuestionCatalog.Question(blockKey, questionKey,
-                fingerprint, "", java.util.Collections.nCopies(Math.max(1, optionCount), ""), 0);
-        List<QuestionAttemptMapper.LinkRow> links = conceptIds == null ? List.of()
-                : conceptIds.stream().map(id -> new QuestionAttemptMapper.LinkRow(id, 1.0)).toList();
-        Integer latency = latencyMs == null ? null
-                : Math.max(0, Math.min(MAX_LATENCY_MS, latencyMs));
-        judge(userId, entryId, question, null, correct, latency, links, now);
+        recordJudgedBatch(userId, List.of(new JudgedAttempt(entryId, blockKey, questionKey, fingerprint,
+                optionCount, correct, conceptIds, latencyMs)), now);
+    }
+
+    /** 交卷侧的一次判定输入（不含正文明细，选项数由快照给出）。 */
+    public record JudgedAttempt(long entryId, String blockKey, String questionKey, String fingerprint,
+                                int optionCount, boolean correct, List<Long> conceptIds,
+                                Integer latencyMs) {
+    }
+
+    /**
+     * 一次交卷批量落作答。
+     *
+     * <p>逐题调 {@link #recordJudged} 时，每道题都会重新全表读概念名与前置边、并做一次补课诊断
+     * （诊断结果在交卷场景根本没人用）。20 题的卷就是上百条语句、多次全表扫描。这里把概念名与
+     * 诊断都移出循环：交卷不需要建议列表，概念名只读一次。
+     */
+    @Transactional
+    public void recordJudgedBatch(long userId, List<JudgedAttempt> attempts, Instant now) {
+        if (attempts == null || attempts.isEmpty()) {
+            return;
+        }
+        Map<Long, String> names = new HashMap<>();
+        for (QuestionAttemptMapper.ConceptRow row : mapper.findAllConcepts()) {
+            names.put(row.id(), row.name());
+        }
+        for (JudgedAttempt attempt : attempts) {
+            QuestionCatalog.Question question = new QuestionCatalog.Question(attempt.blockKey(),
+                    attempt.questionKey(), attempt.fingerprint(), "",
+                    java.util.Collections.nCopies(Math.max(1, attempt.optionCount()), ""), 0);
+            List<QuestionAttemptMapper.LinkRow> links = attempt.conceptIds() == null ? List.of()
+                    : attempt.conceptIds().stream()
+                            .map(id -> new QuestionAttemptMapper.LinkRow(id, 1.0)).toList();
+            Integer latency = attempt.latencyMs() == null ? null
+                    : Math.max(0, Math.min(MAX_LATENCY_MS, attempt.latencyMs()));
+            mapper.insertAttempt(userId, attempt.entryId(), question.blockKey(), question.questionKey(),
+                    question.fingerprint(), null, attempt.correct(), latency, "server", now);
+            if (!attempt.correct()) {
+                mapper.scheduleReview(userId, attempt.entryId(),
+                        now.plus(1, java.time.temporal.ChronoUnit.DAYS));
+            }
+            updateDifficulty(userId, attempt.entryId(), question, links, attempt.correct(), now);
+            updateMastery(userId, question, links, attempt.correct(), names, now);
+        }
     }
 
     private AttemptResult judge(long userId, long entryId, QuestionCatalog.Question question,

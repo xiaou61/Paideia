@@ -31,7 +31,7 @@ contactPoints:
             {{ if eq .Status "firing" }}这条告警正在发生，系统已自动开始诊断，「结论+建议」稍后单独发到本邮箱。{{ else }}这条告警已恢复，无需处理。{{ end }}
 
             告警：{{ .CommonLabels.alertname }}
-            级别：{{ .CommonLabels.severity }}
+            级别：{{ with .CommonLabels.severity }}{{ . }}{{ else }}未标注{{ end }}
             说明：{{ .CommonAnnotations.summary }}
             建议：{{ .CommonAnnotations.description }}
             {{ if eq .Status "firing" }}触发时间：{{ (index .Alerts 0).StartsAt }}{{ end }}

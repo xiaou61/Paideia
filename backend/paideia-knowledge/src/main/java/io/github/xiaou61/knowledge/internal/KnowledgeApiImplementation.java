@@ -17,6 +17,7 @@ import io.github.xiaou61.knowledge.internal.file.FileStorage;
 import io.github.xiaou61.knowledge.internal.file.StoredFile;
 import io.github.xiaou61.knowledge.internal.file.StoredFileMapper;
 import io.github.xiaou61.knowledge.internal.learning.LearningProgressService;
+import io.github.xiaou61.knowledge.internal.question.QuestionIndexService;
 import io.github.xiaou61.platform.PageQuery;
 import io.github.xiaou61.platform.PageResult;
 import java.nio.charset.StandardCharsets;
@@ -35,6 +36,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
@@ -58,6 +61,35 @@ class KnowledgeApiImplementation implements KnowledgeApi {
      *  0.85 偏保守——宁可漏判多存一条，也别误杀一道真新题。 */
     private static final double TITLE_DUPLICATE_THRESHOLD = 0.85;
 
+    /**
+     * 标题归一化用的噪声字符。**预编译**：`String.replaceAll` 每次都重新编译一遍正则，
+     * 而这条路径是「每题 × 库内每条标题」地跑，一轮抓取会编译几十万次。
+     */
+    private static final Pattern TITLE_NOISE =
+            Pattern.compile("[\\s\\p{Punct}，。；：！？、“”‘’「」『』（）【】《》〈〉·…—～]+");
+
+    /**
+     * 「某分类下已有标题」的短时缓存：面经一轮抓取几十道题，每题都全量拉一次该分类标题
+     * 是纯浪费（同一个结果被反复查）。
+     *
+     * <p>TTL 用来兜住**别的进程**的写入（多实例部署时本实例看不到对方的插入）；本进程的
+     * 写入在 {@link #createCollected} 里直接追加，所以同一轮抓取不会因为缓存漏掉刚入库的题
+     * 而把它再插一遍。代价是别的进程刚插的题最多晚 60 秒才参与判重——判重漏一次只是多存一条，
+     * 不会丢内容。
+     */
+    private static final Duration TITLE_CACHE_TTL = Duration.ofSeconds(60);
+
+    /** 「未分类」在缓存里的键：{@link ConcurrentHashMap} 不收 null 键。 */
+    private static final long NO_CATEGORY = -1L;
+
+    private final Map<Long, TitleCache> titleCaches = new ConcurrentHashMap<>();
+
+    private record TitleCache(Instant expiresAt, List<Entry> rows) {
+        boolean fresh(Instant now) {
+            return now.isBefore(expiresAt);
+        }
+    }
+
     private final EntryMapper entryMapper;
     private final ConceptMapper conceptMapper;
     private final ConceptLinkMapper conceptLinkMapper;
@@ -69,6 +101,7 @@ class KnowledgeApiImplementation implements KnowledgeApi {
     private final SelfAssessmentService selfAssessments;
     private final LearningProgressService learningProgress;
     private final KnowledgeRedisCache cache;
+    private final QuestionIndexService questionIndexService;
 
     KnowledgeApiImplementation(EntryMapper entryMapper,
                                ConceptMapper conceptMapper,
@@ -80,7 +113,8 @@ class KnowledgeApiImplementation implements KnowledgeApi {
                                FileStorage fileStorage,
                                SelfAssessmentService selfAssessments,
                                LearningProgressService learningProgress,
-                               KnowledgeRedisCache cache) {
+                               KnowledgeRedisCache cache,
+                               QuestionIndexService questionIndexService) {
         this.entryMapper = entryMapper;
         this.conceptMapper = conceptMapper;
         this.conceptLinkMapper = conceptLinkMapper;
@@ -92,6 +126,7 @@ class KnowledgeApiImplementation implements KnowledgeApi {
         this.selfAssessments = selfAssessments;
         this.learningProgress = learningProgress;
         this.cache = cache;
+        this.questionIndexService = questionIndexService;
     }
 
     @Override
@@ -172,7 +207,12 @@ class KnowledgeApiImplementation implements KnowledgeApi {
         entry.setFingerprint(input.fingerprint());
         entry.setPublishedAt("published".equals(input.status()) ? Instant.now() : null);
         entryMapper.insert(entry);
+        rememberTitle(entry);
         cache.evictEntryBriefs();
+        // 题目索引的对账钩子原本只挂在管理端（EntryAdminService），走这条采集入口进来的
+        // 已发布条目（面经采纳、essay.publish-directly=true）从来不会进 question_index，
+        // 结果「库里有题、刷题/组卷查不到」。reconcile 自身按状态判，草稿不会留下索引行。
+        questionIndexService.reconcile(entry.getId());
         return new CreateOutcome(entry.getId(), true);
     }
 
@@ -186,8 +226,7 @@ class KnowledgeApiImplementation implements KnowledgeApi {
         if (title == null) {
             return "";
         }
-        return title.replaceAll("[\\s\\p{Punct}，。；：！？、“”‘’「」『』（）【】《》〈〉·…—～]+", "")
-                .toLowerCase(Locale.ROOT);
+        return TITLE_NOISE.matcher(title).replaceAll("").toLowerCase(Locale.ROOT);
     }
 
     @Override
@@ -202,13 +241,36 @@ class KnowledgeApiImplementation implements KnowledgeApi {
         if (title.isEmpty()) {
             return Optional.empty();
         }
-        for (Entry existing : entryMapper.findTitlesByCategory(categoryId)) {
+        for (Entry existing : titleRows(categoryId)) {
             String other = normalizeTitle(existing.getTitle());
             if (!other.isEmpty() && sameQuestion(title, other)) {
                 return Optional.of(existing.getId());
             }
         }
         return Optional.empty();
+    }
+
+    /** 某分类下的「id + 标题」，走 60 秒缓存；未分类（categoryId=null）单独一桶。 */
+    private List<Entry> titleRows(Long categoryId) {
+        long key = categoryId == null ? NO_CATEGORY : categoryId;
+        Instant now = Instant.now();
+        TitleCache cached = titleCaches.get(key);
+        if (cached != null && cached.fresh(now)) {
+            return cached.rows();
+        }
+        List<Entry> rows = List.copyOf(entryMapper.findTitlesByCategory(categoryId));
+        titleCaches.put(key, new TitleCache(now.plus(TITLE_CACHE_TTL), rows));
+        return rows;
+    }
+
+    /** 本进程刚插入的条目追加进缓存，避免同轮抓取里判重看不到它而重复插入。 */
+    private void rememberTitle(Entry entry) {
+        long key = entry.getCategoryId() == null ? NO_CATEGORY : entry.getCategoryId();
+        titleCaches.computeIfPresent(key, (ignored, cached) -> {
+            List<Entry> rows = new ArrayList<>(cached.rows());
+            rows.add(entry);
+            return new TitleCache(cached.expiresAt(), List.copyOf(rows));
+        });
     }
 
     /** 归一化后完全相等，或 bigram Jaccard 相似度够高，就当作同一道题。 */

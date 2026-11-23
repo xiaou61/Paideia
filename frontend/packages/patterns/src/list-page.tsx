@@ -97,34 +97,35 @@ export function ListPage<T>({
   renderRow,
   pagination,
 }: ListPageProps<T>) {
-  return (
-    <div>
-      <PageHeader title={title} description={description} actions={actions} />
-      {filters === undefined ? null : <div className="mb-5">{filters}</div>}
-
-      {error !== undefined && error !== null ? (
-        <ErrorAlert title="加载失败" error={error} onRetry={onRetry} />
-      ) : loading ? (
-        (loadingNode ?? <LoadingRow label={loadingLabel} />)
-      ) : rows.length === 0 ? (
-        <Card>
-          <CardContent className="pt-6">
-            <Empty data-testid={emptyTestId}>
-              <EmptyHeader>
-                {emptyIcon === undefined ? null : <EmptyMedia variant="icon">{emptyIcon}</EmptyMedia>}
-                <EmptyTitle>{emptyTitle}</EmptyTitle>
-                {emptyDescription === undefined ? null : (
-                  <EmptyDescription>{emptyDescription}</EmptyDescription>
-                )}
-              </EmptyHeader>
-              {emptyAction === undefined ? null : <EmptyContent>{emptyAction}</EmptyContent>}
-            </Empty>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className={tableContentClassName}>
-            <Table data-testid={tableTestId}>
+  // 错误 → 加载 → 空 → 表格四个分支用 if/else 而不是嵌套三元：
+  // 以后再加状态（如"部分行加载失败"）时，嵌套三元极易插错层把错误态盖掉。
+  let body: ReactNode
+  if (error !== undefined && error !== null) {
+    body = <ErrorAlert title="加载失败" error={error} onRetry={onRetry} />
+  } else if (loading) {
+    body = loadingNode ?? <LoadingRow label={loadingLabel} />
+  } else if (rows.length === 0) {
+    body = (
+      <Card>
+        <CardContent className="pt-6">
+          <Empty data-testid={emptyTestId}>
+            <EmptyHeader>
+              {emptyIcon === undefined ? null : <EmptyMedia variant="icon">{emptyIcon}</EmptyMedia>}
+              <EmptyTitle>{emptyTitle}</EmptyTitle>
+              {emptyDescription === undefined ? null : (
+                <EmptyDescription>{emptyDescription}</EmptyDescription>
+              )}
+            </EmptyHeader>
+            {emptyAction === undefined ? null : <EmptyContent>{emptyAction}</EmptyContent>}
+          </Empty>
+        </CardContent>
+      </Card>
+    )
+  } else {
+    body = (
+      <Card>
+        <CardContent className={tableContentClassName}>
+          <Table data-testid={tableTestId}>
               <TableHeader>
                 <TableRow>
                   {columns.map((column) => (
@@ -159,19 +160,26 @@ export function ListPage<T>({
                   ),
                 )}
               </TableBody>
-            </Table>
-          </CardContent>
-          {pagination === undefined ? null : (
-            <ListPagination
-              total={pagination.total}
-              page={pagination.page}
-              totalPages={pagination.totalPages}
-              onPage={pagination.onPage}
-              testIdPrefix={pagination.testIdPrefix}
-            />
-          )}
-        </Card>
-      )}
+          </Table>
+        </CardContent>
+        {pagination === undefined ? null : (
+          <ListPagination
+            total={pagination.total}
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            onPage={pagination.onPage}
+            testIdPrefix={pagination.testIdPrefix}
+          />
+        )}
+      </Card>
+    )
+  }
+
+  return (
+    <div>
+      <PageHeader title={title} description={description} actions={actions} />
+      {filters === undefined ? null : <div className="mb-5">{filters}</div>}
+      {body}
     </div>
   )
 }

@@ -161,20 +161,18 @@ public class DigestCollectionService {
             byFingerprint.putIfAbsent(fingerprint, item);
         }
 
-        // 兜底来源清理必须在**查重之前**：早上页面通路挂掉时入库的是「GitHub 新项目」，
-        // 现在热榜恢复了，同一个仓库会同时出现在兜底行与热榜候选里——若先查重，它被当成
-        // "已存在"跳过，再删兜底行，这一天它就彻底消失了（d1 也一起丢）。先删再查，它就只是"新的一条"。
-        // 只在**本轮确实取到热榜条目**时才删，否则（仍是兜底轮）会把当天唯一的内容删空。
+        // 兜底行（「GitHub 新项目」）与热榜是同一个仓库的两个来源，指纹相同。
+        // 热榜恢复后这些仓库要**原地接管**，而不是先删再插：删除与插入之间隔着一次 AI 调用，
+        // 上游抛错或进程退出就会在「兜底行已删、新行未写」的状态下结束，当天这一组直接空白。
+        // 因此这里只算出「哪些兜底行会被接管」，真正覆盖发生在逐条入库时的 upsert。
+        // 只算**本轮确实取到热榜**的情况：仍是兜底轮时接管集为空，当天唯一的内容不会被清掉。
         boolean pageGithubFetched = fetched.stream().anyMatch(item ->
                 GithubTrendingSource.GROUP.equals(item.groupKey())
                         && GithubTrendingSource.SOURCE_PAGE.equals(item.sourceName()));
-        if (pageGithubFetched) {
-            int staleFallback = mapper.deleteBySource(today, GithubTrendingSource.GROUP,
-                    GithubTrendingSource.SOURCE_FALLBACK);
-            if (staleFallback > 0) {
-                log.info("速递：热榜已恢复，先清掉当天 {} 条兜底条目再查重", staleFallback);
-            }
-        }
+        Set<String> fallbackFingerprints = pageGithubFetched
+                ? new LinkedHashSet<>(mapper.findFingerprintsBySource(today,
+                        GithubTrendingSource.GROUP, GithubTrendingSource.SOURCE_FALLBACK))
+                : Set.of();
 
         // 4. 查库剔除：GitHub 只查当天（允许同一仓库连续在榜），其它组保持 ±1 天
         List<String> candidates = new ArrayList<>(byFingerprint.keySet());
@@ -188,6 +186,9 @@ public class DigestCollectionService {
         existing.addAll(mapper.existingFingerprintsSafe(today, today, githubCandidates));
         existing.addAll(mapper.existingFingerprintsSafe(
                 today.minusDays(1), today.plusDays(1), otherCandidates));
+        // 兜底行不能算「已存在」：否则同一个仓库被当成重复跳过，接管就不会发生，
+        // 页面上它仍然是「新项目」而不是热榜条目。摘掉后它会作为候选进入本轮。
+        existing.removeAll(fallbackFingerprints);
         List<String> fresh = candidates.stream().filter(fp -> !existing.contains(fp)).toList();
         if (fresh.isEmpty()) {
             log.info("速递本次候选 {} 条全部已存在", candidates.size());
@@ -255,12 +256,23 @@ public class DigestCollectionService {
                 String title = github
                         ? item.title()
                         : (ready && !result.title().isBlank() ? result.title() : item.title());
-                mapper.insert(today, item.groupKey(), item.sourceKey(), item.sourceName(),
-                        title, ready ? result.summary() : null,
-                        item.url(), fingerprint, heat, starsDay,
-                        github ? item.starsWeek() : null,
-                        item.meta(), item.language(), item.publishedAt(),
-                        ready ? STATE_READY : STATE_DEGRADED, now);
+                if (fallbackFingerprints.contains(fingerprint)) {
+                    // 这个仓库当天已有兜底行：原地改写成热榜条目（来源、d1、摘要一起更新），
+                    // 而不是先删后插——不存在「删了还没写」的窗口。
+                    mapper.upsert(today, item.groupKey(), item.sourceKey(), item.sourceName(),
+                            title, ready ? result.summary() : null,
+                            item.url(), fingerprint, heat, starsDay,
+                            github ? item.starsWeek() : null,
+                            item.meta(), item.language(), item.publishedAt(),
+                            ready ? STATE_READY : STATE_DEGRADED, now);
+                } else {
+                    mapper.insert(today, item.groupKey(), item.sourceKey(), item.sourceName(),
+                            title, ready ? result.summary() : null,
+                            item.url(), fingerprint, heat, starsDay,
+                            github ? item.starsWeek() : null,
+                            item.meta(), item.language(), item.publishedAt(),
+                            ready ? STATE_READY : STATE_DEGRADED, now);
+                }
                 created++;
             } catch (RuntimeException exception) {
                 // 并发两个实例同时跑时，唯一约束会挡住后来者——按"已存在"处理，不记失败

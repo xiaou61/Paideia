@@ -45,24 +45,36 @@ public interface QuestionIndexMapper {
             """)
     List<IndexRow> listIdentities(@Param("entryId") long entryId);
 
-    @Select("""
-            SELECT rating, attempts FROM question_difficulty WHERE fingerprint = #{fingerprint}
-            """)
-    DifficultyRow findDifficulty(@Param("fingerprint") String fingerprint);
-
     @Select("SELECT COUNT(*) FROM question_index")
     long countAll();
 
     @Select("SELECT COUNT(*) FROM question_index WHERE entry_id = #{entryId}")
     long countByEntry(@Param("entryId") long entryId);
 
+    /** 一次取回一批指纹的难度校准（全量重建时按条目批量查，避免逐题往返）。 */
+    @Select("""
+            <script>
+            SELECT fingerprint, rating, attempts FROM question_difficulty
+            WHERE fingerprint IN
+            <foreach collection="fingerprints" item="fp" open="(" separator="," close=")">#{fp}</foreach>
+            </script>
+            """)
+    List<DifficultyRow> findDifficulties(@Param("fingerprints") List<String> fingerprints);
+
+    /**
+     * 清空整张派生表。
+     *
+     * <p>刻意与 {@link #deleteOrphans(List)} 分开：这个动作等于"索引表即将被完全重建"，
+     * 只该在明确知道没有任何已发布条目时发生，不能由"传了个空集合"隐式触发。
+     */
+    @Delete("DELETE FROM question_index")
+    int deleteAll();
+
     @Delete("""
             <script>
             DELETE FROM question_index
-            <if test="ids != null and ids.size() > 0">
-              WHERE entry_id NOT IN
-              <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
-            </if>
+            WHERE entry_id NOT IN
+            <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
             </script>
             """)
     int deleteOrphans(@Param("ids") List<Long> ids);
@@ -70,6 +82,6 @@ public interface QuestionIndexMapper {
     record IndexRow(String questionKey, String fingerprint, String difficultyLabel) {
     }
 
-    record DifficultyRow(BigDecimal rating, Integer attempts) {
+    record DifficultyRow(String fingerprint, BigDecimal rating, Integer attempts) {
     }
 }

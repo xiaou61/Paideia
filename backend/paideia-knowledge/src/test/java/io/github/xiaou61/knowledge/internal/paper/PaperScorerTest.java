@@ -12,8 +12,30 @@ class PaperScorerTest {
 
     private static PaperScorer.PaperItemSnapshot item(long id, Long conceptId, String difficulty,
                                                       int answerIndex) {
-        return new PaperScorer.PaperItemSnapshot(id, 1L, "b", "b#" + id, "fp" + id, conceptId,
+        return new PaperScorer.PaperItemSnapshot(id, 1L, "b", "b#" + id, "fp" + id,
+                conceptId == null ? List.of() : List.of(conceptId), difficulty, answerIndex, 2);
+    }
+
+    private static PaperScorer.PaperItemSnapshot multiConceptItem(long id, List<Long> conceptIds,
+                                                                  String difficulty, int answerIndex) {
+        return new PaperScorer.PaperItemSnapshot(id, 1L, "b", "b#" + id, "fp" + id, conceptIds,
                 difficulty, answerIndex, 2);
+    }
+
+    @Test
+    void everyLinkedConceptIsScored() {
+        // 一题挂两个概念：两个概念都要记对错，否则第二个概念拿不到薄弱判定
+        List<PaperScorer.PaperItemSnapshot> items = List.of(
+                multiConceptItem(1, List.of(10L, 20L), "medium", 0),
+                multiConceptItem(2, List.of(20L), "medium", 0));
+        Map<Long, Integer> answers = Map.of(1L, 1, 2L, 1);
+
+        PaperScorer.ScoreResult result = PaperScorer.score(items, answers);
+
+        assertEquals(2, result.concepts().size());
+        assertEquals(1, result.concepts().get(0).total());
+        assertEquals(2, result.concepts().get(1).total());
+        assertTrue(result.weakConceptIds().containsAll(List.of(10L, 20L)));
     }
 
     @Test

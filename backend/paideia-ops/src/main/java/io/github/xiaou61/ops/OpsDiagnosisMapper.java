@@ -55,7 +55,7 @@ interface OpsDiagnosisMapper {
     @Update("""
             UPDATE ops_diagnoses
             SET status = 'FAILED', error_message = #{error}, finished_at = #{finishedAt}
-            WHERE id = #{id}
+            WHERE id = #{id} AND status <> 'DONE'
             """)
     int markFailed(@Param("id") long id,
                    @Param("error") String error,

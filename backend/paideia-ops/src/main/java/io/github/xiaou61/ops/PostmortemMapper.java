@@ -81,25 +81,33 @@ interface PostmortemMapper {
             """)
     long count(@Param("status") String status);
 
-    /** 编辑正文与各字段；状态由调用方决定（APPROVED 被编辑时一并回到 DRAFT）。 */
+    /**
+     * 编辑正文与各字段；状态由调用方决定（APPROVED 被编辑时一并回到 DRAFT）。
+     *
+     * <p>{@code AND status = #{previousStatus}} 是乐观锁：读出来是什么状态，就只允许从那个状态改。
+     * 否则并发下"另一人刚归档"的复盘会被改回 DRAFT（归档不可编辑被绕过），
+     * "另一人刚确认"的复盘会被覆盖回 DRAFT 并清掉审批人。返回 0 表示状态已被别人改过。
+     */
     @Update("""
             UPDATE ops_postmortems
-            SET title = #{title},
-                severity = #{severity},
-                alert_name = #{alertName},
-                root_cause = #{rootCause},
-                impact = #{impact},
-                timeline_md = #{timelineMd},
-                actions_md = #{actionsMd},
-                body_md = #{bodyMd},
-                evidence_refs = #{evidenceRefs},
-                status = #{status},
-                approved_by = #{approvedBy},
-                approved_at = #{approvedAt},
-                updated_at = #{updatedAt}
-            WHERE id = #{id}
+            SET title = #{row.title},
+                severity = #{row.severity},
+                alert_name = #{row.alertName},
+                root_cause = #{row.rootCause},
+                impact = #{row.impact},
+                timeline_md = #{row.timelineMd},
+                actions_md = #{row.actionsMd},
+                body_md = #{row.bodyMd},
+                evidence_refs = #{row.evidenceRefs},
+                status = #{row.status},
+                approved_by = #{row.approvedBy},
+                approved_at = #{row.approvedAt},
+                updated_at = #{row.updatedAt}
+            WHERE id = #{id} AND status = #{previousStatus}
             """)
-    int updateFields(PostmortemRow row);
+    int updateFields(@Param("row") PostmortemRow row,
+                     @Param("id") long id,
+                     @Param("previousStatus") String previousStatus);
 
     @Update("""
             UPDATE ops_postmortems

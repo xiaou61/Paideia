@@ -39,8 +39,14 @@ public class QuestionIndexService {
     public record RebuildResult(int created, int updated, int removed, int skippedBlocks) {
     }
 
-    /** 全量重建：遍历已发布条目，再清掉不在已发布集合里的残留行。 */
-    @Transactional
+    /**
+     * 全量重建：遍历已发布条目，再清掉不在已发布集合里的残留行。
+     *
+     * <p><b>刻意不加 {@code @Transactional}</b>：这里要读全库已发布正文（每篇可能几十 KB），
+     * 如果整轮包在一个事务里，重建期间会一直持有行锁并撑大回滚段，题库变大后这条路径会成为
+     * 稳定性风险。逐条 upsert 是按 (entry_id, question_key) 幂等的，中途失败下一轮自愈，
+     * 不需要整轮原子性；真正的原子性要求落在单条目的 {@link #reconcile(long)} 上。
+     */
     public RebuildResult refreshAll() {
         List<Entry> entries = entryMapper.findAllPublishedWithBody();
         int created = 0;
@@ -56,7 +62,8 @@ public class QuestionIndexService {
             removed += one.removed();
             skipped += one.skippedBlocks();
         }
-        removed += mapper.deleteOrphans(ids);
+        // 空集合意味着"一个已发布条目都没有"：这时该显式清空，而不是让 SQL 退化成裸 DELETE
+        removed += ids.isEmpty() ? mapper.deleteAll() : mapper.deleteOrphans(ids);
         return new RebuildResult(created, updated, removed, skipped);
     }
 
@@ -87,9 +94,10 @@ public class QuestionIndexService {
         Set<String> seen = new HashSet<>();
         Instant now = Instant.now();
         Map<String, String> aiLabels = aiLabels(questions);
+        Map<String, QuestionIndexMapper.DifficultyRow> difficulties = difficulties(questions);
         for (QuestionCatalog.Question question : questions) {
             seen.add(question.questionKey());
-            QuestionIndexMapper.DifficultyRow difficulty = mapper.findDifficulty(question.fingerprint());
+            QuestionIndexMapper.DifficultyRow difficulty = difficulties.get(question.fingerprint());
             Double rating = difficulty == null || difficulty.rating() == null
                     ? null : difficulty.rating().doubleValue();
             int attempts = difficulty == null || difficulty.attempts() == null ? 0 : difficulty.attempts();
@@ -112,6 +120,23 @@ public class QuestionIndexService {
             }
         }
         return new RebuildResult(added, updated, removed, 0);
+    }
+
+    /** 一次取回该条目全部题目的难度校准，避免逐题一次 SQL。 */
+    private Map<String, QuestionIndexMapper.DifficultyRow> difficulties(
+            List<QuestionCatalog.Question> questions) {
+        if (questions.isEmpty()) {
+            return Map.of();
+        }
+        List<String> fingerprints = questions.stream()
+                .map(QuestionCatalog.Question::fingerprint)
+                .distinct()
+                .toList();
+        Map<String, QuestionIndexMapper.DifficultyRow> byFingerprint = new LinkedHashMap<>();
+        for (QuestionIndexMapper.DifficultyRow row : mapper.findDifficulties(fingerprints)) {
+            byFingerprint.put(row.fingerprint(), row);
+        }
+        return byFingerprint;
     }
 
     /** 端口存在则请 AI 打难度标签；无端口/端口异常一律回退空表（不报错）。 */

@@ -153,13 +153,17 @@ export function PostmortemsPage() {
     queryFn: () => api.requestEnvelope<Postmortem>(`/api/v1/ops/admin/postmortems/${selectedId}`),
   })
 
-  // 选中另一条时用详情重置表单：列表里只有摘要，编辑器要的是全字段。
+  // 只在切换到另一条复盘时用缓存里的详情重置表单。
+  // 不能依赖 detail.data 的引用变化：React Query 默认 refetchOnWindowFocus，切回标签页
+  // 或保存后的 invalidate 都会重新拉详情，那样会静默覆盖用户正在编辑的内容。
   useEffect(() => {
-    if (detail.data !== undefined) {
-      setForm(toForm(detail.data))
+    if (selectedId === null) return
+    const cached = queryClient.getQueryData<Postmortem>(['ops', 'postmortem', selectedId])
+    if (cached !== undefined) {
+      setForm(toForm(cached))
       setBodyTouched(false)
     }
-  }, [detail.data])
+  }, [selectedId, queryClient])
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['ops', 'postmortems'] })
@@ -257,8 +261,12 @@ export function PostmortemsPage() {
       const anchor = document.createElement('a')
       anchor.href = url
       anchor.download = `postmortem-${item.id}.md`
+      // 必须挂进文档才触发下载（Firefox 等要求元素在文档里），且不能立刻 revoke：
+      // 部分浏览器此时还没读完 blob，会得到空文件。
+      document.body.appendChild(anchor)
       anchor.click()
-      URL.revokeObjectURL(url)
+      anchor.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
     },
     onError: (error) => toast.error(`下载失败：${errorMessage(error)}`),
   })
@@ -309,6 +317,27 @@ export function PostmortemsPage() {
   const current = detail.data
   const totalPages = Math.max(1, Math.ceil((list.data?.total ?? 0) / (list.data?.pageSize ?? 20)))
   const editable = current !== undefined && current.status !== 'ARCHIVED'
+  // 详情有三种"没有内容"的原因：没选、正在读、读失败。必须分开表述，
+  // 否则加载中像是没点中、失败像是没选。
+  let detailTitle = '选择一条复盘'
+  let detailDescription = '左侧列表选一条查看与编辑。'
+  let detailPlaceholder = '尚未选择。'
+  if (selectedId !== null) {
+    if (current !== undefined) {
+      detailTitle = current.title ?? `复盘 #${current.id}`
+      const statusText =
+        current.status === 'APPROVED' ? '已确认' : current.status === 'DRAFT' ? '草稿' : '已归档'
+      detailDescription = `${statusText} · 最近更新 ${formatLocalDateTime(current.updatedAt)}`
+    } else if (detail.isError) {
+      detailTitle = '读取失败'
+      detailDescription = errorMessage(detail.error, '详情读取失败，稍后重试或换一条')
+      detailPlaceholder = '详情读取失败。'
+    } else {
+      detailTitle = '正在读取…'
+      detailDescription = '正在读取这条复盘…'
+      detailPlaceholder = '正在读取…'
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -391,16 +420,14 @@ export function PostmortemsPage() {
 
         <Card className="self-start">
           <CardHeader>
-            <CardTitle>{current === undefined ? '选择一条复盘' : current.title ?? `复盘 #${current.id}`}</CardTitle>
-            <CardDescription>
-              {current === undefined
-                ? '左侧列表选一条查看与编辑。'
-                : `${current.status === 'APPROVED' ? '已确认' : current.status === 'DRAFT' ? '草稿' : '已归档'} · 最近更新 ${formatLocalDateTime(current.updatedAt)}`}
-            </CardDescription>
+            <CardTitle>{detailTitle}</CardTitle>
+            <CardDescription>{detailDescription}</CardDescription>
           </CardHeader>
           <CardContent>
             {current === undefined ? (
-              <p className="text-muted-foreground text-sm">尚未选择。</p>
+              <p className="text-muted-foreground text-sm" data-testid="postmortem-detail-placeholder">
+                {detailPlaceholder}
+              </p>
             ) : (
               <div className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-2">
@@ -415,7 +442,7 @@ export function PostmortemsPage() {
                   <Button
                     size="sm"
                     variant="secondary"
-                    disabled={current.status === 'APPROVED' || current.status === 'ARCHIVED' || approve.isPending}
+                    disabled={current.status === 'APPROVED' || approve.isPending}
                     onClick={() => approve.mutate(current.id)}
                     data-testid="postmortem-approve"
                   >

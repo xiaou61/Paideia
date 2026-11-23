@@ -210,7 +210,14 @@ public class EssayCollectionService {
                                     question.title(), question.answer(), access.get(), categoryId,
                                     fingerprint, post.url(), post.title());
                             if (EssayVerificationService.REVISED.equals(checked.status())) {
-                                answer = checked.finalAnswer();
+                                String revised = checked.finalAnswer();
+                                if (revised == null || revised.isBlank()) {
+                                    // 修正分支没给出可用正文：按「存疑」转人工，不能把 null 拼进正文
+                                    // （EssayBodyRenderer 会把 null 渲染成字符串 "null"，读者看到的是假答案）。
+                                    pendingReview++;
+                                    continue;
+                                }
+                                answer = revised;
                             } else if (!EssayVerificationService.AUTO_PASSED.equals(checked.status())) {
                                 // 存疑不进库，留档待复核。
                                 pendingReview++;

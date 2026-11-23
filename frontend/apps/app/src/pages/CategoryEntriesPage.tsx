@@ -260,26 +260,40 @@ export function CategoryEntriesPage() {
 
     const trackItems: CategoryNode[] = []
     const interviewItems: CategoryNode[] = []
-    const readingByParent = new Map<string, CategoryNode[]>()
+    // 按父分类的 **slug** 分组，不用显示名：显示名会改（「源码精读」→「核心源码解析」），
+    // 一改名分组就静默失效、所有条目掉进「其他」。slug 全库唯一且不改。
+    const readingByParent = new Map<string, { label: string; items: CategoryNode[] }>()
+    // 每个分类「直属」条目数：判断是不是纯容器要用它，不能用 children.length——
+    // 挂了直属条目的父分类一旦被当成纯容器，那些条目在侧栏里就彻底消失了。
+    const directCounts = new Map<number, number>()
+    for (const entry of allEntries.data ?? []) {
+      if (entry.categoryId === null) continue
+      directCounts.set(entry.categoryId, (directCounts.get(entry.categoryId) ?? 0) + 1)
+    }
 
-    const walk = (nodes: CategoryNode[], parentLabel: string | null) => {
+    const walk = (nodes: CategoryNode[], parent: { slug: string; label: string } | null) => {
       for (const node of nodes) {
         if (isTrack(node)) {
           trackItems.push(node)
           continue
         }
-        // 纯容器：不占行，直接展开子项（子项会按各自属性落到对应段）
-        if (node.children.length > 0) {
-          walk(node.children, node.name)
+        const hasDirect = (directCounts.get(node.id) ?? 0) > 0
+        // 纯容器：有子分类、自身没有直属条目 → 不占行，直接展开子项
+        if (node.children.length > 0 && !hasDirect) {
+          walk(node.children, { slug: node.slug, label: node.name })
           continue
         }
         if (/面经|面试|八股/.test(node.name)) {
           interviewItems.push(node)
         } else {
-          const key = parentLabel ?? '其他'
-          const bucket = readingByParent.get(key) ?? []
-          bucket.push(node)
+          const key = parent?.slug ?? 'other'
+          const bucket = readingByParent.get(key) ?? { label: parent?.label ?? '其他', items: [] }
+          bucket.items.push(node)
           readingByParent.set(key, bucket)
+        }
+        // 有直属条目但还有子分类：自己占一行，子分类也要继续展开
+        if (node.children.length > 0) {
+          walk(node.children, { slug: node.slug, label: node.name })
         }
       }
     }
@@ -306,19 +320,26 @@ export function CategoryEntriesPage() {
       trackGroups.push({ key: OTHER_GROUP.key, label: OTHER_GROUP.label, items: otherTracks })
     }
 
-    const readingItems = Array.from(readingByParent.values()).flat()
-    const preferredParents = ['书籍详解', '核心源码解析']
-    const readingGroups: RailGroup[] = []
-    for (const label of preferredParents) {
-      const items = readingByParent.get(label)
-      if (items && items.length > 0) readingGroups.push({ key: label, label, items })
-    }
-    // 其余非轨道叶子统一收进「其他」——不把它们的父容器名（如「计算机基础」）搬过来，
+    const readingItems = Array.from(readingByParent.values()).flatMap((group) => group.items)
+    // 分组本身按 slug（改名不会失效）；显示顺序仍让「书籍详解 / 核心源码解析」优先，
+    // 其余父分类统一并进「其他」——不把「计算机基础」这类父容器名搬过来，
     // 免得和上面「学习轨道」里的同名主题混淆（例如遗留的重复分类「计算机网络」）。
+    const preferredLabels = ['书籍详解', '核心源码解析']
+    const readingGroups: RailGroup[] = []
+    for (const [slug, group] of readingByParent) {
+      if (preferredLabels.includes(group.label)) {
+        readingGroups.push({ key: `reading:${slug}`, label: group.label, items: group.items })
+      }
+    }
+    readingGroups.sort(
+      (left, right) => preferredLabels.indexOf(left.label) - preferredLabels.indexOf(right.label),
+    )
     const restReading = Array.from(readingByParent.entries())
-      .filter(([label]) => !preferredParents.includes(label))
-      .flatMap(([, items]) => items)
-    if (restReading.length > 0) readingGroups.push({ key: 'other-reading', label: '其他', items: restReading })
+      .filter(([, group]) => !preferredLabels.includes(group.label))
+      .flatMap(([, group]) => group.items)
+    if (restReading.length > 0) {
+      readingGroups.push({ key: 'other-reading', label: '其他', items: restReading })
+    }
 
     return [
       {
@@ -346,7 +367,7 @@ export function CategoryEntriesPage() {
         defaultOpen: true,
       },
     ]
-  }, [categories.data, tracks.data])
+  }, [categories.data, tracks.data, allEntries.data])
 
   const items = entries.data?.items ?? []
   const total = entries.data?.total ?? 0

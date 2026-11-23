@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
@@ -30,12 +31,20 @@ class OpsIncidentMapperTest {
     OpsIncidentMapper mapper;
 
     @Autowired
+    JdbcTemplate jdbc;
+
+    @Autowired
     OpsDiagnosisMapper diagnoses;
 
     @Test
     @DisplayName("120 条历史能按 50/50/20 翻完，不重不漏（AC-003）")
     void paginationAcrossPagesWith120Rows() {
         Instant base = Instant.parse("2103-01-01T00:00:00Z");
+        // 共享测试库上不清干净就累加：每跑一次多 120 行，页数从 3 变成 8。
+        // 时间窗是这条用例独有的（2103 年），所以按窗口删不会碰到别的用例。
+        jdbc.update("DELETE FROM ops_incidents WHERE last_seen BETWEEN ? AND ?",
+                java.sql.Timestamp.from(base.minusSeconds(86_400)),
+                java.sql.Timestamp.from(base.plusSeconds(86_400)));
         for (int i = 0; i < 120; i++) {
             incidents.upsertFiring(null, "bulk-" + UUID.randomUUID(), "warning",
                     Map.of("instance", "bulk-" + i, "job", "j"),
@@ -174,6 +183,10 @@ class OpsIncidentMapperTest {
     void pageWithEqualLastSeenDoesNotSkip() {
         // 三条用 2101，跨页用例 2103、补诊断用例 2104，靠 since 与 beforeLastSeen 各自隔离
         Instant same = Instant.parse("2101-01-01T00:00:00Z");
+        // 同上：同一窗口的行必须先清掉，否则上一轮留下的行会插进这一页。
+        jdbc.update("DELETE FROM ops_incidents WHERE last_seen BETWEEN ? AND ?",
+                java.sql.Timestamp.from(same.minusSeconds(86_400)),
+                java.sql.Timestamp.from(same.plusSeconds(86_400)));
         long first = incidents.upsertFiring(null, "page-" + UUID.randomUUID(), "warning",
                 Map.of("instance", "p1", "job", "j"), same, same).id();
         long second = incidents.upsertFiring(null, "page-" + UUID.randomUUID(), "warning",
@@ -211,4 +224,3 @@ class OpsIncidentMapperTest {
         assertThat(detail.events().getLast().actorUserId()).isEqualTo(7L);
     }
 }
-

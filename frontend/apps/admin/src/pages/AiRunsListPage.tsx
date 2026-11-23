@@ -224,6 +224,7 @@ export function AiRunsListPage() {
       error={list.error}
       onRetry={() => { void list.refetch() }}
       tableTestId="runs-table"
+      tableContentClassName="px-0"
       emptyTestId="runs-list-empty"
       emptyIcon={<ListOrdered />}
       emptyTitle="没有符合条件的调用"

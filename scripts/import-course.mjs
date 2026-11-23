@@ -262,14 +262,17 @@ async function ensureParent(client, tree, spec, options) {
   const existing = findCategory(tree, spec.parent)
   if (existing) {
     // 父分类的名字跟着 frontmatter 走：改名（源码精读 → 核心源码解析）不用再去后台点一遍。
-    // PUT 是整体替换，所以把 parentId 固定成 null、lineKind 固定成 null——父分类只是容器。
+    // PUT 是**整体替换**（后端 update 里 `sortOrder == null ? 0 : sortOrder`、`setParentId(null)`），
+    // 所以不掌握的字段必须原样带回去：以前这里写死 `parentId: null` 与 `sortOrder: 0`，
+    // 于是改个名就把排序重置成 0（books 种子里是 200，会直接跳到根分类最前面），
+    // 还会把后台手工挂到上层容器的父分类整棵挪回根。
     const name = spec.parentName ?? spec.parent
     if (existing.name !== name) {
       if (options.dryRun) {
         console.log(`  [dry-run] 将改父分类名 ${existing.name} → ${name}`)
       } else {
         await client.put(`/api/v1/knowledge/admin/categories/${existing.id}`, {
-          parentId: null,
+          parentId: existing.parentId ?? null,
           name,
           slug: existing.slug,
           sortOrder: existing.sortOrder ?? 0,
@@ -299,8 +302,8 @@ async function ensureParent(client, tree, spec, options) {
 /**
  * 从分类树里反推某个分类现在挂在谁下面：根分类返回 null，树里没有返回 undefined。
  *
- * <p>管理端返回的节点只有 id / name / slug / lineKind / children，没有 parentId，
- * 只能靠树形结构反查。
+ * <p>节点现在也带 `parentId` 了（2026-11-22 补上），但这里仍按树形反查：
+ * 反查得到的是 **slug**，比 id 更适合拿来和 frontmatter 的 `line_parent` 比对。
  */
 function currentParentSlug(tree, slug) {
   const walk = (nodes, parentSlug) => {
@@ -353,7 +356,9 @@ async function syncCategoryName(client, existing, spec, parentId, options, curre
     parentId,
     name: spec.name,
     slug: existing.slug,
-    sortOrder: spec.sortOrder,
+    // frontmatter 没写 sort_order 时沿用库里现值：PUT 是整体替换，写 null 会被后端变成 0，
+    // 等于"这次改名顺手把排序清零了"。
+    sortOrder: spec.sortOrder ?? existing.sortOrder ?? 0,
     lineKind: desiredLineKind,
   })
   if (nameChanged) console.log(`  ~ 分类名 ${existing.name} → ${spec.name}`)

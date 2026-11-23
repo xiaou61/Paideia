@@ -234,18 +234,26 @@ class OpsEvidenceCollectorTest {
     }
 
     @Test
-    @DisplayName("日志查询锚定证据窗口，而不是从此刻往前一小时")
+    @DisplayName("日志查询锚定证据窗口，而不是从此刻往前一小时；上下文段只会更窄")
     void queriesUseEvidenceWindow() {
         OpsEvidenceWindow window = window();
         collector(List.of("paideia"), 10, 16000, true)
                 .collect("alert", "日志模板异常待处理", null, null, window);
 
         assertThat(lokiQueries).isNotEmpty();
+        long windowStart = window.start().getEpochSecond();
+        long windowEnd = window.end().getEpochSecond();
+        // 主段必须覆盖整个窗口……
         assertThat(lokiQueries).allSatisfy(raw -> {
-            String expectedStart = window.start().getEpochSecond() + "000000000";
-            String expectedEnd = window.end().getEpochSecond() + "000000000";
-            assertThat(param(raw, "start")).isEqualTo(expectedStart);
-            assertThat(param(raw, "end")).isEqualTo(expectedEnd);
+            long start = Long.parseLong(param(raw, "start")) / 1_000_000_000L;
+            long end = Long.parseLong(param(raw, "end")) / 1_000_000_000L;
+            // ……上下文段以最早一条异常为中心前后各 30 秒，会比窗口窄，但绝不许越出窗口。
+            assertThat(start).isBetween(windowStart, windowEnd);
+            assertThat(end).isBetween(windowStart, windowEnd);
+        });
+        assertThat(lokiQueries).anySatisfy(raw -> {
+            assertThat(param(raw, "start")).isEqualTo(windowStart + "000000000");
+            assertThat(param(raw, "end")).isEqualTo(windowEnd + "000000000");
         });
     }
 

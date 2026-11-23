@@ -27,8 +27,8 @@ mermaid 在 GitHub 上原生渲染，且在 `frontend/` 里已有渲染链路（
 | [`02-request-path.md`](02-request-path.md) | AI 撰写 | 一个请求从浏览器到数据库、以及 AI 流式回答的时序 |
 | [`03-deployment.md`](03-deployment.md) | AI 撰写 | 部署形态、信任边界与端口拓扑 |
 | [`04-frontend-packages.md`](04-frontend-packages.md) | 脚本生成 | 前端 17 个 workspace 包的依赖方向 |
-| [`05-database-tables.md`](05-database-tables.md) | 脚本生成 | 74 张表与 16 条真实外键 |
-| [`06-api-surface.md`](06-api-surface.md) | 脚本生成 | 212 个端点 / 53 个控制器的清单 |
+| [`05-database-tables.md`](05-database-tables.md) | 脚本生成 | 75 张表与 16 条真实外键 |
+| [`06-api-surface.md`](06-api-surface.md) | 脚本生成 | 219 个端点 / 54 个控制器的清单 |
 | [`paideia-architecture.html`](paideia-architecture.html) | 产物（源是 `.archify.json`） | 20 个运行时组件的全景交互图：5 个视图、可点源码、深浅主题 |
 
 ## 全貌图：Archify（第三种生产方式）

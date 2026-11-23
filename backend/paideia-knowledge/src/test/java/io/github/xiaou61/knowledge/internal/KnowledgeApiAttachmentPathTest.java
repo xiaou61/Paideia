@@ -22,6 +22,7 @@ import io.github.xiaou61.knowledge.internal.file.FileStorage;
 import io.github.xiaou61.knowledge.internal.file.StoredFile;
 import io.github.xiaou61.knowledge.internal.file.StoredFileMapper;
 import io.github.xiaou61.knowledge.internal.learning.LearningProgressService;
+import io.github.xiaou61.knowledge.internal.question.QuestionIndexService;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,10 +50,13 @@ class KnowledgeApiAttachmentPathTest {
     private final SelfAssessmentService selfAssessments = mock(SelfAssessmentService.class);
     private final LearningProgressService learningProgress = mock(LearningProgressService.class);
     private final KnowledgeRedisCache cache = mock(KnowledgeRedisCache.class);
+    /** 采集入口落库后要调 reconcile，桩掉即可（本测试不验索引）。 */
+    private final QuestionIndexService questionIndex = mock(QuestionIndexService.class);
 
     private KnowledgeApiImplementation impl() {
         return new KnowledgeApiImplementation(entryMapper, conceptMapper, conceptLinkMapper, entryService,
-                categoryService, categoryMapper, storedFiles, fileStorage, selfAssessments, learningProgress, cache);
+                categoryService, categoryMapper, storedFiles, fileStorage, selfAssessments, learningProgress, cache,
+                questionIndex);
     }
 
     // ── findAttachment ──────────────────────────────────────────────

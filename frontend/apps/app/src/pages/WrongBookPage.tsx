@@ -11,15 +11,19 @@ export function WrongBookPage() {
   const exam = useMemo(() => createExamApi(api), [])
   const [questions, setQuestions] = useState<WrongQuestion[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
     void (async () => {
       try {
         const list = await exam.wrongQuestions({ limit: 100 })
         if (!cancelled) setQuestions(list)
       } catch (cause) {
         if (!cancelled) setError(errorMessage(cause))
+      } finally {
+        if (!cancelled) setLoading(false)
       }
     })()
     return () => {
@@ -39,7 +43,8 @@ export function WrongBookPage() {
         </div>
 
         {error ? <p className="mt-4 text-sm text-destructive">{error}</p> : null}
-        {questions.length === 0 && !error ? <p className="mt-6 text-sm text-muted-foreground" data-testid="wrong-empty">还没有错题，继续保持。</p> : null}
+        {loading ? <p className="mt-6 text-sm text-muted-foreground">加载中…</p> : null}
+        {!loading && questions.length === 0 && !error ? <p className="mt-6 text-sm text-muted-foreground" data-testid="wrong-empty">还没有错题，继续保持。</p> : null}
 
         <ul className="mt-4 space-y-3" data-testid="wrong-list">
           {questions.map((question) => (

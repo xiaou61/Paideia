@@ -16,9 +16,17 @@ public final class PaperScorer {
     private PaperScorer() {
     }
 
+    /**
+     * 一题的判分快照。{@code conceptIds} 是**全部**关联概念：一题挂多个概念时每个概念都要记一次
+     * 对错，否则其余概念拿不到 BKT/Elo 更新，薄弱识别也会漏判。
+     */
     public record PaperItemSnapshot(long itemId, long entryId, String blockKey, String questionKey,
-                                    String fingerprint, Long conceptId, String difficultyLabel,
+                                    String fingerprint, List<Long> conceptIds, String difficultyLabel,
                                     int answerIndex, int optionCount) {
+
+        public PaperItemSnapshot {
+            conceptIds = conceptIds == null ? List.of() : List.copyOf(conceptIds);
+        }
     }
 
     public record ConceptStat(long conceptId, int correct, int total, boolean weak) {
@@ -50,8 +58,12 @@ public final class PaperScorer {
             if (ok) {
                 diff[0]++;
             }
-            if (item.conceptId() != null) {
-                int[] concept = byConcept.computeIfAbsent(item.conceptId(), key -> new int[4]);
+            // 一题多概念：每个概念各记一次，概念统计因此是「题目-概念」对的口径，与作答轨迹一致
+            for (Long conceptId : item.conceptIds()) {
+                if (conceptId == null) {
+                    continue;
+                }
+                int[] concept = byConcept.computeIfAbsent(conceptId, key -> new int[4]);
                 concept[0]++;
                 if (ok) {
                     concept[1]++;

@@ -452,7 +452,13 @@ function buildScene(
   const byId = new Map(placedNodes.map((item) => [item.node.id, item]))
   const placedEdges: PlacedEdge[] = []
   const seen = new Set<string>()
-  edges.forEach((edge, index) => {
+  // 无向对只画一条：同一对概念可能既有 prerequisite 又有 related，后端 SQL 没有 ORDER BY，
+  // 谁先到谁留下。先按「prerequisite 优先」排一遍，语义更强的那条边才不会被虚线顶掉。
+  const orderedEdges = [...edges].sort((left, right) => {
+    const rank = (type: string) => (type === 'prerequisite' ? 0 : 1)
+    return rank(left.type) - rank(right.type)
+  })
+  orderedEdges.forEach((edge, index) => {
     if (edge.from === edge.to) return
     const a = byId.get(edge.from)
     const b = byId.get(edge.to)

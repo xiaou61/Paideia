@@ -84,6 +84,13 @@ class OpsDiagnosisMailer {
         if (sender == null || !notify.isEnabled()) {
             return;
         }
+        // 没有发件地址时不能进 compose：MimeMessageHelper.setFrom(null) 抛 IllegalArgumentException，
+        // 那是运行时异常，会一路冒泡成"诊断失败"（见 OpsDiagnosisService.run 的 catch）。
+        if (!mail.hasSender()) {
+            log.warn("ops.mail.skipped reason=no-from-address alert={}"
+                    + "（配置 paideia.mail.from-address 或 paideia.mail.username）", alertName);
+            return;
+        }
         String[] recipients = recipients(notify.getTo());
         if (recipients.length == 0) {
             log.debug("ops.mail.skipped reason=no-recipient alert={}", alertName);

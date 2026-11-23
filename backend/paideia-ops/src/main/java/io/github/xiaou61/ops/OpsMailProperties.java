@@ -47,6 +47,16 @@ public record OpsMailProperties(
         return username != null && !username.isBlank() && password != null && !password.isBlank();
     }
 
+    /**
+     * 是否有可用的发件地址。
+     *
+     * <p>配了 host 但既没写 {@code from-address}、{@code username} 也是空时，{@code fromAddress}
+     * 会保持 null；此时发信会在 {@code setFrom(null)} 上抛运行时异常，而不是给出可读的失败原因。
+     */
+    public boolean hasSender() {
+        return fromAddress != null && !fromAddress.isBlank();
+    }
+
     /** record 默认 toString 会带出 password；排障时整个对象常被打印，必须自己写。 */
     @Override
     public String toString() {

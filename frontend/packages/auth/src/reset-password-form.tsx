@@ -10,14 +10,20 @@ import { messageOf, useAuth } from './auth-context'
  * ——"链接无效或已过期"这句话的原因（过期、用过、重新申请过）只有服务端知道，
  * 前端猜一遍只会猜错。
  *
- * <p>长度上限 72 与后端一致，是 BCrypt 的输入上限：BCrypt 只看前 72 字节，
- * 更长的口令后半段根本不参与校验，收下来等于骗用户。
+ * <p>长度上限与后端一致，是 BCrypt 的输入上限：BCrypt 只看前 **72 字节**，
+ * 更长的口令后半段根本不参与校验，收下来等于骗用户。注意字节不是字符——一个中文或
+ * emoji 占 3–4 字节，所以这里用 `TextEncoder` 按 UTF-8 字节数校验，且**不用**
+ * `maxLength`：它按 UTF-16 码元静默截断，粘贴长口令时会存下一个用户并不知道的密码。
  */
 const PASSWORD_MIN = 8
-const PASSWORD_MAX = 72
+const PASSWORD_MAX_BYTES = 72
+
+function utf8Length(value: string): number {
+  return new TextEncoder().encode(value).length
+}
 
 export function ResetPasswordForm({ token }: { token: string }) {
-  const { api } = useAuth()
+  const { api, logout } = useAuth()
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -31,9 +37,16 @@ export function ResetPasswordForm({ token }: { token: string }) {
       setError('两次输入的密码不一致。')
       return
     }
+    if (utf8Length(password) > PASSWORD_MAX_BYTES) {
+      setError(`密码过长：最多 ${PASSWORD_MAX_BYTES} 字节（中文/emoji 占 3–4 字节），请换短一些的。`)
+      return
+    }
     setBusy(true)
     try {
       await api.confirmPasswordReset(token, password)
+      // 后端已吊销该账号全部 refresh 令牌；本地会话必须同步清掉，
+      // 否则「用新密码登录」会被 RequireGuest 当成已登录而弹回首页。
+      await logout()
       setDone(true)
     } catch (failure) {
       setError(messageOf(failure))
@@ -73,12 +86,11 @@ export function ResetPasswordForm({ token }: { token: string }) {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           minLength={PASSWORD_MIN}
-          maxLength={PASSWORD_MAX}
           className="h-10"
           required
         />
         <p className="text-muted-foreground text-xs">
-          {PASSWORD_MIN}–{PASSWORD_MAX} 个字符。
+          至少 {PASSWORD_MIN} 个字符，最多 {PASSWORD_MAX_BYTES} 字节（中文每个约 3 字节）。
         </p>
       </div>
 
@@ -92,7 +104,6 @@ export function ResetPasswordForm({ token }: { token: string }) {
           value={confirm}
           onChange={(event) => setConfirm(event.target.value)}
           minLength={PASSWORD_MIN}
-          maxLength={PASSWORD_MAX}
           className="h-10"
           required
         />

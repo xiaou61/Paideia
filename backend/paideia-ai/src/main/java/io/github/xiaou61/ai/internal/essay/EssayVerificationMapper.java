@@ -71,6 +71,7 @@ public interface EssayVerificationMapper {
                    review_note = #{note},
                    reviewed_at = CURRENT_TIMESTAMP(3)
              WHERE id = #{id}
+               AND status IN ('pending_review', 'revised')
             """)
     int markReviewed(@Param("id") long id,
                      @Param("status") String status,

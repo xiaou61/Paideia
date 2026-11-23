@@ -60,6 +60,9 @@ class PwaEntryPointsTest {
         assertNotBlockedByAuth("/pwa-192.png");
         assertNotBlockedByAuth("/pwa-512.png");
         assertNotBlockedByAuth("/apple-touch-icon.png");
+        // 三端 index.html 都引了 SVG 图标；早先白名单只有 .ico，浏览器取 /favicon.svg 会拿到 401
+        assertNotBlockedByAuth("/favicon.svg");
+        assertNotBlockedByAuth("/favicon.ico");
     }
 
     @Test

@@ -43,6 +43,11 @@ const NAV_GROUPS = [
     items: [
       { testId: 'learner-nav-sql-practice', label: 'SQL 练习' },
       { testId: 'learner-nav-my-assessments', label: '我的自评' },
+      // 试卷与智能组卷（WORK-083）、错题本：页面早就上线，导航清单里一直没跟上，
+      // 「入口存在」这件事因此没有测试盯着。
+      { testId: 'learner-nav-practice', label: '刷题' },
+      { testId: 'learner-nav-papers', label: '试卷' },
+      { testId: 'learner-nav-wrong-book', label: '错题本' },
     ],
   },
   {

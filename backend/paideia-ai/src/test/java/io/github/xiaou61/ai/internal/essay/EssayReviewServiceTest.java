@@ -15,6 +15,7 @@ import static org.mockito.Mockito.when;
 import io.github.xiaou61.knowledge.KnowledgeApi;
 import io.github.xiaou61.platform.BizException;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,13 @@ class EssayReviewServiceTest {
     void setUp() {
         mapper = mock(EssayVerificationMapper.class);
         knowledge = mock(KnowledgeApi.class);
+        // 采纳前会核对分类还在不在（分类被删后再采纳会撞外键，整行永远无法处理）。
+        // 夹具里的记录都挂 categoryId=1，所以这里给一个 id=1 的分类。
+        when(knowledge.listCategories()).thenReturn(List.of(
+                new KnowledgeApi.CategoryNode(1L, "面经", "interview", null)));
+        // markReviewed 现在带状态守卫并返回影响行数：默认"改到了"（=1），
+        // 只有并发冲突那条用例显式让它返回 0。
+        when(mapper.markReviewed(anyLong(), anyString(), any(), anyLong(), any())).thenReturn(1);
         service = new EssayReviewService(mapper, knowledge);
     }
 
@@ -102,6 +110,31 @@ class EssayReviewServiceTest {
         assertThatThrownBy(() -> service.approve(9L, null, null, true, 42L))
                 .isInstanceOf(BizException.class);
         verify(knowledge, never()).createCollected(any());
+    }
+
+    @Test
+    void approveWithDeletedCategoryIsRejectedBeforeCreatingEntry() {
+        // 记录挂着已被删掉的分类：先建条目再撞外键，结果是 500 且这一行永远无法采纳。
+        when(mapper.findById(9L)).thenReturn(Optional.of(row(9L, "pending_review")));
+        when(knowledge.listCategories()).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.approve(9L, null, null, true, 42L))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("分类已不存在");
+        verify(knowledge, never()).createCollected(any());
+    }
+
+    @Test
+    void approveLosesRaceWhenRowWasAlreadyHandled() {
+        // 状态守卫在 SQL 里：并发采纳时只有一个能改到行，另一个必须回滚掉刚建的条目。
+        when(mapper.findById(9L)).thenReturn(Optional.of(row(9L, "pending_review")));
+        when(knowledge.createCollected(any()))
+                .thenReturn(new KnowledgeApi.CreateOutcome(500L, true));
+        when(mapper.markReviewed(eq(9L), eq("approved"), eq(500L), eq(42L), isNull())).thenReturn(0);
+
+        assertThatThrownBy(() -> service.approve(9L, null, null, true, 42L))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("已被其他人处理");
     }
 
     @Test

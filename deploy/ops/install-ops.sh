@@ -159,6 +159,17 @@ GF_SMTP_FROM_ADDRESS=${GRAFANA_SMTP_USER:-3153566913@qq.com}
 GF_SMTP_FROM_NAME=Paideia 运维
 ENVEOF
 fi
+# 告警邮件里的链接由 root_url 生成，grafana.ini 里那条是回环地址；公网地址只能来自环境变量。
+# 已有 grafana.env 的机器不会被上面的 if 覆盖，所以这里单独补写（幂等，已存在则替换）。
+if [ -n "${GRAFANA_ROOT_URL:-}" ]; then
+    if grep -q '^GF_SERVER_ROOT_URL=' /etc/grafana/grafana.env; then
+        sed -i "s#^GF_SERVER_ROOT_URL=.*#GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL}#" /etc/grafana/grafana.env
+    else
+        printf 'GF_SERVER_ROOT_URL=%s\n' "$GRAFANA_ROOT_URL" >> /etc/grafana/grafana.env
+    fi
+else
+    echo "提示：未设置 GRAFANA_ROOT_URL，告警邮件里的链接会指向 127.0.0.1:3000（外部打不开）" >&2
+fi
 chmod 600 /etc/grafana/grafana.env
 
 # 解压安装一个 github release 里的单个二进制
@@ -197,6 +208,10 @@ install_release oliver006/redis_exporter "$REDIS_EXPORTER_VERSION" redis_exporte
 install_release_zip grafana/loki "$LOKI_VERSION" loki "loki-linux-amd64"
 install_release_zip grafana/alloy "$ALLOY_VERSION" alloy "alloy-linux-amd64"
 install_release grafana/tempo "$TEMPO_VERSION" tempo "tempo_${TEMPO_VERSION}_linux_amd64"
+
+# Loki 配置里键名/版本一错就是"服务起不来"，而安装结果只显示 inactive；
+# 与前面的 promtool check rules 对称，这里用 Loki 自己的校验器在重启前挡掉。
+/usr/local/bin/loki -config.file=/etc/loki/loki-config.yaml -verify-config
 
 mkdir -p /var/lib/prometheus
 chown -R prometheus:prometheus /var/lib/prometheus

@@ -169,13 +169,13 @@ class McpAdminIntegrationTest {
     }
 
     @Test
-    @DisplayName("40 个管理工具全部注册、全部 ADMIN、只落在 7 个管理组")
+    @DisplayName("41 个管理工具全部注册、全部 ADMIN、只落在 7 个管理组")
     void allAdminToolsAreRegistered() {
         List<io.github.xiaou61.platform.ToolDescriptor> admin = catalog.snapshot().stream()
                 .filter(tool -> tool.name().startsWith("admin_"))
                 .toList();
 
-        assertThat(admin).hasSize(40);
+        assertThat(admin).hasSize(41);
         assertThat(admin).allMatch(tool -> tool.scope() == ToolScope.ADMIN);
         assertThat(admin).allMatch(tool -> !tool.defaultGroup());
         assertThat(admin.stream().map(io.github.xiaou61.platform.ToolDescriptor::toolset)

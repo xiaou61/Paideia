@@ -6,7 +6,6 @@
 | --- | --- | --- | --- | --- | --- |
 | `account_me` | account | read | true | false | true |
 | `admin_ai_get_run` | admin_ai | admin | true | false | false |
-| `admin_ai_list_feedback` | admin_ai | admin | true | false | false |
 | `admin_ai_list_runs` | admin_ai | admin | true | false | false |
 | `admin_ai_overview` | admin_ai | admin | true | false | false |
 | `admin_ai_series` | admin_ai | admin | true | false | false |
@@ -29,6 +28,7 @@
 | `admin_digest_list_items` | admin_digest | admin | true | false | false |
 | `admin_learning_export_evaluation` | admin_learning | admin | true | false | false |
 | `admin_learning_list_questions` | admin_learning | admin | true | false | false |
+| `admin_learning_reindex_questions` | admin_learning | admin | false | false | false |
 | `admin_learning_set_question_concepts` | admin_learning | admin | false | false | false |
 | `admin_learning_suggest_concepts` | admin_learning | admin | true | false | false |
 | `admin_ops_alerts` | admin_ops | admin | true | false | false |
@@ -58,8 +58,6 @@
 | `knowledge_search` | knowledge | read | true | false | true |
 | `knowledge_weak_concepts` | knowledge | read | true | false | true |
 | `learning_progress` | learning | read | true | false | true |
-| `memory_list` | memory | read | true | false | false |
-| `memory_remember` | memory | write | false | false | false |
 | `note_append` | note | write | false | false | false |
 | `note_create` | note | write | false | false | false |
 | `note_get` | note | read | true | false | true |

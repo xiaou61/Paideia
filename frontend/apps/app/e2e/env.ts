@@ -11,6 +11,17 @@ export const LEARNER = {
 }
 
 /**
+ * 管理员账号：**只用于造/删夹具**（图谱概念等），不参与被测页面。
+ *
+ * <p>放在这里与 {@link LEARNER} 并排：以前它写在 `graph-fixture.ts` 里，夹具多一处就多一份拷贝，
+ * 口令来源迟早漂移。
+ */
+export const ADMIN = {
+  identifier: process.env.E2E_ADMIN_IDENTIFIER ?? 'seed-admin',
+  password: process.env.E2E_ADMIN_PASSWORD ?? 'seed-admin-password',
+}
+
+/**
  * 打的是已部署实例而不是本机（见 `playwright.config.ts`）。
  *
  * <p>**有些用例只在本地成立**：它们依赖 `db/devdata` 的种子内容（那条草稿、那几篇文章），

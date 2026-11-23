@@ -65,6 +65,8 @@ class PostmortemServiceTest {
             ((PostmortemRow) invocation.getArgument(0)).setId(100L);
             return 1;
         });
+        // 乐观锁默认命中：状态没被别人改过
+        when(postmortems.updateFields(any(), anyLong(), any())).thenReturn(1);
         service = new PostmortemService(postmortems, diagnoses, incidents);
     }
 
@@ -150,7 +152,7 @@ class PostmortemServiceTest {
                 "根因改写", null, null, null, null, null), 9L);
 
         ArgumentCaptor<PostmortemRow> captor = ArgumentCaptor.forClass(PostmortemRow.class);
-        verify(postmortems).updateFields(captor.capture());
+        verify(postmortems).updateFields(captor.capture(), eq(7L), eq(PostmortemRow.STATUS_APPROVED));
         assertThat(captor.getValue().getStatus()).isEqualTo(PostmortemRow.STATUS_DRAFT);
         assertThat(captor.getValue().getApprovedBy()).isNull();
         assertThat(captor.getValue().getTitle()).isEqualTo("新标题");
@@ -166,7 +168,7 @@ class PostmortemServiceTest {
                 "连不上库，password=abc123 被写进日志", null, null, null, null, null), 9L);
 
         ArgumentCaptor<PostmortemRow> captor = ArgumentCaptor.forClass(PostmortemRow.class);
-        verify(postmortems).updateFields(captor.capture());
+        verify(postmortems).updateFields(captor.capture(), eq(7L), eq(PostmortemRow.STATUS_DRAFT));
         assertThat(captor.getValue().getRootCause()).contains("***").doesNotContain("abc123");
     }
 

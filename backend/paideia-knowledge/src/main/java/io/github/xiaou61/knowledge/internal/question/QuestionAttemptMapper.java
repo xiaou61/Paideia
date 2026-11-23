@@ -188,14 +188,17 @@ public interface QuestionAttemptMapper {
             <script>
             SELECT qi.entry_id, qi.block_key, qi.question_key, qi.fingerprint,
                    qi.option_count, qi.difficulty_label,
-                   (SELECT qa.correct FROM question_attempts qa
-                      WHERE qa.user_id = #{userId} AND qa.entry_id = qi.entry_id
-                        AND qa.block_key = qi.block_key AND qa.question_key = qi.question_key
-                      ORDER BY qa.id DESC LIMIT 1) AS lastCorrect,
-                   (SELECT COUNT(*) FROM question_attempts qa2
-                      WHERE qa2.user_id = #{userId} AND qa2.entry_id = qi.entry_id
-                        AND qa2.block_key = qi.block_key AND qa2.question_key = qi.question_key) AS attemptCount
+                   agg2.lastCorrect, COALESCE(agg2.attemptCount, 0) AS attemptCount
             FROM question_index qi
+            LEFT JOIN (
+              SELECT qa.entry_id, qa.block_key, qa.question_key, qa.correct AS lastCorrect,
+                     agg.attemptCount
+              FROM question_attempts qa
+              JOIN (SELECT entry_id, block_key, question_key, MAX(id) AS maxId, COUNT(*) AS attemptCount
+                    FROM question_attempts WHERE user_id = #{userId}
+                    GROUP BY entry_id, block_key, question_key) agg ON agg.maxId = qa.id
+            ) agg2 ON agg2.entry_id = qi.entry_id AND agg2.block_key = qi.block_key
+                 AND agg2.question_key = qi.question_key
             WHERE qi.status = 'active'
               <if test="categoryId != null"> AND qi.category_id = #{categoryId}</if>
               <if test="difficultyLabel != null and difficultyLabel != ''"> AND qi.difficulty_label = #{difficultyLabel}</if>
@@ -207,15 +210,10 @@ public interface QuestionAttemptMapper {
                     <foreach collection="conceptIds" item="cid" open="(" separator="," close=")">#{cid}</foreach>)
               </if>
               <if test="onlyUndone">
-                AND NOT EXISTS (SELECT 1 FROM question_attempts qa3
-                  WHERE qa3.user_id = #{userId} AND qa3.entry_id = qi.entry_id
-                    AND qa3.block_key = qi.block_key AND qa3.question_key = qi.question_key)
+                AND agg2.attemptCount IS NULL
               </if>
               <if test="onlyWrong">
-                AND (SELECT qa4.correct FROM question_attempts qa4
-                  WHERE qa4.user_id = #{userId} AND qa4.entry_id = qi.entry_id
-                    AND qa4.block_key = qi.block_key AND qa4.question_key = qi.question_key
-                  ORDER BY qa4.id DESC LIMIT 1) = 0
+                AND agg2.lastCorrect = 0
               </if>
             ORDER BY qi.entry_id, qi.block_key, qi.question_key
             LIMIT #{limit}
@@ -258,7 +256,9 @@ public interface QuestionAttemptMapper {
                   WHERE qc.entry_id = qi.entry_id AND qc.block_key = qi.block_key
                     AND qc.question_key = qi.question_key AND qc.concept_id = #{conceptId})
               </if>
-            ORDER BY qi.entry_id, qi.block_key, qi.question_key
+            -- 错题本语义是「最近一次答错」：按最近作答 id 倒序，否则错题超过 limit 时
+            -- 只有身份键排序靠前的那些永远可见，最近答错的反而翻不到
+            ORDER BY la.id DESC
             LIMIT #{limit}
             </script>
             """)

@@ -25,8 +25,14 @@ public final class CategoryTree {
      *
      * <p>{@code lineKind} 非空表示这个分类是一条学习线（WORK-020）；管理端据此显示"这是条线"，
      * 学习者端的线清单另有 {@code /api/v1/learning/lines}，不靠这棵树。
+     *
+     * <p>{@code parentId} 与 {@code sortOrder} 是给**写路径**用的：改分类是一次整体替换
+     * （{@code PUT /admin/categories/{id}} 会把没传的字段写成默认值），调用方必须能把原值原样带回去。
+     * 以前树里没有这两项，`scripts/import-course.mjs` 改名父分类时只能写死 `parentId: null`、
+     * `sortOrder: 0`，于是改名顺手把排序重置成 0、把手工挂到上层容器的分类挪回根。
      */
-    public record Node(Long id, String name, String slug, String lineKind, List<Node> children) {
+    public record Node(Long id, Long parentId, String name, String slug, int sortOrder, String lineKind,
+                       List<Node> children) {
     }
 
     /**
@@ -66,8 +72,10 @@ public final class CategoryTree {
             }
             nodes.add(new Node(
                     child.getId(),
+                    child.getParentId(),
                     child.getName(),
                     child.getSlug(),
+                    child.getSortOrder(),
                     child.getLineKind(),
                     childrenOf(child.getId(), byParent, visiting)));
             visiting.remove(child.getId());

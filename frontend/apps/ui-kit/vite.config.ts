@@ -17,6 +17,9 @@ export default defineConfig({
   plugins: [react(), tailwindcss(), themeInitPlugin()],
   server: {
     port: 5175,
+    // 同 apps/app：Vite 8 默认只绑 `[::1]`，而 Playwright 探活 `http://127.0.0.1:5175`，
+    // 不显式绑 IPv4 会白等 60s。
+    host: process.env.PAIDEIA_UIKIT_HOST ?? '127.0.0.1',
   },
   preview: {
     port: 5175,

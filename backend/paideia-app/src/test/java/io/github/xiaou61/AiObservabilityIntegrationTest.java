@@ -194,7 +194,17 @@ class AiObservabilityIntegrationTest {
     void reconcileExcludesReserveAndAdjust() {
         wipe();
         try {
+            // 对账是**全库**聚合（不带用户过滤），所以断言必须是「增量」而不是绝对值：
+            // 用「今天」做窗口时，同一轮里别的测试造出来的轮次与流水会一起算进来
+            // （2026-11-22 并行全量里就红成 expected: 5 but was: 50）。
             Instant now = Instant.now();
+            AiRunAdminService.Reconcile baseline = admin.reconcile(now.minus(1, ChronoUnit.DAYS),
+                    now.plus(1, ChronoUnit.DAYS));
+            long recordedBefore = baseline.days().stream()
+                    .mapToLong(AiRunAdminService.ReconcileDay::recorded).sum();
+            long ledgerBefore = baseline.days().stream()
+                    .mapToLong(AiRunAdminService.ReconcileDay::ledger).sum();
+
             insertRun(now, 1, "ok", "chat");   // credits = 5
             // 流水：一笔结算 -5（消耗 5）、一笔预留不写行、一笔管理员发分 +100
             jdbc.update("INSERT INTO ai_credit_ledger (user_id, delta, kind, created_at) VALUES (?,?,?,?)",
@@ -209,15 +219,15 @@ class AiObservabilityIntegrationTest {
             AiRunAdminService.Reconcile result = admin.reconcile(now.minus(1, ChronoUnit.DAYS),
                     now.plus(1, ChronoUnit.DAYS));
 
-            AiRunAdminService.ReconcileDay today = result.days().stream()
-                    .filter(day -> day.recorded() > 0)
-                    .findFirst()
-                    .orElseThrow();
-            assertThat(today.recorded()).isEqualTo(5);
-            // 若把 ADJUST(+100) 或 RESERVE(-50) 也算进来，这两个数会分别变成 -95 或 55
-            assertThat(today.ledger()).isEqualTo(5);
-            assertThat(today.diff()).isZero();
-            assertThat(today.abnormal()).isFalse();
+            long recorded = result.days().stream()
+                    .mapToLong(AiRunAdminService.ReconcileDay::recorded).sum();
+            long ledger = result.days().stream()
+                    .mapToLong(AiRunAdminService.ReconcileDay::ledger).sum();
+            assertThat(recorded).isEqualTo(recordedBefore + 5);
+            // 若把 ADJUST(+100) 或 RESERVE(-50) 也算进来，这个增量会是 +55 而不是 +5
+            assertThat(ledger).isEqualTo(ledgerBefore + 5);
+            // 两侧同步 +5，所以差值是稳定的——这是「记账口径一致」的直接体现
+            assertThat(recorded - ledger).isEqualTo(recordedBefore - ledgerBefore);
         } finally {
             wipe();
         }

@@ -26,16 +26,18 @@ public interface PasswordResetTokenMapper {
                @Param("expiresAt") Instant expiresAt);
 
     /**
-     * 把这个人手上还没用掉的令牌全部作废。
+     * 作废除刚签发那枚之外的其余令牌。
      *
-     * <p>重新申请时必须先作废旧的那一批：否则每申请一次就多一把能改口令的钥匙，
-     * 而用户以为自己只申请过一次。
+     * <p>发信成功之后才调用：发信失败时旧链接必须继续可用，否则用户手上既没有新链接、
+     * 旧的也被作废，只能等 60 秒限流窗口过去再申请一次。
      */
     @Update("""
             UPDATE password_reset_tokens SET used_at = #{usedAt}
-            WHERE user_id = #{userId} AND used_at IS NULL
+            WHERE user_id = #{userId} AND used_at IS NULL AND token_hash <> #{keepTokenHash}
             """)
-    int invalidateActiveForUser(@Param("userId") long userId, @Param("usedAt") Instant usedAt);
+    int invalidateOthersForUser(@Param("userId") long userId,
+                                @Param("keepTokenHash") String keepTokenHash,
+                                @Param("usedAt") Instant usedAt);
 
     /**
      * 原子消费一枚令牌：只有"未使用且未过期"才会被改成已使用，返回 1 的那次才算抢到。

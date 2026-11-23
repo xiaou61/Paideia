@@ -6,8 +6,8 @@
 
 # 数据库表
 
-由 `backend/paideia-app/src/main/resources/db/migration/` 的 56 个迁移生成：
-共 **74 张表**，其中只有 **16 条外键**。
+由 `backend/paideia-app/src/main/resources/db/migration/` 的 59 个迁移生成：
+共 **75 张表**，其中只有 **16 条外键**。
 
 外键少是**刻意的**，不是遗漏：跨模块的关联（比如 `ai_memories_structured.user_id` → `users.id`）
 由应用层保证，不交给数据库。所以下面这张图只画**有真实外键约束**的关系，
@@ -106,6 +106,7 @@ flowchart LR
 | `ops_log_template_buckets` | `V20261119110000__create_ops_log_patterns` | （无） |
 | `ops_log_templates` | `V20261119110000__create_ops_log_patterns` | （无） |
 | `ops_pattern_anomalies` | `V20261119110000__create_ops_log_patterns` | （无） |
+| `ops_postmortems` | `V20261119160000__create_ops_postmortems` | （无） |
 | `paper_answers` | `V20261118161000__create_papers` | （无） |
 | `paper_items` | `V20261118161000__create_papers` | （无） |
 | `papers` | `V20261118161000__create_papers` | （无） |

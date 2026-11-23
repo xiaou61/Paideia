@@ -1,7 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 
+import { requireTestDatabase, springEnvForLocalBackend } from '../../scripts/e2e-db-env'
 import { AUTH_FILE } from './e2e/global-setup'
 
 /** 后端工作目录与产物。运行 e2e 前需要先在 backend 目录执行 `mvn -B -DskipTests package`。 */
@@ -22,43 +21,9 @@ const BACKEND_PORT = process.env.PAIDEIA_BACKEND_PORT ?? '8080'
 const APP_PORT = process.env.PAIDEIA_APP_PORT ?? '5173'
 const APP_ORIGINS = `http://127.0.0.1:${APP_PORT},http://localhost:${APP_PORT}`
 
-/** 配置文件所在目录（`import.meta.dirname` 在 Node 20.11+ 才有，取不到就退回 cwd）。 */
-const CONFIG_DIR = typeof import.meta.dirname === 'string' ? import.meta.dirname : process.cwd()
-
-/**
- * 测试库连接的来源：`backend/config/remote-db.local.env`（在 `.gitignore` 里，口令不入库）。
- *
- * <p>以前要先 `source` 这个文件；忘了就得到一个 MySQL 认证失败的后端启动错误，而原因埋在
- * 二十行 Spring 日志里。这里直接解析同一份文件，于是"先 source"与"直接跑"等价；环境变量
- * 仍然优先，临时指向别的库时不必改文件。
- */
-function localDbEnv(): Record<string, string> {
-  try {
-    const path = join(CONFIG_DIR, '../../../backend/config/remote-db.local.env')
-    const entries: Array<[string, string]> = []
-    for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
-      const matched = /^export\s+([A-Z0-9_]+)=['"]?([^'"]*)['"]?$/.exec(line.trim())
-      if (matched !== null) {
-        entries.push([matched[1] ?? '', matched[2] ?? ''])
-      }
-    }
-    return Object.fromEntries(entries)
-  } catch {
-    return {}
-  }
-}
-
-const LOCAL_DB_ENV = localDbEnv()
-const DB_URL = process.env.PAIDEIA_TEST_DB_URL ?? LOCAL_DB_ENV.PAIDEIA_TEST_DB_URL ?? ''
-const DB_USER = process.env.PAIDEIA_TEST_DB_USER ?? LOCAL_DB_ENV.PAIDEIA_TEST_DB_USER ?? 'paideia_e2e'
-const DB_PASSWORD = process.env.PAIDEIA_TEST_DB_PASSWORD ?? LOCAL_DB_ENV.PAIDEIA_TEST_DB_PASSWORD ?? ''
-
-// 要起本地后端却拿不到库连接时，在**读配置**这一步就说清楚，别等 Spring 起不来再猜。
-if (REMOTE_BASE_URL === undefined && process.env.PWA_BASE_URL === undefined && DB_URL === '') {
-  throw new Error(
-    '缺少测试库连接：backend/config/remote-db.local.env 不存在。请找回该文件，或先 `source` 它再跑。',
-  )
-}
+// 测试库连接与 Spring 覆盖项都来自共用模块（见 frontend/scripts/e2e-db-env.ts）：
+// 两端各抄一份已经漂移过（CONFIG_DIR 取法、DB_USER 兜底），差异本身不致命，各自演化才是问题。
+requireTestDatabase({ remote: REMOTE_BASE_URL !== undefined, pwa: process.env.PWA_BASE_URL !== undefined })
 
 export default defineConfig({
   /**
@@ -134,29 +99,7 @@ export default defineConfig({
        * ② 额外加载 db/devdata —— 种子账号（seed-learner / seed-admin）在那里，
        *    它**不在**任何 profile 的默认迁移目录里，只有这里显式加上才会执行。
        */
-      env: {
-        // forceConnectionTimeZoneToSession 与 connectionTimeZone 必须成对（服务器 MySQL 会话是 +08:00）：
-        // 少了它，建表默认值写进去的是本地钟点，而驱动按 UTC 解释，时间整体快 8 小时。
-        /**
-         * 连接信息优先取环境变量，其次取 `backend/config/remote-db.local.env`（见文件顶部
-         * `localDbEnv`）：那份文件是"测试库在哪"的唯一来源，改库只改它。
-         */
-        // 全仓库只用一个专用测试库 `paideia_e2e`（账号只授权该库；生产库 paideia
-        // 没有任何可远程登录的账号），口令只存在于被 gitignore 的那份 env 文件里。
-        SPRING_DATASOURCE_URL: DB_URL,
-        SPRING_DATASOURCE_USERNAME: DB_USER,
-        SPRING_DATASOURCE_PASSWORD: DB_PASSWORD,
-        SPRING_FLYWAY_LOCATIONS: 'classpath:db/migration,classpath:db/devdata',
-        // paideia_e2e 被三种迁移配置共用（见 backend 的 application-test.yml 注释）：
-        // 夹具用的 V900 会出现在这个库里，而本次 locations 不含 db/testdata，
-        // 不忽略它就会被判成"已应用但本地找不到"而起不来。
-        SPRING_FLYWAY_IGNORE_MIGRATION_PATTERNS: '*:future,*:missing',
-        SPRING_FLYWAY_OUT_OF_ORDER: 'true',
-        // 学习者端的来源显式给出：浏览器对同源 POST 也会带 Origin 头，
-        // 后端按来源判定，未列入直接 403。Actuator 端点另有一份 CORS 配置。
-        PAIDEIA_WEB_CORS_ALLOWED_ORIGINS: APP_ORIGINS,
-        MANAGEMENT_ENDPOINTS_WEB_CORS_ALLOWED_ORIGINS: APP_ORIGINS,
-      },
+      env: springEnvForLocalBackend(APP_ORIGINS),
       url: `http://127.0.0.1:${BACKEND_PORT}/actuator/health`,
       // **不复用已有后端**：固定端口上复用会静默打到别人的库（2026-11-03 实测：上一轮的
       // java 子进程漏在 8080，本轮复用它、连的是已删库，表现为"登录后停在登录页"）。
