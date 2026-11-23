@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -82,13 +83,19 @@ class McpTokenController {
     ApiResponse<List<TokenView>> list() {
         Instant now = Instant.now();
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
-        return ApiResponse.ok(tokens.list(requester()).stream()
+        var rows = tokens.list(requester());
+        // 用量一次查完（两条 IN 查询），不按行循环——34 条凭据逐条查要 3.6 秒（2026-11-23 实测）。
+        List<Long> ids = rows.stream().map(view -> view.id()).toList();
+        Map<Long, McpUsageRecorder.Totals> totalsById = usage.totalsFor(ids);
+        Map<Long, Integer> callsTodayById = usage.callsOnFor(ids, today);
+        return ApiResponse.ok(rows.stream()
                 .map(view -> {
-                    McpUsageRecorder.Totals totals = usage.totals(view.id());
+                    McpUsageRecorder.Totals totals =
+                            totalsById.getOrDefault(view.id(), new McpUsageRecorder.Totals(0, 0));
                     return new TokenView(view.id(), view.name(), view.prefix(),
                             view.scopes().stream().map(ToolScope::key).sorted().toList(),
                             view.toolsets().stream().sorted().toList(),
-                            view.dailyCallLimit(), usage.callsToday(view.id(), today),
+                            view.dailyCallLimit(), callsTodayById.getOrDefault(view.id(), 0),
                             totals.calls(), totals.errors(),
                             view.expiresAt(), view.lastUsedAt(), view.revokedAt(), view.createdAt(),
                             view.active(now));

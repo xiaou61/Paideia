@@ -161,6 +161,17 @@ class OpsDiagnosisService {
         }
     }
 
+    /**
+     * 是否还有一次诊断没跑完（含 DONE 落库之后的发信与自动草稿）。
+     *
+     * <p>给测试用：{@code run()} 先 {@code markDone} 再发信/建草稿，最后才在 finally 里放开单飞闸门，
+     * 所以「诊断记录已 DONE」不等于「服务空闲」。集成测试如果在两者之间发起下一次告警，
+     * 会撞上单飞闸门被当作 busy 跳过。这里把「到底空不空」暴露出来，测试才能等到真正空闲。
+     */
+    boolean isBusy() {
+        return running.get();
+    }
+
     List<View> list() {
         int limit = Math.max(1, properties.getDiagnosis().getListLimit());
         return mapper.listRecent(limit).stream().map(row -> View.of(row, false)).toList();

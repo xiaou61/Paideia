@@ -2,6 +2,7 @@ package io.github.xiaou61.mcp.internal.usage;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
@@ -44,6 +45,35 @@ interface McpUsageMapper {
             """)
     Totals totals(@Param("tokenId") long tokenId);
 
+    /**
+     * 一批凭据的历史累计（列表页用）。
+     *
+     * <p>**为什么不逐条调 {@link #totals}**：列表页一行一条 SQL，20 条凭据就是 40 次往返，
+     * 实测 34 条时列表要 3.6 秒——慢到 e2e 的 5 秒断言都会红（2026-11-23）。一次 IN 查完即可。
+     * 调用方要保证 `tokenIds` 非空（空 IN () 是语法错误）。
+     */
+    @Select("""
+            <script>
+            SELECT token_id AS tokenId, COALESCE(SUM(calls), 0) AS calls, COALESCE(SUM(errors), 0) AS errors
+            FROM mcp_token_usage
+            WHERE token_id IN
+            <foreach collection="tokenIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+            GROUP BY token_id
+            </script>
+            """)
+    List<TokenTotals> totalsFor(@Param("tokenIds") List<Long> tokenIds);
+
+    /** 一批凭据在某一天的调用次数（列表页用），语义同 {@link #callsOn}，只是批量。 */
+    @Select("""
+            <script>
+            SELECT token_id AS tokenId, calls
+            FROM mcp_token_usage
+            WHERE day = #{day} AND token_id IN
+            <foreach collection="tokenIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+            </script>
+            """)
+    List<TokenCalls> callsOnFor(@Param("tokenIds") List<Long> tokenIds, @Param("day") LocalDate day);
+
     /** 注销级联：删掉这个人全部凭据的用量。 */
     @Delete("""
             DELETE u FROM mcp_token_usage u
@@ -54,5 +84,11 @@ interface McpUsageMapper {
 
     /** 累计值。`long` 而不是 `int`：calls 是 INT UNSIGNED，SUM 之后会溢出 int。 */
     record Totals(long calls, long errors) {
+    }
+
+    record TokenTotals(long tokenId, long calls, long errors) {
+    }
+
+    record TokenCalls(long tokenId, int calls) {
     }
 }

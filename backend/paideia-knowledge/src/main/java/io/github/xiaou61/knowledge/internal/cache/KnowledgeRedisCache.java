@@ -88,6 +88,10 @@ public class KnowledgeRedisCache {
 
     public void evictCategories() {
         evict("knowledge:categories:v1");
+        // 分类树的键必须与 CategoryService.TREE_CACHE_KEY 保持一致：改过分类不失效的话，
+        // 管理端建/改/删完分类、前端重新拉列表，读到的还是旧的树（最长 10 分钟）。
+        // 提到 v2 是因为 Node 新增了 parentId/sortOrder，v1 的 JSON 反序列化后是 null/0。
+        evict("knowledge:category-tree:v2");
         evict("knowledge:category-tree:v1");
     }
 

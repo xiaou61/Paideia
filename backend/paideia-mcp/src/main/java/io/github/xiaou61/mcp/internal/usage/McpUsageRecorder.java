@@ -2,6 +2,9 @@ package io.github.xiaou61.mcp.internal.usage;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -54,6 +57,34 @@ public class McpUsageRecorder {
     public Totals totals(long tokenId) {
         McpUsageMapper.Totals row = usage.totals(tokenId);
         return row == null ? new Totals(0, 0) : new Totals(row.calls(), row.errors());
+    }
+
+    /**
+     * 一批凭据的历史累计。列表页用这个，别在循环里逐条调 {@link #totals}（N+1）。
+     *
+     * <p>没出现过用量的凭据不会在结果里，调用方按"缺失即 0"处理。
+     */
+    public Map<Long, Totals> totalsFor(List<Long> tokenIds) {
+        if (tokenIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, Totals> result = new HashMap<>();
+        for (McpUsageMapper.TokenTotals row : usage.totalsFor(tokenIds)) {
+            result.put(row.tokenId(), new Totals(row.calls(), row.errors()));
+        }
+        return result;
+    }
+
+    /** 一批凭据在某天的调用次数。缺失即 0，与 {@link #callsToday} 同语义。 */
+    public Map<Long, Integer> callsOnFor(List<Long> tokenIds, LocalDate day) {
+        if (tokenIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, Integer> result = new HashMap<>();
+        for (McpUsageMapper.TokenCalls row : usage.callsOnFor(tokenIds, day)) {
+            result.put(row.tokenId(), row.calls());
+        }
+        return result;
     }
 
     /** 注销级联调用。 */

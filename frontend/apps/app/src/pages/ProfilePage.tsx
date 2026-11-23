@@ -7,7 +7,7 @@ import {
   type LearnerProfileInput,
 } from '@paideia/identity'
 import { createAssistantApi, CreditsPanel } from '@paideia/assistant'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Alert,
   AlertDescription,
@@ -49,6 +49,7 @@ const identity = createIdentityApi(api)
  */
 export function ProfilePage() {
   const { data, isLoading, error } = useQuery({ queryKey: ['profile'], queryFn: () => identity.profile() })
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const location = useLocation()
   const assistantApi = useMemo(() => createAssistantApi(api), [])
@@ -102,7 +103,17 @@ export function ProfilePage() {
     setSaving(true)
     setSaveError(null)
     try {
-      await identity.saveProfile(form)
+      /**
+       * 保存后必须把返回值写回查询缓存。
+       *
+       * <p>**为什么不能只 `await` 完就走**：保存完会 `navigate` 回上一页/首页，而本站是
+       * hash 路由（`/#/profile` → `/#/` 不重载文档）。用户再点「目标与阶段」时 React Query
+       * 直接拿缓存里的**旧画像**渲染，`form` 又只在首次为 null 时才从 `data` 灌值，
+       * 于是输入框显示的是上一次保存前的值——看起来像"没保存成功"。
+       * 2026-11-23 e2e `identity.spec.ts` 就是被这个假象绊住的（数据库里其实已经写进去了）。
+       */
+      const saved = await identity.saveProfile(form)
+      queryClient.setQueryData(['profile'], saved)
       setSaved(true)
       // 保存完回到来的那一页（2026-11-06 用户要求）：首页「三步就能开始」的第 1 步点进来，
       // 保存后停在这里就断了——用户不知道下一步在首页。`key === 'default'` 表示这是本次

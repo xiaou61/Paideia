@@ -42,6 +42,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "paideia.ops.hook-token=test-token",
         "paideia.ops.diagnosis.user-id=1",
         "paideia.ops.diagnosis.cooldown-seconds=600",
+        // 共享测试库里常有上次被中断留下的 OPEN 事件；应用启动时的重启补诊断会先占住单飞闸门，
+        // 让本类第一条告警被当成 busy 跳过。本类只验 webhook 入口与落库，不需要补诊断。
+        "paideia.ops.diagnosis.catch-up-enabled=false",
         "paideia.ops.prometheus-url=http://127.0.0.1:1",
         "paideia.ops.loki-url=http://127.0.0.1:1",
         "paideia.ops.tempo-url=http://127.0.0.1:1",
@@ -64,6 +67,9 @@ class OpsHookIntegrationTest {
     @Autowired
     OpsIncidentMapper incidentMapper;
 
+    @Autowired
+    OpsDiagnosisService diagnosisService;
+
     @MockitoBean
     OpsDiagnoser diagnoser;
 
@@ -75,6 +81,8 @@ class OpsHookIntegrationTest {
                 "## 结论\n告警已确认\n## 证据\nup=0\n## 可能原因\n目标下线\n"
                         + "## 建议动作\n检查进程\n## 需要人工确认\n看面板",
                 new TokenUsage(5, 6, 11), "deepseek-flash"));
+        // 上一个用例的诊断可能在 DONE 之后还在发信/建草稿；等它彻底空闲再开始，避免撞单飞闸门。
+        awaitIdle();
     }
 
     @Test
@@ -315,10 +323,21 @@ class OpsHookIntegrationTest {
     }
 
     private OpsDiagnosisRow awaitFinished(long id) throws InterruptedException {
-        return Await.value(() -> mapper.findById(id).orElseThrow(),
-                        row -> !OpsDiagnosisRow.STATUS_PENDING.equals(row.getStatus())
-                                && !OpsDiagnosisRow.STATUS_RUNNING.equals(row.getStatus()),
+        OpsDiagnosisRow row = Await.value(() -> mapper.findById(id).orElseThrow(),
+                        row2 -> !OpsDiagnosisRow.STATUS_PENDING.equals(row2.getStatus())
+                                && !OpsDiagnosisRow.STATUS_RUNNING.equals(row2.getStatus()),
                         5_000, 50)
                 .orElseThrow(() -> new AssertionError("诊断未在 5 秒内完成"));
+        // 记录 DONE 之后还要发信、建自动草稿，单飞闸门最后才放开；等它真正空闲再返回，
+        // 否则同一用例里的下一次告警（例如 resolved 后的再次 firing）会被当成 busy 跳过。
+        awaitIdle();
+        return row;
+    }
+
+    /** 等到诊断服务真正空闲（不受上一轮的收尾阶段干扰）。 */
+    private void awaitIdle() {
+        if (!Await.until(() -> !diagnosisService.isBusy(), 10_000, 25)) {
+            throw new AssertionError("诊断服务在 10 秒内没有空闲下来");
+        }
     }
 }
