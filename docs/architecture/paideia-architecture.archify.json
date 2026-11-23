@@ -14,7 +14,7 @@
       "url": "https://github.com/xiaou61/Paideia",
       "provider": "github",
       "link_mode": "web",
-      "revision": "8c54e6607e82be26f11cf0c8ea2e5fd64f33f97b"
+      "revision": "bf467b55112e63aba6351d5ffed876a813f2b171"
     },
     "views": [
       {
@@ -400,7 +400,7 @@
       "to": "prometheus",
       "label": "查询指标",
       "variant": "dashed",
-      "labelDy": 24
+      "labelDy": 84
     },
     {
       "from": "ops",
