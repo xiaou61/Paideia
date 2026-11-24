@@ -34,7 +34,8 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/v1/note-books")
 class NoteBookController {
 
-    record SaveRequest(String name, String description, Integer sortOrder) {
+    record SaveRequest(String name, String description, Integer sortOrder,
+                       String visibility, String accentColor, java.util.List<String> tags) {
     }
 
     private final NoteBookService books;
@@ -54,12 +55,14 @@ class NoteBookController {
 
     @PostMapping
     ApiResponse<NoteBookService.BookView> create(@RequestBody SaveRequest request) {
-        return ApiResponse.ok(books.create(requireUserId(), request.name(), request.description()));
+        return ApiResponse.ok(books.create(requireUserId(), request.name(), request.description(),
+                request.visibility(), request.accentColor(), request.tags()));
     }
 
     @PutMapping("/{id}")
     ApiResponse<NoteBookService.BookView> update(@PathVariable("id") long id, @RequestBody SaveRequest request) {
-        return ApiResponse.ok(books.update(requireUserId(), id, request.name(), request.description(), request.sortOrder()));
+        return ApiResponse.ok(books.update(requireUserId(), id, request.name(), request.description(),
+                request.sortOrder(), request.visibility(), request.accentColor(), request.tags()));
     }
 
     @DeleteMapping("/{id}")

@@ -6,7 +6,7 @@
 
 # 数据库表
 
-由 `backend/paideia-app/src/main/resources/db/migration/` 的 61 个迁移生成：
+由 `backend/paideia-app/src/main/resources/db/migration/` 的 62 个迁移生成：
 共 **77 张表**，其中只有 **16 条外键**。
 
 外键少是**刻意的**，不是遗漏：跨模块的关联（比如 `ai_memories_structured.user_id` → `users.id`）

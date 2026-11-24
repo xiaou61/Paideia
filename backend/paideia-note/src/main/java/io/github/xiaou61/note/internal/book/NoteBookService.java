@@ -4,7 +4,10 @@ import io.github.xiaou61.note.internal.note.NoteMapper;
 import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +23,11 @@ public class NoteBookService {
     private static final int MAX_BOOKS_PER_USER = 100;
     private static final int MAX_NAME_CHARS = 200;
     private static final int MAX_DESC_CHARS = 1_000;
+    private static final int MAX_TAGS = 10;
+    private static final int MAX_TAG_CHARS = 20;
+    private static final String PRIVATE = "private";
+    private static final String PUBLIC = "public";
+    private static final Pattern ACCENT = Pattern.compile("^#[0-9a-fA-F]{6}$");
     /** 旧扁平写入路径兜底用的默认库名；与迁移回填的名字一致。 */
     private static final String DEFAULT_BOOK_NAME = "我的笔记";
 
@@ -31,7 +39,8 @@ public class NoteBookService {
         this.notes = notes;
     }
 
-    public record BookView(Long id, String name, String description, int sortOrder,
+    public record BookView(Long id, String name, String description, String visibility, String accentColor,
+                           List<String> tags, int sortOrder, int documentCount,
                            Instant createdAt, Instant updatedAt) {
     }
 
@@ -41,6 +50,12 @@ public class NoteBookService {
 
     @Transactional
     public BookView create(long userId, String name, String description) {
+        return create(userId, name, description, null, null, null);
+    }
+
+    @Transactional
+    public BookView create(long userId, String name, String description,
+                           String visibility, String accentColor, List<String> tags) {
         String n = requireName(name);
         String d = requireDesc(description);
         if (books.countByUser(userId) >= MAX_BOOKS_PER_USER) {
@@ -50,6 +65,9 @@ public class NoteBookService {
         book.setUserId(userId);
         book.setName(n);
         book.setDescription(d);
+        book.setVisibility(normalizeVisibility(visibility));
+        book.setAccentColor(normalizeAccent(accentColor));
+        book.setTags(joinTags(normalizeTags(tags)));
         book.setSortOrder(0);
         books.insert(book);
         return toView(books.findByIdAndUser(book.getId(), userId).orElseThrow(NoteBookService::notFound));
@@ -57,6 +75,12 @@ public class NoteBookService {
 
     @Transactional
     public BookView update(long userId, long id, String name, String description, Integer sortOrder) {
+        return update(userId, id, name, description, sortOrder, null, null, null);
+    }
+
+    @Transactional
+    public BookView update(long userId, long id, String name, String description, Integer sortOrder,
+                           String visibility, String accentColor, List<String> tags) {
         NoteBook book = books.findByIdAndUser(id, userId).orElseThrow(NoteBookService::notFound);
         if (name != null) {
             book.setName(requireName(name));
@@ -64,6 +88,15 @@ public class NoteBookService {
         book.setDescription(requireDesc(description));
         if (sortOrder != null) {
             book.setSortOrder(sortOrder);
+        }
+        if (visibility != null) {
+            book.setVisibility(normalizeVisibility(visibility));
+        }
+        if (accentColor != null) {
+            book.setAccentColor(normalizeAccent(accentColor));
+        }
+        if (tags != null) {
+            book.setTags(joinTags(normalizeTags(tags)));
         }
         books.update(book);
         return toView(books.findByIdAndUser(id, userId).orElseThrow(NoteBookService::notFound));
@@ -85,6 +118,12 @@ public class NoteBookService {
         }
     }
 
+    /** "这个库是我的"并返回可见性；公开库的分享链接永不过期。 */
+    public String requireOwnedVisibility(long userId, long bookId) {
+        NoteBook book = books.findByIdAndUser(bookId, userId).orElseThrow(NoteBookService::notFound);
+        return book.getVisibility() == null ? PRIVATE : book.getVisibility();
+    }
+
     /** 给旧的扁平写入路径兜底：没有库就建一个「我的笔记」，返回其 id。 */
     @Transactional
     public long ensureDefaultBook(long userId) {
@@ -101,14 +140,68 @@ public class NoteBookService {
         book.setUserId(userId);
         book.setName(DEFAULT_BOOK_NAME);
         book.setDescription(null);
+        book.setVisibility(PRIVATE);
         book.setSortOrder(0);
         books.insert(book);
         return book.getId();
     }
 
     private static BookView toView(NoteBook book) {
-        return new BookView(book.getId(), book.getName(), book.getDescription(), book.getSortOrder(),
-                book.getCreatedAt(), book.getUpdatedAt());
+        return new BookView(book.getId(), book.getName(), book.getDescription(),
+                book.getVisibility() == null ? PRIVATE : book.getVisibility(),
+                book.getAccentColor(), splitTags(book.getTags()), book.getSortOrder(),
+                book.getDocumentCount(), book.getCreatedAt(), book.getUpdatedAt());
+    }
+
+    private static String normalizeVisibility(String raw) {
+        String value = raw == null ? PRIVATE : raw.trim();
+        if (!PRIVATE.equals(value) && !PUBLIC.equals(value)) {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT, "可见范围只能是 private 或 public");
+        }
+        return value;
+    }
+
+    private static String normalizeAccent(String raw) {
+        String value = raw == null ? "" : raw.trim();
+        if (value.isEmpty()) {
+            return null;
+        }
+        if (!ACCENT.matcher(value).matches()) {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT, "主题色需为 #RRGGBB 格式");
+        }
+        return value.toLowerCase();
+    }
+
+    private static List<String> normalizeTags(List<String> raw) {
+        if (raw == null) {
+            return List.of();
+        }
+        Set<String> unique = new LinkedHashSet<>();
+        for (String item : raw) {
+            String tag = item == null ? "" : item.trim();
+            if (tag.isEmpty()) {
+                continue;
+            }
+            if (tag.length() > MAX_TAG_CHARS) {
+                throw new BizException(ErrorCode.INVALID_ARGUMENT, "标签不能超过 " + MAX_TAG_CHARS + " 个字符");
+            }
+            unique.add(tag);
+        }
+        if (unique.size() > MAX_TAGS) {
+            throw new BizException(ErrorCode.INVALID_ARGUMENT, "标签最多 " + MAX_TAGS + " 个");
+        }
+        return List.copyOf(unique);
+    }
+
+    private static String joinTags(List<String> tags) {
+        return tags.isEmpty() ? null : String.join(",", tags);
+    }
+
+    private static List<String> splitTags(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return List.of();
+        }
+        return List.of(raw.split(","));
     }
 
     private static String requireName(String raw) {

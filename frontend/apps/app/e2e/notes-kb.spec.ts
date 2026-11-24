@@ -7,8 +7,13 @@ async function createBook(page: Page): Promise<string> {
   await clickNav(page, 'learner-nav-notes')
   await expect(page).toHaveURL(/#\/notes$/)
   const name = `e2e 知识库 ${Date.now()}`
+  await page.getByRole('link', { name: '新建知识库' }).click()
+  await expect(page).toHaveURL(/#\/notes\/new-book$/)
   await page.getByLabel('知识库名称').fill(name)
-  await page.getByRole('button', { name: '新建知识库' }).click()
+  await page.getByLabel('知识库描述').fill('e2e 自动化创建')
+  await page.getByRole('button', { name: '创建知识库' }).click()
+  await expect(page).toHaveURL(/#\/notes\/\d+$/)
+  await page.goto('/#/notes')
   await expect(page.getByRole('link', { name })).toBeVisible()
   return name
 }

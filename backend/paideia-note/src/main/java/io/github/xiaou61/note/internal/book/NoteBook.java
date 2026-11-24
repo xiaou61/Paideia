@@ -9,7 +9,11 @@ class NoteBook {
     private Long userId;
     private String name;
     private String description;
+    private String visibility;
+    private String accentColor;
+    private String tags;
     private int sortOrder;
+    private int documentCount;
     private Instant deletedAt;
     private Instant createdAt;
     private Instant updatedAt;
@@ -44,6 +48,38 @@ class NoteBook {
 
     void setDescription(String description) {
         this.description = description;
+    }
+
+    String getVisibility() {
+        return visibility;
+    }
+
+    void setVisibility(String visibility) {
+        this.visibility = visibility;
+    }
+
+    String getAccentColor() {
+        return accentColor;
+    }
+
+    void setAccentColor(String accentColor) {
+        this.accentColor = accentColor;
+    }
+
+    String getTags() {
+        return tags;
+    }
+
+    void setTags(String tags) {
+        this.tags = tags;
+    }
+
+    int getDocumentCount() {
+        return documentCount;
+    }
+
+    void setDocumentCount(int documentCount) {
+        this.documentCount = documentCount;
     }
 
     int getSortOrder() {

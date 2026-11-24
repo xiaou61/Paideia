@@ -30,13 +30,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ShareService {
 
-    /**
-     * 分享的固定有效期。
-     *
-     * <p>ponytail: 固定 30 天，不做成配置、也不做"永久"。理由是这条链接**免鉴权**——
-     * 它一旦外泄就是公开的，到期是这个模型唯一的兜底。等真有"长期分享"的需求再谈可配。
-     */
+    /** 私有库分享的固定有效期（30 天）；公开库分享永久有效（见 {@link #PERMANENT_EXPIRY}）。 */
     private static final Duration TTL = Duration.ofDays(30);
+
+    /** 公开知识库的分享链接到期时间：取 MySQL DATETIME 的上限年份，等价于"永久"。 */
+    private static final Instant PERMANENT_EXPIRY = Instant.parse("9999-12-31T23:59:59Z");
 
     /** 举报理由的长度上限：与列宽一致，超长在写入前报错。 */
     private static final int MAX_REASON_CHARS = 500;
@@ -83,9 +81,10 @@ public class ShareService {
     /** 整库分享：先确认库是本人的（否则 404），再生成 id。 */
     @Transactional
     public String shareBook(long userId, long bookId) {
-        books.requireOwned(userId, bookId);
+        String visibility = books.requireOwnedVisibility(userId, bookId);
+        Instant expiresAt = "public".equals(visibility) ? PERMANENT_EXPIRY : Instant.now().plus(TTL);
         String shareId = UUID.randomUUID().toString();
-        shares.insertBook(shareId, bookId, userId, Instant.now().plus(TTL));
+        shares.insertBook(shareId, bookId, userId, expiresAt);
         return shareId;
     }
 

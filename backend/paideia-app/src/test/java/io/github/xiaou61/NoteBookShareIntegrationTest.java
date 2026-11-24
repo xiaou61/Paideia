@@ -130,6 +130,26 @@ class NoteBookShareIntegrationTest {
                 .getResponse().getStatus()).isEqualTo(404);
     }
 
+    @Test
+    @DisplayName("公开知识库的分享链接永久有效")
+    void publicBookShareNeverExpires() throws Exception {
+        long bookA = createBook(userA, "公开库", "public");
+        createNode(userA, bookA, null, "doc", "公开文档", "x");
+        String shareId = shareBook(userA, bookA);
+
+        java.sql.Timestamp expiresAt = jdbcTemplate.queryForObject(
+                "SELECT expires_at FROM note_shares WHERE share_id = ?", java.sql.Timestamp.class, shareId);
+        assertThat(expiresAt).isNotNull();
+        assertThat(expiresAt.toInstant()).isAfter(Instant.parse("9000-01-01T00:00:00Z"));
+
+        // 私有库仍是 30 天
+        long privateBook = createBook(userA, "私有库");
+        String privateShare = shareBook(userA, privateBook);
+        java.sql.Timestamp privateExpiry = jdbcTemplate.queryForObject(
+                "SELECT expires_at FROM note_shares WHERE share_id = ?", java.sql.Timestamp.class, privateShare);
+        assertThat(privateExpiry.toInstant()).isBefore(Instant.parse("9000-01-01T00:00:00Z"));
+    }
+
     // ---------------------------------------------------------------- helpers
 
     private String shareBook(String subject, long bookId) throws Exception {
@@ -140,10 +160,16 @@ class NoteBookShareIntegrationTest {
     }
 
     private long createBook(String subject, String name) throws Exception {
+        return createBook(subject, name, null);
+    }
+
+    private long createBook(String subject, String name, String visibility) throws Exception {
+        String payload = "{\"name\":" + quote(name) + ",\"description\":null"
+                + (visibility == null ? "" : ",\"visibility\":" + quote(visibility)) + "}";
         MvcResult result = mockMvc.perform(post("/api/v1/note-books")
                         .header("Authorization", token(subject))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":" + quote(name) + ",\"description\":null}"))
+                        .content(payload))
                 .andReturn();
         assertThat(result.getResponse().getStatus()).as(body(result)).isEqualTo(200);
         return ((Number) JsonPath.read(body(result), "$.data.id")).longValue();

@@ -26,6 +26,7 @@ import { AppearancePage } from './pages/AppearancePage'
 import { MyAssessmentsPage } from './pages/MyAssessmentsPage'
 import { NoteNewPage } from './pages/NoteNewPage'
 import { NoteBooksPage } from './pages/NoteBooksPage'
+import { NoteNewBookPage } from './pages/NoteNewBookPage'
 import { NotesPage } from './pages/NotesPage'
 import { NoteWorkspacePage } from './pages/NoteWorkspacePage'
 import { OAuthCallbackPage } from './pages/OAuthCallbackPage'
@@ -304,6 +305,15 @@ export const router = createHashRouter([
     element: (
       <RequireAuth>
         <NoteNewPage />
+      </RequireAuth>
+    ),
+  },
+  // 新建知识库：完整表单页（名称/描述/可见范围/主题色/标签）。
+  {
+    path: '/notes/new-book',
+    element: (
+      <RequireAuth>
+        <NoteNewBookPage />
       </RequireAuth>
     ),
   },

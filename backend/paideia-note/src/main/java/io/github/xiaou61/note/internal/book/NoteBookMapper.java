@@ -14,30 +14,37 @@ import org.apache.ibatis.annotations.Update;
 interface NoteBookMapper {
 
     @Insert("""
-            INSERT INTO note_books (user_id, name, description, sort_order)
-            VALUES (#{userId}, #{name}, #{description}, #{sortOrder})
+            INSERT INTO note_books (user_id, name, description, visibility, accent_color, tags, sort_order)
+            VALUES (#{userId}, #{name}, #{description}, #{visibility}, #{accentColor}, #{tags}, #{sortOrder})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(NoteBook book);
 
     @Select("""
-            SELECT id, user_id, name, description, sort_order, deleted_at, created_at, updated_at
-            FROM note_books
-            WHERE id = #{id} AND user_id = #{userId} AND deleted_at IS NULL
+            SELECT b.id, b.user_id, b.name, b.description, b.visibility, b.accent_color, b.tags,
+                   b.sort_order, b.deleted_at, b.created_at, b.updated_at,
+                   (SELECT COUNT(1) FROM notes n
+                     WHERE n.book_id = b.id AND n.deleted_at IS NULL AND n.kind = 'doc') AS document_count
+            FROM note_books b
+            WHERE b.id = #{id} AND b.user_id = #{userId} AND b.deleted_at IS NULL
             """)
     Optional<NoteBook> findByIdAndUser(@Param("id") long id, @Param("userId") long userId);
 
     @Select("""
-            SELECT id, user_id, name, description, sort_order, deleted_at, created_at, updated_at
-            FROM note_books
-            WHERE user_id = #{userId} AND deleted_at IS NULL
-            ORDER BY sort_order, id
+            SELECT b.id, b.user_id, b.name, b.description, b.visibility, b.accent_color, b.tags,
+                   b.sort_order, b.deleted_at, b.created_at, b.updated_at,
+                   (SELECT COUNT(1) FROM notes n
+                     WHERE n.book_id = b.id AND n.deleted_at IS NULL AND n.kind = 'doc') AS document_count
+            FROM note_books b
+            WHERE b.user_id = #{userId} AND b.deleted_at IS NULL
+            ORDER BY b.sort_order, b.id
             """)
     List<NoteBook> listByUser(@Param("userId") long userId);
 
     @Update("""
             UPDATE note_books
-            SET name = #{name}, description = #{description}, sort_order = #{sortOrder}
+            SET name = #{name}, description = #{description}, visibility = #{visibility},
+                accent_color = #{accentColor}, tags = #{tags}, sort_order = #{sortOrder}
             WHERE id = #{id} AND user_id = #{userId} AND deleted_at IS NULL
             """)
     int update(NoteBook book);

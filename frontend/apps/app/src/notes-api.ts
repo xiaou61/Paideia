@@ -33,7 +33,14 @@ export interface BookView {
   id: number
   name: string
   description: string | null
+  /** private | public；公开库的整库分享链接永久有效。 */
+  visibility: string
+  /** #RRGGBB 主题色，可为空。 */
+  accentColor: string | null
+  tags: string[]
   sortOrder: number
+  /** 库内文档数（不含目录）。 */
+  documentCount: number
   createdAt: string | null
   updatedAt: string | null
 }
@@ -41,6 +48,9 @@ export interface BookView {
 export interface BookInput {
   name: string
   description?: string | null
+  visibility?: 'private' | 'public'
+  accentColor?: string | null
+  tags?: string[]
   sortOrder?: number
 }
 
