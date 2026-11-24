@@ -57,6 +57,15 @@ playwright-report/
 blob-report/
 # 本地手工跑 e2e 时攒下的日志、探针脚本与截图（不是台账产物）
 .tmp-e2e/
+# 全接口自查（ApiWalkthroughTest）每次本地跑都会写一份：单份 220+ 行端点表、
+# 约 150KB，内容全部由测试自动生成、可随时重跑。按 .agent/testing/README.md
+# 的规矩 contract / smoke 的运行记录要入台账，但 walkthrough 的量级完全是重跑噪声，
+# 只忽略这一种，别把整个 runs/ 关掉。
+.agent/testing/runs/*-walkthrough-local.md
+# 会话里的临时日志、探针脚本与截图（.shots/ 是我和 agent 排查时的草稿区）
+/.shots/
+# 个人在用的工作清单，属于本机状态，不是项目内容
+.agent/ai-flavor-worklist.json
 # ego 点击测试的失败截图（WORK-059）；报告入台账，截图不入库。
 .agent/testing/.artifacts/
 # ego runner 的当次参数（cli.mjs 生成，含模块名与模式，不含凭据）。
