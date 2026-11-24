@@ -70,6 +70,15 @@ public class NoteApiImplementation implements NoteApi {
     }
 
     @Override
+    public List<NoteBrief> search(long userId, String keyword, int limit) {
+        int capped = Math.max(1, Math.min(limit <= 0 ? MAX_LIST : limit, MAX_LIST));
+        return notes.search(userId, keyword).stream()
+                .limit(capped)
+                .map(s -> new NoteBrief(s.id(), s.title(), s.excerpt(), s.updatedAt()))
+                .toList();
+    }
+
+    @Override
     public long createBook(long userId, String name, String description) {
         return books.create(userId, name, description).id();
     }

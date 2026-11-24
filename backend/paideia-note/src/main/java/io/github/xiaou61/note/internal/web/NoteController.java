@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -43,6 +44,12 @@ class NoteController {
     @GetMapping
     ApiResponse<List<NoteService.NoteSummary>> list() {
         return ApiResponse.ok(notes.list(requireUserId()));
+    }
+
+    @GetMapping("/search")
+    ApiResponse<List<NoteService.NoteSummary>> search(
+            @RequestParam(value = "q", required = false) String q) {
+        return ApiResponse.ok(notes.search(requireUserId(), q));
     }
 
     @GetMapping("/{id}")

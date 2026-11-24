@@ -35,6 +35,9 @@ public interface NoteApi {
      */
     Optional<NoteContent> append(long userId, long noteId, String text);
 
+    /** 本人文档全文检索（MCP 用）。 */
+    List<NoteBrief> search(long userId, String keyword, int limit);
+
     /** 本人的知识库列表（不含正文）。 */
     List<BookBrief> listBooks(long userId);
 

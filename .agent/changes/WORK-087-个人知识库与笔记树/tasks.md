@@ -73,14 +73,15 @@ approver_role: CTO
 - 验证：`PUT /notes/{id}/move` 到自身/子孙返回业务错误；删除父节点后子节点不可见
 - 完成记录：`NoteService.createNode/createFolder/updateDoc/move/softDeleteNode/tree`（`MAX_DOC_BODY_CHARS=200000`、`MAX_NODES_PER_BOOK=5000`、`MAX_TREE_DEPTH=32`）+ `NoteController`（POST 扩 `bookId/parentId/kind`、`PUT /{id}/move`）；`NoteTreeIntegrationTest` 3 条绿（防成环、跨库 404、删目录连带子树）。
 
-### TASK-004 | pending | 全文检索
+### TASK-004 | done | 全文检索
 
 - 对应：REQ-004，AC-004
 - 依赖：TASK-001/003
-- 修改：`NoteMapper.java`（`searchByNgram MATCH...AGAINST(... IN BOOLEAN MODE)`、`searchByLike` 回退）、`NoteService.search`、`NoteController` `GET /search`、`NoteApi.search`
+- 修改：`NoteMapper.search`（`<choose>` 按 `fulltext` 走 `MATCH...AGAINST(... IN BOOLEAN MODE)` 或 `LIKE` 回退）、`NoteService.search`、`NoteController` `GET /search`、`NoteApi.search`
 - 测试：`NoteSearchTest`（中文召回、短查询回退、跨用户不命中、结果含摘要）
 - 步骤：复用 `paideia-platform/SearchQuery` 构造 BOOLEAN 串 → mapper → service（强制 `user_id` 过滤）→ 控制器
 - 验证：搜「知识」命中正文含该词的本人文档，他人文档不出现
+- 完成记录：复用 `paideia-platform/SearchQuery`（normalize/booleanMode/likePattern）；`NoteSearchIntegrationTest` 绿（多字「倒排索引」命中、单字「索」回退 LIKE 命中、无关词为空、空白为空、跨用户不命中、匿名 401）。
 
 ### TASK-005 | pending | 双链解析与反链
 

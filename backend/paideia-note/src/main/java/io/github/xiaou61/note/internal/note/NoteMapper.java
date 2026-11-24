@@ -58,6 +58,30 @@ public interface NoteMapper {
             """)
     List<Note> listByBook(@Param("userId") long userId, @Param("bookId") long bookId);
 
+    /**
+     * 本人文档全文检索。长查询走 ngram 全文索引，短查询（单字）退回 LIKE——
+     * 判定与转义都在 {@code SearchQuery} 里，这里只按 {@code fulltext} 分支。
+     */
+    @Select("""
+            <script>
+            SELECT id, user_id, book_id, kind, parent_id, sort_order, entry_id, title,
+                   LEFT(body, 200) AS excerpt, created_at, updated_at, deleted_at
+            FROM notes
+            WHERE user_id = #{userId} AND deleted_at IS NULL AND kind = 'doc'
+            <choose>
+                <when test="fulltext">AND MATCH(title, body) AGAINST(#{booleanText} IN BOOLEAN MODE)</when>
+                <otherwise>AND (title LIKE #{likePattern} OR body LIKE #{likePattern})</otherwise>
+            </choose>
+            ORDER BY updated_at DESC, id DESC
+            LIMIT #{limit}
+            </script>
+            """)
+    List<Note> search(@Param("userId") long userId,
+                      @Param("booleanText") String booleanText,
+                      @Param("fulltext") boolean fulltext,
+                      @Param("likePattern") String likePattern,
+                      @Param("limit") int limit);
+
     @Update("""
             UPDATE notes
             SET title = #{title}, body = #{body}, entry_id = #{entryId}

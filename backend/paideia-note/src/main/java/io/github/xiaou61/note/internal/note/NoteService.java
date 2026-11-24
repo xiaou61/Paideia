@@ -3,6 +3,7 @@ package io.github.xiaou61.note.internal.note;
 import io.github.xiaou61.note.internal.book.NoteBookService;
 import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
+import io.github.xiaou61.platform.SearchQuery;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -90,6 +91,20 @@ public class NoteService {
     public List<NoteSummary> list(long userId) {
         return mapper.listByUser(userId, LIST_LIMIT).stream()
                 .map(note -> new NoteSummary(note.getId(), note.getEntryId(), note.getTitle(), note.getExcerpt(), note.getUpdatedAt()))
+                .toList();
+    }
+
+    /** 本人文档检索；空白关键词返回空（不返回全库）。 */
+    public List<NoteSummary> search(long userId, String keyword) {
+        String normalized = SearchQuery.normalize(keyword);
+        if (normalized == null) {
+            return List.of();
+        }
+        String booleanText = SearchQuery.booleanMode(normalized);
+        boolean fulltext = booleanText != null;
+        String likePattern = SearchQuery.likePattern(normalized);
+        return mapper.search(userId, booleanText, fulltext, likePattern, LIST_LIMIT).stream()
+                .map(n -> new NoteSummary(n.getId(), n.getEntryId(), n.getTitle(), n.getExcerpt(), n.getUpdatedAt()))
                 .toList();
     }
 
