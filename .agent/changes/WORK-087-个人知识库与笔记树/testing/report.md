@@ -42,6 +42,21 @@ updated: 2026-11-24
   - `notes-kb.spec.ts`：①建库→建文档→编辑保存→大纲→检索；②整库分享链接在**全新匿名上下文**打开，书名与文档树可见。
   - `notes.spec.ts`：原 6 条扁平笔记用例迁到 `/notes/all` 后全部通过（新建/预览/挂靠条目/分享撤回/未保存拦截/AI 提炼）。
 
+## 检查证据
+
+| 检查项 | 命令 | 退出码 | 结果 | 证据 |
+| --- | --- | --- | --- | --- |
+| AC-001/AC-002/AC-003 多库、树增删改移、软删连带子树 | `scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=NoteTreeIntegrationTest test` | 0 | passed | NoteTreeIntegrationTest 3 条绿 |
+| AC-004 中文全文检索（含单字回退） | `scripts/test-db.sh mvn -Dtest=NoteSearchIntegrationTest test` | 0 | passed | NoteSearchIntegrationTest 全绿 |
+| AC-005 大纲 TOC / AC-014 前端完整链路 | `test:e2e e2e/notes-kb.spec.ts` | 0 | passed | notes-kb 2 条绿 |
+| AC-006 双链/反链 | `scripts/test-db.sh mvn -Dtest=NoteLinkIntegrationTest test` | 0 | passed | NoteLinkIntegrationTest 全绿 |
+| AC-007 导入导出 .md（含 zip slip） | `scripts/test-db.sh mvn -Dtest=NoteImportExportIntegrationTest test` | 0 | passed | NoteImportExportIntegrationTest 全绿 |
+| AC-008/AC-009 MCP 工具面与只读写边界 | `scripts/test-db.sh mvn -Dtest=McpToolSnapshotTest,McpStartupSmokeTest,NoteToolsTest,AgentToolBridgeIntegrationTest test` | 0 | passed | 4 类共 23 条绿 |
+| AC-010 分享单篇+整库 / AC-011 举报撤回回归 | `scripts/test-db.sh mvn -Dtest=NoteBookShareIntegrationTest test` + `test:e2e e2e/notes.spec.ts` | 0 | passed | 3 条绿、分享撤回用例绿 |
+| AC-012 注销级联（含 note_books/note_links） | `scripts/test-db.sh mvn -Dtest=AccountDeletionCascadeIntegrationTest test` | 0 | passed | 4 条绿 |
+| AC-013 归属隔离与访问级别 | `scripts/test-db.sh mvn -Dtest=ApiSurfaceTest,AuthorizationIsolationTest test` | 0 | passed | ApiSurface 7、AuthorizationIsolation 9 条绿 |
+| 契约与迁移守卫 | `scripts/test-db.sh mvn -Dtest=ApiContractTest,MigrationVersionFormatTest,MigrationChecksumTest,MigrationSeedOverlapTest test` | 0 | passed | ApiContract 10、迁移三件全绿 |
+
 ## 架构与静态检查
 
 - `node scripts/gen-arch-diagram.mjs --check`：模块/包/表(77)/端点(233) 四图一致。
