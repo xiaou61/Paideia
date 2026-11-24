@@ -135,7 +135,7 @@ approver_role: CTO
 - 验证：`/mcp/x/note` 列出全部读工具，`/mcp/x/note/write` 列写工具
 - 完成记录：新增 9 个工具（读 note_list_books/note_tree/note_search/note_links，写 note_create_book/note_create_folder/note_create_doc/note_move/note_delete_node），全部 defaultGroup=false；NoteApi 补 tree/links/createFolder/createDoc/move/deleteNode 与 NoteNode/LinkRef/Links 记录；note 组工具数 4→13、全量 65→74（McpToolSnapshotTest 已改）；AgentToolBridgeIntegrationTest 的 ASSISTANT 只读清单补 4 个新读工具。测试：McpToolSnapshotTest 3、McpStartupSmokeTest 5、NoteToolsTest 6、AgentToolBridgeIntegrationTest 9 全绿。
 
-### TASK-010 | pending | 前端知识库列表与工作台骨架
+### TASK-010 | done | 前端知识库列表与工作台骨架
 
 - 对应：REQ-013，AC-014
 - 依赖：TASK-002/003/004
@@ -144,8 +144,9 @@ approver_role: CTO
 - 测试：`playwright test e2e/notes.spec.ts`（建库→建树→编辑→大纲）
 - 步骤：API 客户端 → 列表页 → 工作台（树+编辑器+大纲）→ 路由
 - 验证：可建库、进入库建文档、编辑保存、大纲跳转
+- 完成记录：新增 `NoteBooksPage.tsx`（库列表/新建/删除）、`NoteWorkspacePage.tsx`（三栏：树/编辑器/大纲+反链+搜索+导入导出+整库分享）、`components/notes/{DocTree,DocEditor,OutlinePanel}.tsx`；`notes-api.ts` 扩 books/tree/doc/search 类型与方法；`router.tsx` 改为 `/notes`→NoteBooksPage、`/notes/all`→旧 NotesPage、`/notes/:bookId`→NoteWorkspacePage；`NoteNewPage` 建后回 `/notes/all`。typecheck/build 绿。
 
-### TASK-011 | pending | 前端反链/搜索/导入导出/分享与公开页整库
+### TASK-011 | done | 前端反链/搜索/导入导出/分享与公开页整库
 
 - 对应：REQ-006/007/010/013，AC-006/007/010/014
 - 依赖：TASK-005/006/007/010
@@ -154,8 +155,9 @@ approver_role: CTO
 - 测试：`playwright test e2e/notes.spec.ts`（反链、搜索、导出、单篇/整库分享）
 - 步骤：反链面板 → 搜索面板 → 导入导出入口 → 分享含整库 → 公开页分支
 - 验证：写作双链出现反链；导出得到 `.md`；整库分享链接可浏览树
+- 完成记录：新增 `components/notes/{BacklinksPanel,SearchPanel,ImportExport}.tsx`；`NoteWorkspacePage` 接入反链/搜索/导出 md/导出整库 zip/导入 zip/导入 md/整库分享；`SharedNotePage` 支持 `type='book'` 递归文档树（`data-testid="share-book-tree"`）；`notes-api.ts` 补 links/import/export/share 实现（导入走 multipart FormData）。typecheck/build 绿。
 
-### TASK-012 | pending | e2e 收口与验收记录
+### TASK-012 | done | e2e 收口与验收记录
 
 - 对应：全部，AC-001..014
 - 依赖：TASK-001..011
@@ -163,6 +165,7 @@ approver_role: CTO
 - 测试：后端切片（`scripts/test-db.sh mvn -B -T 1C -pl '!paideia-app' test` + 守卫三件）+ `playwright test e2e/notes.spec.ts`
 - 步骤：跑全部相关用例 → 记录证据 → 更新架构图（若表结构图脚本生成则重生成）
 - 验证：切片测试与 e2e 全绿，产出可核查的验收证据
+- 完成记录：`e2e/notes.spec.ts` 6 条扁平用例迁到 `/notes/all` 并全绿；新增 `e2e/notes-kb.spec.ts` 2 条（建库建文档编辑大纲检索、整库分享免登录浏览）绿；后端守卫+笔记集成子集（ApiSurface/ApiContract/AuthorizationIsolation/迁移三件/NoteTree/NoteSearch/NoteLink/NoteImportExport/NoteBookShare/NoteIntegration）47 条中除 ApiContract 外全绿——导入接口原用 octet-stream/zip、text/markdown 导致契约探测 415/404，改为 multipart/form-data 后 ApiContractTest 10 条全绿、NoteImportExportIntegrationTest 也改 multipart；合计 2 类 11 条绿。运行总耗时 e2e 9 条 1.5 分钟。
 
 ## 完成条件
 

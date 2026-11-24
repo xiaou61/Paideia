@@ -6,7 +6,7 @@
 
 # API 端点清单
 
-由后端 54 个 Controller 生成：**219 个端点**，分布在 9 个模块。
+由后端 55 个 Controller 生成：**233 个端点**，分布在 9 个模块。
 
 这是**结构性的清单**，不是手写文档——端点加一个这里就多一行，
 所以它不会像手写的接口文档那样过期。真正的授权规则在 `SecurityConfiguration`，
@@ -50,8 +50,9 @@
 | `paideia-knowledge` | `/api/v1/learning/papers` | `PaperController` | 登录即可 | 6 |
 | `paideia-knowledge` | `/api/v1/learning/practice` | `PracticeController` | 登录即可 | 1 |
 | `paideia-mcp` | `/api/v1/ai/mcp-tokens` | `McpTokenController` | 登录即可 | 3 |
-| `paideia-note` | `/api/v1` | `NoteShareController` | 登录即可 | 3 |
-| `paideia-note` | `/api/v1/notes` | `NoteController` | 登录即可 | 5 |
+| `paideia-note` | `/api/v1` | `NoteShareController` | 登录即可 | 5 |
+| `paideia-note` | `/api/v1/note-books` | `NoteBookController` | 登录即可 | 8 |
+| `paideia-note` | `/api/v1/notes` | `NoteController` | 登录即可 | 9 |
 | `paideia-note` | `/api/v1/notes/admin/reports` | `NoteReportAdminController` | 仅管理员 | 2 |
 | `paideia-note` | `/api/v1/public/shares` | `PublicShareController` | 免鉴权 | 1 |
 | `paideia-note` | `/api/v1/reports` | `ReportController` | 登录即可 | 1 |
@@ -73,8 +74,8 @@
 
 | 方法 | 数量 |
 | --- | --- |
-| `GET` | 101 |
-| `POST` | 82 |
-| `DELETE` | 20 |
-| `PUT` | 13 |
+| `GET` | 108 |
+| `POST` | 86 |
+| `DELETE` | 21 |
+| `PUT` | 15 |
 | `PATCH` | 3 |
