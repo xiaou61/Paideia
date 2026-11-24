@@ -21,3 +21,4 @@ updated: 2026-11-24
 | 前端类型检查 | `pnpm --filter @paideia/app typecheck` | 0 | passed | `tsc -p tsconfig.json` 无输出 |
 | 前端生产构建 | `pnpm --filter @paideia/app build` | 0 | passed | `✓ built in 3.94s`，懒加载守卫通过 |
 | e2e 知识库与旧笔记回归 | `E2E_CHANNEL=chrome PAIDEIA_BACKEND_PORT=8082 PAIDEIA_APP_PORT=5184 scripts/test-db.sh pnpm --filter @paideia/app test:e2e e2e/notes-kb.spec.ts e2e/notes.spec.ts` | 0 | passed | `9 passed (1.5m)` |
+| 部署后「页面打不开」修复（整卡可点/窄屏入口/加载失败兜底/chunk 失效自动刷新） | 上线后用 Playwright 以 admin 账号实测：点击卡片正文区域跳转 `#/notes/4`；访问 `#/notes/999999` 显示「找不到这个知识库」；`E2E_CHANNEL=chrome PAIDEIA_BACKEND_PORT=8082 PAIDEIA_APP_PORT=5184 scripts/test-db.sh pnpm --filter @paideia/app test:e2e e2e/notes-kb.spec.ts` | 0 | passed | `2 passed (42.7s)`；`git commit 72785481`；`release.ps1` 部署成功 61.0s |
