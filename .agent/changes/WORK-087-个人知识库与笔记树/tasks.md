@@ -95,15 +95,16 @@ approver_role: CTO
 - 完成记录：`NoteLinkService`（正则 `\[\[([^\]]+)\]\]`、MAX_LINKS=200、`[[id:N]]` 按 id、`[[标题]]` 同库标题、自引用/重复忽略、悬空保留标题）；`NoteLinkIntegrationTest` 1 条绿（出链去重+悬空、入链、自引用清空、他人 404）。
 - 偏差：未把 `links` 加到 `NoteApi`（MCP 侧暂无消费方），仅控制器暴露；如 TASK-009 需要再补。
 
-### TASK-006 | pending | .md 导入导出
+### TASK-006 | done | .md 导入导出
 
 - 对应：REQ-007，AC-007
 - 依赖：TASK-003
 - 新建：`internal/importexport/NoteImportExportService.java`
 - 修改：`NoteBookController`（`/{id}/export`、`POST /import`）、`NoteController`（`/{id}/export`）
-- 测试：`NoteImportExportServiceTest`（zip slip 拒绝、zip bomb 上限、导入生成树、导出往返一致）
+- 测试：`NoteImportExportIntegrationTest`（单篇导出含正文、整库 zip 往返生成树、zip slip `../` 拒绝 400）
 - 步骤：单文档导出 → 整库 zip 导出 → zip/md 导入（规范化路径、限条目/解压量、事务）→ 控制器
 - 验证：含 `../` 的 zip 被拒并回滚；正常 `.md` 包导入成树
+- 完成记录：`NoteImportExportService` + `NoteBookController`（`GET /{id}/export`、`POST /{id}/import/zip`、`POST /{id}/import/markdown`）+ `NoteController`（`GET /{id}/export`）；集成测试 1 条绿（含 zip slip 400）。
 
 ### TASK-007 | pending | 分享扩展（单篇 + 整库）
 

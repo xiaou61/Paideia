@@ -2,10 +2,14 @@ package io.github.xiaou61.note.internal.web;
 
 import io.github.xiaou61.note.internal.note.NoteService;
 import io.github.xiaou61.note.internal.link.NoteLinkService;
+import io.github.xiaou61.note.internal.importexport.NoteImportExportService;
 import io.github.xiaou61.platform.ApiAccess;
 import io.github.xiaou61.platform.ApiResponse;
 import io.github.xiaou61.security.CurrentUser;
 import java.util.List;
+import java.nio.charset.StandardCharsets;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -38,10 +42,12 @@ class NoteController {
 
     private final NoteService notes;
     private final NoteLinkService linkService;
+    private final NoteImportExportService transfer;
 
-    NoteController(NoteService notes, NoteLinkService linkService) {
+    NoteController(NoteService notes, NoteLinkService linkService, NoteImportExportService transfer) {
         this.notes = notes;
         this.linkService = linkService;
+        this.transfer = transfer;
     }
 
     @GetMapping
@@ -65,6 +71,16 @@ class NoteController {
         long userId = requireUserId();
         notes.read(userId, id);
         return ApiResponse.ok(linkService.links(userId, id));
+    }
+
+    /** 单篇导出为 Markdown 文件。 */
+    @GetMapping("/{id}/export")
+    ResponseEntity<byte[]> export(@PathVariable("id") long id) {
+        String markdown = transfer.exportDoc(requireUserId(), id);
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"note.md\"")
+                .contentType(MediaType.parseMediaType("text/markdown; charset=utf-8"))
+                .body(markdown.getBytes(StandardCharsets.UTF_8));
     }
 
     @PostMapping
