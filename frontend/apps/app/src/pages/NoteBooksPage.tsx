@@ -116,7 +116,7 @@ export function NoteBooksPage() {
         title="我的知识库"
         description="把学习资料整理成一个个知识库，每个库都是一棵可自由编排的文档树，正文以 Markdown 保存。"
         actions={
-          <Button render={<Link to="/notes/new-book" />}>
+          <Button className="hidden shrink-0 whitespace-nowrap sm:inline-flex" render={<Link to="/notes/new-book" />}>
             <Plus className="mr-1 h-4 w-4" />
             新建知识库
           </Button>
@@ -160,6 +160,10 @@ export function NoteBooksPage() {
         </select>
         <Button variant="ghost" render={<Link to="/notes/all" />}>
           旧版全部笔记
+        </Button>
+        <Button className="sm:hidden" render={<Link to="/notes/new-book" />}>
+          <Plus className="mr-1 h-4 w-4" />
+          新建知识库
         </Button>
       </div>
 
@@ -209,7 +213,7 @@ export function NoteBooksPage() {
             const isPublic = book.visibility === 'public'
             return (
               <div key={book.id} className="group relative">
-                <Card className="hover:border-border h-full overflow-hidden transition duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+                <Card className="hover:border-border relative h-full overflow-hidden transition duration-200 hover:-translate-y-0.5 hover:shadow-lg">
                   <div
                     className="h-1.5 w-full"
                     style={{ background: `linear-gradient(90deg, ${accent}, ${accent}55)` }}
@@ -228,7 +232,10 @@ export function NoteBooksPage() {
                       </Badge>
                     </div>
                     <CardTitle className="truncate pr-1 text-base">
-                      <Link className="hover:underline" to={`/notes/${book.id}`}>
+                      <Link
+                        className="after:absolute after:inset-0 hover:underline"
+                        to={`/notes/${book.id}`}
+                      >
                         {book.name}
                       </Link>
                     </CardTitle>
@@ -271,7 +278,7 @@ export function NoteBooksPage() {
                         variant="ghost"
                         size="sm"
                         aria-label="删除知识库"
-                        className="text-muted-foreground hover:text-destructive -mr-2 h-7 w-7 p-0 opacity-0 transition group-hover:opacity-100"
+                        className="text-muted-foreground hover:text-destructive relative z-10 -mr-2 h-7 w-7 p-0 opacity-0 transition group-hover:opacity-100"
                         onClick={() => setPendingDelete(book)}
                       >
                         <Trash2 className="h-4 w-4" />

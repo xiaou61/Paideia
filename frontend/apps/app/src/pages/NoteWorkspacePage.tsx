@@ -279,6 +279,24 @@ export function NoteWorkspacePage() {
       .catch((reason: unknown) => setError(errorMessage(reason)))
   }
 
+  const bookMissing = booksQuery.isSuccess && book === undefined
+
+  if (!Number.isFinite(bookId) || bookMissing) {
+    return (
+      <AppShell title="Paideia" actions={<LearnerHeader />}>
+        <PageHeader title="知识库" description="这个知识库不存在，或者你没有访问权限。" />
+        <Alert variant="destructive">
+          <AlertDescription className="flex flex-wrap items-center gap-3">
+            <span>找不到这个知识库，可能已被删除，或者分享链接已失效。</span>
+            <Button variant="outline" size="sm" render={<Link to="/notes" />}>
+              返回知识库列表
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </AppShell>
+    )
+  }
+
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
       <PageHeader
@@ -294,6 +312,17 @@ export function NoteWorkspacePage() {
       {error !== null ? (
         <Alert variant="destructive" className="mb-4">
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {treeQuery.isError ? (
+        <Alert className="mb-4">
+          <AlertDescription className="flex flex-wrap items-center gap-3">
+            <span>目录加载失败，请检查网络后重试。</span>
+            <Button variant="outline" size="sm" onClick={() => void treeQuery.refetch()}>
+              重新加载
+            </Button>
+          </AlertDescription>
         </Alert>
       ) : null}
 
@@ -384,6 +413,18 @@ export function NoteWorkspacePage() {
           ) : docQuery.isLoading ? (
             <div className="flex h-full items-center justify-center py-20">
               <Spinner />
+            </div>
+          ) : docQuery.isError ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 py-20">
+              <p className="text-sm font-medium">这篇文档加载失败，可能已被删除或无权访问。</p>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => void docQuery.refetch()}>
+                  重试
+                </Button>
+                <Button variant="ghost" onClick={() => setSelected(null)}>
+                  返回空白
+                </Button>
+              </div>
             </div>
           ) : (
             <DocEditor

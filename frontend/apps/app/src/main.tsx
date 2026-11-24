@@ -72,6 +72,20 @@ if (container === null) {
 }
 
 /**
+ * 发版后旧页面还在跑时，按需加载的异步 chunk 可能已被新版本删除（文件名带哈希）。
+ * 这时 Vite 会抛 `vite:preloadError`，表现为"点某个页面没反应/白屏"。
+ * 这里拦一次并整页刷新去拿新的 index.html——防抖 10 秒，避免语言/网络问题导致刷新死循环。
+ */
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault()
+  const last = Number(window.sessionStorage.getItem('paideia:preload-reload') ?? '0')
+  if (Date.now() - last > 10_000) {
+    window.sessionStorage.setItem('paideia:preload-reload', String(Date.now()))
+    window.location.reload()
+  }
+})
+
+/**
  * 宿主标识挂在 `<html data-platform>` 上。
  *
  * <p>它原本是首页"运行状态"那一块里的一枚可见徽章，2026-10-15 用户要求去掉那一段。但
