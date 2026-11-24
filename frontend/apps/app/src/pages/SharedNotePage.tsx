@@ -18,10 +18,53 @@ import { api } from '../api'
 import { JSON_HEADERS, errorMessage } from '@paideia/core'
 
 /** 分享端点返回的形状。**没有作者、没有时间**——服务端就不给。 */
-interface SharedNote {
+interface SharedDocNode {
+  kind: string
   title: string
-  body: string
+  body: string | null
+  children: SharedDocNode[]
+}
+
+interface SharedView {
+  type: string
+  title: string
+  body: string | null
   entryId: number | null
+  documents: SharedDocNode[] | null
+}
+
+function BookTree({ nodes }: { nodes: SharedDocNode[] }) {
+  if (nodes.length === 0) {
+    return null
+  }
+  return (
+    <ul className="space-y-3" data-testid="share-book-tree">
+      {nodes.map((node, index) => (
+        <li key={`${node.title}-${index}`}>
+          {node.kind === 'folder' ? (
+            <details open>
+              <summary className="cursor-pointer font-medium">{node.title}</summary>
+              <div className="mt-2 pl-4">
+                <BookTree nodes={node.children} />
+              </div>
+            </details>
+          ) : (
+            <div>
+              <h3 className="font-medium">{node.title}</h3>
+              {node.body !== null && node.body !== '' ? (
+                <p className="mt-1 whitespace-pre-wrap text-sm">{node.body}</p>
+              ) : null}
+              {node.children.length > 0 ? (
+                <div className="mt-2 pl-4">
+                  <BookTree nodes={node.children} />
+                </div>
+              ) : null}
+            </div>
+          )}
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 /**
@@ -37,7 +80,7 @@ interface SharedNote {
 export function SharedNotePage() {
   const { shareId } = useParams<{ shareId: string }>()
   const { status } = useAuth()
-  const [note, setNote] = useState<SharedNote | null>(null)
+  const [shared, setShared] = useState<SharedView | null>(null)
   const [missing, setMissing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [reportOpen, setReportOpen] = useState(false)
@@ -64,8 +107,8 @@ export function SharedNotePage() {
         if (!response.ok) {
           throw new Error(`请求失败：HTTP ${response.status}`)
         }
-        const envelope = (await response.json()) as { data: SharedNote }
-        setNote(envelope.data)
+        const envelope = (await response.json()) as { data: SharedView }
+        setShared(envelope.data)
       })
       .catch((cause: unknown) => {
         if (alive) {
@@ -76,6 +119,8 @@ export function SharedNotePage() {
       alive = false
     }
   }, [shareId])
+
+  const isBook = shared?.type === 'book'
 
   return (
     // 同一个 AppShell：分享页是免登录的独立面，但**观感要与站内一致**——
@@ -93,20 +138,24 @@ export function SharedNotePage() {
         <p className="text-muted-foreground" data-testid="share-missing">
           这条分享不存在或已失效。
         </p>
-      ) : note === null ? (
+      ) : shared === null ? (
         error === null ? <Spinner /> : null
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle data-testid="share-title">{note.title}</CardTitle>
+            <CardTitle data-testid="share-title">{shared.title}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="whitespace-pre-wrap" data-testid="share-body">
-              {note.body}
-            </p>
-            {note.entryId === null ? null : (
+            {isBook ? (
+              <BookTree nodes={shared.documents ?? []} />
+            ) : (
+              <p className="whitespace-pre-wrap" data-testid="share-body">
+                {shared.body ?? ''}
+              </p>
+            )}
+            {isBook || shared.entryId === null ? null : (
               <p className="text-muted-foreground mt-4 text-xs" data-testid="share-entry">
-                相关条目 #{note.entryId}
+                相关条目 #{shared.entryId}
               </p>
             )}
 

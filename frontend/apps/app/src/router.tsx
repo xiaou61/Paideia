@@ -25,7 +25,9 @@ import { McpTokensPage } from './pages/McpTokensPage'
 import { AppearancePage } from './pages/AppearancePage'
 import { MyAssessmentsPage } from './pages/MyAssessmentsPage'
 import { NoteNewPage } from './pages/NoteNewPage'
+import { NoteBooksPage } from './pages/NoteBooksPage'
 import { NotesPage } from './pages/NotesPage'
+import { NoteWorkspacePage } from './pages/NoteWorkspacePage'
 import { OAuthCallbackPage } from './pages/OAuthCallbackPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
@@ -283,6 +285,15 @@ export const router = createHashRouter([
     path: '/notes',
     element: (
       <RequireAuth>
+        <NoteBooksPage />
+      </RequireAuth>
+    ),
+  },
+  // 旧版"全部笔记"扁平列表，保留直达入口（新建页回来也落这里）。
+  {
+    path: '/notes/all',
+    element: (
+      <RequireAuth>
         <NotesPage />
       </RequireAuth>
     ),
@@ -293,6 +304,15 @@ export const router = createHashRouter([
     element: (
       <RequireAuth>
         <NoteNewPage />
+      </RequireAuth>
+    ),
+  },
+  // 单个个人知识库的工作区（文档树 + 编辑器）。
+  {
+    path: '/notes/:bookId',
+    element: (
+      <RequireAuth>
+        <NoteWorkspacePage />
       </RequireAuth>
     ),
   },

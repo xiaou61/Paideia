@@ -52,7 +52,7 @@ export function NoteNewPage() {
       setError(null)
       await queryClient.invalidateQueries({ queryKey: ['notes'] })
       // 带着 id 回列表页，那边会把它选中并加载出来
-      void navigate('/notes', { state: { selected: created.id } })
+      void navigate('/notes/all', { state: { selected: created.id } })
     },
     onError: (cause: unknown) => setError(errorMessage(cause)),
   })
@@ -63,7 +63,7 @@ export function NoteNewPage() {
       setConfirmLeave(true)
       return
     }
-    void navigate('/notes')
+    void navigate('/notes/all')
   }
 
   return (
@@ -130,7 +130,7 @@ export function NoteNewPage() {
               size="sm"
               variant="destructive"
               data-testid="new-note-discard-confirm"
-              onClick={() => void navigate('/notes')}
+              onClick={() => void navigate('/notes/all')}
             >
               丢掉并返回
             </Button>

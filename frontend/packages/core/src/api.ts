@@ -123,7 +123,10 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   async function stream(path: string, init: RequestInit = {}): Promise<Response> {
     const headers = new Headers(init.headers)
     // 两个都声明：成功走 SSE，开流前的校验失败走 JSON（只写前者会让那些错误变成 500）
-    headers.set('Accept', 'text/event-stream, application/json')
+    // 调用方显式指定 Accept 时尊重它（下载二进制要走 */*，不能被 SSE 的 Accept 卡成 406）。
+    if (!headers.has('Accept')) {
+      headers.set('Accept', 'text/event-stream, application/json')
+    }
     const token = options.getToken?.() ?? null
     if (token !== null && token !== '') {
       headers.set('Authorization', `Bearer ${token}`)

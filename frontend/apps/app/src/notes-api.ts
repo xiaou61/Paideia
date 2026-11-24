@@ -15,12 +15,82 @@ export interface NoteSummary {
 export interface NoteView extends NoteSummary {
   body: string
   createdAt: string | null
+  /** 所属知识库；旧版扁平笔记路径下可能为默认库 id。 */
+  bookId?: number | null
+  kind?: string
+  parentId?: number | null
+  sortOrder?: number
 }
 
 export interface NoteInput {
   entryId: number | null
   title: string
   body: string
+}
+
+/** 知识库（个人知识库）摘要。 */
+export interface BookView {
+  id: number
+  name: string
+  description: string | null
+  sortOrder: number
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface BookInput {
+  name: string
+  description?: string | null
+  sortOrder?: number
+}
+
+/** 目录树里的一个节点：扁平一行，父子关系由 parentId 表示。 */
+export interface NoteNodeRow {
+  id: number
+  kind: 'doc' | 'folder' | string
+  parentId: number | null
+  sortOrder: number
+  title: string
+  excerpt: string | null
+  updatedAt: string | null
+}
+
+/** 一篇文档（含正文）。 */
+export interface DocView {
+  id: number
+  bookId: number | null
+  kind: string
+  parentId: number | null
+  sortOrder: number
+  entryId: number | null
+  title: string
+  body: string
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface DocNodeInput {
+  bookId: number
+  parentId: number | null
+  kind: 'doc' | 'folder'
+  entryId?: number | null
+  title: string
+  body: string
+}
+
+export interface LinkRef {
+  noteId: number
+  title: string
+}
+
+export interface NoteLinks {
+  outbound: LinkRef[]
+  inbound: LinkRef[]
+}
+
+export interface ImportResult {
+  folders: number
+  documents: number
 }
 
 export interface NotesApi {
@@ -37,6 +107,25 @@ export interface NotesApi {
   activeShares(id: number): Promise<string[]>
   /** 拼出可发给别人的链接（由界面按当前站点拼）。 */
   shareLink(shareId: string): string
+
+  // ── 个人知识库与文档树（WORK-087） ──
+  listBooks(): Promise<BookView[]>
+  createBook(input: BookInput): Promise<BookView>
+  updateBook(id: number, input: BookInput): Promise<BookView>
+  removeBook(id: number): Promise<boolean>
+  tree(bookId: number): Promise<NoteNodeRow[]>
+  createNode(input: DocNodeInput): Promise<DocView>
+  updateDoc(id: number, input: { entryId: number | null; title: string; body: string }): Promise<DocView>
+  moveNode(id: number, parentId: number | null, sortOrder: number): Promise<void>
+  removeNode(id: number): Promise<boolean>
+  search(keyword: string): Promise<NoteSummary[]>
+  links(id: number): Promise<NoteLinks>
+  exportDocBlob(id: number): Promise<Blob>
+  exportBookBlob(bookId: number): Promise<Blob>
+  importZip(bookId: number, file: File): Promise<ImportResult>
+  importMarkdown(bookId: number, title: string, text: string): Promise<ImportResult>
+  shareBook(bookId: number): Promise<string>
+  activeBookShares(bookId: number): Promise<string[]>
 }
 
 /**
@@ -49,6 +138,13 @@ export interface NotesApi {
  */
 export function createNotesApi(client: ApiClient): NotesApi {
   const base = '/api/v1/notes'
+  const bookBase = '/api/v1/note-books'
+
+  /** 下载二进制（导出 zip / md）：走 stream，复用同一套鉴权与 401 刷新。 */
+  async function download(path: string): Promise<Blob> {
+    const response = await client.stream(path, { headers: { Accept: '*/*' } })
+    return response.blob()
+  }
 
   return {
     list: () => client.requestEnvelope<NoteSummary[]>(base),
@@ -69,6 +165,68 @@ export function createNotesApi(client: ApiClient): NotesApi {
     share: (id) => client.requestEnvelope<string>(`${base}/${id}/share`, { method: 'POST' }),
     revoke: (shareId) => client.requestEnvelope<boolean>(`/api/v1/shares/${shareId}`, { method: 'DELETE' }),
     activeShares: (id) => client.requestEnvelope<string[]>(`${base}/${id}/shares`),
+
+    // ── 个人知识库与文档树（WORK-087） ──
+    listBooks: () => client.requestEnvelope<BookView[]>(bookBase),
+    createBook: (input) =>
+      client.requestEnvelope<BookView>(bookBase, {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(input),
+      }),
+    updateBook: (id, input) =>
+      client.requestEnvelope<BookView>(`${bookBase}/${id}`, {
+        method: 'PUT',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(input),
+      }),
+    removeBook: (id) => client.requestEnvelope<boolean>(`${bookBase}/${id}`, { method: 'DELETE' }),
+    tree: (bookId) => client.requestEnvelope<NoteNodeRow[]>(`${bookBase}/${bookId}/tree`),
+    createNode: (input) =>
+      client.requestEnvelope<DocView>(base, {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(input),
+      }),
+    updateDoc: (id, input) =>
+      client.requestEnvelope<DocView>(`${base}/${id}`, {
+        method: 'PUT',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(input),
+      }),
+    moveNode: (id, parentId, sortOrder) =>
+      client
+        .requestEnvelope<null>(`${base}/${id}/move`, {
+          method: 'PUT',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ parentId, sortOrder }),
+        })
+        .then(() => undefined),
+    removeNode: (id) => client.requestEnvelope<boolean>(`${base}/${id}`, { method: 'DELETE' }),
+    search: (keyword) =>
+      client.requestEnvelope<NoteSummary[]>(`${base}/search?q=${encodeURIComponent(keyword)}`),
+    links: (id) => client.requestEnvelope<NoteLinks>(`${base}/${id}/links`),
+    exportDocBlob: (id) => download(`${base}/${id}/export`),
+    exportBookBlob: (bookId) => download(`${bookBase}/${bookId}/export`),
+    importZip: (bookId, file) =>
+      client.requestEnvelope<ImportResult>(`${bookBase}/${bookId}/import/zip`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: file,
+      }),
+    importMarkdown: (bookId, title, text) =>
+      client.requestEnvelope<ImportResult>(
+        `${bookBase}/${bookId}/import/markdown?title=${encodeURIComponent(title)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/markdown' },
+          body: text,
+        },
+      ),
+    shareBook: (bookId) =>
+      client.requestEnvelope<string>(`${bookBase}/${bookId}/share`, { method: 'POST' }),
+    activeBookShares: (bookId) =>
+      client.requestEnvelope<string[]>(`${bookBase}/${bookId}/shares`),
 
     // 分享链接由界面按当前站点拼：后端不知道自己是哪个域名（本地、隧道、线上各不相同）
     shareLink: (shareId) => `${window.location.origin}/#/share/${shareId}`,
