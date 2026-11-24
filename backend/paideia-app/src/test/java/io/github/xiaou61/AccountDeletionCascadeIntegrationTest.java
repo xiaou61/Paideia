@@ -71,6 +71,8 @@ class AccountDeletionCascadeIntegrationTest {
             {"notes", "user_id"},
             {"note_shares", "user_id"},
             {"note_reports", "reporter_user_id"},
+            {"note_books", "user_id"},
+            {"note_links", "user_id"},
             // 简历（WORK-018）：简历是本项目最敏的一类 PII，四张表都必须逐表归零。
             // 只断言主简历会让"注销后还留着旧提案与岗位版本"这种残留悄悄过关。
             {"resume_proposals", "user_id"},
@@ -237,6 +239,12 @@ class AccountDeletionCascadeIntegrationTest {
                 VALUES (1, REPEAT('a', 64), 'm', 'v1', ?, 'private', '{}')
                 """, owner);
         jdbcTemplate.update("INSERT INTO notes (user_id, title, body) VALUES (?, '标题', '正文')", owner);
+        jdbcTemplate.update("INSERT INTO note_books (user_id, name) VALUES (?, '我的笔记')", owner);
+        long linkSourceId = jdbcTemplate.queryForObject(
+                "SELECT MAX(id) FROM notes WHERE user_id = ?", Long.class, owner);
+        jdbcTemplate.update(
+                "INSERT INTO note_links (user_id, source_note_id, target_title) VALUES (?, ?, '目标')",
+                owner, linkSourceId);
         // 调用轮次与反馈（WORK-022 / WORK-036）：轮次行有 user_id，反馈也挂 user_id
         jdbcTemplate.update("""
                 INSERT INTO ai_runs (trace_id, user_id, kind, status, started_at)

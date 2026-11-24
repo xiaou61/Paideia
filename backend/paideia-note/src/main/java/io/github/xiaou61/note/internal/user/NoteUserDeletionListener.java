@@ -24,10 +24,12 @@ import org.springframework.transaction.event.TransactionalEventListener;
 class NoteUserDeletionListener {
 
     private static final String[][] USER_TABLES = {
-            // 先举报后分享：举报指着分享；再删笔记
+            // 先删双链（指着笔记），再删举报（指着分享），再删分享，再删笔记，最后删空库
+            {"note_links", "user_id"},
             {"note_reports", "reporter_user_id"},
             {"note_shares", "user_id"},
             {"notes", "user_id"},
+            {"note_books", "user_id"},
     };
 
     private final JdbcTemplate jdbcTemplate;

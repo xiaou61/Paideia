@@ -115,14 +115,15 @@ approver_role: CTO
 - 验证：整库分享链接能浏览整棵树，且不含其它库/用户文档
 - 完成记录：新增迁移 `V20261124130000__note_shares_target_nullable.sql`（note_id 放宽为可空，支撑整库分享）；`SharedView(type,title,body,entryId,documents)` + 嵌套 `SharedBookNode`；`NoteMapper.listShareDocs(userId,bookId)` 按分享者身份限定；`NoteReportMapper.list` 标题 `COALESCE(n.title,b.name)`。测试 `NoteBookShareIntegrationTest` 3 条绿（整库只含本人文档+撤回404、单篇回归+跨用户404、到期404）。
 
-### TASK-008 | pending | 注销级联扩表
+### TASK-008 | done | 注销级联扩表
 
 - 对应：REQ-012，AC-012
 - 依赖：TASK-001
-- 修改：`internal/user/NoteUserDeletionListener.java`（加删 `note_books`、`note_links`）
-- 测试：`NoteUserDeletionTest`（注销后五表该用户行数为 0）
+- 修改：`internal/user/NoteUserDeletionListener.java`（USER_TABLES 加 `note_links`、`note_books`）
+- 测试：`AccountDeletionCascadeIntegrationTest`（USER_DATA 扩两表并造种子行）
 - 步骤：扩删除清单 → 用例
 - 验证：注销后任何人（含本人）不可再访问
+- 完成记录：USER_TABLES 现依次为 note_links/note_reports/note_shares/notes/note_books；测试 4 条绿（含"别人的数据不受影响"）。
 
 ### TASK-009 | pending | MCP 工具面与快照/契约
 
