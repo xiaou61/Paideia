@@ -54,7 +54,8 @@ public interface NoteMapper {
 
     /** 某知识库的全部存活节点（树查询用，由服务层组装成层级）。 */
     @Select("""
-            SELECT id, user_id, book_id, kind, doc_type, pair_key, parent_id, sort_order, entry_id, title,
+            SELECT id, user_id, book_id, kind, doc_type, pair_key, category, level,
+                   parent_id, sort_order, entry_id, title,
                    created_at, updated_at, deleted_at
             FROM notes
             WHERE user_id = #{userId} AND book_id = #{bookId} AND deleted_at IS NULL
