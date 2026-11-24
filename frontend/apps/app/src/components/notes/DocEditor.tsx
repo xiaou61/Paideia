@@ -1,5 +1,6 @@
 import { MarkdownField } from '@paideia/knowledge'
 import { Button, Input } from '@paideia/ui'
+import { Maximize2, Minimize2 } from 'lucide-react'
 
 interface DocEditorProps {
   title: string
@@ -9,12 +10,19 @@ interface DocEditorProps {
   onTitle: (value: string) => void
   onBody: (value: string) => void
   onSave: () => void
-  onExport: () => void
   /** 粘贴/拖入图片时把图片转成 data URL（由调用方决定实现）。 */
   onUpload: (file: File) => Promise<{ url: string; name: string }>
+  /** 纯净预览：隐藏目录与侧栏，只留正文。 */
+  zen?: boolean
+  onToggleZen?: () => void
 }
 
-/** 右侧文档编辑器：标题 + markdown 正文 + 显式保存。 */
+/**
+ * 文档编辑器：标题 + markdown 正文。
+ *
+ * <p>默认打开就是「预览」——知识库是给自己复习用的，先看到排版结果比先看到源码更自然；
+ * 要动笔再切到「编辑」。右上角的「纯净预览」把目录和侧栏都收起来，只留正文。
+ */
 export function DocEditor({
   title,
   body,
@@ -23,36 +31,49 @@ export function DocEditor({
   onTitle,
   onBody,
   onSave,
-  onExport,
   onUpload,
+  zen = false,
+  onToggleZen,
 }: DocEditorProps) {
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex items-center gap-2 border-b border-border px-5 py-3">
         <Input
           aria-label="文档标题"
           data-testid="doc-title"
-          className="h-9 flex-1 border-0 text-lg font-semibold shadow-none focus-visible:ring-0"
+          className="h-9 flex-1 border-0 px-0 text-xl font-semibold shadow-none focus-visible:ring-0"
           value={title}
           onChange={(event) => onTitle(event.target.value)}
           placeholder="无标题文档"
         />
-        <Button variant="ghost" size="sm" onClick={onExport}>
-          导出 .md
-        </Button>
+        {onToggleZen === undefined ? null : (
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={zen ? '退出纯净预览' : '纯净预览'}
+            onClick={onToggleZen}
+          >
+            {zen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            <span className="hidden sm:inline">{zen ? '退出纯净预览' : '纯净预览'}</span>
+          </Button>
+        )}
         <Button size="sm" data-testid="doc-save" onClick={onSave} disabled={saving}>
           {saving ? '保存中…' : dirty ? '保存' : '已保存'}
         </Button>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
-        <MarkdownField
-          testIdPrefix="note-doc"
-          value={body}
-          onChange={onBody}
-          placeholder="用 Markdown 写正文，支持 [[标题]] 双链"
-          onUpload={onUpload}
-          slashCommands
-        />
+      <div className="min-h-0 flex-1 overflow-auto">
+        <div className="mx-auto w-full max-w-4xl px-5 py-6">
+          <MarkdownField
+            testIdPrefix="note-doc"
+            value={body}
+            onChange={onBody}
+            placeholder="用 Markdown 写正文，支持 [[标题]] 双链"
+            onUpload={onUpload}
+            slashCommands
+            defaultTab="preview"
+            rows={24}
+          />
+        </div>
       </div>
     </div>
   )

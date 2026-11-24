@@ -42,3 +42,10 @@ approver_role: CTO
 
 - 更新 `frontend/apps/app/e2e/notes-kb.spec.ts` 的 createBook helper：从列表页跳新建页填表提交。
 - 完成：`e2e/notes-kb.spec.ts` + `e2e/notes.spec.ts` 共 9 条绿。
+
+### TASK-005 | done | 工作台视觉重做：铺满、去导入导出、默认预览、纯净预览
+
+- `AppShell` 新增 `full` 档（`max-w-none`），工作台改用铺满布局。
+- 工作台移除「导入 / 导出」卡片；左右侧栏在 `lg` 以上吸顶、独立滚动。
+- `DocEditor` 默认打开「预览」标签（`MarkdownField` 新增 `defaultTab`）；新增「纯净预览」按钮，一键收起目录与侧栏只看正文。
+- 完成：typecheck/build 绿；`e2e/notes-kb.spec.ts` + `e2e/notes.spec.ts` 9 条绿。

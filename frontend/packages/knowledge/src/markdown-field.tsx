@@ -50,6 +50,7 @@ export function MarkdownField({
   mediaBaseUrl,
   onUpload,
   slashCommands = false,
+  defaultTab = 'edit',
 }: {
   value: string
   onChange: (next: string) => void
@@ -62,8 +63,10 @@ export function MarkdownField({
   onUpload?: (file: File) => Promise<{ url: string; name: string }>
   /** 打开行首 `/` 斜杠命令菜单（默认关闭，避免影响既有消费者）。 */
   slashCommands?: boolean
+  /** 初始标签页，默认"编辑"；阅读为主的场景可传 "preview" 默认展示预览。 */
+  defaultTab?: 'edit' | 'preview'
 }) {
-  const [tab, setTab] = useState('edit')
+  const [tab, setTab] = useState(defaultTab)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [slash, setSlash] = useState<{ at: number; index: number } | null>(null)
@@ -182,7 +185,11 @@ export function MarkdownField({
   ]
 
   return (
-    <Tabs value={tab} onValueChange={(next) => setTab(String(next))} className="flex flex-col gap-3">
+    <Tabs
+      value={tab}
+      onValueChange={(next) => setTab(String(next) === 'preview' ? 'preview' : 'edit')}
+      className="flex flex-col gap-3"
+    >
       <TabsList variant="line">
         <TabsTrigger value="edit" data-testid={`${testIdPrefix}-tab-edit`}>
           编辑

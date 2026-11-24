@@ -34,6 +34,7 @@ export function AppShell({
   actions,
   children,
   wide = false,
+  full = false,
   className,
   homeHref = '#/',
 }: {
@@ -44,6 +45,8 @@ export function AppShell({
   children: ReactNode
   /** 列表/总览类页面用宽档：窄档在 1440 屏上两侧留白太多，读起来像"没做完"。 */
   wide?: boolean
+  /** 真正铺满：去掉 86rem 上限（编辑器/工作台这类需要大画布的页面用）。 */
+  full?: boolean
   className?: string
   /** 点品牌回到哪里；传 `null` 渲染成不可点的纯文本。 */
   homeHref?: string | null
@@ -107,7 +110,7 @@ export function AppShell({
         tabIndex={-1}
         className={cn(
           'mx-auto w-full flex-1 px-4 py-8 sm:px-6 sm:py-10 focus:outline-none',
-          wide ? 'max-w-[86rem]' : 'max-w-3xl',
+          full ? 'max-w-none' : wide ? 'max-w-[86rem]' : 'max-w-3xl',
         )}
       >
         {children}

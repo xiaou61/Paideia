@@ -46,6 +46,7 @@ test('知识库：建库→建文档→编辑保存→大纲与检索', async ({
   const title = await createDoc(page, book)
 
   // 编辑正文并显式保存
+  await page.getByTestId('note-doc-tab-edit').click()
   await page.getByTestId('note-doc-body').fill('# 一级标题\n\n正文里有倒排索引这个词')
   await page.getByTestId('doc-save').click()
   await expect(page.getByTestId('doc-save')).toHaveText('已保存')

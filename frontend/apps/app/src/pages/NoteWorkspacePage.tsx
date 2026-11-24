@@ -32,7 +32,6 @@ import { BacklinksPanel } from '../components/notes/BacklinksPanel'
 import { DocEditor } from '../components/notes/DocEditor'
 import { DocTree } from '../components/notes/DocTree'
 import { uploadNoteImage } from '../components/notes/image-upload'
-import { ImportExport } from '../components/notes/ImportExport'
 import { OutlinePanel } from '../components/notes/OutlinePanel'
 import { SearchPanel } from '../components/notes/SearchPanel'
 import { LearnerHeader } from '../components/LearnerHeader'
@@ -59,6 +58,7 @@ export function NoteWorkspacePage() {
   const [copiedShare, setCopiedShare] = useState<string | null>(null)
   const [renameTarget, setRenameTarget] = useState<{ id: number; title: string } | null>(null)
   const [renameTitle, setRenameTitle] = useState('')
+  const [zen, setZen] = useState(false)
   const savingRef = useRef(false)
 
   const booksQuery = useQuery({ queryKey: ['note-books'], queryFn: () => notes.listBooks() })
@@ -264,21 +264,6 @@ export function NoteWorkspacePage() {
     match?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  function exportDoc(): void {
-    if (selected === null) return
-    void notes
-      .exportDocBlob(selected)
-      .then((blob) => {
-        const url = URL.createObjectURL(blob)
-        const anchor = document.createElement('a')
-        anchor.href = url
-        anchor.download = 'note.md'
-        anchor.click()
-        URL.revokeObjectURL(url)
-      })
-      .catch((reason: unknown) => setError(errorMessage(reason)))
-  }
-
   const bookMissing = booksQuery.isSuccess && book === undefined
 
   if (!Number.isFinite(bookId) || bookMissing) {
@@ -298,16 +283,18 @@ export function NoteWorkspacePage() {
   }
 
   return (
-    <AppShell title="Paideia" actions={<LearnerHeader />} wide>
-      <PageHeader
-        title={book?.name ?? '知识库'}
-        description={book?.description ?? '整理你的文档与目录，正文用 Markdown 保存。'}
-        actions={
-          <Button variant="ghost" render={<Link to="/notes" />}>
-            返回知识库列表
-          </Button>
-        }
-      />
+    <AppShell title="Paideia" actions={<LearnerHeader />} full>
+      {zen ? null : (
+        <PageHeader
+          title={book?.name ?? '知识库'}
+          description={book?.description ?? '整理你的文档与目录，正文用 Markdown 保存。'}
+          actions={
+            <Button variant="ghost" render={<Link to="/notes" />}>
+              返回知识库列表
+            </Button>
+          }
+        />
+      )}
 
       {error !== null ? (
         <Alert variant="destructive" className="mb-4">
@@ -326,8 +313,8 @@ export function NoteWorkspacePage() {
         </Alert>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)_230px]">
-        <aside className="space-y-4">
+      <div className={zen ? 'grid gap-4' : 'grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)_248px]'}>
+        <aside className={zen ? 'hidden' : 'space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-7rem)] lg:overflow-auto'}>
           <Card>
             <CardHeader className="flex-row items-center justify-between space-y-0 py-3">
               <CardTitle className="text-sm">目录</CardTitle>
@@ -378,21 +365,6 @@ export function NoteWorkspacePage() {
           </Card>
 
           <Card>
-            <CardHeader className="py-3">
-              <CardTitle className="text-sm">导入 / 导出</CardTitle>
-            </CardHeader>
-            <CardContent className="py-2">
-              <ImportExport
-                bookId={bookId}
-                docId={selected}
-                onImported={() => {
-                  void queryClient.invalidateQueries({ queryKey: ['note-tree', bookId] })
-                }}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
             <CardHeader className="flex-row items-center justify-between space-y-0 py-3">
               <CardTitle className="text-sm">分享整个知识库</CardTitle>
               <Button variant="ghost" size="sm" onClick={() => setShareOpen(true)}>
@@ -402,7 +374,11 @@ export function NoteWorkspacePage() {
           </Card>
         </aside>
 
-        <section className="min-h-[70vh] overflow-hidden rounded-lg border border-border bg-card">
+        <section
+          className={`overflow-hidden rounded-xl border border-border bg-card shadow-sm ${
+            zen ? 'min-h-[calc(100dvh-6rem)]' : 'min-h-[70vh] lg:h-[calc(100dvh-9rem)]'
+          }`}
+        >
           {selected === null ? (
             <Empty className="h-full">
               <EmptyHeader>
@@ -443,13 +419,14 @@ export function NoteWorkspacePage() {
               onSave={() => {
                 void save()
               }}
-              onExport={exportDoc}
               onUpload={uploadNoteImage}
+              zen={zen}
+              onToggleZen={() => setZen((current) => !current)}
             />
           )}
         </section>
 
-        <aside className="space-y-4">
+        <aside className={zen ? 'hidden' : 'space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-7rem)] lg:overflow-auto'}>
           <Card>
             <CardHeader className="py-3">
               <CardTitle className="text-sm">检索</CardTitle>
