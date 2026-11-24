@@ -18,6 +18,14 @@ interface DocEditorProps {
   /** 配对文档标题（教程 ↔ 查漏补缺）；有值时显示跳转按钮。 */
   pairedTitle?: string
   onOpenPair?: () => void
+  /** 分类标签（自由文本，可为空）。 */
+  category?: string
+  onCategory?: (value: string) => void
+  /** 难度评级：入门 / 进阶 / 高级 / 空。 */
+  level?: string
+  onLevel?: (value: string) => void
+  /** 已有分类，供输入联想。 */
+  categoryOptions?: string[]
 }
 
 /**
@@ -39,6 +47,11 @@ export function DocEditor({
   onToggleZen,
   pairedTitle,
   onOpenPair,
+  category = '',
+  onCategory,
+  level = '',
+  onLevel,
+  categoryOptions,
 }: DocEditorProps) {
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -71,6 +84,34 @@ export function DocEditor({
           {saving ? '保存中…' : dirty ? '保存' : '已保存'}
         </Button>
       </div>
+      {zen || onCategory === undefined ? null : (
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-2">
+          <Input
+            aria-label="分类"
+            list="note-category-options"
+            className="h-8 w-48 text-sm"
+            placeholder="分类，如 Agent基础概念"
+            value={category}
+            onChange={(event) => onCategory(event.target.value)}
+          />
+          <datalist id="note-category-options">
+            {(categoryOptions ?? []).map((option) => (
+              <option key={option} value={option} />
+            ))}
+          </datalist>
+          <select
+            aria-label="难度"
+            className="border-input bg-background h-8 rounded-md border px-2 text-sm"
+            value={level}
+            onChange={(event) => onLevel?.(event.target.value)}
+          >
+            <option value="">难度：不限</option>
+            <option value="入门">入门</option>
+            <option value="进阶">进阶</option>
+            <option value="高级">高级</option>
+          </select>
+        </div>
+      )}
       <div className="min-h-0 flex-1 overflow-auto">
         <div className={zen ? 'w-full px-8 py-8' : 'w-full px-6 py-6'}>
           <MarkdownField

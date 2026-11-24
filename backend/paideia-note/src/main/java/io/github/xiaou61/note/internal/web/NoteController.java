@@ -35,7 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 class NoteController {
 
     record SaveRequest(Long bookId, Long parentId, String kind, Long entryId, String title, String body,
-                       String docType, String pairKey) {
+                       String docType, String pairKey, String category, String level) {
     }
 
     record MoveRequest(Long parentId, Integer sortOrder) {
@@ -91,13 +91,14 @@ class NoteController {
             return ApiResponse.ok(notes.create(userId, request.entryId(), request.title(), request.body()));
         }
         return ApiResponse.ok(notes.createNode(userId, request.bookId(), request.parentId(),
-                request.kind(), request.title(), request.body(), request.docType(), request.pairKey()));
+                request.kind(), request.title(), request.body(), request.docType(), request.pairKey(),
+                request.category(), request.level()));
     }
 
     @PutMapping("/{id}")
     ApiResponse<NoteService.NoteView> update(@PathVariable("id") long id, @RequestBody SaveRequest request) {
         return ApiResponse.ok(notes.updateDoc(requireUserId(), id, request.entryId(), request.title(),
-                request.body(), request.docType(), request.pairKey()));
+                request.body(), request.docType(), request.pairKey(), request.category(), request.level()));
     }
 
     @PutMapping("/{id}/move")

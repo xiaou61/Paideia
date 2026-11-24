@@ -15,6 +15,8 @@ interface DocTreeProps {
   onMove: (dragId: number, parentId: number | null, index: number) => void
   /** 一链补建缺失的「查漏补缺」文档。 */
   onAddGapFill?: (pairKey: string, parentId: number | null) => void
+  /** 按分类筛选：为空/不传则显示全部；否则只显示该分类的文档及其祖先目录。 */
+  categoryFilter?: string | null
 }
 
 interface TreeNode {
@@ -46,6 +48,25 @@ function buildForest(nodes: NoteNodeRow[]): TreeNode[] {
   }
   sortRec(roots)
   return roots
+}
+
+/** 按分类筛选：保留匹配分类的文档，以及它们的所有祖先目录；不传筛选时原样返回。 */
+function filterByCategory(nodes: NoteNodeRow[], category: string | null): NoteNodeRow[] {
+  if (category === null || category === '') {
+    return nodes
+  }
+  const byId = new Map(nodes.map((node) => [node.id, node]))
+  const keep = new Set<number>()
+  for (const node of nodes) {
+    if (node.kind === 'doc' && node.category === category) {
+      let cursor: NoteNodeRow | undefined = node
+      while (cursor !== undefined && !keep.has(cursor.id)) {
+        keep.add(cursor.id)
+        cursor = cursor.parentId === null ? undefined : byId.get(cursor.parentId)
+      }
+    }
+  }
+  return nodes.filter((node) => keep.has(node.id))
 }
 
 function TreeRow({
@@ -152,6 +173,16 @@ function TreeRow({
               查漏补缺
             </span>
           ) : null}
+          {item.node.category !== null && item.node.category !== '' ? (
+            <span className="bg-sky-100 text-sky-700 shrink-0 rounded px-1 py-0.5 text-[10px] leading-none">
+              {item.node.category}
+            </span>
+          ) : null}
+          {item.node.level !== null && item.node.level !== '' ? (
+            <span className="bg-slate-100 text-slate-700 shrink-0 rounded px-1 py-0.5 text-[10px] leading-none">
+              {item.node.level}
+            </span>
+          ) : null}
         </button>
         <button
           type="button"
@@ -216,12 +247,14 @@ export function DocTree({
   onRename,
   onMove,
   onAddGapFill,
+  categoryFilter,
 }: DocTreeProps) {
   const [draggedId, setDraggedId] = useState<number | null>(null)
   const [hint, setHint] = useState<{ id: number; pos: DropPos } | null>(null)
-  const roots = buildForest(nodes)
+  const visibleNodes = filterByCategory(nodes, categoryFilter ?? null)
+  const roots = buildForest(visibleNodes)
   const gapPairs = new Set<string>()
-  for (const node of nodes) {
+  for (const node of visibleNodes) {
     if (node.kind === 'doc' && node.docType === 'gap_fill' && node.pairKey !== null) {
       gapPairs.add(`${node.parentId ?? 'root'}:${node.pairKey}`)
     }

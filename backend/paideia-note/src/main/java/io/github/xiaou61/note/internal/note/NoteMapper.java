@@ -23,16 +23,17 @@ import org.apache.ibatis.annotations.Update;
 public interface NoteMapper {
 
     @Insert("""
-            INSERT INTO notes (user_id, book_id, kind, doc_type, pair_key, parent_id, sort_order,
-                               entry_id, title, body)
-            VALUES (#{userId}, #{bookId}, #{kind}, #{docType}, #{pairKey}, #{parentId}, #{sortOrder},
-                    #{entryId}, #{title}, #{body})
+            INSERT INTO notes (user_id, book_id, kind, doc_type, pair_key, category, level,
+                               parent_id, sort_order, entry_id, title, body)
+            VALUES (#{userId}, #{bookId}, #{kind}, #{docType}, #{pairKey}, #{category}, #{level},
+                    #{parentId}, #{sortOrder}, #{entryId}, #{title}, #{body})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(Note note);
 
     @Select("""
-            SELECT id, user_id, book_id, kind, doc_type, pair_key, parent_id, sort_order, entry_id, title, body,
+            SELECT id, user_id, book_id, kind, doc_type, pair_key, category, level,
+                   parent_id, sort_order, entry_id, title, body,
                    created_at, updated_at, deleted_at
             FROM notes
             WHERE id = #{id} AND user_id = #{userId} AND deleted_at IS NULL
@@ -41,7 +42,8 @@ public interface NoteMapper {
 
     /** 列表带一段**截断的正文**（前 200 字），不带全文。 */
     @Select("""
-            SELECT id, user_id, book_id, kind, doc_type, pair_key, parent_id, sort_order, entry_id, title,
+            SELECT id, user_id, book_id, kind, doc_type, pair_key, category, level,
+                   parent_id, sort_order, entry_id, title,
                    LEFT(body, 200) AS excerpt, created_at, updated_at, deleted_at
             FROM notes
             WHERE user_id = #{userId} AND deleted_at IS NULL
@@ -106,7 +108,8 @@ public interface NoteMapper {
     @Update("""
             UPDATE notes
             SET title = #{title}, body = #{body}, entry_id = #{entryId},
-                doc_type = #{docType}, pair_key = #{pairKey}
+                doc_type = #{docType}, pair_key = #{pairKey},
+                category = #{category}, level = #{level}
             WHERE id = #{id} AND user_id = #{userId} AND deleted_at IS NULL
             """)
     int update(Note note);

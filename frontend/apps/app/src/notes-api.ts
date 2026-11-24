@@ -20,6 +20,10 @@ export interface NoteView extends NoteSummary {
   kind?: string
   parentId?: number | null
   sortOrder?: number
+  docType?: 'tutorial' | 'gap_fill' | null
+  pairKey?: string | null
+  category?: string | null
+  level?: string | null
 }
 
 export interface NoteInput {
@@ -65,6 +69,8 @@ export interface NoteNodeRow {
   updatedAt: string | null
   docType: 'tutorial' | 'gap_fill' | null
   pairKey: string | null
+  category: string | null
+  level: string | null
 }
 
 /** 一篇文档（含正文）。 */
@@ -81,6 +87,8 @@ export interface DocView {
   updatedAt: string | null
   docType: 'tutorial' | 'gap_fill' | null
   pairKey: string | null
+  category: string | null
+  level: string | null
 }
 
 export interface DocNodeInput {
@@ -92,6 +100,8 @@ export interface DocNodeInput {
   body: string
   docType?: 'tutorial' | 'gap_fill' | null
   pairKey?: string | null
+  category?: string | null
+  level?: string | null
 }
 
 export interface LinkRef {
@@ -139,6 +149,8 @@ export interface NotesApi {
       body: string
       docType?: 'tutorial' | 'gap_fill' | null
       pairKey?: string | null
+      category?: string | null
+      level?: string | null
     },
   ): Promise<DocView>
   moveNode(id: number, parentId: number | null, sortOrder: number): Promise<void>

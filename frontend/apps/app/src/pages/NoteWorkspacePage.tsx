@@ -48,6 +48,8 @@ export function NoteWorkspacePage() {
   const [selected, setSelected] = useState<number | null>(null)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
+  const [docCategory, setDocCategory] = useState('')
+  const [docLevel, setDocLevel] = useState('')
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -55,6 +57,9 @@ export function NoteWorkspacePage() {
   const [newTitle, setNewTitle] = useState('')
   const [newDocType, setNewDocType] = useState<'none' | 'tutorial' | 'gap_fill'>('none')
   const [newPairKey, setNewPairKey] = useState('')
+  const [newCategory, setNewCategory] = useState('')
+  const [newLevel, setNewLevel] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [shareOpen, setShareOpen] = useState(false)
   const [copiedShare, setCopiedShare] = useState<string | null>(null)
@@ -103,6 +108,8 @@ export function NoteWorkspacePage() {
     if (doc !== undefined && doc !== null) {
       setTitle(doc.title)
       setBody(doc.body)
+      setDocCategory(doc.category ?? '')
+      setDocLevel(doc.level ?? '')
       setDirty(false)
     }
   }, [docQuery.data])
@@ -115,6 +122,13 @@ export function NoteWorkspacePage() {
             node.id !== selectedNode.id && node.kind === 'doc' && node.pairKey === selectedNode.pairKey,
         )
       : undefined
+  const categoryOptions = Array.from(
+    new Set(
+      (treeQuery.data ?? [])
+        .filter((node) => node.kind === 'doc' && node.category !== null && node.category !== '')
+        .map((node) => node.category as string),
+    ),
+  ).sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'))
 
   function refreshDoc(): void {
     void queryClient.invalidateQueries({ queryKey: ['note-tree', bookId] })
@@ -149,6 +163,8 @@ export function NoteWorkspacePage() {
         entryId: docQuery.data?.entryId ?? null,
         title,
         body,
+        category: docCategory.trim() === '' ? null : docCategory.trim(),
+        level: docLevel === '' ? null : docLevel,
       })
       setDirty(false)
       refreshDoc()
@@ -170,7 +186,7 @@ export function NoteWorkspacePage() {
     }, 700)
     return () => window.clearTimeout(handle)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, body, selected, dirty])
+  }, [title, body, docCategory, docLevel, selected, dirty])
 
   /** 把 dragId 挂到 parentId 下第 index 位；同级按新顺序重新编号落库。 */
   async function applyMove(dragId: number, parentId: number | null, index: number): Promise<void> {
@@ -233,6 +249,8 @@ export function NoteWorkspacePage() {
       title: string
       docType?: 'tutorial' | 'gap_fill' | null
       pairKey?: string | null
+      category?: string | null
+      level?: string | null
     }) =>
       notes.createNode({
         bookId,
@@ -242,12 +260,16 @@ export function NoteWorkspacePage() {
         body: '',
         docType: input.docType ?? null,
         pairKey: input.pairKey ?? null,
+        category: input.category ?? null,
+        level: input.level ?? null,
       }),
     onSuccess: (created, input) => {
       setCreateKind(null)
       setNewTitle('')
       setNewDocType('none')
       setNewPairKey('')
+      setNewCategory('')
+      setNewLevel('')
       void queryClient.invalidateQueries({ queryKey: ['note-tree', bookId] })
       if (input.kind === 'doc') {
         setSelected(created.id)
@@ -364,6 +386,8 @@ export function NoteWorkspacePage() {
                     setNewTitle('')
                     setNewDocType('none')
                     setNewPairKey('')
+                    setNewCategory('')
+                    setNewLevel('')
                     setCreateKind('doc')
                   }}
                 >
@@ -382,6 +406,23 @@ export function NoteWorkspacePage() {
                 </Button>
               </div>
             </CardHeader>
+            {categoryOptions.length === 0 ? null : (
+              <div className="px-3 pb-2">
+                <select
+                  aria-label="按分类筛选"
+                  className="border-input bg-background h-8 w-full rounded-md border px-2 text-sm"
+                  value={categoryFilter}
+                  onChange={(event) => setCategoryFilter(event.target.value)}
+                >
+                  <option value="">全部分类</option>
+                  {categoryOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <CardContent className="max-h-[50vh] overflow-auto py-2">
               {treeQuery.isLoading ? (
                 <div className="flex justify-center py-6">
@@ -399,6 +440,7 @@ export function NoteWorkspacePage() {
                   }}
                   onMove={(dragId, parentId, index) => void applyMove(dragId, parentId, index)}
                   onAddGapFill={(pairKey, parentId) => addGapFill.mutate({ pairKey, parentId })}
+                  categoryFilter={categoryFilter}
                 />
               )}
             </CardContent>
@@ -464,6 +506,17 @@ export function NoteWorkspacePage() {
               onToggleZen={() => setZen((current) => !current)}
               pairedTitle={pairNode?.title}
               onOpenPair={pairNode === undefined ? undefined : () => void openDoc(pairNode.id)}
+              category={docCategory}
+              onCategory={(value) => {
+                setDocCategory(value)
+                setDirty(true)
+              }}
+              level={docLevel}
+              onLevel={(value) => {
+                setDocLevel(value)
+                setDirty(true)
+              }}
+              categoryOptions={categoryOptions}
             />
           )}
         </section>
@@ -538,6 +591,31 @@ export function NoteWorkspacePage() {
                   onChange={(event) => setNewPairKey(event.target.value)}
                 />
               )}
+              <div className="flex gap-2">
+                <Input
+                  aria-label="分类"
+                  list="note-new-category-options"
+                  placeholder="分类，如 Agent基础概念"
+                  value={newCategory}
+                  onChange={(event) => setNewCategory(event.target.value)}
+                />
+                <datalist id="note-new-category-options">
+                  {categoryOptions.map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+                </datalist>
+                <select
+                  aria-label="难度"
+                  className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+                  value={newLevel}
+                  onChange={(event) => setNewLevel(event.target.value)}
+                >
+                  <option value="">难度：不限</option>
+                  <option value="入门">入门</option>
+                  <option value="进阶">进阶</option>
+                  <option value="高级">高级</option>
+                </select>
+              </div>
             </div>
           ) : null}
           <DialogFooter>
@@ -556,6 +634,8 @@ export function NoteWorkspacePage() {
                       createKind === 'doc' && newDocType !== 'none' && newPairKey.trim() !== ''
                         ? newPairKey.trim()
                         : null,
+                    category: createKind === 'doc' && newCategory.trim() !== '' ? newCategory.trim() : null,
+                    level: createKind === 'doc' && newLevel !== '' ? newLevel : null,
                   })
                 }
               }}

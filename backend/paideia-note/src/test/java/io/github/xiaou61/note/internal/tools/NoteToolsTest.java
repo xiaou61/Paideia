@@ -106,11 +106,12 @@ class NoteToolsTest {
 
         @Override
         public long createDoc(long userId, long bookId, Long parentId, String title, String body,
-                              String docType, String pairKey) {
+                              String docType, String pairKey, String category, String level) {
             seenUserIds.add(userId);
             long id = nextId++;
             rows.put(id, new NoteContent(id, title, body, Instant.EPOCH));
-            nodes.add(new NoteNode(id, "doc", parentId, 0, title, null, Instant.EPOCH, docType, pairKey));
+            nodes.add(new NoteNode(id, "doc", parentId, 0, title, null, Instant.EPOCH,
+                    docType, pairKey, category, level));
             return id;
         }
 
@@ -201,5 +202,20 @@ class NoteToolsTest {
 
         assertThat(result.error()).isFalse();
         assertThat(result.text()).contains("doc_type=tutorial").contains("pair_key=A1");
+    }
+
+    @Test
+    void createDocPassesCategoryAndLevel() {
+        ToolResult result = new NoteTools.CreateDoc(notes).call(CALLER, Map.of(
+                "bookId", 1, "title", "A1 教程", "category", "Agent基础概念", "level", "进阶"));
+
+        assertThat(result.error()).isFalse();
+        assertThat(notes.nodes).hasSize(1);
+        assertThat(notes.nodes.get(0).category()).isEqualTo("Agent基础概念");
+        assertThat(notes.nodes.get(0).level()).isEqualTo("进阶");
+
+        ToolResult tree = new NoteTools.GetTree(notes).call(CALLER, Map.of("bookId", 1));
+        assertThat(tree.error()).isFalse();
+        assertThat(tree.text()).contains("category=Agent基础概念").contains("level=进阶");
     }
 }

@@ -90,7 +90,8 @@ public class NoteApiImplementation implements NoteApi {
     public List<NoteNode> tree(long userId, long bookId) {
         return notes.tree(userId, bookId).stream()
                 .map(node -> new NoteNode(node.id(), node.kind(), node.parentId(), node.sortOrder(),
-                        node.title(), node.excerpt(), node.updatedAt(), node.docType(), node.pairKey()))
+                        node.title(), node.excerpt(), node.updatedAt(), node.docType(), node.pairKey(),
+                        node.category(), node.level()))
                 .toList();
     }
 
@@ -112,9 +113,9 @@ public class NoteApiImplementation implements NoteApi {
 
     @Override
     public long createDoc(long userId, long bookId, Long parentId, String title, String body,
-                          String docType, String pairKey) {
+                          String docType, String pairKey, String category, String level) {
         return notes.createNode(userId, bookId, parentId, "doc", title, body == null ? "" : body,
-                docType, pairKey).id();
+                docType, pairKey, category, level).id();
     }
 
     @Override

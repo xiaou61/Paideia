@@ -36,6 +36,10 @@ class Note {
     private String docType;
     /** 学习单元标识；同一知识库内同 pair_key 的两篇（教程+查漏补缺）为一对。 */
     private String pairKey;
+    /** 分类标签（自由文本，≤64）；NULL=未分类。 */
+    private String category;
+    /** 难度评级：入门 / 进阶 / 高级；NULL=未评级。 */
+    private String level;
 
     Long getId() {
         return id;
@@ -155,5 +159,21 @@ class Note {
 
     void setPairKey(String pairKey) {
         this.pairKey = pairKey;
+    }
+
+    String getCategory() {
+        return category;
+    }
+
+    void setCategory(String category) {
+        this.category = category;
+    }
+
+    String getLevel() {
+        return level;
+    }
+
+    void setLevel(String level) {
+        this.level = level;
     }
 }

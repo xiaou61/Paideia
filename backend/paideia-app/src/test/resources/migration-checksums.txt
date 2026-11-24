@@ -61,6 +61,7 @@ src/main/resources/db/migration/V20261124120000__note_books_tree_links.sql 20010
 src/main/resources/db/migration/V20261124130000__note_shares_target_nullable.sql -1757690279
 src/main/resources/db/migration/V20261124153000__note_doc_type_pair.sql 2011671897
 src/main/resources/db/migration/V20261124160000__note_books_visibility_color_tags.sql 409474587
+src/main/resources/db/migration/V20261124170000__add_note_category_level.sql 1040696098
 src/main/resources/db/migration/V20__add_entry_read_indexes.sql -1148086735
 src/main/resources/db/migration/V21__create_ai_telemetry_tables.sql -891669932
 src/main/resources/db/migration/V22__create_learning_tracks.sql -976007377

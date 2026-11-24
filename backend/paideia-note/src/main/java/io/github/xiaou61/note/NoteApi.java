@@ -59,8 +59,14 @@ public interface NoteApi {
     }
 
     /** 新建文档，可带文档类型（tutorial/gap_fill）与学习单元标识 pairKey。 */
+    default long createDoc(long userId, long bookId, Long parentId, String title, String body,
+                           String docType, String pairKey) {
+        return createDoc(userId, bookId, parentId, title, body, docType, pairKey, null, null);
+    }
+
+    /** 新建文档，附带分类（category）与难度（level，入门/进阶/高级）。 */
     long createDoc(long userId, long bookId, Long parentId, String title, String body,
-                   String docType, String pairKey);
+                   String docType, String pairKey, String category, String level);
 
     /** 移动节点（改父与排序）。跨库或成环由内部拒绝。 */
     void move(long userId, long noteId, Long targetParentId, int sortOrder);
@@ -78,7 +84,8 @@ public interface NoteApi {
     }
 
     record NoteNode(long id, String kind, Long parentId, int sortOrder,
-                    String title, String excerpt, Instant updatedAt, String docType, String pairKey) {
+                    String title, String excerpt, Instant updatedAt, String docType, String pairKey,
+                    String category, String level) {
     }
 
     record LinkRef(long noteId, String title) {
