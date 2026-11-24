@@ -21,6 +21,17 @@ class Note {
     /** 只有列表查询会填：正文前 200 字。写入路径不带它。 */
     private String excerpt;
 
+    /** 所属知识库；迁移回填后必有值。 */
+    private Long bookId;
+    /** 节点类型：目录(folder) 还是文档(doc)。 */
+    private String kind = "doc";
+    /** 父节点（NULL=库根）。 */
+    private Long parentId;
+    /** 同级排序。 */
+    private int sortOrder;
+    /** 软删标记（NULL=存活）；删除目录时整棵子树一起置。 */
+    private Instant deletedAt;
+
     Long getId() {
         return id;
     }
@@ -83,5 +94,45 @@ class Note {
 
     public void setExcerpt(String excerpt) {
         this.excerpt = excerpt;
+    }
+
+    Long getBookId() {
+        return bookId;
+    }
+
+    void setBookId(Long bookId) {
+        this.bookId = bookId;
+    }
+
+    String getKind() {
+        return kind;
+    }
+
+    void setKind(String kind) {
+        this.kind = kind;
+    }
+
+    Long getParentId() {
+        return parentId;
+    }
+
+    void setParentId(Long parentId) {
+        this.parentId = parentId;
+    }
+
+    int getSortOrder() {
+        return sortOrder;
+    }
+
+    void setSortOrder(int sortOrder) {
+        this.sortOrder = sortOrder;
+    }
+
+    Instant getDeletedAt() {
+        return deletedAt;
+    }
+
+    void setDeletedAt(Instant deletedAt) {
+        this.deletedAt = deletedAt;
     }
 }

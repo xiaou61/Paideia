@@ -11,55 +11,92 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 /**
- * 笔记的读写。
+ * 笔记（目录/文档）的读写。
  *
- * <p><b>归属写在 SQL 里</b>，与项目其它模块同一纪律：每一条语句都带 {@code user_id}。
- * 笔记是最私有的那种数据（用户自己写的），漏一处就等于把别人的笔记读出去——
- * 写在 WHERE 里就不存在"忘了判断"这条路径。
+ * <p><b>归属写在 SQL 里</b>：每一条语句都带 {@code user_id}。读取用 {@code Optional}，
+ * 拿不到就当"不存在"，**不区分**"没有这条"与"不是你的"。
  *
- * <p>读取用 {@code Optional}：调用方拿不到就当"不存在"，**不区分**"没有这条"与"不是你的"。
- * 区分开就等于确认"某个 id 存在"。
+ * <p>WORK-087 起 notes 承载树结构：{@code book_id / parent_id / kind / sort_order / deleted_at}
+ * 与正文/标题同表。存活判断统一为 {@code deleted_at IS NULL}。
  */
 @Mapper
 interface NoteMapper {
 
     @Insert("""
-            INSERT INTO notes (user_id, entry_id, title, body)
-            VALUES (#{userId}, #{entryId}, #{title}, #{body})
+            INSERT INTO notes (user_id, book_id, kind, parent_id, sort_order, entry_id, title, body)
+            VALUES (#{userId}, #{bookId}, #{kind}, #{parentId}, #{sortOrder}, #{entryId}, #{title}, #{body})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(Note note);
 
     @Select("""
-            SELECT id, user_id, entry_id, title, body, created_at, updated_at
+            SELECT id, user_id, book_id, kind, parent_id, sort_order, entry_id, title, body,
+                   created_at, updated_at, deleted_at
             FROM notes
-            WHERE id = #{id} AND user_id = #{userId}
+            WHERE id = #{id} AND user_id = #{userId} AND deleted_at IS NULL
             """)
     Optional<Note> findByIdAndUser(@Param("id") long id, @Param("userId") long userId);
 
-    /**
-     * 列表带一段**截断的正文**（前 200 字），不带全文。
-     *
-     * <p>原来只给标题，列表里两条"未命名笔记"因此长得一模一样、分不出谁是谁——用户
-     * 2026-10-15 的反馈正是"这里还是太简单了"。摘要与知识库列表同一做法（`LEFT(body, 200)`）：
-     * 长度由 SQL 定，而不是把全文拽回来再在内存里截。
-     */
+    /** 列表带一段**截断的正文**（前 200 字），不带全文。 */
     @Select("""
-            SELECT id, user_id, entry_id, title, LEFT(body, 200) AS excerpt, created_at, updated_at
+            SELECT id, user_id, book_id, kind, parent_id, sort_order, entry_id, title,
+                   LEFT(body, 200) AS excerpt, created_at, updated_at, deleted_at
             FROM notes
-            WHERE user_id = #{userId}
+            WHERE user_id = #{userId} AND deleted_at IS NULL
             ORDER BY updated_at DESC, id DESC
             LIMIT #{limit}
             """)
     List<Note> listByUser(@Param("userId") long userId, @Param("limit") int limit);
 
+    /** 某知识库的全部存活节点（树查询用，由服务层组装成层级）。 */
+    @Select("""
+            SELECT id, user_id, book_id, kind, parent_id, sort_order, entry_id, title,
+                   created_at, updated_at, deleted_at
+            FROM notes
+            WHERE user_id = #{userId} AND book_id = #{bookId} AND deleted_at IS NULL
+            ORDER BY parent_id, sort_order, id
+            """)
+    List<Note> listByBook(@Param("userId") long userId, @Param("bookId") long bookId);
+
     @Update("""
             UPDATE notes
             SET title = #{title}, body = #{body}, entry_id = #{entryId}
-            WHERE id = #{id} AND user_id = #{userId}
+            WHERE id = #{id} AND user_id = #{userId} AND deleted_at IS NULL
             """)
     int update(Note note);
 
+    @Update("""
+            UPDATE notes
+            SET parent_id = #{parentId}, sort_order = #{sortOrder}
+            WHERE id = #{id} AND user_id = #{userId} AND deleted_at IS NULL
+            """)
+    int move(@Param("id") long id,
+             @Param("userId") long userId,
+             @Param("parentId") Long parentId,
+             @Param("sortOrder") int sortOrder);
+
+    /** 软删单个节点。 */
+    @Update("""
+            UPDATE notes SET deleted_at = CURRENT_TIMESTAMP(3)
+            WHERE id = #{id} AND user_id = #{userId} AND deleted_at IS NULL
+            """)
+    int softDelete(@Param("id") long id, @Param("userId") long userId);
+
+    /** 软删一个知识库下的全部节点（删库时连带）。 */
+    @Update("""
+            UPDATE notes SET deleted_at = CURRENT_TIMESTAMP(3)
+            WHERE user_id = #{userId} AND book_id = #{bookId} AND deleted_at IS NULL
+            """)
+    int softDeleteByBook(@Param("userId") long userId, @Param("bookId") long bookId);
+
+    /** 某库存活节点数（上限校验）。 */
+    @Select("""
+            SELECT COUNT(1) FROM notes
+            WHERE user_id = #{userId} AND book_id = #{bookId} AND deleted_at IS NULL
+            """)
+    int countByBook(@Param("userId") long userId, @Param("bookId") long bookId);
+
+    /** 硬删单条（旧扁平删除路径保留）。 */
     @Delete("DELETE FROM notes WHERE id = #{id} AND user_id = #{userId}")
     int deleteByIdAndUser(@Param("id") long id, @Param("userId") long userId);
 }
