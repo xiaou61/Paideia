@@ -20,7 +20,7 @@ import org.apache.ibatis.annotations.Update;
  * 与正文/标题同表。存活判断统一为 {@code deleted_at IS NULL}。
  */
 @Mapper
-interface NoteMapper {
+public interface NoteMapper {
 
     @Insert("""
             INSERT INTO notes (user_id, book_id, kind, parent_id, sort_order, entry_id, title, body)

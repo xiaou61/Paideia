@@ -1,6 +1,7 @@
 package io.github.xiaou61.note.internal.api;
 
 import io.github.xiaou61.note.NoteApi;
+import io.github.xiaou61.note.internal.book.NoteBookService;
 import io.github.xiaou61.note.internal.note.NoteService;
 import java.util.List;
 import java.util.Optional;
@@ -20,9 +21,11 @@ public class NoteApiImplementation implements NoteApi {
     private static final int MAX_LIST = 50;
 
     private final NoteService notes;
+    private final NoteBookService books;
 
-    NoteApiImplementation(NoteService notes) {
+    NoteApiImplementation(NoteService notes, NoteBookService books) {
         this.notes = notes;
+        this.books = books;
     }
 
     @Override
@@ -57,5 +60,17 @@ public class NoteApiImplementation implements NoteApi {
                 : note.body() + "\n\n" + text;
         NoteService.NoteView updated = notes.update(userId, noteId, note.entryId(), note.title(), body);
         return Optional.of(new NoteContent(updated.id(), updated.title(), updated.body(), updated.updatedAt()));
+    }
+
+    @Override
+    public List<BookBrief> listBooks(long userId) {
+        return books.list(userId).stream()
+                .map(book -> new BookBrief(book.id(), book.name(), book.sortOrder(), book.updatedAt()))
+                .toList();
+    }
+
+    @Override
+    public long createBook(long userId, String name, String description) {
+        return books.create(userId, name, description).id();
     }
 }

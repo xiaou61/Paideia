@@ -40,17 +40,18 @@ approver_role: CTO
 
 ## 任务
 
-### TASK-001 | pending | 数据层迁移与实体 Mapper
+### TASK-001 | done | 数据层迁移与实体 Mapper
 
 - 对应：REQ-001/002/006/010/013，AC-001/006/013
 - 依赖：无
 - 新建：`db/migration/V20261124120000__note_books_tree_links.sql`；`internal/book/NoteBook.java`、`NoteBookMapper.java`；`internal/link/NoteLink.java`、`NoteLinkMapper.java`
-- 修改：`internal/note/Note.java`（加 `bookId/parentId/kind/sortOrder/deletedAt`）、`NoteMapper.java`（映射新列 + 基础 SQL）、`internal/share/NoteShareMapper.java`（`target_type/target_id`）
+- 修改：`internal/note/Note.java`（加 `bookId/parentId/kind/sortOrder/deletedAt`）、`NoteMapper.java`（映射新列 + 基础 SQL）；`NoteShareMapper` 本任务不动
 - 测试：迁移用例（存量进「我的笔记」、`note_shares.target_id` 回填、原分享可读）；`scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=ModularityTest,MigrationVersionFormatTest,MigrationChecksumTest,MigrationSeedOverlapTest -Dsurefire.failIfNoSpecifiedTests=false test`
-- 步骤：写迁移（加法+回填+FULLTEXT ngram+note_shares 去 `note_id`）→ 实体/Mapper → 跑迁移与守卫测试
+- 步骤：写迁移（加法+回填+FULLTEXT ngram+note_shares 加 `target_type/target_id` 并**保留 `note_id`**，因 `NoteReportMapper.list` JOIN 依赖它）→ 实体/Mapper → 跑迁移与守卫测试
 - 验证：新库 `test-db.sh` 起飞成功，守卫三件绿
+- 完成记录：2026-11-24 提交 `d831d2d9`；`MigrationVersionFormatTest` / `MigrationChecksumTest` / `MigrationSeedOverlapTest` 绿，`NoteIntegrationTest`+`NoteShareIntegrationTest`+`NoteReportIntegrationTest` 共 14 条绿（Flyway 实跑新迁移，含 FULLTEXT ngram）；`note_books` 不在 devdata 种子表集合。
 
-### TASK-002 | pending | 知识库管理 API
+### TASK-002 | done | 知识库管理 API
 
 - 对应：REQ-001，AC-001
 - 依赖：TASK-001
@@ -59,8 +60,9 @@ approver_role: CTO
 - 测试：`NoteBookServiceTest`（上限/软删连带/三态）；`AuthorizationIsolationTest` 覆盖新端点
 - 步骤：Service（上限 `MAX_BOOKS_PER_USER=100`）→ 控制器 → 隔离用例
 - 验证：本人可见、他人 404、匿名 401
+- 完成记录：`internal/book/NoteBookService.java`（list/create/update/softDelete/requireOwned/ensureDefaultBook）+ `internal/web/NoteBookController.java`（`/api/v1/note-books` CRUD + `/{id}/tree`）+ `NoteApi.listBooks/createBook`；`NoteTreeIntegrationTest#bookIsolationAndCascade` 覆盖他人 404/匿名 401。
 
-### TASK-003 | pending | 文档树 CRUD 与防成环
+### TASK-003 | done | 文档树 CRUD 与防成环
 
 - 对应：REQ-002/003，AC-002/003
 - 依赖：TASK-001
@@ -69,6 +71,7 @@ approver_role: CTO
 - 测试：`NoteServiceTest`（成环拒绝、深度上限、软删子树、标题必填正文可空）
 - 步骤：树查询 → 建/改 → 移动防成环 → 软删子树 → 控制器
 - 验证：`PUT /notes/{id}/move` 到自身/子孙返回业务错误；删除父节点后子节点不可见
+- 完成记录：`NoteService.createNode/createFolder/updateDoc/move/softDeleteNode/tree`（`MAX_DOC_BODY_CHARS=200000`、`MAX_NODES_PER_BOOK=5000`、`MAX_TREE_DEPTH=32`）+ `NoteController`（POST 扩 `bookId/parentId/kind`、`PUT /{id}/move`）；`NoteTreeIntegrationTest` 3 条绿（防成环、跨库 404、删目录连带子树）。
 
 ### TASK-004 | pending | 全文检索
 

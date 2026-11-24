@@ -35,9 +35,18 @@ public interface NoteApi {
      */
     Optional<NoteContent> append(long userId, long noteId, String text);
 
+    /** 本人的知识库列表（不含正文）。 */
+    List<BookBrief> listBooks(long userId);
+
+    /** 新建一个知识库，返回新 id。 */
+    long createBook(long userId, String name, String description);
+
     record NoteBrief(long id, String title, String excerpt, Instant updatedAt) {
     }
 
     record NoteContent(long id, String title, String body, Instant updatedAt) {
+    }
+
+    record BookBrief(long id, String name, int sortOrder, Instant updatedAt) {
     }
 }
