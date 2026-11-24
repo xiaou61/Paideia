@@ -32,7 +32,7 @@ class PublicShareController {
     }
 
     @GetMapping("/{shareId}")
-    ResponseEntity<ApiResponse<ShareService.SharedNoteView>> read(@PathVariable("shareId") String shareId) {
+    ResponseEntity<ApiResponse<ShareService.SharedView>> read(@PathVariable("shareId") String shareId) {
         return shares.read(shareId)
                 .map(view -> ResponseEntity.ok(ApiResponse.ok(view)))
                 // 手写 404（而不是抛异常）是有意的：全局异常处理会带上 traceId 之类的运行信息，

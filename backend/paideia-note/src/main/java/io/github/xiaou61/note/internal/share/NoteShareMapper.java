@@ -26,13 +26,23 @@ import org.apache.ibatis.annotations.Update;
 interface NoteShareMapper {
 
     @Insert("""
-            INSERT INTO note_shares (share_id, note_id, user_id, expires_at)
-            VALUES (#{shareId}, #{noteId}, #{userId}, #{expiresAt})
+            INSERT INTO note_shares (share_id, note_id, target_type, target_id, user_id, expires_at)
+            VALUES (#{shareId}, #{noteId}, 'note', #{noteId}, #{userId}, #{expiresAt})
             """)
     int insert(@Param("shareId") String shareId,
                @Param("noteId") long noteId,
                @Param("userId") long userId,
                @Param("expiresAt") Instant expiresAt);
+
+    /** 整库分享：没有单篇 note_id，只有 target_type='book' 与 target_id=bookId。 */
+    @Insert("""
+            INSERT INTO note_shares (share_id, note_id, target_type, target_id, user_id, expires_at)
+            VALUES (#{shareId}, NULL, 'book', #{bookId}, #{userId}, #{expiresAt})
+            """)
+    int insertBook(@Param("shareId") String shareId,
+                   @Param("bookId") long bookId,
+                   @Param("userId") long userId,
+                   @Param("expiresAt") Instant expiresAt);
 
     /**
      * 读一条**仍然有效**的分享连同笔记正文。
@@ -43,12 +53,28 @@ interface NoteShareMapper {
     @Select("""
             SELECT n.title, n.body, n.entry_id
             FROM note_shares s
-            JOIN notes n ON n.id = s.note_id
+            JOIN notes n ON n.id = s.target_id AND s.target_type = 'note'
             WHERE s.share_id = #{shareId}
               AND s.revoked_at IS NULL
               AND s.expires_at > #{now}
             """)
     Optional<SharedNote> findValid(@Param("shareId") String shareId, @Param("now") Instant now);
+
+    /**
+     * 读一条**仍然有效**的整库分享，返回库名与分享者（用于限定遍历范围）。
+     *
+     * <p>同样一次 join 取回；这里多取 {@code user_id} 不是为了展示，而是让后续"遍历哪些文档"
+     * 被钉死在分享者本人，杜绝读到别人在同一 bookId 下的数据。
+     */
+    @Select("""
+            SELECT b.id AS book_id, b.name AS name, s.user_id AS user_id
+            FROM note_shares s
+            JOIN note_books b ON b.id = s.target_id AND s.target_type = 'book'
+            WHERE s.share_id = #{shareId}
+              AND s.revoked_at IS NULL
+              AND s.expires_at > #{now}
+            """)
+    Optional<SharedBook> findValidBook(@Param("shareId") String shareId, @Param("now") Instant now);
 
     /**
      * 某条笔记**当前有效**的分享 id（本人）。
@@ -65,6 +91,19 @@ interface NoteShareMapper {
             ORDER BY created_at DESC
             """)
     List<String> findActiveForNote(@Param("noteId") long noteId,
+                                   @Param("userId") long userId,
+                                   @Param("now") Instant now);
+
+    /** 某个知识库当前有效的分享 id（本人）。 */
+    @Select("""
+            SELECT share_id
+            FROM note_shares
+            WHERE target_type = 'book' AND target_id = #{bookId} AND user_id = #{userId}
+              AND revoked_at IS NULL
+              AND expires_at > #{now}
+            ORDER BY created_at DESC
+            """)
+    List<String> findActiveForBook(@Param("bookId") long bookId,
                                    @Param("userId") long userId,
                                    @Param("now") Instant now);
 
@@ -113,6 +152,38 @@ interface NoteShareMapper {
 
         public void setEntryId(Long entryId) {
             this.entryId = entryId;
+        }
+    }
+
+    /** 整库分享读取的最小投影：库 id、库名、分享者。 */
+    class SharedBook {
+
+        private Long bookId;
+        private String name;
+        private Long userId;
+
+        public Long getBookId() {
+            return bookId;
+        }
+
+        public void setBookId(Long bookId) {
+            this.bookId = bookId;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public Long getUserId() {
+            return userId;
+        }
+
+        public void setUserId(Long userId) {
+            this.userId = userId;
         }
     }
 }

@@ -40,10 +40,12 @@ interface NoteReportMapper {
 
     /** 管理端列表：待处理在前，同状态内早的在前。带上笔记标题，好判断该看哪条。 */
     @Select("""
-            SELECT r.id, r.share_id, r.reason, r.status, r.created_at, n.title
+            SELECT r.id, r.share_id, r.reason, r.status, r.created_at,
+                   COALESCE(n.title, b.name) AS title
             FROM note_reports r
             LEFT JOIN note_shares s ON s.share_id = r.share_id
-            LEFT JOIN notes n ON n.id = s.note_id
+            LEFT JOIN notes n ON s.target_type = 'note' AND n.id = s.target_id
+            LEFT JOIN note_books b ON s.target_type = 'book' AND b.id = s.target_id
             WHERE #{status} IS NULL OR r.status = #{status}
             ORDER BY (r.status = 'pending') DESC, r.created_at ASC
             LIMIT #{limit}

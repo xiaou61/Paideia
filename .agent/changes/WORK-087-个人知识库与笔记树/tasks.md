@@ -106,14 +106,14 @@ approver_role: CTO
 - 验证：含 `../` 的 zip 被拒并回滚；正常 `.md` 包导入成树
 - 完成记录：`NoteImportExportService` + `NoteBookController`（`GET /{id}/export`、`POST /{id}/import/zip`、`POST /{id}/import/markdown`）+ `NoteController`（`GET /{id}/export`）；集成测试 1 条绿（含 zip slip 400）。
 
-### TASK-007 | pending | 分享扩展（单篇 + 整库）
+### TASK-007 | done | 分享扩展（单篇 + 整库）
 
 - 对应：REQ-010，AC-010
 - 依赖：TASK-001/003
-- 修改：`share/NoteShareMapper.java`（`findValidNote/findValidBook`）、`share/ShareService.java`（`shareNote/shareBook/read` 分支）、`web/NoteShareController.java`（`/note-books/{id}/share|shares`）、`web/PublicShareController.java`（判别联合）
-- 测试：`ShareServiceTest`（整库只遍历被分享库、到期/撤回/下架失效、单篇回归）
+- 修改：`share/NoteShareMapper.java`（`findValid/findValidBook/findActiveForBook`）、`share/ShareService.java`（`shareBook/activeBookShares/read` 判别）、`web/NoteShareController.java`（`/note-books/{id}/share|shares`）、`web/PublicShareController.java`（`SharedView` 联合）
 - 步骤：mapper → service 分支 → 控制器 → 公开读取判别
 - 验证：整库分享链接能浏览整棵树，且不含其它库/用户文档
+- 完成记录：新增迁移 `V20261124130000__note_shares_target_nullable.sql`（note_id 放宽为可空，支撑整库分享）；`SharedView(type,title,body,entryId,documents)` + 嵌套 `SharedBookNode`；`NoteMapper.listShareDocs(userId,bookId)` 按分享者身份限定；`NoteReportMapper.list` 标题 `COALESCE(n.title,b.name)`。测试 `NoteBookShareIntegrationTest` 3 条绿（整库只含本人文档+撤回404、单篇回归+跨用户404、到期404）。
 
 ### TASK-008 | pending | 注销级联扩表
 

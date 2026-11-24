@@ -56,6 +56,18 @@ class NoteShareController {
         return ApiResponse.ok(true);
     }
 
+    /** 生成一条整库分享链接的 id。 */
+    @PostMapping("/note-books/{id}/share")
+    ApiResponse<String> shareBook(@PathVariable("id") long bookId) {
+        return ApiResponse.ok(shares.shareBook(requireUserId(), bookId));
+    }
+
+    /** 我在这个知识库上还有效的分享 id。 */
+    @GetMapping("/note-books/{id}/shares")
+    ApiResponse<List<String>> activeBookShares(@PathVariable("id") long bookId) {
+        return ApiResponse.ok(shares.activeBookShares(requireUserId(), bookId));
+    }
+
     private static long requireUserId() {
         return CurrentUser.userId();
     }

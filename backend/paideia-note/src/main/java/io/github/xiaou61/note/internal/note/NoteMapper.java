@@ -142,4 +142,68 @@ public interface NoteMapper {
     /** 硬删单条（旧扁平删除路径保留）。 */
     @Delete("DELETE FROM notes WHERE id = #{id} AND user_id = #{userId}")
     int deleteByIdAndUser(@Param("id") long id, @Param("userId") long userId);
+
+    /**
+     * 整库分享读取用：被分享库内全部存活节点（含正文）。
+     *
+     * <p>按 {@code user_id}（分享者本人，来自分享记录）+ {@code book_id} 双限定，
+     * 这是"整库分享只能遍历被分享者该库内文档"的硬保证——分享端点没有身份可兜底。
+     */
+    @Select("""
+            SELECT id, parent_id, kind, title, body
+            FROM notes
+            WHERE user_id = #{userId} AND book_id = #{bookId} AND deleted_at IS NULL
+            ORDER BY sort_order, id
+            """)
+    List<ShareDocRow> listShareDocs(@Param("userId") long userId, @Param("bookId") long bookId);
+
+    /** 整库分享的扁平行。只带渲染需要的字段，不含任何用户身份。 */
+    class ShareDocRow {
+
+        private Long id;
+        private Long parentId;
+        private String kind;
+        private String title;
+        private String body;
+
+        public Long getId() {
+            return id;
+        }
+
+        public void setId(Long id) {
+            this.id = id;
+        }
+
+        public Long getParentId() {
+            return parentId;
+        }
+
+        public void setParentId(Long parentId) {
+            this.parentId = parentId;
+        }
+
+        public String getKind() {
+            return kind;
+        }
+
+        public void setKind(String kind) {
+            this.kind = kind;
+        }
+
+        public String getTitle() {
+            return title;
+        }
+
+        public void setTitle(String title) {
+            this.title = title;
+        }
+
+        public String getBody() {
+            return body;
+        }
+
+        public void setBody(String body) {
+            this.body = body;
+        }
+    }
 }

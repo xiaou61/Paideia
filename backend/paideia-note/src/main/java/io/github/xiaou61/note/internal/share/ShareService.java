@@ -1,10 +1,16 @@
 package io.github.xiaou61.note.internal.share;
 
 import io.github.xiaou61.note.internal.note.NoteService;
+import io.github.xiaou61.note.internal.note.NoteMapper;
+import io.github.xiaou61.note.internal.book.NoteBookService;
 import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -38,15 +44,31 @@ public class ShareService {
     private final NoteShareMapper shares;
     private final NoteReportMapper reports;
     private final NoteService notes;
+    private final NoteMapper noteMapper;
+    private final NoteBookService books;
 
-    ShareService(NoteShareMapper shares, NoteReportMapper reports, NoteService notes) {
+    ShareService(NoteShareMapper shares, NoteReportMapper reports, NoteService notes,
+                 NoteMapper noteMapper, NoteBookService books) {
         this.shares = shares;
         this.reports = reports;
         this.notes = notes;
+        this.noteMapper = noteMapper;
+        this.books = books;
     }
 
-    /** 对外形状：**只有这三样**，没有作者、没有时间、没有 id。 */
-    public record SharedNoteView(String title, String body, Long entryId) {
+    /**
+     * 免鉴权只读产物。单篇与整库统一成一个形状：{@code type} 区分（{@code note}/{@code book}）。
+     *
+     * <p>单篇：{@code title/body/entryId} 有值、{@code documents=null}；
+     * 整库：{@code title=库名}、{@code documents} 为嵌套树、{@code body=null}。
+     * 无论哪种都**不含**作者、时间、内部 id 或任何学习痕迹。
+     */
+    public record SharedView(String type, String title, String body, Long entryId,
+                             List<SharedBookNode> documents) {
+    }
+
+    /** 整库分享的嵌套节点：目录/文档都可能有 children。不含内部 id。 */
+    public record SharedBookNode(String kind, String title, String body, List<SharedBookNode> children) {
     }
 
     @Transactional
@@ -58,11 +80,26 @@ public class ShareService {
         return shareId;
     }
 
+    /** 整库分享：先确认库是本人的（否则 404），再生成 id。 */
+    @Transactional
+    public String shareBook(long userId, long bookId) {
+        books.requireOwned(userId, bookId);
+        String shareId = UUID.randomUUID().toString();
+        shares.insertBook(shareId, bookId, userId, Instant.now().plus(TTL));
+        return shareId;
+    }
+
     /** 某条笔记当前有效的分享 id（本人）。界面据此告诉用户"现在撤的是一条已发出的链接"。 */
     public java.util.List<String> activeShares(long userId, long noteId) {
         // 先确认笔记是本人的：不是本人的笔记连"它有没有被分享过"都不该答
         notes.read(userId, noteId);
         return shares.findActiveForNote(noteId, userId, Instant.now());
+    }
+
+    /** 某个知识库当前有效的分享 id（本人）。 */
+    public List<String> activeBookShares(long userId, long bookId) {
+        books.requireOwned(userId, bookId);
+        return shares.findActiveForBook(bookId, userId, Instant.now());
     }
 
     /** 撤回。删不到（不是本人的、已失效）就报 404——同样不确认它是否存在。 */
@@ -78,15 +115,43 @@ public class ShareService {
      *
      * <p>过期与撤回都在 SQL 里判，所以这里拿到的要么是有效内容、要么什么也没有。
      */
-    public Optional<SharedNoteView> read(String shareId) {
+    public Optional<SharedView> read(String shareId) {
         if (shareId == null || shareId.isBlank()) {
             return Optional.empty();
         }
-        return shares.findValid(shareId, Instant.now())
-                .map(note -> new SharedNoteView(
-                        note.getTitle(),
-                        note.getBody() == null ? "" : note.getBody(),
-                        note.getEntryId()));
+        Instant now = Instant.now();
+        Optional<SharedView> note = shares.findValid(shareId, now)
+                .map(n -> new SharedView("note", n.getTitle(),
+                        n.getBody() == null ? "" : n.getBody(), n.getEntryId(), null));
+        if (note.isPresent()) {
+            return note;
+        }
+        return shares.findValidBook(shareId, now)
+                .map(book -> new SharedView("book", book.getName(), null, null,
+                        buildTree(noteMapper.listShareDocs(book.getUserId(), book.getBookId()))));
+    }
+
+    /** 把扁平行组装成嵌套树；根是 parentId 为空的节点。顺序沿用 SQL 的 sort_order。 */
+    private static List<SharedBookNode> buildTree(List<NoteMapper.ShareDocRow> rows) {
+        Map<Long, List<NoteMapper.ShareDocRow>> byParent = new LinkedHashMap<>();
+        for (NoteMapper.ShareDocRow row : rows) {
+            byParent.computeIfAbsent(row.getParentId(), k -> new ArrayList<>()).add(row);
+        }
+        return buildChildren(null, byParent);
+    }
+
+    private static List<SharedBookNode> buildChildren(Long parentId, Map<Long, List<NoteMapper.ShareDocRow>> byParent) {
+        List<NoteMapper.ShareDocRow> children = byParent.get(parentId);
+        if (children == null) {
+            return List.of();
+        }
+        List<SharedBookNode> nodes = new ArrayList<>(children.size());
+        for (NoteMapper.ShareDocRow row : children) {
+            nodes.add(new SharedBookNode(row.getKind(), row.getTitle(),
+                    row.getBody() == null ? "" : row.getBody(),
+                    buildChildren(row.getId(), byParent)));
+        }
+        return nodes;
     }
 
     /**
