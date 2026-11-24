@@ -2,6 +2,7 @@ package io.github.xiaou61;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import com.jayway.jsonpath.JsonPath;
@@ -24,6 +25,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -89,10 +91,11 @@ class NoteImportExportIntegrationTest {
 
         // 导入到新库
         long targetBook = createBook(user, "导入库");
-        MvcResult imported = mockMvc.perform(post("/api/v1/note-books/" + targetBook + "/import/zip")
-                        .header("Authorization", token(user))
-                        .contentType("application/zip")
-                        .content(zip)).andReturn();
+        MvcResult imported = mockMvc.perform(
+                        multipart("/api/v1/note-books/" + targetBook + "/import/zip")
+                                .file(new MockMultipartFile("file", "notes.zip", "application/zip", zip))
+                                .header("Authorization", token(user)))
+                .andReturn();
         assertThat(imported.getResponse().getStatus()).as("响应：%s", body(imported)).isEqualTo(200);
         assertThat(((Number) JsonPath.read(body(imported), "$.data.documents")).intValue()).isGreaterThanOrEqualTo(1);
 
@@ -103,10 +106,11 @@ class NoteImportExportIntegrationTest {
 
         // zip slip 被拒
         byte[] evil = zipOf(Map.of("../evil.md", "坏东西"));
-        MvcResult rejected = mockMvc.perform(post("/api/v1/note-books/" + targetBook + "/import/zip")
-                        .header("Authorization", token(user))
-                        .contentType("application/zip")
-                        .content(evil)).andReturn();
+        MvcResult rejected = mockMvc.perform(
+                        multipart("/api/v1/note-books/" + targetBook + "/import/zip")
+                                .file(new MockMultipartFile("file", "evil.zip", "application/zip", evil))
+                                .header("Authorization", token(user)))
+                .andReturn();
         assertThat(rejected.getResponse().getStatus()).isEqualTo(400);
     }
 

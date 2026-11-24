@@ -208,21 +208,22 @@ export function createNotesApi(client: ApiClient): NotesApi {
     links: (id) => client.requestEnvelope<NoteLinks>(`${base}/${id}/links`),
     exportDocBlob: (id) => download(`${base}/${id}/export`),
     exportBookBlob: (bookId) => download(`${bookBase}/${bookId}/export`),
-    importZip: (bookId, file) =>
-      client.requestEnvelope<ImportResult>(`${bookBase}/${bookId}/import/zip`, {
+    importZip: (bookId, file) => {
+      const form = new FormData()
+      form.append('file', file)
+      return client.requestEnvelope<ImportResult>(`${bookBase}/${bookId}/import/zip`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/octet-stream' },
-        body: file,
-      }),
-    importMarkdown: (bookId, title, text) =>
-      client.requestEnvelope<ImportResult>(
+        body: form,
+      })
+    },
+    importMarkdown: (bookId, title, text) => {
+      const form = new FormData()
+      form.append('file', new Blob([text], { type: 'text/markdown' }), 'note.md')
+      return client.requestEnvelope<ImportResult>(
         `${bookBase}/${bookId}/import/markdown?title=${encodeURIComponent(title)}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/markdown' },
-          body: text,
-        },
-      ),
+        { method: 'POST', body: form },
+      )
+    },
     shareBook: (bookId) =>
       client.requestEnvelope<string>(`${bookBase}/${bookId}/share`, { method: 'POST' }),
     activeBookShares: (bookId) =>

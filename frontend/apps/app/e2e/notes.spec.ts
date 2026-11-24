@@ -2,6 +2,12 @@ import { expect, test, type Page } from '@playwright/test'
 
 import { clickNav, signIn } from './session'
 
+/** 主入口 /notes 现在是知识库列表；旧的扁平"全部笔记"挪到 /notes/all，这里统一进入。 */
+async function openLegacyNotes(page: Page): Promise<void> {
+  await clickNav(page, 'learner-nav-notes')
+  await page.goto('/#/notes/all')
+}
+
 /**
  * 我的笔记（AC-010 的界面一半）。
  *
@@ -28,14 +34,14 @@ async function createNote(page: Page, title: string, body: string): Promise<void
   }
   await page.getByTestId('new-note-create').click()
   // 回到列表页，并且刚建的那条已经打开
-  await expect(page).toHaveURL(/#\/notes$/)
+  await expect(page).toHaveURL(/#\/notes\/all$/)
   await expect(page.getByTestId('note-title')).toHaveValue(title)
 }
 
 test('新建走独立页：建档→改一次并保存→重载仍在→删除', async ({ page }) => {
   await signIn(page)
   // 入口在主导航里（"某个页面忘了加入口"是 2026-10-12 修过的真缺陷，这里顺带钉住）
-  await clickNav(page, 'learner-nav-notes')
+  await openLegacyNotes(page)
   await expect(page.getByTestId('notes-placeholder')).toBeVisible()
 
   const title = `e2e 笔记 ${Date.now()}`
@@ -58,7 +64,7 @@ test('新建走独立页：建档→改一次并保存→重载仍在→删除',
 
   // 重新加载：内容是从库里读回来的，不是内存里的草稿
   await page.reload()
-  await clickNav(page, 'learner-nav-notes')
+  await openLegacyNotes(page)
   await page.getByTestId('notes-list').getByText(title).click()
   await expect(page.getByTestId('note-body')).toHaveValue('正文第二版')
 
@@ -73,7 +79,7 @@ test('新建走独立页：建档→改一次并保存→重载仍在→删除',
 
 test('新建页能预览 markdown；详情里改没改说得清', async ({ page }) => {
   await signIn(page)
-  await clickNav(page, 'learner-nav-notes')
+  await openLegacyNotes(page)
 
   const title = `e2e 状态 ${Date.now()}`
   await page.getByTestId('notes-create').click()
@@ -119,7 +125,7 @@ test('新建时可以把笔记挂到一条知识库条目上', async ({ page }) 
   const entryTitle = (await page.getByTestId('entry-list').locator('[data-testid=entry-title]').first().innerText()).trim()
   expect(entryTitle).not.toBe('')
 
-  await clickNav(page, 'learner-nav-notes')
+  await openLegacyNotes(page)
   const title = `e2e 挂靠 ${Date.now()}`
   await page.getByTestId('notes-create').click()
   await page.getByTestId('new-note-title').fill(title)
@@ -143,7 +149,7 @@ test('新建时可以把笔记挂到一条知识库条目上', async ({ page }) 
 
 test('分享：链接免登录可读，撤回后立刻失效', async ({ page, browser }) => {
   await signIn(page)
-  await clickNav(page, 'learner-nav-notes')
+  await openLegacyNotes(page)
 
   const title = `e2e 分享 ${Date.now()}`
   await createNote(page, title, '分享出去的正文')
@@ -181,7 +187,7 @@ test('分享：链接免登录可读，撤回后立刻失效', async ({ page, br
 
 test('带着未保存的改动切走，会先问一句而不是静默丢掉', async ({ page }) => {
   await signIn(page)
-  await clickNav(page, 'learner-nav-notes')
+  await openLegacyNotes(page)
 
   const kept = `e2e 拦截A ${Date.now()}`
   await createNote(page, kept, '先保存下来的那条')
@@ -217,12 +223,12 @@ test('带着未保存的改动切走，会先问一句而不是静默丢掉', as
 
 test('新建页没写东西就能直接返回；写了东西才拦一下', async ({ page }) => {
   await signIn(page)
-  await clickNav(page, 'learner-nav-notes')
+  await openLegacyNotes(page)
 
   // 空着返回：不该多问一句
   await page.getByTestId('notes-create').click()
   await page.getByTestId('new-note-back').click()
-  await expect(page).toHaveURL(/#\/notes$/)
+  await expect(page).toHaveURL(/#\/notes\/all$/)
   await expect(page.getByTestId('new-note-discard')).toHaveCount(0)
 
   // 写了内容再取消：先拦一下，且"继续写"要能回到编辑状态
@@ -239,7 +245,7 @@ test('新建页没写东西就能直接返回；写了东西才拦一下', async
   expect(before.startsWith('e2e 丢弃')).toBe(true)
   await page.getByTestId('new-note-cancel').click()
   await page.getByTestId('new-note-discard-confirm').click()
-  await expect(page).toHaveURL(/#\/notes$/)
+  await expect(page).toHaveURL(/#\/notes\/all$/)
   /**
    * 断言落在**整页**而不是 `notes-list`。
    *
@@ -268,7 +274,7 @@ test('AI 提炼要点：点一次列出要点（接口打桩）', async ({ page 
     })
   })
 
-  await page.goto('/#/notes')
+  await page.goto('/#/notes/all')
   await expect(page.getByTestId('notes-create')).toBeVisible()
   await createNote(page, `e2e AI 要点 ${Date.now()}`, '正文里写了边界条件和空列表')
   await page.getByTestId('note-ai-points').click()

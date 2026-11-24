@@ -6,6 +6,7 @@ import io.github.xiaou61.note.internal.note.NoteService;
 import io.github.xiaou61.platform.ApiAccess;
 import io.github.xiaou61.platform.ApiResponse;
 import io.github.xiaou61.security.CurrentUser;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.springframework.http.MediaType;
@@ -18,7 +19,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 知识库端点。全部是**本人范围**：没有"读别人知识库"的路径。
@@ -81,22 +84,21 @@ class NoteBookController {
     }
 
     /** 导入 zip（按包内相对路径还原目录树）。 */
-    @PostMapping(value = "/{id}/import/zip",
-            consumes = {MediaType.APPLICATION_OCTET_STREAM_VALUE, "application/zip"})
+    @PostMapping(value = "/{id}/import/zip", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     ApiResponse<NoteImportExportService.ImportResult> importZip(@PathVariable("id") long id,
-                                                               @RequestBody byte[] zipBytes) {
-        return ApiResponse.ok(transfer.importZip(requireUserId(), id, zipBytes));
+                                                               @RequestPart("file") MultipartFile file)
+            throws IOException {
+        return ApiResponse.ok(transfer.importZip(requireUserId(), id, file.getBytes()));
     }
 
     /** 导入单篇 Markdown 到库根。 */
-    @PostMapping(value = "/{id}/import/markdown",
-            consumes = {MediaType.TEXT_MARKDOWN_VALUE, MediaType.TEXT_PLAIN_VALUE})
+    @PostMapping(value = "/{id}/import/markdown", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     ApiResponse<NoteImportExportService.ImportResult> importMarkdown(
             @PathVariable("id") long id,
             @RequestParam(name = "title", required = false) String title,
-            @RequestBody(required = false) String markdown) {
-        return ApiResponse.ok(transfer.importMarkdown(requireUserId(), id, title,
-                markdown == null ? "" : markdown));
+            @RequestPart(name = "file", required = false) MultipartFile file) throws IOException {
+        String markdown = file == null ? "" : new String(file.getBytes(), StandardCharsets.UTF_8);
+        return ApiResponse.ok(transfer.importMarkdown(requireUserId(), id, title, markdown));
     }
 
     private static long requireUserId() {

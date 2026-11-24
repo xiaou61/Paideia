@@ -28,6 +28,7 @@ export function DocEditor({
       <div className="flex items-center gap-2 border-b border-border px-4 py-3">
         <Input
           aria-label="文档标题"
+          data-testid="doc-title"
           className="h-9 flex-1 border-0 text-lg font-semibold shadow-none focus-visible:ring-0"
           value={title}
           onChange={(event) => onTitle(event.target.value)}
@@ -36,7 +37,7 @@ export function DocEditor({
         <Button variant="ghost" size="sm" onClick={onExport}>
           导出 .md
         </Button>
-        <Button size="sm" onClick={onSave} disabled={saving || !dirty}>
+        <Button size="sm" data-testid="doc-save" onClick={onSave} disabled={saving || !dirty}>
           {saving ? '保存中…' : dirty ? '保存' : '已保存'}
         </Button>
       </div>
