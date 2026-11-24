@@ -72,7 +72,7 @@ export function DocEditor({
         </Button>
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
-        <div className="mx-auto w-full max-w-4xl px-5 py-6">
+        <div className={zen ? 'w-full px-8 py-8' : 'mx-auto w-full max-w-4xl px-5 py-6'}>
           <MarkdownField
             testIdPrefix="note-doc"
             value={body}
@@ -81,6 +81,7 @@ export function DocEditor({
             onUpload={onUpload}
             slashCommands
             defaultTab="preview"
+            previewOnly={zen}
             rows={24}
           />
         </div>

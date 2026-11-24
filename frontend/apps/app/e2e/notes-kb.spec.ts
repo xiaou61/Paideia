@@ -62,6 +62,25 @@ test('知识库：建库→建文档→编辑保存→大纲与检索', async ({
   await deleteBook(page, book)
 })
 
+test('纯净预览铺满：隐藏标签栏且正文接近全宽', async ({ page }) => {
+  await signIn(page)
+  const book = await createBook(page)
+  const title = await createDoc(page, book)
+
+  await page.getByTestId('note-doc-tab-edit').click()
+  await page.getByTestId('note-doc-body').fill('# 铺满测试\n\n正文')
+  await page.getByTestId('doc-save').click()
+  await page.getByRole('button', { name: '纯净预览' }).click()
+
+  await expect(page.getByTestId('note-doc-tab-preview')).toHaveCount(0)
+  const body = page.getByTestId('markdown-body')
+  await expect(body).toBeVisible()
+  const box = await body.boundingBox()
+  expect(box?.width ?? 0).toBeGreaterThan(900)
+
+  await deleteBook(page, book)
+})
+
 test('教程与查漏补缺：同标识成对，可一键补建', async ({ page }) => {
   await signIn(page)
   const book = await createBook(page)

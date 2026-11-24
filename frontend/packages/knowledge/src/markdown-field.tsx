@@ -51,6 +51,7 @@ export function MarkdownField({
   onUpload,
   slashCommands = false,
   defaultTab = 'edit',
+  previewOnly = false,
 }: {
   value: string
   onChange: (next: string) => void
@@ -65,6 +66,8 @@ export function MarkdownField({
   slashCommands?: boolean
   /** 初始标签页，默认"编辑"；阅读为主的场景可传 "preview" 默认展示预览。 */
   defaultTab?: 'edit' | 'preview'
+  /** 纯预览：不渲染标签栏与工具栏，只显示排版结果（用于纯净预览/阅读模式）。 */
+  previewOnly?: boolean
 }) {
   const [tab, setTab] = useState(defaultTab)
   const [uploading, setUploading] = useState(false)
@@ -183,6 +186,20 @@ export function MarkdownField({
     { label: '</>', testId: 'code', before: '```\n', after: '\n```' },
     { label: '链接', testId: 'link', before: '[', after: '](https://)' },
   ]
+
+  if (previewOnly) {
+    return (
+      <div className="w-full" data-testid={`${testIdPrefix}-preview`}>
+        {value.trim() === '' ? (
+          <p className="text-muted-foreground py-6 text-sm" data-testid={`${testIdPrefix}-preview-empty`}>
+            还没有正文。
+          </p>
+        ) : (
+          <MarkdownBody markdown={value} mediaBaseUrl={mediaBaseUrl} />
+        )}
+      </div>
+    )
+  }
 
   return (
     <Tabs
