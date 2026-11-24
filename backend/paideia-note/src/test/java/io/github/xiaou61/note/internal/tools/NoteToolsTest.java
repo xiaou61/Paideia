@@ -63,6 +63,27 @@ class NoteToolsTest {
             rows.put(noteId, updated);
             return Optional.of(updated);
         }
+
+        @Override
+        public List<NoteBrief> search(long userId, String keyword, int limit) {
+            seenUserIds.add(userId);
+            return rows.values().stream()
+                    .limit(limit)
+                    .map(note -> new NoteBrief(note.id(), note.title(), note.body(), note.updatedAt()))
+                    .toList();
+        }
+
+        @Override
+        public List<BookBrief> listBooks(long userId) {
+            seenUserIds.add(userId);
+            return List.of();
+        }
+
+        @Override
+        public long createBook(long userId, String name, String description) {
+            seenUserIds.add(userId);
+            return nextId++;
+        }
     }
 
     private final FakeNotes notes = new FakeNotes();

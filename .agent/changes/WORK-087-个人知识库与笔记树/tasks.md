@@ -83,15 +83,17 @@ approver_role: CTO
 - 验证：搜「知识」命中正文含该词的本人文档，他人文档不出现
 - 完成记录：复用 `paideia-platform/SearchQuery`（normalize/booleanMode/likePattern）；`NoteSearchIntegrationTest` 绿（多字「倒排索引」命中、单字「索」回退 LIKE 命中、无关词为空、空白为空、跨用户不命中、匿名 401）。
 
-### TASK-005 | pending | 双链解析与反链
+### TASK-005 | done | 双链解析与反链
 
 - 对应：REQ-006，AC-006
 - 依赖：TASK-001/003
 - 新建：`internal/link/NoteLinkService.java`
-- 修改：`NoteService.updateDoc`（保存后同事务 `rebuild`）、`NoteController` `GET /{id}/links`、`NoteApi.links`
-- 测试：`NoteLinkServiceTest`（`[[标题]]`/`[[id:123]]` 解析、悬空、重建幂等）
+- 修改：`NoteService`（create/createNode/update/updateDoc 保存后同事务 `rebuild`；软删时清理出链）、`NoteController` `GET /{id}/links`、`NoteMapper.findDocIdByTitle/findDocTitleById`
+- 测试：`NoteLinkIntegrationTest`（`[[标题]]`/`[[id:123]]` 解析、悬空、自引用忽略、去重、入链、他人 404）
 - 步骤：正则解析 → 解析目标 → 重建 → 出链/入链查询 → 控制器
 - 验证：A 文引用 B 后，B 的反链出现 A，A 的出链出现 B；B 删除后 A 出链标悬空
+- 完成记录：`NoteLinkService`（正则 `\[\[([^\]]+)\]\]`、MAX_LINKS=200、`[[id:N]]` 按 id、`[[标题]]` 同库标题、自引用/重复忽略、悬空保留标题）；`NoteLinkIntegrationTest` 1 条绿（出链去重+悬空、入链、自引用清空、他人 404）。
+- 偏差：未把 `links` 加到 `NoteApi`（MCP 侧暂无消费方），仅控制器暴露；如 TASK-009 需要再补。
 
 ### TASK-006 | pending | .md 导入导出
 

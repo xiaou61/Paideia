@@ -1,6 +1,7 @@
 package io.github.xiaou61.note.internal.note;
 
 import io.github.xiaou61.note.internal.book.NoteBookService;
+import io.github.xiaou61.note.internal.link.NoteLinkService;
 import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
 import io.github.xiaou61.platform.SearchQuery;
@@ -50,10 +51,12 @@ public class NoteService {
 
     private final NoteMapper mapper;
     private final NoteBookService books;
+    private final NoteLinkService links;
 
-    NoteService(NoteMapper mapper, NoteBookService books) {
+    NoteService(NoteMapper mapper, NoteBookService books, NoteLinkService links) {
         this.mapper = mapper;
         this.books = books;
+        this.links = links;
     }
 
     /** 对外形状。**不含 userId**——界面不需要，带上只是多一个会漏出去的字段。 */
@@ -85,6 +88,7 @@ public class NoteService {
         note.setTitle(requireText(title, "标题", MAX_TITLE_CHARS));
         note.setBody(requireBody(body, MAX_BODY_CHARS));
         mapper.insert(note);
+        links.rebuild(userId, note.getId(), bookId, note.getBody());
         return read(userId, note.getId());
     }
 
@@ -119,6 +123,7 @@ public class NoteService {
         note.setTitle(requireText(title, "标题", MAX_TITLE_CHARS));
         note.setBody(requireBody(body, MAX_BODY_CHARS));
         mapper.update(note);
+        links.rebuild(userId, id, note.getBookId(), note.getBody());
         return read(userId, id);
     }
 
@@ -174,6 +179,9 @@ public class NoteService {
         note.setTitle(requireText(title, "标题", MAX_TITLE_CHARS));
         note.setBody("folder".equals(k) ? "" : requireBody(body, MAX_DOC_BODY_CHARS));
         mapper.insert(note);
+        if ("doc".equals(k)) {
+            links.rebuild(userId, note.getId(), bookId, note.getBody());
+        }
         return read(userId, note.getId());
     }
 
@@ -189,6 +197,7 @@ public class NoteService {
         note.setTitle(requireText(title, "标题", MAX_TITLE_CHARS));
         note.setBody(requireBody(body, MAX_DOC_BODY_CHARS));
         mapper.update(note);
+        links.rebuild(userId, id, note.getBookId(), note.getBody());
         return read(userId, id);
     }
 
@@ -232,6 +241,7 @@ public class NoteService {
         List<Note> nodes = mapper.listByBook(userId, note.getBookId());
         for (Long nodeId : subtreeIds(nodes, id)) {
             mapper.softDelete(nodeId, userId);
+            links.deleteForSource(userId, nodeId);
         }
     }
 

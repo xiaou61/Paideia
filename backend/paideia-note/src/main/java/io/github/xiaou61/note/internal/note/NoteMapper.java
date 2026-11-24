@@ -82,6 +82,25 @@ public interface NoteMapper {
                       @Param("likePattern") String likePattern,
                       @Param("limit") int limit);
 
+    /** 同库内按标题找最早一条本人文档（双链 {@code [[标题]]} 解析用）。 */
+    @Select("""
+            SELECT id FROM notes
+            WHERE user_id = #{userId} AND book_id = #{bookId} AND kind = 'doc'
+              AND title = #{title} AND deleted_at IS NULL
+            ORDER BY id
+            LIMIT 1
+            """)
+    Long findDocIdByTitle(@Param("userId") long userId,
+                          @Param("bookId") long bookId,
+                          @Param("title") String title);
+
+    /** 按 id 取本人文档标题（双链 {@code [[id:N]]} 解析用）；不存在或非本人返回 null。 */
+    @Select("""
+            SELECT title FROM notes
+            WHERE id = #{id} AND user_id = #{userId} AND kind = 'doc' AND deleted_at IS NULL
+            """)
+    String findDocTitleById(@Param("id") long id, @Param("userId") long userId);
+
     @Update("""
             UPDATE notes
             SET title = #{title}, body = #{body}, entry_id = #{entryId}

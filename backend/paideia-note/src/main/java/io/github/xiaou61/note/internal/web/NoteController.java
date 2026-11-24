@@ -1,6 +1,7 @@
 package io.github.xiaou61.note.internal.web;
 
 import io.github.xiaou61.note.internal.note.NoteService;
+import io.github.xiaou61.note.internal.link.NoteLinkService;
 import io.github.xiaou61.platform.ApiAccess;
 import io.github.xiaou61.platform.ApiResponse;
 import io.github.xiaou61.security.CurrentUser;
@@ -36,9 +37,11 @@ class NoteController {
     }
 
     private final NoteService notes;
+    private final NoteLinkService linkService;
 
-    NoteController(NoteService notes) {
+    NoteController(NoteService notes, NoteLinkService linkService) {
         this.notes = notes;
+        this.linkService = linkService;
     }
 
     @GetMapping
@@ -55,6 +58,13 @@ class NoteController {
     @GetMapping("/{id}")
     ApiResponse<NoteService.NoteView> read(@PathVariable("id") long id) {
         return ApiResponse.ok(notes.read(requireUserId(), id));
+    }
+
+    @GetMapping("/{id}/links")
+    ApiResponse<NoteLinkService.Links> links(@PathVariable("id") long id) {
+        long userId = requireUserId();
+        notes.read(userId, id);
+        return ApiResponse.ok(linkService.links(userId, id));
     }
 
     @PostMapping
