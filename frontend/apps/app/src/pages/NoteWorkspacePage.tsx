@@ -1,7 +1,7 @@
 import { errorMessage } from '@paideia/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Copy, FilePlus, FolderPlus } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 
 import {
@@ -31,6 +31,7 @@ import {
 import { BacklinksPanel } from '../components/notes/BacklinksPanel'
 import { DocEditor } from '../components/notes/DocEditor'
 import { DocTree } from '../components/notes/DocTree'
+import { uploadNoteImage } from '../components/notes/image-upload'
 import { ImportExport } from '../components/notes/ImportExport'
 import { OutlinePanel } from '../components/notes/OutlinePanel'
 import { SearchPanel } from '../components/notes/SearchPanel'
@@ -56,6 +57,9 @@ export function NoteWorkspacePage() {
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [shareOpen, setShareOpen] = useState(false)
   const [copiedShare, setCopiedShare] = useState<string | null>(null)
+  const [renameTarget, setRenameTarget] = useState<{ id: number; title: string } | null>(null)
+  const [renameTitle, setRenameTitle] = useState('')
+  const savingRef = useRef(false)
 
   const booksQuery = useQuery({ queryKey: ['note-books'], queryFn: () => notes.listBooks() })
   const book = booksQuery.data?.find((item) => item.id === bookId)
@@ -127,6 +131,8 @@ export function NoteWorkspacePage() {
 
   async function save(): Promise<void> {
     if (selected === null) return
+    if (savingRef.current) return
+    savingRef.current = true
     setSaving(true)
     setError(null)
     try {
@@ -140,9 +146,77 @@ export function NoteWorkspacePage() {
     } catch (reason) {
       setError(errorMessage(reason))
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
+
+  // 自动保存：正文/标题改动后停顿 700ms 落库（显式保存按钮仍保留）。
+  useEffect(() => {
+    if (selected === null || !dirty) {
+      return
+    }
+    const handle = window.setTimeout(() => {
+      void save()
+    }, 700)
+    return () => window.clearTimeout(handle)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, body, selected, dirty])
+
+  /** 把 dragId 挂到 parentId 下第 index 位；同级按新顺序重新编号落库。 */
+  async function applyMove(dragId: number, parentId: number | null, index: number): Promise<void> {
+    setError(null)
+    const nodes = treeQuery.data ?? []
+    const parentOf = new Map<number, number | null>()
+    for (const node of nodes) {
+      parentOf.set(node.id, node.parentId)
+    }
+    let cursor = parentId
+    while (cursor !== null && cursor !== undefined) {
+      if (cursor === dragId) {
+        setError('不能把节点移动到自己的子孙目录下')
+        return
+      }
+      cursor = parentOf.get(cursor) ?? null
+    }
+    const siblings = nodes
+      .filter((node) => node.parentId === parentId && node.id !== dragId)
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
+    const order: number[] = siblings.map((node) => node.id)
+    const at = Math.max(0, Math.min(index, order.length))
+    order.splice(at, 0, dragId)
+    try {
+      for (let i = 0; i < order.length; i++) {
+        const id = order[i]
+        if (id === undefined) {
+          continue
+        }
+        const original = nodes.find((node) => node.id === id)
+        if (id === dragId || original === undefined || original.sortOrder !== i || original.parentId !== parentId) {
+          await notes.moveNode(id, parentId, i)
+        }
+      }
+      await queryClient.invalidateQueries({ queryKey: ['note-tree', bookId] })
+    } catch (reason) {
+      setError(errorMessage(reason))
+    }
+  }
+
+  const renameNode = useMutation({
+    mutationFn: async (input: { id: number; title: string }) => {
+      const doc = await notes.read(input.id)
+      return notes.updateDoc(input.id, { entryId: doc.entryId, title: input.title, body: doc.body })
+    },
+    onSuccess: (updated) => {
+      setRenameTarget(null)
+      void queryClient.invalidateQueries({ queryKey: ['note-tree', bookId] })
+      if (updated.id === selected) {
+        setTitle(updated.title)
+        void queryClient.invalidateQueries({ queryKey: ['note-doc', selected] })
+      }
+    },
+    onError: (reason) => setError(errorMessage(reason)),
+  })
 
   const createNode = useMutation({
     mutationFn: (input: { kind: 'doc' | 'folder'; title: string }) =>
@@ -264,6 +338,11 @@ export function NoteWorkspacePage() {
                   selectedId={selected}
                   onSelect={chooseDoc}
                   onDelete={(id) => setDeleteTarget(id)}
+                  onRename={(id, currentTitle) => {
+                    setRenameTitle(currentTitle)
+                    setRenameTarget({ id, title: currentTitle })
+                  }}
+                  onMove={(dragId, parentId, index) => void applyMove(dragId, parentId, index)}
                 />
               )}
             </CardContent>
@@ -324,6 +403,7 @@ export function NoteWorkspacePage() {
                 void save()
               }}
               onExport={exportDoc}
+              onUpload={uploadNoteImage}
             />
           )}
         </section>
@@ -451,6 +531,35 @@ export function NoteWorkspacePage() {
           <DialogFooter>
             <Button variant="ghost" onClick={() => setShareOpen(false)}>
               关闭
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={renameTarget !== null} onOpenChange={(open) => !open && setRenameTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>重命名</DialogTitle>
+            <DialogDescription>修改这个节点的标题。</DialogDescription>
+          </DialogHeader>
+          <Input
+            aria-label="节点标题"
+            value={renameTitle}
+            onChange={(event) => setRenameTitle(event.target.value)}
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRenameTarget(null)}>
+              取消
+            </Button>
+            <Button
+              disabled={renameNode.isPending || renameTitle.trim() === ''}
+              onClick={() => {
+                if (renameTarget !== null && renameTitle.trim() !== '') {
+                  renameNode.mutate({ id: renameTarget.id, title: renameTitle.trim() })
+                }
+              }}
+            >
+              保存
             </Button>
           </DialogFooter>
         </DialogContent>

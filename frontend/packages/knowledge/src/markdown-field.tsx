@@ -1,7 +1,26 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@paideia/ui'
-import { useRef, useState, type ClipboardEvent, type DragEvent } from 'react'
+import {
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type DragEvent,
+  type KeyboardEvent,
+} from 'react'
 
 import { MarkdownBody } from './markdown-body'
+
+/** 斜杠命令：标签 + 插入的 Markdown 片段。 */
+const SLASH_COMMANDS: { label: string; snippet: string }[] = [
+  { label: '一级标题', snippet: '# ' },
+  { label: '二级标题', snippet: '## ' },
+  { label: '无序列表', snippet: '- ' },
+  { label: '有序列表', snippet: '1. ' },
+  { label: '待办事项', snippet: '- [ ] ' },
+  { label: '引用', snippet: '> ' },
+  { label: '代码块', snippet: '```\n\n```' },
+  { label: '表格', snippet: '| 列 1 | 列 2 |\n| --- | --- |\n|  |  |\n' },
+  { label: '分割线', snippet: '\n---\n' },
+]
 
 /**
  * markdown 正文编辑器：**编辑 / 预览**两个标签共用一份内容。
@@ -30,6 +49,7 @@ export function MarkdownField({
   placeholder = '用 markdown 写点什么…',
   mediaBaseUrl,
   onUpload,
+  slashCommands = false,
 }: {
   value: string
   onChange: (next: string) => void
@@ -40,10 +60,13 @@ export function MarkdownField({
   mediaBaseUrl?: string
   /** WORK-072：粘贴/拖拽上传；不传时编辑器仍可用，只是没有上传能力。 */
   onUpload?: (file: File) => Promise<{ url: string; name: string }>
+  /** 打开行首 `/` 斜杠命令菜单（默认关闭，避免影响既有消费者）。 */
+  slashCommands?: boolean
 }) {
   const [tab, setTab] = useState('edit')
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [slash, setSlash] = useState<{ at: number; index: number } | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const insertAtCursor = (before: string, after = '') => {
@@ -97,6 +120,57 @@ export function MarkdownField({
     }
   }
 
+  /** 用一段片段替换掉触发菜单的那个 `/`。 */
+  const applyCommand = (at: number, snippet: string) => {
+    const next = `${value.slice(0, at)}${snippet}${value.slice(at + 1)}`
+    onChange(next)
+    setSlash(null)
+    requestAnimationFrame(() => {
+      const element = textareaRef.current
+      if (element !== null) {
+        element.focus()
+        const cursor = at + snippet.length
+        element.setSelectionRange(cursor, cursor)
+      }
+    })
+  }
+
+  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!slashCommands) {
+      return
+    }
+    if (slash === null) {
+      if (event.key === '/') {
+        event.preventDefault()
+        const at = textareaRef.current?.selectionStart ?? value.length
+        insertAtCursor('/')
+        setSlash({ at, index: 0 })
+      }
+      return
+    }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      setSlash((current) =>
+        current === null ? current : { ...current, index: (current.index + 1) % SLASH_COMMANDS.length },
+      )
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      setSlash((current) =>
+        current === null
+          ? current
+          : { ...current, index: (current.index - 1 + SLASH_COMMANDS.length) % SLASH_COMMANDS.length },
+      )
+    } else if (event.key === 'Enter') {
+      event.preventDefault()
+      applyCommand(slash.at, SLASH_COMMANDS[slash.index]?.snippet ?? '')
+    } else if (event.key === 'Escape') {
+      event.preventDefault()
+      setSlash(null)
+    } else if (event.key.length === 1) {
+      setSlash(null)
+    }
+  }
+
   const toolbar = [
     { label: 'H2', testId: 'heading', before: '## ', after: '' },
     { label: 'B', testId: 'bold', before: '**', after: '**' },
@@ -146,11 +220,36 @@ export function MarkdownField({
           placeholder={placeholder}
           data-testid={`${testIdPrefix}-body`}
           onChange={(event) => onChange(event.target.value)}
+          onKeyDown={onKeyDown}
           onPaste={onPaste}
           onDrop={onDrop}
           onDragOver={(event) => event.preventDefault()}
           className="border-border bg-background focus:border-ring w-full resize-y rounded-b-lg border p-4 font-mono text-sm leading-7 outline-none"
         />
+        {slash === null ? null : (
+          <ul
+            role="listbox"
+            aria-label="插入命令"
+            data-testid={`${testIdPrefix}-slash-menu`}
+            className="border-border bg-popover mt-1 w-48 overflow-hidden rounded-md border shadow-md"
+          >
+            {SLASH_COMMANDS.map((command, index) => (
+              <li key={command.label}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={index === slash.index}
+                  className={`flex w-full items-center px-3 py-1.5 text-left text-sm ${
+                    index === slash.index ? 'bg-accent text-accent-foreground' : 'hover:bg-muted'
+                  }`}
+                  onClick={() => applyCommand(slash.at, command.snippet)}
+                >
+                  {command.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         {uploadError === null ? null : (
           <p className="text-destructive mt-1 text-xs" data-testid={`${testIdPrefix}-upload-error`}>
             {uploadError}

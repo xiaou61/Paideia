@@ -10,6 +10,8 @@ interface DocEditorProps {
   onBody: (value: string) => void
   onSave: () => void
   onExport: () => void
+  /** 粘贴/拖入图片时把图片转成 data URL（由调用方决定实现）。 */
+  onUpload: (file: File) => Promise<{ url: string; name: string }>
 }
 
 /** 右侧文档编辑器：标题 + markdown 正文 + 显式保存。 */
@@ -22,6 +24,7 @@ export function DocEditor({
   onBody,
   onSave,
   onExport,
+  onUpload,
 }: DocEditorProps) {
   return (
     <div className="flex h-full flex-col">
@@ -37,7 +40,7 @@ export function DocEditor({
         <Button variant="ghost" size="sm" onClick={onExport}>
           导出 .md
         </Button>
-        <Button size="sm" data-testid="doc-save" onClick={onSave} disabled={saving || !dirty}>
+        <Button size="sm" data-testid="doc-save" onClick={onSave} disabled={saving}>
           {saving ? '保存中…' : dirty ? '保存' : '已保存'}
         </Button>
       </div>
@@ -47,6 +50,8 @@ export function DocEditor({
           value={body}
           onChange={onBody}
           placeholder="用 Markdown 写正文，支持 [[标题]] 双链"
+          onUpload={onUpload}
+          slashCommands
         />
       </div>
     </div>
