@@ -146,6 +146,7 @@ class AgentToolBridgeIntegrationTest {
                 .containsExactlyInAnyOrder("account_me", "assessment_list_marks", "assistant_draft_note",
                         "knowledge_get_entry", "knowledge_list_categories", "knowledge_my_marks",
                         "knowledge_search", "knowledge_weak_concepts", "note_get", "note_list",
+                        "note_links", "note_list_books", "note_search", "note_tree",
                         // WORK-035 的只读工具：给数据集 key 返回表/列/类型，**不返回数据行**，
                         // 声明的也是 ToolScope.READ。它出现在清单里不违反"自主只建议不动作"。
                         "sql_describe_dataset",

@@ -84,6 +84,43 @@ class NoteToolsTest {
             seenUserIds.add(userId);
             return nextId++;
         }
+
+        @Override
+        public List<NoteNode> tree(long userId, long bookId) {
+            seenUserIds.add(userId);
+            return List.of();
+        }
+
+        @Override
+        public Links links(long userId, long noteId) {
+            seenUserIds.add(userId);
+            return new Links(List.of(), List.of());
+        }
+
+        @Override
+        public long createFolder(long userId, long bookId, Long parentId, String title) {
+            seenUserIds.add(userId);
+            return nextId++;
+        }
+
+        @Override
+        public long createDoc(long userId, long bookId, Long parentId, String title, String body) {
+            seenUserIds.add(userId);
+            long id = nextId++;
+            rows.put(id, new NoteContent(id, title, body, Instant.EPOCH));
+            return id;
+        }
+
+        @Override
+        public void move(long userId, long noteId, Long targetParentId, int sortOrder) {
+            seenUserIds.add(userId);
+        }
+
+        @Override
+        public void deleteNode(long userId, long noteId) {
+            seenUserIds.add(userId);
+            rows.remove(noteId);
+        }
     }
 
     private final FakeNotes notes = new FakeNotes();

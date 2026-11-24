@@ -2,6 +2,7 @@ package io.github.xiaou61.note.internal.api;
 
 import io.github.xiaou61.note.NoteApi;
 import io.github.xiaou61.note.internal.book.NoteBookService;
+import io.github.xiaou61.note.internal.link.NoteLinkService;
 import io.github.xiaou61.note.internal.note.NoteService;
 import java.util.List;
 import java.util.Optional;
@@ -22,10 +23,12 @@ public class NoteApiImplementation implements NoteApi {
 
     private final NoteService notes;
     private final NoteBookService books;
+    private final NoteLinkService links;
 
-    NoteApiImplementation(NoteService notes, NoteBookService books) {
+    NoteApiImplementation(NoteService notes, NoteBookService books, NoteLinkService links) {
         this.notes = notes;
         this.books = books;
+        this.links = links;
     }
 
     @Override
@@ -81,5 +84,44 @@ public class NoteApiImplementation implements NoteApi {
     @Override
     public long createBook(long userId, String name, String description) {
         return books.create(userId, name, description).id();
+    }
+
+    @Override
+    public List<NoteNode> tree(long userId, long bookId) {
+        return notes.tree(userId, bookId).stream()
+                .map(node -> new NoteNode(node.id(), node.kind(), node.parentId(), node.sortOrder(),
+                        node.title(), node.excerpt(), node.updatedAt()))
+                .toList();
+    }
+
+    @Override
+    public Links links(long userId, long noteId) {
+        if (notes.find(userId, noteId).isEmpty()) {
+            return new Links(List.of(), List.of());
+        }
+        NoteLinkService.Links found = links.links(userId, noteId);
+        return new Links(
+                found.outbound().stream().map(r -> new LinkRef(r.noteId(), r.title())).toList(),
+                found.inbound().stream().map(r -> new LinkRef(r.noteId(), r.title())).toList());
+    }
+
+    @Override
+    public long createFolder(long userId, long bookId, Long parentId, String title) {
+        return notes.createFolder(userId, bookId, parentId, title).id();
+    }
+
+    @Override
+    public long createDoc(long userId, long bookId, Long parentId, String title, String body) {
+        return notes.createNode(userId, bookId, parentId, "doc", title, body == null ? "" : body).id();
+    }
+
+    @Override
+    public void move(long userId, long noteId, Long targetParentId, int sortOrder) {
+        notes.move(userId, noteId, targetParentId, sortOrder);
+    }
+
+    @Override
+    public void deleteNode(long userId, long noteId) {
+        notes.delete(userId, noteId);
     }
 }

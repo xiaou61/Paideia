@@ -125,7 +125,7 @@ approver_role: CTO
 - 验证：注销后任何人（含本人）不可再访问
 - 完成记录：USER_TABLES 现依次为 note_links/note_reports/note_shares/notes/note_books；测试 4 条绿（含"别人的数据不受影响"）。
 
-### TASK-009 | pending | MCP 工具面与快照/契约
+### TASK-009 | done | MCP 工具面与快照/契约
 
 - 对应：REQ-009，AC-009
 - 依赖：TASK-002/003/004/005
@@ -133,6 +133,7 @@ approver_role: CTO
 - 测试：`McpToolSnapshotTest`、`McpStartupSmokeTest`、只读令牌不能调写工具用例、越权 id 用例
 - 步骤：工具实现（`ToolDescriptor` 名称符合 `^[a-z][a-z0-9]*_[a-z][a-z0-9_]*$`）→ 更新快照 → 契约测试
 - 验证：`/mcp/x/note` 列出全部读工具，`/mcp/x/note/write` 列写工具
+- 完成记录：新增 9 个工具（读 note_list_books/note_tree/note_search/note_links，写 note_create_book/note_create_folder/note_create_doc/note_move/note_delete_node），全部 defaultGroup=false；NoteApi 补 tree/links/createFolder/createDoc/move/deleteNode 与 NoteNode/LinkRef/Links 记录；note 组工具数 4→13、全量 65→74（McpToolSnapshotTest 已改）；AgentToolBridgeIntegrationTest 的 ASSISTANT 只读清单补 4 个新读工具。测试：McpToolSnapshotTest 3、McpStartupSmokeTest 5、NoteToolsTest 6、AgentToolBridgeIntegrationTest 9 全绿。
 
 ### TASK-010 | pending | 前端知识库列表与工作台骨架
 

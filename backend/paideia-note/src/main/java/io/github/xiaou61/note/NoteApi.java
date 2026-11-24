@@ -44,6 +44,24 @@ public interface NoteApi {
     /** 新建一个知识库，返回新 id。 */
     long createBook(long userId, String name, String description);
 
+    /** 某知识库的完整节点树（扁平列表，父子关系由 parentId 表示）。 */
+    List<NoteNode> tree(long userId, long bookId);
+
+    /** 某文档的出链与入链。所有权不通过则整组为空。 */
+    Links links(long userId, long noteId);
+
+    /** 在知识库内新建目录，返回新 id。 */
+    long createFolder(long userId, long bookId, Long parentId, String title);
+
+    /** 在知识库内新建文档，返回新 id。 */
+    long createDoc(long userId, long bookId, Long parentId, String title, String body);
+
+    /** 移动节点（改父与排序）。跨库或成环由内部拒绝。 */
+    void move(long userId, long noteId, Long targetParentId, int sortOrder);
+
+    /** 软删一个节点及其整棵子树。 */
+    void deleteNode(long userId, long noteId);
+
     record NoteBrief(long id, String title, String excerpt, Instant updatedAt) {
     }
 
@@ -51,5 +69,15 @@ public interface NoteApi {
     }
 
     record BookBrief(long id, String name, int sortOrder, Instant updatedAt) {
+    }
+
+    record NoteNode(long id, String kind, Long parentId, int sortOrder,
+                    String title, String excerpt, Instant updatedAt) {
+    }
+
+    record LinkRef(long noteId, String title) {
+    }
+
+    record Links(List<LinkRef> outbound, List<LinkRef> inbound) {
     }
 }
