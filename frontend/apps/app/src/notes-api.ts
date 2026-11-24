@@ -63,6 +63,8 @@ export interface NoteNodeRow {
   title: string
   excerpt: string | null
   updatedAt: string | null
+  docType: 'tutorial' | 'gap_fill' | null
+  pairKey: string | null
 }
 
 /** 一篇文档（含正文）。 */
@@ -77,6 +79,8 @@ export interface DocView {
   body: string
   createdAt: string | null
   updatedAt: string | null
+  docType: 'tutorial' | 'gap_fill' | null
+  pairKey: string | null
 }
 
 export interface DocNodeInput {
@@ -86,6 +90,8 @@ export interface DocNodeInput {
   entryId?: number | null
   title: string
   body: string
+  docType?: 'tutorial' | 'gap_fill' | null
+  pairKey?: string | null
 }
 
 export interface LinkRef {
@@ -125,7 +131,16 @@ export interface NotesApi {
   removeBook(id: number): Promise<boolean>
   tree(bookId: number): Promise<NoteNodeRow[]>
   createNode(input: DocNodeInput): Promise<DocView>
-  updateDoc(id: number, input: { entryId: number | null; title: string; body: string }): Promise<DocView>
+  updateDoc(
+    id: number,
+    input: {
+      entryId: number | null
+      title: string
+      body: string
+      docType?: 'tutorial' | 'gap_fill' | null
+      pairKey?: string | null
+    },
+  ): Promise<DocView>
   moveNode(id: number, parentId: number | null, sortOrder: number): Promise<void>
   removeNode(id: number): Promise<boolean>
   search(keyword: string): Promise<NoteSummary[]>

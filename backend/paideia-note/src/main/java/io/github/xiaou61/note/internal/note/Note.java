@@ -32,6 +32,11 @@ class Note {
     /** 软删标记（NULL=存活）；删除目录时整棵子树一起置。 */
     private Instant deletedAt;
 
+    /** 文档类型：tutorial / gap_fill；NULL=普通文档。目录恒为 NULL。 */
+    private String docType;
+    /** 学习单元标识；同一知识库内同 pair_key 的两篇（教程+查漏补缺）为一对。 */
+    private String pairKey;
+
     Long getId() {
         return id;
     }
@@ -134,5 +139,21 @@ class Note {
 
     void setDeletedAt(Instant deletedAt) {
         this.deletedAt = deletedAt;
+    }
+
+    String getDocType() {
+        return docType;
+    }
+
+    void setDocType(String docType) {
+        this.docType = docType;
+    }
+
+    String getPairKey() {
+        return pairKey;
+    }
+
+    void setPairKey(String pairKey) {
+        this.pairKey = pairKey;
     }
 }

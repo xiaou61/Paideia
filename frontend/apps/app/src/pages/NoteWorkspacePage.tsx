@@ -53,6 +53,8 @@ export function NoteWorkspacePage() {
   const [error, setError] = useState<string | null>(null)
   const [createKind, setCreateKind] = useState<'doc' | 'folder' | null>(null)
   const [newTitle, setNewTitle] = useState('')
+  const [newDocType, setNewDocType] = useState<'none' | 'tutorial' | 'gap_fill'>('none')
+  const [newPairKey, setNewPairKey] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [shareOpen, setShareOpen] = useState(false)
   const [copiedShare, setCopiedShare] = useState<string | null>(null)
@@ -106,6 +108,13 @@ export function NoteWorkspacePage() {
   }, [docQuery.data])
 
   const selectedNode = (treeQuery.data ?? []).find((node) => node.id === selected)
+  const pairNode =
+    selectedNode !== undefined && selectedNode.kind === 'doc' && selectedNode.pairKey !== null
+      ? (treeQuery.data ?? []).find(
+          (node) =>
+            node.id !== selectedNode.id && node.kind === 'doc' && node.pairKey === selectedNode.pairKey,
+        )
+      : undefined
 
   function refreshDoc(): void {
     void queryClient.invalidateQueries({ queryKey: ['note-tree', bookId] })
@@ -219,21 +228,49 @@ export function NoteWorkspacePage() {
   })
 
   const createNode = useMutation({
-    mutationFn: (input: { kind: 'doc' | 'folder'; title: string }) =>
+    mutationFn: (input: {
+      kind: 'doc' | 'folder'
+      title: string
+      docType?: 'tutorial' | 'gap_fill' | null
+      pairKey?: string | null
+    }) =>
       notes.createNode({
         bookId,
         parentId: selectedNode?.kind === 'folder' ? selectedNode.id : null,
         kind: input.kind,
         title: input.title,
         body: '',
+        docType: input.docType ?? null,
+        pairKey: input.pairKey ?? null,
       }),
     onSuccess: (created, input) => {
       setCreateKind(null)
       setNewTitle('')
+      setNewDocType('none')
+      setNewPairKey('')
       void queryClient.invalidateQueries({ queryKey: ['note-tree', bookId] })
       if (input.kind === 'doc') {
         setSelected(created.id)
       }
+    },
+    onError: (reason) => setError(errorMessage(reason)),
+  })
+
+  /** 教程缺「查漏补缺」时，一键在同目录建配对文档。 */
+  const addGapFill = useMutation({
+    mutationFn: (input: { pairKey: string; parentId: number | null }) =>
+      notes.createNode({
+        bookId,
+        parentId: input.parentId,
+        kind: 'doc',
+        title: '查漏补缺',
+        body: '',
+        docType: 'gap_fill',
+        pairKey: input.pairKey,
+      }),
+    onSuccess: (created) => {
+      void queryClient.invalidateQueries({ queryKey: ['note-tree', bookId] })
+      setSelected(created.id)
     },
     onError: (reason) => setError(errorMessage(reason)),
   })
@@ -325,6 +362,8 @@ export function NoteWorkspacePage() {
                   aria-label="新建文档"
                   onClick={() => {
                     setNewTitle('')
+                    setNewDocType('none')
+                    setNewPairKey('')
                     setCreateKind('doc')
                   }}
                 >
@@ -359,6 +398,7 @@ export function NoteWorkspacePage() {
                     setRenameTarget({ id, title: currentTitle })
                   }}
                   onMove={(dragId, parentId, index) => void applyMove(dragId, parentId, index)}
+                  onAddGapFill={(pairKey, parentId) => addGapFill.mutate({ pairKey, parentId })}
                 />
               )}
             </CardContent>
@@ -422,6 +462,8 @@ export function NoteWorkspacePage() {
               onUpload={uploadNoteImage}
               zen={zen}
               onToggleZen={() => setZen((current) => !current)}
+              pairedTitle={pairNode?.title}
+              onOpenPair={pairNode === undefined ? undefined : () => void openDoc(pairNode.id)}
             />
           )}
         </section>
@@ -470,6 +512,34 @@ export function NoteWorkspacePage() {
             value={newTitle}
             onChange={(event) => setNewTitle(event.target.value)}
           />
+          {createKind === 'doc' ? (
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="new-doc-type">
+                文档类型
+              </label>
+              <select
+                id="new-doc-type"
+                aria-label="文档类型"
+                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                value={newDocType}
+                onChange={(event) =>
+                  setNewDocType(event.target.value as 'none' | 'tutorial' | 'gap_fill')
+                }
+              >
+                <option value="none">普通文档</option>
+                <option value="tutorial">教程</option>
+                <option value="gap_fill">查漏补缺</option>
+              </select>
+              {newDocType === 'none' ? null : (
+                <Input
+                  aria-label="单元标识"
+                  placeholder="单元标识，如 A1（同标识的教程与查漏补缺成对）"
+                  value={newPairKey}
+                  onChange={(event) => setNewPairKey(event.target.value)}
+                />
+              )}
+            </div>
+          ) : null}
           <DialogFooter>
             <Button variant="ghost" onClick={() => setCreateKind(null)}>
               取消
@@ -478,7 +548,15 @@ export function NoteWorkspacePage() {
               disabled={createNode.isPending || newTitle.trim() === ''}
               onClick={() => {
                 if (createKind !== null && newTitle.trim() !== '') {
-                  createNode.mutate({ kind: createKind, title: newTitle.trim() })
+                  createNode.mutate({
+                    kind: createKind,
+                    title: newTitle.trim(),
+                    docType: createKind === 'doc' && newDocType !== 'none' ? newDocType : null,
+                    pairKey:
+                      createKind === 'doc' && newDocType !== 'none' && newPairKey.trim() !== ''
+                        ? newPairKey.trim()
+                        : null,
+                  })
                 }
               }}
             >

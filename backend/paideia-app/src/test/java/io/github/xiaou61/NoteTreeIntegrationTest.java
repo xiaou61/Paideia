@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import com.jayway.jsonpath.JsonPath;
 import io.github.xiaou61.security.AuthPort;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -96,6 +97,41 @@ class NoteTreeIntegrationTest {
     }
 
     @Test
+    @DisplayName("教程与查漏补缺按 pairKey 配对：树返回 docType/pairKey，目录/非法值被拒")
+    void pairFieldsRoundTrip() throws Exception {
+        long bookId = createBook(userA, "配对库");
+
+        long tutorial = createNodeFull(userA, bookId, null, "doc", "A1 教程", "", "tutorial", "A1");
+        long gap = createNodeFull(userA, bookId, null, "doc", "查漏补缺", "", "gap_fill", "A1");
+
+        List<Map<String, Object>> nodes = JsonPath.read(body(mockMvc.perform(
+                get("/api/v1/note-books/" + bookId + "/tree")
+                        .header("Authorization", token(userA))).andReturn()), "$.data");
+        assertThat(nodes).hasSize(2);
+        Map<String, Object> tutorialRow = nodes.stream()
+                .filter(row -> ((Number) row.get("id")).longValue() == tutorial).findFirst().orElseThrow();
+        assertThat(tutorialRow.get("docType")).isEqualTo("tutorial");
+        assertThat(tutorialRow.get("pairKey")).isEqualTo("A1");
+        Map<String, Object> gapRow = nodes.stream()
+                .filter(row -> ((Number) row.get("id")).longValue() == gap).findFirst().orElseThrow();
+        assertThat(gapRow.get("docType")).isEqualTo("gap_fill");
+        assertThat(gapRow.get("pairKey")).isEqualTo("A1");
+
+        // 目录不能带文档类型
+        assertThat(postNode(userA, nodeBodyFull(bookId, null, "folder", "坏目录", "", "tutorial", "A1")))
+                .isEqualTo(400);
+        // 非法 doc_type
+        assertThat(postNode(userA, nodeBodyFull(bookId, null, "doc", "坏类型", "", "essay", null)))
+                .isEqualTo(400);
+        // pairKey 超 64
+        assertThat(postNode(userA, nodeBodyFull(bookId, null, "doc", "超长标识", "", "tutorial", "x".repeat(65))))
+                .isEqualTo(400);
+        // 普通文档仍可建（docType/pairKey 都为 null）
+        long plain = createNode(userA, bookId, null, "doc", "普通文档", "内容");
+        assertThat(plain).isPositive();
+    }
+
+    @Test
     @DisplayName("移动防成环：到自身 / 到子孙被拒；跨库目标当不存在")
     void moveRejectsCycle() throws Exception {
         long bookId = createBook(userA, "移动测试");
@@ -164,6 +200,25 @@ class NoteTreeIntegrationTest {
         return ((Number) JsonPath.read(body(result), "$.data.id")).longValue();
     }
 
+    private long createNodeFull(String subject, long bookId, Long parentId, String kind, String title,
+                                String bodyText, String docType, String pairKey) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/v1/notes")
+                        .header("Authorization", token(subject))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(nodeBodyFull(bookId, parentId, kind, title, bodyText, docType, pairKey)))
+                .andReturn();
+        assertThat(result.getResponse().getStatus()).as("响应：%s", body(result)).isEqualTo(200);
+        return ((Number) JsonPath.read(body(result), "$.data.id")).longValue();
+    }
+
+    private int postNode(String subject, String json) throws Exception {
+        return mockMvc.perform(post("/api/v1/notes")
+                        .header("Authorization", token(subject))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andReturn().getResponse().getStatus();
+    }
+
     private MvcResult move(String subject, long id, Long parentId) throws Exception {
         return mockMvc.perform(put("/api/v1/notes/" + id + "/move")
                         .header("Authorization", token(subject))
@@ -183,6 +238,17 @@ class NoteTreeIntegrationTest {
                 + ",\"kind\":" + quote(kind)
                 + ",\"title\":" + quote(title)
                 + ",\"body\":" + quote(bodyText) + "}";
+    }
+
+    private static String nodeBodyFull(long bookId, Long parentId, String kind, String title, String bodyText,
+                                       String docType, String pairKey) {
+        return "{\"bookId\":" + bookId
+                + ",\"parentId\":" + (parentId == null ? "null" : parentId)
+                + ",\"kind\":" + quote(kind)
+                + ",\"title\":" + quote(title)
+                + ",\"body\":" + quote(bodyText)
+                + ",\"docType\":" + (docType == null ? "null" : quote(docType))
+                + ",\"pairKey\":" + (pairKey == null ? "null" : quote(pairKey)) + "}";
     }
 
     private static String quote(String value) {

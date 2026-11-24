@@ -48,6 +48,8 @@ public class NoteService {
     private static final int MAX_NODES_PER_BOOK = 5_000;
     /** 目录嵌套深度上限，防移动成环之外的病态深树。 */
     private static final int MAX_TREE_DEPTH = 32;
+    /** 学习单元标识长度上限，与迁移里的列宽一致。 */
+    private static final int MAX_PAIR_KEY_CHARS = 64;
 
     private final NoteMapper mapper;
     private final NoteBookService books;
@@ -61,7 +63,8 @@ public class NoteService {
 
     /** 对外形状。**不含 userId**——界面不需要，带上只是多一个会漏出去的字段。 */
     public record NoteView(Long id, Long bookId, String kind, Long parentId, int sortOrder,
-                           Long entryId, String title, String body, Instant createdAt, Instant updatedAt) {
+                           Long entryId, String title, String body, Instant createdAt, Instant updatedAt,
+                           String docType, String pairKey) {
     }
 
     /** 列表项：不带正文，带一段截断的摘要（列表页用）。 */
@@ -70,7 +73,7 @@ public class NoteService {
 
     /** 树节点：不带正文，供前端组装目录树。 */
     public record NoteNode(Long id, String kind, Long parentId, int sortOrder, String title,
-                           String excerpt, Instant updatedAt) {
+                           String excerpt, Instant updatedAt, String docType, String pairKey) {
     }
 
     // ---------------------------------------------------------------- 旧扁平写入（兼容）
@@ -144,15 +147,26 @@ public class NoteService {
         books.requireOwned(userId, bookId);
         return mapper.listByBook(userId, bookId).stream()
                 .map(n -> new NoteNode(n.getId(), n.getKind(), n.getParentId(), n.getSortOrder(),
-                        n.getTitle(), null, n.getUpdatedAt()))
+                        n.getTitle(), null, n.getUpdatedAt(), n.getDocType(), n.getPairKey()))
                 .toList();
     }
 
     /** 新建目录或文档。kind 只认 folder/doc。 */
-    @Transactional
     public NoteView createNode(long userId, long bookId, Long parentId, String kind, String title, String body) {
+        return createNode(userId, bookId, parentId, kind, title, body, null, null);
+    }
+
+    /** 新建目录或文档，可带文档类型与学习单元标识（普通文档两者都为 null）。 */
+    @Transactional
+    public NoteView createNode(long userId, long bookId, Long parentId, String kind, String title, String body,
+                               String docType, String pairKey) {
         books.requireOwned(userId, bookId);
         String k = normalizeKind(kind);
+        String dt = normalizeDocType(docType);
+        String pk = normalizePairKey(pairKey);
+        if ("folder".equals(k) && (dt != null || pk != null)) {
+            throw invalid("目录不能设置文档类型或配对标识");
+        }
         List<Note> nodes = mapper.listByBook(userId, bookId);
         if (nodes.size() >= MAX_NODES_PER_BOOK) {
             throw invalid("知识库节点数已达上限（" + MAX_NODES_PER_BOOK + "）");
@@ -174,6 +188,8 @@ public class NoteService {
         note.setUserId(userId);
         note.setBookId(bookId);
         note.setKind(k);
+        note.setDocType(dt);
+        note.setPairKey(pk);
         note.setParentId(parentId);
         note.setSortOrder(nextSortOrder(nodes, parentId));
         note.setTitle(requireText(title, "标题", MAX_TITLE_CHARS));
@@ -190,12 +206,28 @@ public class NoteService {
     }
 
     /** 更新文档正文/标题（不碰层级）。 */
-    @Transactional
     public NoteView updateDoc(long userId, long id, Long entryId, String title, String body) {
+        Note existing = findOrThrow(userId, id);
+        return updateDoc(userId, id, entryId, title, body, existing.getDocType(), existing.getPairKey());
+    }
+
+    /** 更新文档；docType/pairKey 为 null 时保留原值（兼容只传标题正文的重命名/保存调用）。 */
+    @Transactional
+    public NoteView updateDoc(long userId, long id, Long entryId, String title, String body,
+                              String docType, String pairKey) {
         Note note = findOrThrow(userId, id);
+        if ("folder".equals(note.getKind()) && (docType != null || pairKey != null)) {
+            throw invalid("目录不能设置文档类型或配对标识");
+        }
         note.setEntryId(entryId);
         note.setTitle(requireText(title, "标题", MAX_TITLE_CHARS));
         note.setBody(requireBody(body, MAX_DOC_BODY_CHARS));
+        if (docType != null) {
+            note.setDocType(normalizeDocType(docType));
+        }
+        if (pairKey != null) {
+            note.setPairKey(normalizePairKey(pairKey));
+        }
         mapper.update(note);
         links.rebuild(userId, id, note.getBookId(), note.getBody());
         return read(userId, id);
@@ -254,7 +286,8 @@ public class NoteService {
     private static NoteView toView(Note note) {
         return new NoteView(note.getId(), note.getBookId(), note.getKind(), note.getParentId(),
                 note.getSortOrder(), note.getEntryId(), note.getTitle(),
-                note.getBody() == null ? "" : note.getBody(), note.getCreatedAt(), note.getUpdatedAt());
+                note.getBody() == null ? "" : note.getBody(), note.getCreatedAt(), note.getUpdatedAt(),
+                note.getDocType(), note.getPairKey());
     }
 
     private static String normalizeKind(String kind) {
@@ -266,6 +299,30 @@ public class NoteService {
             throw invalid("节点类型只能是 doc 或 folder");
         }
         return k;
+    }
+
+    /** 文档类型：null/空=普通文档；否则只能是 tutorial / gap_fill。 */
+    private static String normalizeDocType(String docType) {
+        if (docType == null || docType.isBlank()) {
+            return null;
+        }
+        String value = docType.trim();
+        if (!"tutorial".equals(value) && !"gap_fill".equals(value)) {
+            throw invalid("文档类型只能是 tutorial 或 gap_fill");
+        }
+        return value;
+    }
+
+    /** 学习单元标识：null/空=无；否则去空白后不超过 64 字符。 */
+    private static String normalizePairKey(String pairKey) {
+        if (pairKey == null || pairKey.isBlank()) {
+            return null;
+        }
+        String value = pairKey.trim();
+        if (value.length() > MAX_PAIR_KEY_CHARS) {
+            throw invalid("配对标识不能超过 " + MAX_PAIR_KEY_CHARS + " 个字符");
+        }
+        return value;
     }
 
     private static Map<Long, Note> byId(List<Note> nodes) {

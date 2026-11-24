@@ -13,6 +13,8 @@ interface DocTreeProps {
   onRename: (id: number, currentTitle: string) => void
   /** 把 dragId 挂到 parentId 下第 index 位（index 已在同级里排好）。 */
   onMove: (dragId: number, parentId: number | null, index: number) => void
+  /** 一链补建缺失的「查漏补缺」文档。 */
+  onAddGapFill?: (pairKey: string, parentId: number | null) => void
 }
 
 interface TreeNode {
@@ -58,6 +60,8 @@ function TreeRow({
   onDragStart,
   onDragOverRow,
   onDropRow,
+  gapPairs,
+  onAddGapFill,
 }: {
   item: TreeNode
   depth: number
@@ -70,12 +74,18 @@ function TreeRow({
   onDragStart: (id: number) => void
   onDragOverRow: (id: number, isFolder: boolean, event: DragEvent<HTMLDivElement>) => void
   onDropRow: (id: number) => void
+  gapPairs: Set<string>
+  onAddGapFill?: (pairKey: string, parentId: number | null) => void
 }) {
   const [open, setOpen] = useState(true)
   const isFolder = item.node.kind === 'folder'
   const hasChildren = item.children.length > 0
   const selected = item.node.id === selectedId
   const rowHint = hint?.id === item.node.id ? hint.pos : null
+  const pairKey = item.node.pairKey
+  const isTutorial = item.node.kind === 'doc' && item.node.docType === 'tutorial'
+  const pairSlot = `${item.node.parentId ?? 'root'}:${pairKey ?? ''}`
+  const missingGap = isTutorial && pairKey !== null && !gapPairs.has(pairSlot)
 
   return (
     <li>
@@ -132,6 +142,16 @@ function TreeRow({
             <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           )}
           <span className="truncate">{item.node.title}</span>
+          {item.node.docType === 'tutorial' ? (
+            <span className="shrink-0 rounded bg-amber-100 px-1 py-0.5 text-[10px] leading-none text-amber-700">
+              教程
+            </span>
+          ) : null}
+          {item.node.docType === 'gap_fill' ? (
+            <span className="bg-violet-100 text-violet-700 shrink-0 rounded px-1 py-0.5 text-[10px] leading-none">
+              查漏补缺
+            </span>
+          ) : null}
         </button>
         <button
           type="button"
@@ -150,6 +170,17 @@ function TreeRow({
           ×
         </button>
       </div>
+      {missingGap && onAddGapFill !== undefined && pairKey !== null ? (
+        <div style={{ paddingLeft: `${depth * 14 + 26}px` }} className="py-0.5">
+          <button
+            type="button"
+            className="text-primary text-xs hover:underline"
+            onClick={() => onAddGapFill(pairKey, item.node.parentId)}
+          >
+            ＋ 新建查漏补缺
+          </button>
+        </div>
+      ) : null}
       {isFolder && hasChildren && open ? (
         <ul>
           {item.children.map((child) => (
@@ -166,6 +197,8 @@ function TreeRow({
               onDragStart={onDragStart}
               onDragOverRow={onDragOverRow}
               onDropRow={onDropRow}
+              gapPairs={gapPairs}
+              onAddGapFill={onAddGapFill}
             />
           ))}
         </ul>
@@ -175,10 +208,24 @@ function TreeRow({
 }
 
 /** 个人知识库的文档目录树：支持拖拽排序/移动与重命名。 */
-export function DocTree({ nodes, selectedId, onSelect, onDelete, onRename, onMove }: DocTreeProps) {
+export function DocTree({
+  nodes,
+  selectedId,
+  onSelect,
+  onDelete,
+  onRename,
+  onMove,
+  onAddGapFill,
+}: DocTreeProps) {
   const [draggedId, setDraggedId] = useState<number | null>(null)
   const [hint, setHint] = useState<{ id: number; pos: DropPos } | null>(null)
   const roots = buildForest(nodes)
+  const gapPairs = new Set<string>()
+  for (const node of nodes) {
+    if (node.kind === 'doc' && node.docType === 'gap_fill' && node.pairKey !== null) {
+      gapPairs.add(`${node.parentId ?? 'root'}:${node.pairKey}`)
+    }
+  }
 
   function siblingsOf(parentId: number | null): NoteNodeRow[] {
     return nodes
@@ -262,6 +309,8 @@ export function DocTree({ nodes, selectedId, onSelect, onDelete, onRename, onMov
           onDragStart={setDraggedId}
           onDragOverRow={onDragOverRow}
           onDropRow={onDropRow}
+          gapPairs={gapPairs}
+          onAddGapFill={onAddGapFill}
         />
       ))}
     </ul>

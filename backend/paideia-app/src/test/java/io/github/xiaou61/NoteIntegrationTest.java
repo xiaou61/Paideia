@@ -78,6 +78,8 @@ class NoteIntegrationTest {
         MvcResult detail = mockMvc.perform(get("/api/v1/notes/" + id).header("Authorization", token(userA)))
                 .andReturn();
         assertThat(JsonPath.<String>read(body(detail), "$.data.body")).isEqualTo("正文第一版");
+        // 普通文档不带教程/查漏补缺属性（旧行为不变）
+        assertThat(body(detail)).contains("\"docType\":null").contains("\"pairKey\":null");
 
         // 改：标题与正文都换掉
         MvcResult updated = mockMvc.perform(put("/api/v1/notes/" + id)

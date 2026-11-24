@@ -248,7 +248,9 @@ public final class NoteTools {
             return ToolResult.ok(String.join("\n", nodes.stream()
                     .map(node -> "id=" + node.id() + " kind=" + node.kind()
                             + " parentId=" + (node.parentId() == null ? 0 : node.parentId())
-                            + " 标题=" + node.title())
+                            + " 标题=" + node.title()
+                            + (node.docType() == null ? "" : " doc_type=" + node.docType())
+                            + (node.pairKey() == null ? "" : " pair_key=" + node.pairKey()))
                     .toList()));
         }
     }
@@ -425,7 +427,11 @@ public final class NoteTools {
                             "bookId", Map.of("type", "integer", "description", "知识库 id"),
                             "parentId", Map.of("type", "integer", "description", "父目录 id，留空为根"),
                             "title", Map.of("type", "string", "description", "标题，不超过 200 字"),
-                            "body", Map.of("type", "string", "description", "正文，可多行；可以为空"))),
+                            "body", Map.of("type", "string", "description", "正文，可多行；可以为空"),
+                            "doc_type", Map.of("type", "string",
+                                    "description", "文档类型：tutorial（教程）/ gap_fill（查漏补缺）/ 留空为普通文档"),
+                            "pair_key", Map.of("type", "string",
+                                    "description", "学习单元标识，同一 pair_key 的教程与查漏补缺为一对，不超过 64 字"))),
                     Map.of("type", "object", "properties", Map.of(
                             "noteId", Map.of("type", "integer", "description", "新文档 id"))),
                     false, false, false, ToolScope.WRITE, false);
@@ -440,7 +446,8 @@ public final class NoteTools {
             }
             try {
                 long id = notes.createDoc(context.userId(), bookId, longOf(arguments, "parentId"),
-                        title, stringOf(arguments, "body"));
+                        title, stringOf(arguments, "body"),
+                        stringOf(arguments, "doc_type"), stringOf(arguments, "pair_key"));
                 return ToolResult.ok("已新建文档 id=" + id + "（" + title + "）。", Map.of("noteId", id));
             } catch (RuntimeException failure) {
                 return ToolResult.fail("新建失败：" + messageOf(failure));

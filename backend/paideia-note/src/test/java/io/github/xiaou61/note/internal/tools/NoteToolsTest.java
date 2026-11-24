@@ -25,6 +25,7 @@ class NoteToolsTest {
 
         private final Map<Long, NoteContent> rows = new HashMap<>();
         private final List<Long> seenUserIds = new ArrayList<>();
+        private final List<NoteNode> nodes = new ArrayList<>();
         private long nextId = 1;
 
         @Override
@@ -88,7 +89,7 @@ class NoteToolsTest {
         @Override
         public List<NoteNode> tree(long userId, long bookId) {
             seenUserIds.add(userId);
-            return List.of();
+            return List.copyOf(nodes);
         }
 
         @Override
@@ -104,10 +105,12 @@ class NoteToolsTest {
         }
 
         @Override
-        public long createDoc(long userId, long bookId, Long parentId, String title, String body) {
+        public long createDoc(long userId, long bookId, Long parentId, String title, String body,
+                              String docType, String pairKey) {
             seenUserIds.add(userId);
             long id = nextId++;
             rows.put(id, new NoteContent(id, title, body, Instant.EPOCH));
+            nodes.add(new NoteNode(id, "doc", parentId, 0, title, null, Instant.EPOCH, docType, pairKey));
             return id;
         }
 
@@ -177,5 +180,26 @@ class NoteToolsTest {
         assertThat(new NoteTools.AppendNote(notes).descriptor().readOnly()).isFalse();
         assertThat(new NoteTools.ListNotes(notes).descriptor().readOnly()).isTrue();
         assertThat(new NoteTools.GetNote(notes).descriptor().readOnly()).isTrue();
+    }
+
+    @Test
+    void createDocPassesDocTypeAndPairKey() {
+        ToolResult result = new NoteTools.CreateDoc(notes).call(CALLER, Map.of(
+                "bookId", 1, "title", "A1 教程", "doc_type", "tutorial", "pair_key", "A1"));
+
+        assertThat(result.error()).isFalse();
+        assertThat(notes.nodes).hasSize(1);
+        assertThat(notes.nodes.get(0).docType()).isEqualTo("tutorial");
+        assertThat(notes.nodes.get(0).pairKey()).isEqualTo("A1");
+    }
+
+    @Test
+    void treeShowsDocTypeAndPairKey() {
+        notes.createDoc(7L, 1L, null, "A1 教程", "", "tutorial", "A1");
+
+        ToolResult result = new NoteTools.GetTree(notes).call(CALLER, Map.of("bookId", 1));
+
+        assertThat(result.error()).isFalse();
+        assertThat(result.text()).contains("doc_type=tutorial").contains("pair_key=A1");
     }
 }

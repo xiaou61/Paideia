@@ -15,6 +15,9 @@ interface DocEditorProps {
   /** 纯净预览：隐藏目录与侧栏，只留正文。 */
   zen?: boolean
   onToggleZen?: () => void
+  /** 配对文档标题（教程 ↔ 查漏补缺）；有值时显示跳转按钮。 */
+  pairedTitle?: string
+  onOpenPair?: () => void
 }
 
 /**
@@ -34,6 +37,8 @@ export function DocEditor({
   onUpload,
   zen = false,
   onToggleZen,
+  pairedTitle,
+  onOpenPair,
 }: DocEditorProps) {
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -46,6 +51,11 @@ export function DocEditor({
           onChange={(event) => onTitle(event.target.value)}
           placeholder="无标题文档"
         />
+        {pairedTitle !== undefined && onOpenPair !== undefined ? (
+          <Button variant="ghost" size="sm" aria-label="跳到配对文档" onClick={onOpenPair}>
+            ↔ {pairedTitle}
+          </Button>
+        ) : null}
         {onToggleZen === undefined ? null : (
           <Button
             variant="ghost"

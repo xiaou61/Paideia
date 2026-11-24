@@ -62,6 +62,27 @@ test('知识库：建库→建文档→编辑保存→大纲与检索', async ({
   await deleteBook(page, book)
 })
 
+test('教程与查漏补缺：同标识成对，可一键补建', async ({ page }) => {
+  await signIn(page)
+  const book = await createBook(page)
+
+  await page.getByRole('link', { name: book }).click()
+  await page.getByRole('button', { name: '新建文档' }).click()
+  const dialog = page.getByRole('dialog')
+  const title = `e2e 教程 ${Date.now()}`
+  await dialog.getByLabel('文档标题').fill(title)
+  await dialog.getByLabel('文档类型').selectOption('tutorial')
+  await dialog.getByLabel('单元标识').fill('A1')
+  await dialog.getByRole('button', { name: '创建' }).click()
+
+  // 教程行带徽章，且提示可补建查漏补缺
+  await expect(page.getByText('教程', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '＋ 新建查漏补缺' }).click()
+  await expect(page.getByText('查漏补缺', { exact: true }).first()).toBeVisible()
+
+  await deleteBook(page, book)
+})
+
 test('整库分享：链接免登录可浏览文档树', async ({ page, browser }) => {
   await signIn(page)
   const book = await createBook(page)
