@@ -879,7 +879,7 @@ function HomeLayoutEditor({ draft, onChange, onSave, onCancel, onReset, saving }
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-8" data-testid="home-layout-editor">
-      <div className="border-border bg-card flex max-h-[86vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border shadow-xl">
+      <div className="border-border bg-background flex max-h-[86vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border shadow-2xl">
         <div className="border-border flex items-center justify-between border-b px-5 py-3.5">
           <h2 className="text-sm font-medium">自定义首页</h2>
           <button type="button" onClick={onCancel} aria-label="关闭" className="text-muted-foreground hover:text-foreground">
