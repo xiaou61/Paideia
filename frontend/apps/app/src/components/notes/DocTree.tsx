@@ -124,8 +124,8 @@ function TreeRow({
           onDropRow(item.node.id)
         }}
         data-drop-pos={rowHint ?? undefined}
-        className={`group flex items-start gap-1 rounded-md pr-1 ${
-          selected ? 'bg-accent text-accent-foreground' : 'hover:bg-muted'
+        className={`group relative flex items-start gap-1 rounded-md border-l-2 border-transparent pr-1 ${
+          selected ? 'border-primary bg-primary/5' : 'hover:bg-muted'
         } ${draggedId === item.node.id ? 'opacity-40' : ''} ${
           rowHint === 'into' ? 'ring-primary ring-1' : ''
         } ${rowHint === 'before' ? 'border-primary border-t-2' : ''} ${
@@ -163,7 +163,13 @@ function TreeRow({
             ) : (
               <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             )}
-            <span className="line-clamp-2 break-words">{item.node.title}</span>
+            <span
+              className={`line-clamp-2 break-words ${
+                selected ? 'text-primary font-medium' : ''
+              }`}
+            >
+              {item.node.title}
+            </span>
           </span>
           {item.node.docType === 'tutorial' ||
           item.node.docType === 'gap_fill' ||
@@ -193,22 +199,24 @@ function TreeRow({
             </span>
           ) : null}
         </button>
-        <button
-          type="button"
-          aria-label="重命名"
-          className="mt-0.5 hidden h-6 w-6 items-center justify-center rounded text-muted-foreground hover:text-foreground group-hover:flex"
-          onClick={() => onRename(item.node.id, item.node.title)}
-        >
-          <Pencil className="h-3 w-3" />
-        </button>
-        <button
-          type="button"
-          aria-label="删除"
-          className="mt-0.5 hidden h-6 w-6 items-center justify-center rounded text-muted-foreground hover:text-destructive group-hover:flex"
-          onClick={() => onDelete(item.node.id)}
-        >
-          ×
-        </button>
+        <div className="absolute right-1 top-1 hidden items-center gap-0.5 rounded-md bg-background/90 p-0.5 shadow-sm backdrop-blur group-hover:flex">
+          <button
+            type="button"
+            aria-label="重命名"
+            className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+            onClick={() => onRename(item.node.id, item.node.title)}
+          >
+            <Pencil className="h-3 w-3" />
+          </button>
+          <button
+            type="button"
+            aria-label="删除"
+            className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:text-destructive"
+            onClick={() => onDelete(item.node.id)}
+          >
+            ×
+          </button>
+        </div>
       </div>
       {missingGap && onAddGapFill !== undefined && pairKey !== null ? (
         <div style={{ paddingLeft: `${depth * 14 + 26}px` }} className="py-0.5">
