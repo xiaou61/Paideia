@@ -72,7 +72,9 @@ public class NoteService {
     }
 
     /** 列表项：不带正文，带一段截断的摘要（列表页用）。 */
-    public record NoteSummary(Long id, Long entryId, String title, String excerpt, Instant updatedAt) {
+    public record NoteSummary(Long id, Long entryId, Long bookId, String bookName, String title,
+                              String excerpt, String docType, String category, String level,
+                              Instant updatedAt) {
     }
 
     /** 树节点：不带正文，供前端组装目录树。 */
@@ -102,7 +104,9 @@ public class NoteService {
 
     public List<NoteSummary> list(long userId) {
         return mapper.listByUser(userId, LIST_LIMIT).stream()
-                .map(note -> new NoteSummary(note.getId(), note.getEntryId(), note.getTitle(), note.getExcerpt(), note.getUpdatedAt()))
+                .map(note -> new NoteSummary(note.getId(), note.getEntryId(), note.getBookId(), note.getBookName(),
+                        note.getTitle(), note.getExcerpt(), note.getDocType(), note.getCategory(),
+                        note.getLevel(), note.getUpdatedAt()))
                 .toList();
     }
 
@@ -116,7 +120,9 @@ public class NoteService {
         boolean fulltext = booleanText != null;
         String likePattern = SearchQuery.likePattern(normalized);
         return mapper.search(userId, booleanText, fulltext, likePattern, LIST_LIMIT).stream()
-                .map(n -> new NoteSummary(n.getId(), n.getEntryId(), n.getTitle(), n.getExcerpt(), n.getUpdatedAt()))
+                .map(n -> new NoteSummary(n.getId(), n.getEntryId(), n.getBookId(), n.getBookName(),
+                        n.getTitle(), n.getExcerpt(), n.getDocType(), n.getCategory(), n.getLevel(),
+                        n.getUpdatedAt()))
                 .toList();
     }
 

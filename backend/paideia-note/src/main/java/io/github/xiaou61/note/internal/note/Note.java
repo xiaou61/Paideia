@@ -41,6 +41,9 @@ class Note {
     /** 难度评级：入门 / 进阶 / 高级；NULL=未评级。 */
     private String level;
 
+    /** 所属知识库名称：仅列表/搜索投影附带，写入路径不带它。 */
+    private String bookName;
+
     Long getId() {
         return id;
     }
@@ -175,5 +178,13 @@ class Note {
 
     void setLevel(String level) {
         this.level = level;
+    }
+
+    String getBookName() {
+        return bookName;
+    }
+
+    void setBookName(String bookName) {
+        this.bookName = bookName;
     }
 }

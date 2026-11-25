@@ -7,8 +7,13 @@ import { JSON_HEADERS } from '@paideia/core'
 export interface NoteSummary {
   id: number
   entryId: number | null
+  bookId?: number | null
+  bookName?: string | null
   title: string
   excerpt: string | null
+  docType?: 'tutorial' | 'gap_fill' | null
+  category?: string | null
+  level?: string | null
   updatedAt: string | null
 }
 

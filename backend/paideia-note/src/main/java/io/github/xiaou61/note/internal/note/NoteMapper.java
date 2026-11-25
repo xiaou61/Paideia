@@ -69,15 +69,18 @@ public interface NoteMapper {
      */
     @Select("""
             <script>
-            SELECT id, user_id, book_id, kind, doc_type, pair_key, parent_id, sort_order, entry_id, title,
-                   LEFT(body, 200) AS excerpt, created_at, updated_at, deleted_at
-            FROM notes
-            WHERE user_id = #{userId} AND deleted_at IS NULL AND kind = 'doc'
+            SELECT n.id, n.user_id, n.book_id, n.kind, n.doc_type, n.pair_key, n.category, n.level,
+                   n.parent_id, n.sort_order, n.entry_id, n.title,
+                   LEFT(n.body, 200) AS excerpt, n.created_at, n.updated_at, n.deleted_at,
+                   b.name AS book_name
+            FROM notes n
+            LEFT JOIN note_books b ON b.id = n.book_id
+            WHERE n.user_id = #{userId} AND n.deleted_at IS NULL AND n.kind = 'doc'
             <choose>
-                <when test="fulltext">AND MATCH(title, body) AGAINST(#{booleanText} IN BOOLEAN MODE)</when>
-                <otherwise>AND (title LIKE #{likePattern} OR body LIKE #{likePattern})</otherwise>
+                <when test="fulltext">AND MATCH(n.title, n.body) AGAINST(#{booleanText} IN BOOLEAN MODE)</when>
+                <otherwise>AND (n.title LIKE #{likePattern} OR n.body LIKE #{likePattern})</otherwise>
             </choose>
-            ORDER BY updated_at DESC, id DESC
+            ORDER BY n.updated_at DESC, n.id DESC
             LIMIT #{limit}
             </script>
             """)
