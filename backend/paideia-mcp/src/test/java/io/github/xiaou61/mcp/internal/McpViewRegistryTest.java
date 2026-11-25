@@ -51,7 +51,7 @@ class McpViewRegistryTest {
 
     private static List<String> names(ToolCatalog catalog, McpViews view, String role) {
         Set<ToolScope> scopes = Set.of(ToolScope.READ, ToolScope.WRITE, ToolScope.ADMIN);
-        return catalog.view(view.queryFor(scopes, Set.of(), role)).stream()
+        return catalog.view(view.queryFor(scopes, Set.of(), role).orElseThrow()).stream()
                 .map(ToolDescriptor::name).toList();
     }
 
@@ -115,5 +115,28 @@ class McpViewRegistryTest {
         assertThatThrownBy(() -> registry.view("/x/admin_users", Set.of(), "learner"))
                 .isInstanceOf(McpViewRegistry.ViewNotFoundException.class);
         assertThat(registry.view("/x/admin_users", Set.of(), "admin").name()).isEqualTo("admin_users");
+    }
+
+    @Test
+    void explicitGroupOutsideAllowlistIsNotVisible() {
+        ToolCatalog catalog = new ToolCatalog(List.of(
+                tool("alpha_list", "alpha", ToolScope.READ, true, true),
+                tool("beta_list", "beta", ToolScope.READ, true, true)));
+        McpViewRegistry registry = new McpViewRegistry(catalog, mock(McpToolInvoker.class));
+
+        assertThat(registry.view("/x/alpha", Set.of("alpha"), "learner").name()).isEqualTo("alpha");
+        assertThatThrownBy(() -> registry.view("/x/alpha", Set.of("beta"), "learner"))
+                .isInstanceOf(McpViewRegistry.ViewNotFoundException.class);
+    }
+
+    @Test
+    void aggregateViewsKeepTheExplicitAllowlist() {
+        ToolCatalog catalog = new ToolCatalog(List.of(
+                tool("alpha_list", "alpha", ToolScope.READ, true, true),
+                tool("beta_list", "beta", ToolScope.READ, true, true)));
+        for (McpViews view : List.of(McpViews.DEFAULT, McpViews.parse("/x/all").orElseThrow())) {
+            var query = view.queryFor(Set.of(ToolScope.READ), Set.of("alpha"), "learner").orElseThrow();
+            assertThat(catalog.view(query)).extracting(ToolDescriptor::name).containsExactly("alpha_list");
+        }
     }
 }

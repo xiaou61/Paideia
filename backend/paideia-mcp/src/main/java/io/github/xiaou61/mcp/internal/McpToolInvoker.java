@@ -99,9 +99,11 @@ class McpToolInvoker {
         }
         ToolDescriptor descriptor = found.get().descriptor();
 
-        // 视图校验：当前视图的清单是唯一权威（按调用者的 scope 与角色过滤后仍须包含它）
-        boolean visible = catalog.view(view.queryFor(caller.scopes(), caller.toolsets(), caller.role()))
-                .stream().anyMatch(candidate -> candidate.name().equals(toolName));
+        // 不信任已缓存的视图：按当次凭据的工具组、scope 与角色重新判定。
+        boolean visible = view.queryFor(caller.scopes(), caller.toolsets(), caller.role())
+                .map(query -> catalog.view(query).stream()
+                        .anyMatch(candidate -> candidate.name().equals(toolName)))
+                .orElse(false);
         if (!visible) {
             return Outcome.denied("没有名为「" + toolName + "」的工具", Denial.PERMISSION);
         }

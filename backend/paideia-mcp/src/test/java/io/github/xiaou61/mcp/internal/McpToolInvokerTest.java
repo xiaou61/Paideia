@@ -91,6 +91,19 @@ class McpToolInvokerTest {
     }
 
     @Test
+    void deniedGroupDoesNotInvokeHandler() {
+        ToolCatalog catalog = new ToolCatalog(List.of(recording("alpha_list", "alpha", true)));
+        McpToolInvoker invoker = new McpToolInvoker(catalog, new McpRateLimiter(100), usage,
+                new McpMetrics(registry));
+        McpViews view = new McpViews("alpha", Set.of("alpha"), false, false);
+        var caller = new McpViewRegistry.PatCaller(7L, 1L, "learner", Set.of(ToolScope.READ),
+                Set.of("beta"), null);
+
+        assertThat(invoker.invoke(caller, view, "alpha_list", Map.of()).error()).isTrue();
+        assertThat(lastContext.get()).isNull();
+    }
+
+    @Test
     void toolInsideWriteViewRunsForWriteToken() {
         McpViews writeView = McpViews.parse("/x/note/write").orElseThrow();
 

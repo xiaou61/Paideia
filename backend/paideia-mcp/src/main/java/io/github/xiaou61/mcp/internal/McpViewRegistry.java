@@ -3,6 +3,7 @@ package io.github.xiaou61.mcp.internal;
 import io.github.xiaou61.platform.ToolCatalog;
 import io.github.xiaou61.platform.ToolContext;
 import io.github.xiaou61.platform.ToolDescriptor;
+import io.github.xiaou61.platform.ToolQuery;
 import io.github.xiaou61.platform.ToolResult;
 import io.github.xiaou61.platform.ToolScope;
 import io.modelcontextprotocol.server.McpServer;
@@ -90,8 +91,11 @@ class McpViewRegistry {
         if (!isAdmin(role) && parsed.toolsets().stream().anyMatch(group -> group.startsWith("admin_"))) {
             throw new ViewNotFoundException(path);
         }
+        // 清单按视图的读写设置过滤；单张凭据的 scope 在执行阶段验证。
+        ToolQuery query = parsed.queryFor(Set.of(ToolScope.READ, ToolScope.WRITE, ToolScope.ADMIN),
+                allowedToolsets, role).orElseThrow(() -> new ViewNotFoundException(path));
         String key = cacheKey(parsed, allowedToolsets, role);
-        return views.computeIfAbsent(key, ignored -> build(parsed, pathOf(path), allowedToolsets, role));
+        return views.computeIfAbsent(key, ignored -> build(parsed, pathOf(path), query));
     }
 
     /**
@@ -106,11 +110,8 @@ class McpViewRegistry {
                 + "|" + (isAdmin(role) ? "admin" : "user");
     }
 
-    private McpView build(McpViews view, String endpoint, Set<String> allowedToolsets, String role) {
-        // scope 带全三档（清单按视图的 write 设置过滤，不按某张凭据的 scope 过滤）；
-        // 工具组必须与凭据白名单取交集——漏了它会让"只授权知识库"的凭据看到全部工具。
-        List<ToolDescriptor> descriptors = catalog.view(view.queryFor(
-                Set.of(ToolScope.READ, ToolScope.WRITE, ToolScope.ADMIN), allowedToolsets, role));
+    private McpView build(McpViews view, String endpoint, ToolQuery query) {
+        List<ToolDescriptor> descriptors = catalog.view(query);
         HttpServletStreamableServerTransportProvider transport =
                 HttpServletStreamableServerTransportProvider.builder()
                         .mcpEndpoint(endpoint)
