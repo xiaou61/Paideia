@@ -175,6 +175,7 @@ public class ConversationService {
      * @param memorySnippets 召回的记忆（本人私有，每条一行）
      * @param access         凭据；调用方据此给出"尚未配置"的提示
      * @param reservedCredits 已从余额里预扣的积分（0 表示未计量）；结算时调用方要把它带回来
+     * @param roundId        本轮预约的唯一标识（WORK-092 TASK-005）；结算/退回据此幂等，0 计量时为 null
      */
     public record TurnPreparation(long conversationId,
                                   List<ConversationTurn> history,
@@ -190,7 +191,9 @@ public class ConversationService {
                                   /** 页面场景（WORK-035 T-15）。只进提示词，不落库。 */
                                   String pageContext,
                                   /** RAG 检索上下文（WORK-072）。只进提示词，不落库。 */
-                                  String knowledgeContext) {
+                                  String knowledgeContext,
+                                  /** 本轮预约的 round_id（WORK-092 TASK-005）：结算/退回的幂等键。 */
+                                  String roundId) {
 
         /** 不带页面场景/RAG 的形态：既有调用点与测试用它。 */
         public TurnPreparation(long conversationId, List<ConversationTurn> history, String userMessage,
@@ -198,7 +201,7 @@ public class ConversationService {
                                List<String> memorySnippets, ModelAccess access, long reservedCredits,
                                Harness harness) {
             this(conversationId, history, userMessage, entryTitle, entryBody, learningSummary,
-                    memorySnippets, access, reservedCredits, harness, null, null);
+                    memorySnippets, access, reservedCredits, harness, null, null, null);
         }
     }
 
@@ -298,7 +301,8 @@ public class ConversationService {
 
         // 预扣在**调模型之前**同步做完：余额不足时一个上游请求都不会发出去（REQ-006）。
         // 放在限流之后：被限流的那一轮本来就不该占用户的额度。**它的后面不能再有会抛的动作。**
-        long reserved = credits.reserve(userId, credits.estimate());
+        CreditService.Reservation reservation = credits.reserveRound(userId, credits.estimate());
+        long reserved = reservation.amount();
         // 页面场景只做长度兜底（前端已按自己的上限截过）：防有人绕过前端直接调接口塞一大段
         String context = pageContext == null || pageContext.isBlank()
                 ? null
@@ -306,7 +310,7 @@ public class ConversationService {
                         ? pageContext.substring(0, MAX_PAGE_CONTEXT_CHARS)
                         : pageContext;
         return new TurnPreparation(conversationId, history, trimmed, entry.title(), entry.body(),
-                learning, snippets, access.get(), reserved, harness, context, knowledgeContext);
+                learning, snippets, access.get(), reserved, harness, context, knowledgeContext, reservation.roundId());
     }
 
     /**

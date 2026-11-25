@@ -5,8 +5,10 @@ import io.github.xiaou61.platform.PageQuery;
 import io.github.xiaou61.platform.PageResult;
 import io.github.xiaou61.platform.ErrorCode;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -41,13 +43,15 @@ public class CreditService {
 
     private final CreditAccountMapper accounts;
     private final CreditLedgerMapper ledger;
+    private final CreditReservationMapper reservations;
     private final BillingProperties billing;
     private final MeterRegistry metrics;
 
-    CreditService(CreditAccountMapper accounts, CreditLedgerMapper ledger, BillingProperties billing,
-                  MeterRegistry metrics) {
+    CreditService(CreditAccountMapper accounts, CreditLedgerMapper ledger, CreditReservationMapper reservations,
+                  BillingProperties billing, MeterRegistry metrics) {
         this.accounts = accounts;
         this.ledger = ledger;
+        this.reservations = reservations;
         this.billing = billing;
         this.metrics = metrics;
     }
@@ -62,6 +66,13 @@ public class CreditService {
                     row.getInputTokens(), row.getOutputTokens(), row.getRefMessageId(),
                     row.getOperatorUserId(), row.getNote(), row.getCreatedAt());
         }
+    }
+
+    /**
+     * 一轮调用的预约凭据（WORK-092 TASK-005）。{@code roundId} 是幂等键，{@code amount} 是已从余额
+     * 扣下的预扣额。结算 / 退回都带着它，保证「同一轮」无论重试多少次只落一次账。
+     */
+    public record Reservation(String roundId, long userId, long amount) {
     }
 
     public boolean enabled() {
@@ -109,6 +120,96 @@ public class CreditService {
     }
 
     /**
+     * 带预约的预留（WORK-092 TASK-005）：扣余额与写预约记录**在同一事务**内完成。
+     *
+     * <p>与 {@link #reserve} 的区别：这里留下一条 {@code RESERVED} 预约（带唯一 {@code roundId}），
+     * 于是「预留后、结算前」若进程中断，恢复任务能凭这条记录把预扣额退回。{@link #reserve} 保留给
+     * 其余尚未迁移的 AI 路径，行为不变（只扣余额、不留痕）。
+     *
+     * @return 预约凭据；未启用计费或金额为 0 时返回 {@code amount=0} 的空预约（无副作用）
+     */
+    @Transactional
+    public Reservation reserveRound(long userId, long amount) {
+        if (!billing.isEnabled() || amount <= 0) {
+            return new Reservation(null, userId, 0);
+        }
+        if (accounts.deductIfEnough(userId, amount) == 0) {
+            throw new BizException(ErrorCode.INSUFFICIENT_CREDITS,
+                    "积分不足，本次需要预留 " + amount + " 分（当前 " + balance(userId) + " 分）。"
+                            + "当前没有自动充值，请联系管理员。");
+        }
+        CreditReservation row = new CreditReservation();
+        row.setRoundId(UUID.randomUUID().toString());
+        row.setUserId(userId);
+        row.setAmount(amount);
+        row.setStatus(CreditReservation.STATUS_RESERVED);
+        reservations.insert(row);
+        return new Reservation(row.getRoundId(), userId, amount);
+    }
+
+    /**
+     * 按预约结算（WORK-092 TASK-005）：对 {@code roundId} 幂等——只有仍处于 {@code RESERVED} 的那一次
+     * 会真正补退/补扣并写结算流水，之后重复调用直接返回 0。
+     *
+     * <p>整个「读取预约（行锁）→ 余额调整 → 写流水 → 置终态」在同一事务：任何一步失败都整体回滚，
+     * 预约仍停在 {@code RESERVED}，交给恢复任务兜底，绝不会出现「钱扣了、流水没写」的中间态。
+     */
+    @Transactional
+    public int settleRound(Reservation reservation, String model, Integer inputTokens, Integer outputTokens,
+                           Long refMessageId) {
+        return settleRound(reservation.userId(), reservation.roundId(), reservation.amount(),
+                CreditLedger.KIND_SETTLE, model, inputTokens, outputTokens, refMessageId);
+    }
+
+    @Transactional
+    public int settleRound(long userId, String roundId, long reserved, String kind, String model,
+                           Integer inputTokens, Integer outputTokens, Long refMessageId) {
+        if (!billing.isEnabled() || reserved <= 0) {
+            return 0;
+        }
+        CreditReservation row = reservations.lockByRoundId(roundId);
+        if (row == null || !CreditReservation.STATUS_RESERVED.equals(row.getStatus())) {
+            return 0;
+        }
+        int charged = settleAs(userId, reserved, kind, model, inputTokens, outputTokens, refMessageId, roundId);
+        reservations.complete(row.getId(), CreditReservation.STATUS_SETTLED, refMessageId, null);
+        return charged;
+    }
+
+    /**
+     * 按预约全额退回（WORK-092 TASK-005）：同样对 {@code roundId} 幂等，只退仍在 {@code RESERVED} 的那一次。
+     */
+    @Transactional
+    public void refundRound(Reservation reservation, Long refMessageId, String note) {
+        refundRound(reservation.userId(), reservation.roundId(), refMessageId, note);
+    }
+
+    @Transactional
+    public void refundRound(long userId, String roundId, Long refMessageId, String note) {
+        if (!billing.isEnabled()) {
+            return;
+        }
+        CreditReservation row = reservations.lockByRoundId(roundId);
+        if (row == null || !CreditReservation.STATUS_RESERVED.equals(row.getStatus())) {
+            return;
+        }
+        accounts.add(row.getUserId(), row.getAmount());
+        reservations.complete(row.getId(), CreditReservation.STATUS_REFUNDED, refMessageId, note);
+        log.info("ai.credit.refunded roundId={} userId={} amount={} reason={}",
+                roundId, row.getUserId(), row.getAmount(), note);
+    }
+
+    /**
+     * 超时仍停在 {@code RESERVED} 的预约（恢复任务用）。只读快照，真正退由 {@link #refundRound} 加锁幂等完成。
+     */
+    public List<Reservation> staleReservations(Duration timeout, int limit) {
+        Instant before = Instant.now().minus(timeout);
+        return reservations.findStaleReserved(before, Math.max(1, limit)).stream()
+                .map(row -> new Reservation(row.getRoundId(), row.getUserId(), row.getAmount()))
+                .toList();
+    }
+
+    /**
      * 结算：按**实际用量**算出该扣多少，与预留的差额补退；流水只写**一行净额**。
      *
      * <p>三步：
@@ -126,7 +227,7 @@ public class CreditService {
     @Transactional
     public int settle(long userId, long reserved, String model, Integer inputTokens, Integer outputTokens,
                       Long refMessageId) {
-        return settleAs(userId, reserved, CreditLedger.KIND_SETTLE, model, inputTokens, outputTokens, refMessageId);
+        return settleAs(userId, reserved, CreditLedger.KIND_SETTLE, model, inputTokens, outputTokens, refMessageId, null);
     }
 
     /**
@@ -138,7 +239,7 @@ public class CreditService {
     @Transactional
     public int settleInterviewReview(long userId, long reserved, String model,
                                      Integer inputTokens, Integer outputTokens, Long refMessageId) {
-        return settleAs(userId, reserved, CreditLedger.KIND_INTERVIEW_REVIEW, model, inputTokens, outputTokens, refMessageId);
+        return settleAs(userId, reserved, CreditLedger.KIND_INTERVIEW_REVIEW, model, inputTokens, outputTokens, refMessageId, null);
     }
 
     /**
@@ -150,7 +251,7 @@ public class CreditService {
     @Transactional
     public int settleResume(long userId, long reserved, String model,
                             Integer inputTokens, Integer outputTokens, Long refMessageId) {
-        return settleAs(userId, reserved, CreditLedger.KIND_RESUME, model, inputTokens, outputTokens, refMessageId);
+        return settleAs(userId, reserved, CreditLedger.KIND_RESUME, model, inputTokens, outputTokens, refMessageId, null);
     }
 
     /**
@@ -162,14 +263,14 @@ public class CreditService {
     @Transactional
     public int settleCamp(long userId, long reserved, String model,
                           Integer inputTokens, Integer outputTokens, Long refMessageId) {
-        return settleAs(userId, reserved, CreditLedger.KIND_CAMP, model, inputTokens, outputTokens, refMessageId);
+        return settleAs(userId, reserved, CreditLedger.KIND_CAMP, model, inputTokens, outputTokens, refMessageId, null);
     }
 
     /** 复习出题的结算（WORK-034）：与训练营同一套预留/结算，只是流水种类分开。 */
     @Transactional
     public int settleReview(long userId, long reserved, String model,
                             Integer inputTokens, Integer outputTokens) {
-        return settleAs(userId, reserved, CreditLedger.KIND_REVIEW, model, inputTokens, outputTokens, null);
+        return settleAs(userId, reserved, CreditLedger.KIND_REVIEW, model, inputTokens, outputTokens, null, null);
     }
 
     /**
@@ -179,7 +280,7 @@ public class CreditService {
     @Transactional
     public int settleOpsDiagnosis(long userId, long reserved, String model,
                                   Integer inputTokens, Integer outputTokens) {
-        return settleAs(userId, reserved, CreditLedger.KIND_OPS_DIAGNOSIS, model, inputTokens, outputTokens, null);
+        return settleAs(userId, reserved, CreditLedger.KIND_OPS_DIAGNOSIS, model, inputTokens, outputTokens, null, null);
     }
 
     /**
@@ -189,7 +290,7 @@ public class CreditService {
      * 而那是结算算出来的，调用方原先只知道自己预留了多少。返回 0 表示没扣。
      */
     private int settleAs(long userId, long reserved, String kind, String model,
-                         Integer inputTokens, Integer outputTokens, Long refMessageId) {
+                         Integer inputTokens, Integer outputTokens, Long refMessageId, String roundId) {
         if (!billing.isEnabled() || reserved <= 0) {
             return 0;
         }
@@ -213,7 +314,7 @@ public class CreditService {
             }
         }
         if (deducted > 0) {
-            write(userId, -deducted, kind, model, inputTokens, outputTokens, refMessageId, null, note);
+            write(userId, -deducted, kind, model, inputTokens, outputTokens, refMessageId, null, note, roundId);
         }
         return (int) Math.max(deducted, 0);
     }
@@ -242,7 +343,7 @@ public class CreditService {
     @Transactional
     public int settleExternalAsk(long userId, long reserved, String model,
                                  Integer inputTokens, Integer outputTokens) {
-        return settleAs(userId, reserved, CreditLedger.KIND_MCP_ASK, model, inputTokens, outputTokens, null);
+        return settleAs(userId, reserved, CreditLedger.KIND_MCP_ASK, model, inputTokens, outputTokens, null, null);
     }
 
     /**
@@ -262,7 +363,7 @@ public class CreditService {
             throw new BizException(ErrorCode.INVALID_ARGUMENT,
                     "该用户余额不足以扣减 " + (-delta) + " 分（当前 " + balance(userId) + " 分）");
         }
-        write(userId, delta, CreditLedger.KIND_ADJUST, null, null, null, null, operatorUserId, note);
+        write(userId, delta, CreditLedger.KIND_ADJUST, null, null, null, null, operatorUserId, note, null);
         return balance(userId);
     }
 
@@ -299,7 +400,7 @@ public class CreditService {
     }
 
     private void write(long userId, long delta, String kind, String model, Integer inputTokens,
-                       Integer outputTokens, Long refMessageId, Long operatorUserId, String note) {
+                       Integer outputTokens, Long refMessageId, Long operatorUserId, String note, String roundId) {
         CreditLedger row = new CreditLedger();
         row.setUserId(userId);
         row.setDelta(delta);
@@ -310,6 +411,7 @@ public class CreditService {
         row.setRefMessageId(refMessageId);
         row.setOperatorUserId(operatorUserId);
         row.setNote(note);
+        row.setRoundId(roundId);
         ledger.insert(row);
     }
 }

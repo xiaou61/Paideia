@@ -18,10 +18,10 @@ interface CreditLedgerMapper {
 
     @Insert("""
             INSERT INTO ai_credit_ledger
-              (user_id, delta, kind, model, input_tokens, output_tokens, ref_message_id, operator_user_id, note)
+              (user_id, delta, kind, model, input_tokens, output_tokens, ref_message_id, operator_user_id, note, round_id)
             VALUES
               (#{userId}, #{delta}, #{kind}, #{model}, #{inputTokens}, #{outputTokens},
-               #{refMessageId}, #{operatorUserId}, #{note})
+               #{refMessageId}, #{operatorUserId}, #{note}, #{roundId})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(CreditLedger row);

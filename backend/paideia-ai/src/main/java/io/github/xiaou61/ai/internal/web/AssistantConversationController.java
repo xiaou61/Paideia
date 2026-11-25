@@ -342,12 +342,16 @@ class AssistantConversationController {
             return 0;
         }
         settled[0] = true;
+        // 用持久化预约的 round_id 结算/退回：数据库按 round_id 幂等，崩溃或重复回调都不会多扣多退。
+        // 内存里的 settled 闸只是省一次 DB 往返，真正的幂等由 ai_credit_reservations 的状态保证。
+        CreditService.Reservation reservation =
+                new CreditService.Reservation(turn.roundId(), userId, turn.reservedCredits());
         if (usage == null) {
             // 全额退回：这一次实扣是 0，统计里记 0 而不是"预留值"——预留不是花费
-            credits.refund(userId, turn.reservedCredits(), messageId, "上游未返回用量");
+            credits.refundRound(reservation, messageId, "上游未返回用量");
             return 0;
         }
-        return credits.settle(userId, turn.reservedCredits(), turn.access().model(),
+        return credits.settleRound(reservation, turn.access().model(),
                 usage.inputTokens(), usage.outputTokens(), messageId);
     }
 

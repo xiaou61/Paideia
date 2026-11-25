@@ -72,12 +72,14 @@ approver_role: CTO
 - 步骤：先写并发与慢保存回归；学习侧改为确保行 + `SELECT … FOR UPDATE` 锁 + 按 id 更新（不迁移学习表）；笔记侧把自动保存抽成与框架无关的 `NoteAutosaver`（草稿版本、保存中补存最新、编辑中不用服务端结果覆盖本地、切换文档丢弃旧文档排队保存）。
 - 实测：后端 `../scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=LearningProgressIntegrationTest` → `Tests run: 11, Failures: 0, Errors: 0`（含新增 `concurrentDisjointBlocksBothSurvive`：两线程不同块并发写，两块的 c1/c2 都保留）BUILD SUCCESS，隔离库，不触碰线上库；前端 `pnpm --filter @paideia/knowledge exec vitest run src/note-autosave.test.ts` 5 passed；`pnpm --filter @paideia/knowledge typecheck` 0、`pnpm --filter @paideia/app typecheck` 0。
 
-### TASK-005 | wait | AI 计费预约的持久幂等与恢复
+### TASK-005 | done | AI 计费预约的持久幂等与恢复
 
 - 对应：REQ-005、AC-005；依赖：无。
 - 修改：`backend/paideia-ai/src/main/java/io/github/xiaou61/ai/internal/billing/{CreditService,CreditLedgerMapper}.java`、新增 `CreditReservationMapper.java`、`backend/paideia-ai/src/main/java/io/github/xiaou61/ai/internal/web/AssistantConversationController.java`、恢复调度；新增迁移 `V2026112514xxxx__add_ai_credit_reservations.sql`。
 - 步骤：先写幂等与恢复回归；建预约表与台账 `round_id` 唯一键；`reserve` 记录 round_id；结算/退款幂等；控制器改用 roundId；加恢复任务。
 - 验证：隔离库 `scripts/test-db.sh` 跑结算/退款幂等、重复恢复、并发；迁移在零数据新库通过。
+- 实测：迁移 `V20261125141000__add_ai_credit_reservations.sql`（新建 `ai_credit_reservations` + `ai_credit_ledger.round_id` 唯一键）。隔离库 `../scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=AiCreditIntegrationTest,AccountDeletionCascadeIntegrationTest,ModularityTest -Dsurefire.failIfNoSpecifiedTests=false test` → `Tests run: 13, Failures: 0, Errors: 0` BUILD SUCCESS（AiCredit 8 条含新增 `settleRoundIsIdempotent`、`refundRoundIsIdempotent`、`staleReservationIsRecovered`；AccountDeletionCascade 4 条含预约行注销归零；Modularity 1 条）；`mvn -q -o -T 1C -pl paideia-ai,paideia-app -am -DskipTests compile` 退出 0。
+- 实现补充（切片边界）：新增 `reserveRound`/`settleRound`/`refundRound`/`staleReservations` 与恢复任务，**只把被审计的会话路径**（`ConversationService.prepare` + `AssistantConversationController.settleOnce`）切到持久 round_id；其余约 8 个 AI 服务（简历/训练营/复盘/外部问答等）仍用旧 `reserve/settle/refund`，不随本轮改动——这是刻意的切片边界，避免一次性改动未覆盖测试的结算点；崩溃恢复只保证会话路径，其余路径按现状。`settled[0]` 内存闸仍保留（省一次 DB 往返），真正幂等由 `ai_credit_reservations` 状态 CAS 保证。
 
 ### TASK-006 | wait | 知识导入中断的可恢复与 fencing
 

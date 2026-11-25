@@ -72,6 +72,8 @@ class CreditLedger {
     private Long refMessageId;
     private Long operatorUserId;
     private String note;
+    /** 结算流水对应的预约轮次（WORK-092 TASK-005）；非结算行为 NULL。 */
+    private String roundId;
     private Instant createdAt;
 
     Long getId() {
@@ -152,6 +154,14 @@ class CreditLedger {
 
     void setNote(String note) {
         this.note = note;
+    }
+
+    String getRoundId() {
+        return roundId;
+    }
+
+    void setRoundId(String roundId) {
+        this.roundId = roundId;
     }
 
     Instant getCreatedAt() {

@@ -41,6 +41,9 @@ class AiUserDeletionListener {
             {"ai_entry_summaries", "owner_user_id"},
             // 积分流水与账户（WORK-009）。**注销一并删**（用户决定 8）：守住"注销即级联硬删"，
             // 代价是注销用户的账不再完整——这是明确选过的方向，别改成"保留审计"。
+            // 预约行（WORK-092 TASK-005）同理：留着会被恢复任务当成"待退"退回一个已注销的账户，
+            // 所以必须和账户、流水一起删。
+            {"ai_credit_reservations", "user_id"},
             {"ai_credit_ledger", "user_id"},
             {"ai_credit_accounts", "user_id"},
             // 简历（WORK-018）：四张表都要删。`resume_documents` 是主简历本体，另外三张是它的

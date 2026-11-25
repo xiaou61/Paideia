@@ -13,6 +13,9 @@ import io.github.xiaou61.ai.AssistantConversation;
 import io.github.xiaou61.ai.TokenUsage;
 import io.github.xiaou61.ai.internal.billing.CreditService;
 import io.github.xiaou61.security.AuthPort;
+import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -76,6 +79,7 @@ class AiCreditIntegrationTest {
         createdConversations.clear();
         jdbcTemplate.update("DELETE FROM ai_messages");
         jdbcTemplate.update("DELETE FROM ai_conversations");
+        jdbcTemplate.update("DELETE FROM ai_credit_reservations");
         jdbcTemplate.update("DELETE FROM ai_credit_ledger");
         jdbcTemplate.update("DELETE FROM ai_credit_accounts");
         String suffix = Long.toString(System.nanoTime() % 1_000_000L);
@@ -224,6 +228,78 @@ class AiCreditIntegrationTest {
             listener.onCompleted();
             return null;
         }).when(assistant).stream(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("AC-005：预约结算按 round_id 幂等，重复结算不再多扣")
+    void settleRoundIsIdempotent() {
+        long userId = Long.parseLong(userA);
+        credits.adjust(userId, 10_000, 1L, "用例发放");
+        CreditService.Reservation reserved = credits.reserveRound(userId, RESERVE);
+        CreditService.Reservation round =
+                new CreditService.Reservation(reserved.roundId(), userId, reserved.amount());
+
+        int first = credits.settleRound(round, "deepseek-flash", 500, 500, null);
+        int second = credits.settleRound(round, "deepseek-flash", 500, 500, null);
+
+        assertThat(first).as("500 input→50，500 output→100，合计 150").isEqualTo(150);
+        assertThat(second).as("同一 round 第二次结算应幂等返回 0").isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ai_credit_ledger WHERE kind = 'SETTLE'", Long.class))
+                .as("只写一行净额，不会重复记账").isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM ai_credit_reservations WHERE round_id = ?", String.class, reserved.roundId()))
+                .isEqualTo("SETTLED");
+        assertThat(credits.balance(userId)).isEqualTo(10_000 - 150);
+    }
+
+    @Test
+    @DisplayName("AC-005：预约退回按 round_id 幂等，余额只恢复一次")
+    void refundRoundIsIdempotent() {
+        long userId = Long.parseLong(userA);
+        credits.adjust(userId, 10_000, 1L, "用例发放");
+        CreditService.Reservation reserved = credits.reserveRound(userId, RESERVE);
+        CreditService.Reservation round =
+                new CreditService.Reservation(reserved.roundId(), userId, reserved.amount());
+        assertThat(credits.balance(userId)).as("预留先扣掉 1000").isEqualTo(10_000 - RESERVE);
+
+        credits.refundRound(round, null, "上游未返回用量");
+        credits.refundRound(round, null, "重复退回");
+
+        assertThat(credits.balance(userId)).as("只退回一次，不会退两次").isEqualTo(10_000);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM ai_credit_reservations WHERE round_id = ?", String.class, reserved.roundId()))
+                .isEqualTo("REFUNDED");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ai_credit_ledger WHERE kind IN ('RESERVE','REFUND')", Long.class))
+                .as("预留与退还不写流水").isZero();
+    }
+
+    @Test
+    @DisplayName("AC-005：中断的预约超过阈值会被恢复任务整笔退回，重复恢复不再变动")
+    void staleReservationIsRecovered() {
+        long userId = Long.parseLong(userA);
+        credits.adjust(userId, 10_000, 1L, "用例发放");
+        CreditService.Reservation reserved = credits.reserveRound(userId, RESERVE);
+        // 造一笔"卡住"的预约：把 created_at 拨回超过超时阈值
+        jdbcTemplate.update("UPDATE ai_credit_reservations SET created_at = ? WHERE round_id = ?",
+                Timestamp.from(Instant.now().minusSeconds(3600)), reserved.roundId());
+
+        List<CreditService.Reservation> stale = credits.staleReservations(Duration.ofMinutes(10), 200);
+        assertThat(stale).extracting(CreditService.Reservation::roundId).contains(reserved.roundId());
+        for (CreditService.Reservation staleReservation : stale) {
+            credits.refundRound(staleReservation, null, "恢复：结算前中断");
+        }
+        assertThat(credits.balance(userId)).as("恢复把预留整笔退回").isEqualTo(10_000);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM ai_credit_reservations WHERE round_id = ?", String.class, reserved.roundId()))
+                .isEqualTo("REFUNDED");
+
+        // 再跑一次恢复：已 REFUNDED 的行不再被扫到，余额不变
+        for (CreditService.Reservation staleReservation : credits.staleReservations(Duration.ofMinutes(10), 200)) {
+            credits.refundRound(staleReservation, null, "重复恢复");
+        }
+        assertThat(credits.balance(userId)).as("重复恢复不改动余额").isEqualTo(10_000);
     }
 
     private MvcResult sendMessage(String subject, long conversationId, String message) throws Exception {

@@ -67,6 +67,7 @@ class AccountDeletionCascadeIntegrationTest {
             // 积分账户与流水（WORK-009）。用户决定 8：注销时**一并删**，守住"注销即级联硬删"。
             // 新增用户私有表却忘了在这里加一行，注销就会悄悄留下一份账，而没人会知道。
             {"ai_credit_accounts", "user_id"},
+            {"ai_credit_reservations", "user_id"},
             {"ai_credit_ledger", "user_id"},
             {"notes", "user_id"},
             {"note_shares", "user_id"},
@@ -258,6 +259,11 @@ class AccountDeletionCascadeIntegrationTest {
                 """, owner);
         // 积分账户 + 一条流水（WORK-009）
         jdbcTemplate.update("INSERT INTO ai_credit_accounts (user_id, balance) VALUES (?, 123)", owner);
+        // 一条预约（WORK-092 TASK-005）：注销后必须一并归零，否则恢复任务会给已注销账户退款
+        jdbcTemplate.update("""
+                INSERT INTO ai_credit_reservations (round_id, user_id, amount, status)
+                VALUES (UUID(), ?, 10, 'RESERVED')
+                """, owner);
         jdbcTemplate.update("""
                 INSERT INTO user_home_layout (user_id, layout_json, updated_at)
                 VALUES (?, '{"version":1}', UTC_TIMESTAMP(3))
