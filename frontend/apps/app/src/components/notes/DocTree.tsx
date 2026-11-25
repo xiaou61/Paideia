@@ -157,13 +157,13 @@ function TreeRow({
           className="flex min-w-0 flex-1 flex-col gap-0.5 py-1 text-left text-sm"
           onClick={() => onSelect(item.node.id)}
         >
-          <span className="flex min-w-0 items-center gap-1.5">
+          <span className="flex min-w-0 items-start gap-1.5">
             {isFolder ? (
-              <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <Folder className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             ) : (
-              <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             )}
-            <span className="truncate">{item.node.title}</span>
+            <span className="line-clamp-2 break-words">{item.node.title}</span>
           </span>
           {item.node.docType === 'tutorial' ||
           item.node.docType === 'gap_fill' ||
