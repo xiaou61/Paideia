@@ -90,9 +90,11 @@ approver_role: CTO
 - 实测：迁移 `V20261125142000__add_knowledge_import_lease.sql`（`claim_token` / `processing_since` / `attempts` + `(status, processing_since)` 索引）。隔离库 `../scripts/test-db.sh mvn -B -pl paideia-ai,paideia-app -am -Dtest=KnowledgeImportServiceTest,KnowledgeImportJobTest,KnowledgeImportRecoveryIntegrationTest,KnowledgeImportFlowIntegrationTest,ModularityTest -Dsurefire.failIfNoSpecifiedTests=false test` → BUILD SUCCESS：`KnowledgeImportServiceTest` 6 条、`KnowledgeImportJobTest` 3 条（单飞/吞异常）、新增 `KnowledgeImportRecoveryIntegrationTest` 2 条（过期令牌写结果被丢弃不覆盖；超时 processing 被回收为 pending、旧令牌失效、可重新领取）、既有 `KnowledgeImportFlowIntegrationTest` 3 条（草稿落库/指纹去重/RAG，回归通过）、`ModularityTest` 1 条。
 - 实现补充：`processPending` 每轮先 `requeueStale(now - processingTimeout)` 把「领取后被杀」的行退回 pending 再消费；`processOne` 用 UUID 令牌领取，所有 `updateResult` 都带令牌做 fencing；超时阈值 `${paideia.ai.import.processing-timeout-ms:600000}`。指纹去重仍由 `KnowledgeApi.createCollected` 保证，所以「回收后重跑」不会产生重复草稿。
 
-### TASK-007 | wait | SSE 未完整结束不显示正常完成
+### TASK-007 | done | SSE 未完整结束不显示正常完成
 
 - 对应：REQ-005、AC-005；依赖：无。
 - 修改：`frontend/packages/assistant/src/{sse.ts,client.ts}`、`frontend/apps/app/src/pages/InterviewPage.tsx`。
 - 步骤：先写截断流回归；`readEventStream` 暴露终止事件；页面据终止状态提示未完整；abort 不报错。
 - 验证：`pnpm --filter @paideia/assistant test`（新增）与 `pnpm --filter @paideia/app typecheck`；合成流，不调用真实模型。
+- 实测：`pnpm --filter @paideia/assistant test` → 4 个文件 24 条通过（`sse.test.ts` 11 条含"截断流未终止""error 也算终止"；新增 `client.test.ts` 3 条：done 不补错并按 input/output/total 归一、无终止断流补一条"未能完整结束"错误、服务端已发 error 不叠加）。`pnpm --filter @paideia/app typecheck` 0。
+- 实现补充：`readEventStream` 现返回 `StreamOutcome{terminated}`（收到 `done` 或 `error` 即 true；无响应体/仅正文即断为 false）；`sendMessage` 在 `!terminated` 时合成一条 `{type:'error',message:'回答未能完整结束（连接中断），请重试'}` 事件。面试页原有 `event.type==='error' → setError` 已据终止状态给出"没成功"提示、`busy` 正常收尾且不留"假装完成"的空气泡，故 `InterviewPage.tsx` 无需改动（原设计第 15 项对该文件的功能要求由既有处理满足）；abort 仍以异常抛出、不合成错误。

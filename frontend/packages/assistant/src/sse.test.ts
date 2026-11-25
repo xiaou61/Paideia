@@ -70,27 +70,50 @@ describe('readEventStream', () => {
       'event:done\ndata:{"usage":null,"empty":false}\n\n',
     ])
 
-    await readEventStream(response, (event) => events.push(event))
+    const outcome = await readEventStream(response, (event) => events.push(event))
 
     expect(events).toEqual([
       { type: 'thinking', delta: '先想' },
       { type: 'content', delta: '答案' },
       { type: 'done', usage: null, empty: false },
     ])
+    expect(outcome.terminated).toBe(true)
   })
 
   it('兼容 \\r\\n 换行与最后一块没有空行结尾', async () => {
     const events: AssistantEvent[] = []
     const response = responseFromChunks(['event:content\r\ndata:{"delta":"尾"}\r\n\r\n', 'event:done\ndata:{"empty":true}'])
 
-    await readEventStream(response, (event) => events.push(event))
+    const outcome = await readEventStream(response, (event) => events.push(event))
 
     expect(events).toEqual([{ type: 'content', delta: '尾' }, { type: 'done', empty: true }])
+    expect(outcome.terminated).toBe(true)
   })
 
   it('没有响应体时安静结束', async () => {
     const events: AssistantEvent[] = []
-    await readEventStream(new Response(null, { status: 200 }), (event) => events.push(event))
+    const outcome = await readEventStream(new Response(null, { status: 200 }), (event) => events.push(event))
     expect(events).toEqual([])
+    expect(outcome.terminated).toBe(false)
+  })
+
+  it('只有正文、没有 done/error 的截断流标记为未终止', async () => {
+    const events: AssistantEvent[] = []
+    const response = responseFromChunks(['event:content\ndata:{"delta":"半截回答"}\n\n'])
+
+    const outcome = await readEventStream(response, (event) => events.push(event))
+
+    expect(events).toEqual([{ type: 'content', delta: '半截回答' }])
+    expect(outcome.terminated).toBe(false)
+  })
+
+  it('error 事件也算已终止，不会在客户端再补一条未完整提示', async () => {
+    const events: AssistantEvent[] = []
+    const response = responseFromChunks(['event:error\ndata:{"message":"上游失败"}\n\n'])
+
+    const outcome = await readEventStream(response, (event) => events.push(event))
+
+    expect(events).toEqual([{ type: 'error', message: '上游失败' }])
+    expect(outcome.terminated).toBe(true)
   })
 })

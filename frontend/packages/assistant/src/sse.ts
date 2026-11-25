@@ -88,18 +88,36 @@ export function parseSseBlock(block: string): AssistantEvent | null {
   return { type: name, ...payload } as AssistantEvent
 }
 
+/**
+ * 读流的结果。
+ *
+ * <p>`terminated=true` 表示收到过 `done` 或 `error`——服务端明确宣告这一轮结束。
+ * 连接在既没有 `done` 也没有 `error` 的情况下断流时为 `false`：调用方据此提示"回答未完整"，
+ * 而不是把半截正文当成完整回答（WORK-092 TASK-007）。
+ */
+export interface StreamOutcome {
+  terminated: boolean
+}
+
 /** 按块读取响应体并逐个回调事件。返回时表示流已结束（或读取被 abort）。 */
 export async function readEventStream(
   response: Response,
   onEvent: (event: AssistantEvent) => void,
-): Promise<void> {
+): Promise<StreamOutcome> {
   const body = response.body
   if (body === null) {
-    return
+    return { terminated: false }
   }
   const reader = body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
+  let terminated = false
+  const emit = (event: AssistantEvent): void => {
+    if (event.type === 'done' || event.type === 'error') {
+      terminated = true
+    }
+    onEvent(event)
+  }
   for (;;) {
     const { done, value } = await reader.read()
     if (done) {
@@ -113,7 +131,7 @@ export async function readEventStream(
       buffer = buffer.slice(boundary + 2)
       const event = parseSseBlock(block)
       if (event !== null) {
-        onEvent(event)
+        emit(event)
       }
       boundary = buffer.indexOf('\n\n')
     }
@@ -121,6 +139,7 @@ export async function readEventStream(
   // 收尾：某些实现最后一块不带空行结尾
   const tail = parseSseBlock(buffer)
   if (tail !== null) {
-    onEvent(tail)
+    emit(tail)
   }
+  return { terminated }
 }

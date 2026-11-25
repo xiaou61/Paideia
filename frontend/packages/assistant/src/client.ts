@@ -126,7 +126,7 @@ export function createAssistantApi(client: ApiClient): AssistantApi {
       })
       // 用量在线上是 `input`/`output`/`total`，界面用的是 `TokenUsage`。**只在这一处归一**：
       // 分散到各个渲染点去换字段名，迟早有一条路径漏掉。
-      await readEventStream(response, (event) => {
+      const outcome = await readEventStream(response, (event) => {
         const usage =
           event.type === 'done' && event.usage !== undefined && event.usage !== null
             ? {
@@ -148,7 +148,13 @@ export function createAssistantApi(client: ApiClient): AssistantApi {
           traceId: event.traceId,
           usage,
         })
-      })    },
+      })
+      // 服务端既没发 done 也没发 error 就断流：上游可能在结算前断开，正文只是半截。
+      // 合成一条 error 让界面提示"未完整"，而不是把半截回答显示成正常结束（WORK-092 TASK-007）。
+      if (!outcome.terminated) {
+        onEvent({ type: 'error', message: '回答未能完整结束（连接中断），请重试' })
+      }
+    },
     explainReviewItem: (input) =>
       client.requestEnvelope<AiText>('/api/v1/ai/explain/review-item', {
         method: 'POST',
