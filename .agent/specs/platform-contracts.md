@@ -102,7 +102,7 @@ updated: 2026-10-09
 
 - 未列入白名单的来源会被**直接拒为 403**，不是返回 200 少一个放行头。
 - 两处开关都要配：`paideia.web.cors.allowed-origins` 管 `/api/**`；Actuator 端点只认 `management.endpoints.web.cors.allowed-origins`。
-- 桌面壳渲染进程的来源是 `http://127.0.0.1:5310`（Electron 主进程的本地静态服务）。
+- 桌面壳渲染进程的来源是 `http://127.0.0.1:5310`。正式 Tauri 宿主先独占监听并提供内嵌资产，冲突时不打开 WebView；只有显式的调试构建使用 Vite，调试构建不读写正式缓存，也不接收正式的 OAuth 协议握手。
 
 ## 构建与检查命令
 

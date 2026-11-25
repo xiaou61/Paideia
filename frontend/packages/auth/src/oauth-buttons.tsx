@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 
 import { messageOf, useAuth } from './auth-context'
 import type { OAuthProviderView } from './auth-api'
+import { canOpenOAuthAuthorization, desktopOAuthHost, openOAuthAuthorization } from './oauth-navigation'
 
 /**
  * 第三方登录按钮组（WORK-037）。
@@ -10,15 +11,17 @@ import type { OAuthProviderView } from './auth-api'
  * <p><b>只渲染后端说可用的平台</b>：没配 clientId/secret 的平台不在列表里，因此按钮不出现。
  * 渲染一个点了只会报错的按钮，比不渲染更糟——用户会以为是自己操作错了。
  *
- * <p>点击后是**整页跳转**到平台，不是 fetch：那一步必须由用户亲手在平台上完成授权。
+ * <p>浏览器整页跳转，桌面交给系统浏览器：授权页不在桌面渲染进程运行。
  */
 export function OAuthButtons({ mode = 'login' }: { mode?: 'login' | 'bind' }) {
   const { api } = useAuth()
   const [providers, setProviders] = useState<OAuthProviderView[]>([])
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const available = canOpenOAuthAuthorization()
 
   useEffect(() => {
+    if (!available) return
     let cancelled = false
     void api
       .oauthProviders()
@@ -36,9 +39,9 @@ export function OAuthButtons({ mode = 'login' }: { mode?: 'login' | 'bind' }) {
     return () => {
       cancelled = true
     }
-  }, [api])
+  }, [api, available])
 
-  if (providers.length === 0) {
+  if (!available || providers.length === 0) {
     return null
   }
 
@@ -46,16 +49,13 @@ export function OAuthButtons({ mode = 'login' }: { mode?: 'login' | 'bind' }) {
     setBusy(provider)
     setError(null)
     try {
-      // 桌面壳里发起时要带 desktop：回调会回到应用而不是留在浏览器（WORK-037）。
-      // 这里不 import @paideia/platform-desktop——auth 包刻意不依赖任何宿主实现，
-      // 只探测 preload 注入的那个全局对象是否存在。
-      const desktop = 'paideiaDesktop' in window
       const { authorizeUrl } = mode === 'bind'
         ? await api.oauthBindStart(provider)
-        : await api.oauthStart(provider, desktop)
-      window.location.assign(authorizeUrl)
+        : await api.oauthStart(provider, desktopOAuthHost() !== undefined)
+      await openOAuthAuthorization(authorizeUrl)
     } catch (failure) {
       setError(messageOf(failure))
+    } finally {
       setBusy(null)
     }
   }

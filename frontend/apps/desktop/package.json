@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "prepare-renderer": "pnpm --filter @paideia/app build:desktop && node scripts/prepare-renderer.mjs",
-    "dev": "tauri dev",
+    "dev": "tauri dev --features dev-renderer --config src-tauri/tauri.dev.json",
     "build": "tauri build",
     "smoke": "node scripts/smoke-desktop.mjs"
   },

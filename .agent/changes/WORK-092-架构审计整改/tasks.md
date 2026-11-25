@@ -26,7 +26,7 @@ approver_role: CTO
 | --- | --- | --- |
 | 白名单无匹配被解释为不限制 | TASK-001 | `explicitGroupOutsideAllowlistIsNotVisible`、`deniedGroupDoesNotInvokeHandler` |
 | 旧响应、旧续期错误或暂停的变更干扰新登录 | TASK-002 | `ignores refresh from a superseded session`、`does not retry a stale request in a new session`、两端 `切换账号后不沿用旧会话数据` |
-| 正式模式启用开发回退，或未持有监听却继续初始化 | TASK-003 | `release_never_selects_dev_renderer`、`occupied_listener_cannot_start_embedded_renderer` |
+| 正式模式启用开发回退，或未持有监听却继续初始化 | TASK-003 | `only_explicit_unbundled_debug_build_selects_dev_renderer`、`occupied_listener_cannot_start_embedded_renderer` |
 | 非原定来源或子框架取得桥、开发模式读取正式缓存 | TASK-003 | `renderer_navigation_only_allows_expected_origin`、`dev_renderer_uses_ephemeral_cache`，以及窗口启动检查 |
 
 ## 任务
@@ -48,12 +48,14 @@ approver_role: CTO
 - 实测：认证单测 22 条、知识进度定向单测 14 条、认证/知识/学习者端/管理端四个 TypeScript 检查通过。`E2E_CHANNEL=chrome pnpm --filter @paideia/app exec playwright test --config e2e-session/playwright.config.ts --repeat-each=2` 通过 4 次（两端各 2 次，合成 HTTP），包含迟到的管理端变更与例行令牌续期。没有确认独占数据库，因此未运行真实后端 e2e。
 - 实现补充：简历临时草稿随会话查询缓存清理；浏览器本地阅读记录按账号存储，旧共享记录不自动归属任何账号，已经同步到服务端的进度不受此影响。已结束的会话不发送延迟进度批次。
 
-### TASK-003 | pending | 桌面正式版只加载自身的渲染服务
+### TASK-003 | done | 桌面正式版只加载自身的渲染服务
 
 - 对应：REQ-003、AC-003；依赖：无（按顺序在 TASK-002 之后执行，共享前端行为已稳定）。
 - 修改：`frontend/apps/desktop/src-tauri/src/main.rs`、`frontend/apps/desktop/src-tauri/Cargo.toml`、`frontend/apps/desktop/package.json`；在现有 Rust 测试模块扩充夹具。
 - 步骤：验证正式模式始终要求拥有监听，显式调试模式才接 Vite；移除 HTTP 特征探测；先绑定后读取正式缓存和构建窗口；将开发缓存留在内存，停止开发进程注册正式协议；限制 WebView 和桥注入。
-- 验证：在 `frontend/apps/desktop/src-tauri/` 执行 `cargo test --locked`、`cargo test --locked --features dev-renderer`、`cargo check --locked --release --features dev-renderer`。验证打包嵌入资产所需 renderer 用 `pnpm --filter @paideia/desktop prepare-renderer` 生成，不构建安装包。用隔离的桌面测试环境检查窗口、冲突时的错误与既有 OAuth 入口；缺少隔离窗口或测试 OAuth 配置时明确列为未验，不动现有安装的缓存和系统协议归属。
+- 验证：在 `frontend/apps/desktop/src-tauri/` 执行 `cargo test --locked`、`cargo test --locked --features dev-renderer`、`cargo check --locked --release --features custom-protocol,dev-renderer`。验证打包嵌入资产所需 renderer 用 `pnpm --filter @paideia/desktop prepare-renderer` 生成，不构建安装包。用隔离的桌面测试环境检查窗口、冲突时的错误与既有 OAuth 入口；缺少隔离窗口或测试 OAuth 配置时明确列为未验，不动现有安装的缓存和系统协议归属。
+- 实测：锁定依赖离线取包 `cargo fetch --locked --offline --target x86_64-pc-windows-msvc` 退出 0；`cargo test --locked`、`--features dev-renderer`、`--features custom-protocol,dev-renderer` 三组各 12 条测试全通过、0 警告；`cargo check --locked --release --features custom-protocol,dev-renderer` 通过。真实隔离窗口、OAuth 提供方回跳与账号绑定仍未在隔离用户环境复核。
+- 实现补充：Windows 在绑定前启用地址独占。在桌面端将 OAuth 授权交给系统浏览器，返回账号安全页时重新查询绑定结果。Web 端保留原有整页跳转，后端 OAuth 协议不变；开发宿主隐藏第三方授权并拒绝消费正式握手。复查另发现开发实例仍继承正式 `paideia` 协议与深链 IPC：开发特性下不注册原生深链插件，`tauri.dev.json` 清空协议声明并单列 identifier，渲染页移除 `deep-link:default` 权限，冷启动参数也按同一开关过滤。
 
 ## 完成条件
 

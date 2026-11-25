@@ -1,7 +1,6 @@
 // Paideia 桌面端外壳（Tauri v2）。
 //
-// 与 Electron 版保持**同一个对外契约**：页面只认 preload 注入的 `window.paideiaDesktop`
-// （见 `@paideia/platform-desktop`），React 业务代码一行不改。
+// 页面通过 `window.paideiaDesktop` 使用原生能力（见 `@paideia/platform-desktop`）。
 //
 // 三个刻意的设计决定：
 //
@@ -24,6 +23,19 @@ use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder
 /// 必须与后端 CORS 白名单、OAuth 文档里写的来源一致。改这里要同时改后端。
 const RENDERER_ORIGIN: &str = "http://127.0.0.1:5310";
 const RENDERER_PORT: u16 = 5310;
+const DEV_RENDERER: bool = use_dev_renderer(
+    cfg!(feature = "dev-renderer"),
+    cfg!(debug_assertions),
+    !tauri::is_dev(),
+);
+
+const fn use_dev_renderer(feature_enabled: bool, debug_build: bool, bundled_build: bool) -> bool {
+    feature_enabled && debug_build && !bundled_build
+}
+
+fn renderer_navigation_allowed(url: &url::Url) -> bool {
+    url.scheme() == "http" && url.origin().ascii_serialization() == RENDERER_ORIGIN
+}
 
 /// 进程内缓存镜像。读走内存（首帧同步语义），写时落盘。
 #[derive(Default)]
@@ -41,7 +53,12 @@ fn cache_file(app: &AppHandle) -> PathBuf {
 /// Electron 版的 userData：`%APPDATA%\@paideia\desktop\cache.json`（包名派生的目录）。
 fn legacy_cache_file() -> Option<PathBuf> {
     let appdata = std::env::var_os("APPDATA")?;
-    Some(PathBuf::from(appdata).join("@paideia").join("desktop").join("cache.json"))
+    Some(
+        PathBuf::from(appdata)
+            .join("@paideia")
+            .join("desktop")
+            .join("cache.json"),
+    )
 }
 
 fn read_cache_file(file: &PathBuf) -> Option<HashMap<String, String>> {
@@ -65,7 +82,21 @@ fn load_cache(app: &AppHandle) -> HashMap<String, String> {
     HashMap::new()
 }
 
+fn renderer_cache(
+    dev_renderer: bool,
+    load: impl FnOnce() -> HashMap<String, String>,
+) -> HashMap<String, String> {
+    if dev_renderer {
+        HashMap::new()
+    } else {
+        load()
+    }
+}
+
 fn persist(app: &AppHandle, data: &HashMap<String, String>) {
+    if DEV_RENDERER {
+        return;
+    }
     let Ok(text) = serde_json::to_string(data) else {
         return;
     };
@@ -159,48 +190,56 @@ fn percent_decode(input: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-/// 端口上是否已经有"我们自己的页面"在服务（开发期是 Vite，异常退出后是残留实例）。
-///
-/// <p>用最小的一发 HTTP GET 判断，而不是只看端口能不能连：端口被无关程序占用时必须报错，
-/// 不能把别人的页面当自己的界面加载进来。
-fn renderer_already_serving() -> bool {
-    use std::io::{Read, Write};
-    let address = ("127.0.0.1", RENDERER_PORT);
-    let Ok(mut stream) = std::net::TcpStream::connect(address) else {
-        return false;
+#[cfg(windows)]
+fn renderer_listener(port: u16) -> std::io::Result<std::net::TcpListener> {
+    use socket2::{Domain, Protocol, Socket, Type};
+    use std::os::windows::io::AsRawSocket;
+    use windows_sys::Win32::Networking::WinSock::{
+        setsockopt, WSAGetLastError, SOCKET_ERROR, SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
     };
-    let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(2)));
-    let request = format!("GET / HTTP/1.0\r\nHost: 127.0.0.1:{RENDERER_PORT}\r\n\r\n");
-    if stream.write_all(request.as_bytes()).is_err() {
-        return false;
+
+    let address = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))?;
+    let enabled: i32 = 1;
+    // SAFETY: socket remains open and enabled is a DWORD-sized buffer valid for the call.
+    let result = unsafe {
+        setsockopt(
+            socket.as_raw_socket() as _,
+            SOL_SOCKET,
+            SO_EXCLUSIVEADDRUSE,
+            (&enabled as *const i32).cast(),
+            std::mem::size_of_val(&enabled) as i32,
+        )
+    };
+    if result == SOCKET_ERROR {
+        return Err(std::io::Error::from_raw_os_error(unsafe {
+            WSAGetLastError()
+        }));
     }
-    let mut body = String::new();
-    // 只读前几 KB：首页第一个能说明身份的标志就够判断了
-    let mut buffer = [0u8; 4096];
-    if let Ok(size) = stream.read(&mut buffer) {
-        body.push_str(&String::from_utf8_lossy(&buffer[..size]));
-    }
-    body.contains("id=\"root\"")
+    socket.bind(&address.into())?;
+    socket.listen(128)?;
+    Ok(socket.into())
 }
 
-/// 这是本壳与 Electron 版最容易踩坏的差异点：Tauri 内嵌资产走的是 asset 协议
-/// （`http://tauri.localhost`），来源一换，后端的 CORS 白名单就对不上了。
-/// 因此自己在回环上起一个只读静态服务，把来源钉回 `RENDERER_ORIGIN`。
-///
-/// <p>**不按"开发/生产"开关来启动**：`tauri::is_dev()` 在直接 `cargo build --release`
-/// 打出的包上仍可能为真，一旦据此跳过服务，应用会加载一个没人监听的 5310 然后白屏
-/// （实测踩过）。改为无条件启动，端口被占用时再判断占用者是不是自己人。
+#[cfg(not(windows))]
+fn renderer_listener(port: u16) -> std::io::Result<std::net::TcpListener> {
+    std::net::TcpListener::bind(([127, 0, 0, 1], port))
+}
+
+fn bind_renderer(port: u16) -> Result<tiny_http::Server, String> {
+    let listener = renderer_listener(port)
+        .map_err(|error| format!("无法独占 127.0.0.1:{port} 启动渲染服务：{error}"))?;
+    tiny_http::Server::from_listener(listener, None)
+        .map_err(|error| format!("无法在 127.0.0.1:{port} 启动渲染服务：{error}"))
+}
+
+/// 正式模式必须持有回环监听。任何已运行的 HTTP 服务都不能作为内嵌资产的替代。
 fn serve_renderer(app: &AppHandle) -> Result<(), String> {
-    let server = match tiny_http::Server::http(("127.0.0.1", RENDERER_PORT)) {
-        Ok(server) => server,
-        Err(_) if renderer_already_serving() => {
-            // 开发期由 Vite 在同一端口提供同一份页面；残留实例同理。直接复用。
-            return Ok(());
-        }
-        Err(error) => {
-            return Err(format!("无法在 127.0.0.1:{RENDERER_PORT} 启动渲染服务：{error}"))
-        }
-    };
+    // Tauri CLI 也可直接启用 tauri/custom-protocol，不经过当前 crate 的 feature 别名。
+    if tauri::is_dev() || app.asset_resolver().get("index.html".into()).is_none() {
+        return Err("缺少内嵌渲染资源，请通过项目的桌面构建命令生成应用。".into());
+    }
+    let server = bind_renderer(RENDERER_PORT)?;
     let handle = app.clone();
     std::thread::spawn(move || {
         for request in server.incoming_requests() {
@@ -239,23 +278,27 @@ fn serve_renderer(app: &AppHandle) -> Result<(), String> {
 
 fn bridge_script(snapshot: &HashMap<String, String>, initial_handoff: Option<&str>) -> String {
     let snapshot_json = serde_json::to_string(snapshot).unwrap_or_else(|_| "{}".to_string());
-    let initial_json = serde_json::to_string(&initial_handoff).unwrap_or_else(|_| "null".to_string());
+    let initial_json =
+        serde_json::to_string(&initial_handoff).unwrap_or_else(|_| "null".to_string());
     // 这是 Electron preload 那份桥的等价物：形状必须完全一致，`@paideia/platform-desktop`
     // 是照着它写的。注意不要在脚本里提前捕获 `__TAURI__`——它由 Tauri 自己的脚本注入，
     // 两者的执行顺序不是约定；所有调用都延迟到方法被调用时才取。
     format!(
         r#"(function () {{
+  if (window.top !== window.self || window.location.protocol !== 'http:' || window.location.origin !== '{origin}') return;
   const core = () => window.__TAURI__.core;
   window.paideiaDesktop = {{
     rendererOrigin: '{origin}',
+    developmentRenderer: {development},
     cacheSnapshot: {snapshot},
     initialHandoff: {initial},
+    openExternal: (url) => core().invoke('open_external', {{ url: String(url) }}),
     cache: {{
       get: (key) => core().invoke('cache_get', {{ key: String(key) }}),
       set: (key, value) => core().invoke('cache_set', {{ key: String(key), value: String(value) }}),
       remove: (key) => core().invoke('cache_remove', {{ key: String(key) }}),
     }},
-    onOauthHandoff: (callback) => {{
+    onOauthHandoff: {development} ? undefined : (callback) => {{
       if (typeof callback !== 'function') return () => {{}};
       const listening = window.__TAURI__.event.listen('paideia://oauth-handoff', (event) => {{
         if (typeof event.payload === 'string' && event.payload !== '') callback(event.payload);
@@ -283,13 +326,14 @@ fn bridge_script(snapshot: &HashMap<String, String>, initial_handoff: Option<&st
   }};
 }})();"#,
         origin = RENDERER_ORIGIN,
+        development = DEV_RENDERER,
         snapshot = snapshot_json,
         initial = initial_json
     )
 }
 
 fn main() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         // 单实例必须最先注册：第二个进程（协议唤起）不该再开一个窗口
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             // 排查用开关（默认关闭）：协议唤起"没反应"时，先看第二实例到底带了什么参数。
@@ -311,13 +355,20 @@ fn main() {
                 let _ = window.show();
                 let _ = window.set_focus();
             }
-            for argument in argv.iter() {
-                if let Some(handoff) = handoff_from_url(argument) {
-                    let _ = app.emit("paideia://oauth-handoff", handoff);
+            if !DEV_RENDERER {
+                for argument in argv.iter() {
+                    if let Some(handoff) = handoff_from_url(argument) {
+                        let _ = app.emit("paideia://oauth-handoff", handoff);
+                    }
                 }
             }
-        }))
-        .plugin(tauri_plugin_deep_link::init())
+        }));
+    let builder = if DEV_RENDERER {
+        builder
+    } else {
+        builder.plugin(tauri_plugin_deep_link::init())
+    };
+    builder
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             cache_get,
@@ -328,29 +379,32 @@ fn main() {
         .setup(|app| {
             let handle = app.handle().clone();
 
-            // 注册协议。开发期注册的是本地 target 里的 exe 路径，安装包里由 NSIS 写注册表；
-            // 两种都要，否则 `pnpm dev` 下这条链路永远测不到。
-            #[cfg(any(target_os = "windows", target_os = "linux"))]
-            {
-                use tauri_plugin_deep_link::DeepLinkExt;
-                if let Err(error) = app.deep_link().register_all() {
-                    eprintln!("注册 paideia:// 协议失败：{error}");
+            if !DEV_RENDERER {
+                if let Err(message) = serve_renderer(&handle) {
+                    use tauri_plugin_dialog::DialogExt;
+                    handle
+                        .dialog()
+                        .message(message)
+                        .title("Paideia 启动失败")
+                        .show(|_| std::process::exit(1));
+                    // setup 跑在事件循环线程；绝不能等待对话框，也不能继续初始化渲染器。
+                    return Ok(());
+                }
+                // 开发实例不能覆盖正式安装的系统协议注册。
+                #[cfg(any(target_os = "windows", target_os = "linux"))]
+                {
+                    use tauri_plugin_deep_link::DeepLinkExt;
+                    if let Err(error) = app.deep_link().register_all() {
+                        eprintln!("注册 paideia:// 协议失败：{error}");
+                    }
                 }
             }
 
-            let cache = load_cache(&handle);
+            let cache = renderer_cache(DEV_RENDERER, || load_cache(&handle));
             app.manage(CacheState(Mutex::new(cache.clone())));
-
-            // 生产构建与开发构建都走这一步：开发期端口被 Vite 占着，探测到自家页面后直接复用。
-            if let Err(message) = serve_renderer(&handle) {
-                // 端口被无关程序占用等启动期错误必须让用户看见：Electron 版是弹框，
-                // 这里不能只打一行 stderr 然后进程静默退出。
-                use tauri_plugin_dialog::DialogExt;
-                handle.dialog().message(message).title("Paideia 启动失败").blocking_show();
-                std::process::exit(1);
-            }
-
-            let initial_handoff = std::env::args().find_map(|argument| handoff_from_url(&argument));
+            let initial_handoff = (!DEV_RENDERER)
+                .then(|| std::env::args().find_map(|argument| handoff_from_url(&argument)))
+                .flatten();
             let script = bridge_script(&cache, initial_handoff.as_deref());
 
             // 必须显式指向本地静态服务，而不是 `WebviewUrl::App`：
@@ -368,6 +422,9 @@ fn main() {
                 .inner_size(1200.0, 800.0)
                 // 最小尺寸取手机竖屏（360×480）：窄于此布局已无可压缩空间
                 .min_inner_size(360.0, 480.0)
+                .incognito(DEV_RENDERER)
+                .on_navigation(renderer_navigation_allowed)
+                .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
                 .initialization_script(&script)
                 .build()?;
 
@@ -379,7 +436,54 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{handoff_from_url, percent_decode};
+    use super::*;
+
+    #[test]
+    fn only_explicit_unbundled_debug_build_selects_dev_renderer() {
+        assert!(!use_dev_renderer(true, false, false));
+        assert!(!use_dev_renderer(false, true, false));
+        assert!(!use_dev_renderer(true, true, true));
+        assert!(use_dev_renderer(true, true, false));
+    }
+
+    #[test]
+    fn occupied_listener_cannot_start_embedded_renderer() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        assert!(bind_renderer(port).is_err());
+    }
+
+    #[test]
+    fn embedded_renderer_owns_its_loopback_listener() {
+        let listener = renderer_listener(0).unwrap();
+        let address = listener.local_addr().unwrap();
+        assert_eq!(address.ip(), std::net::Ipv4Addr::LOCALHOST);
+        assert!(std::net::TcpListener::bind(address).is_err());
+        assert!(tiny_http::Server::from_listener(listener, None).is_ok());
+    }
+
+    #[test]
+    fn renderer_navigation_only_allows_expected_origin() {
+        assert!(renderer_navigation_allowed(
+            &format!("{RENDERER_ORIGIN}/#/notes").parse().unwrap()
+        ));
+        for unrelated in [
+            "https://example.invalid/",
+            "http://127.0.0.1:5311/",
+            "http://localhost:5310/",
+            "about:blank",
+            "blob:http://127.0.0.1:5310/fixture",
+        ] {
+            assert!(!renderer_navigation_allowed(&unrelated.parse().unwrap()));
+        }
+    }
+
+    #[test]
+    fn dev_renderer_uses_ephemeral_cache() {
+        assert!(renderer_cache(true, || panic!("must not load the installed cache")).is_empty());
+        let data = HashMap::from([("theme".to_string(), "light".to_string())]);
+        assert_eq!(renderer_cache(false, || data.clone()), data);
+    }
 
     #[test]
     fn accepts_valid_handoff() {
@@ -429,7 +533,10 @@ mod tests {
 
     #[test]
     fn decodes_percent_escapes_and_keeps_plain_paths() {
-        assert_eq!(percent_decode("/assets/index-abc.js"), "/assets/index-abc.js");
+        assert_eq!(
+            percent_decode("/assets/index-abc.js"),
+            "/assets/index-abc.js"
+        );
         assert_eq!(percent_decode("/%E4%B8%AD"), "/中");
         // 畸形转义不能 panic，也不能把整段吞掉
         assert_eq!(percent_decode("/%zz"), "/%zz");

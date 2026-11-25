@@ -1,4 +1,11 @@
-import { createAuthApi, messageOf, type OAuthIdentities } from '@paideia/auth'
+import {
+  canOpenOAuthAuthorization,
+  createAuthApi,
+  desktopOAuthHost,
+  messageOf,
+  openOAuthAuthorization,
+  type OAuthIdentities,
+} from '@paideia/auth'
 import { Alert, AlertDescription, Button, Spinner } from '@paideia/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link2, Unlink } from 'lucide-react'
@@ -34,8 +41,14 @@ export function AccountSecuritySection() {
     queryFn: () => oauthApi.oauthIdentities(),
   })
 
-  // 绑定是从外部平台跳回来的，页面会整页重载 → 重新取一次即可
+  // Web 会整页重载；桌面授权留在系统浏览器，返回本窗口时重新查绑定状态。
   useEffect(() => {
+    const desktop = desktopOAuthHost()
+    if (desktop && !desktop.developmentRenderer) {
+      const refresh = () => void queryClient.invalidateQueries({ queryKey: ['oauth-identities'] })
+      window.addEventListener('focus', refresh)
+      return () => window.removeEventListener('focus', refresh)
+    }
     const params = new URLSearchParams(window.location.hash.split('?')[1] ?? '')
     if (params.get('oauthBound') === '1') {
       void queryClient.invalidateQueries({ queryKey: ['oauth-identities'] })
@@ -76,7 +89,7 @@ export function AccountSecuritySection() {
   const { bound, hasPassword, available } = identities.data
   // 剩下的方式 = 其它绑定 + 有没有密码。等于 1 时解掉最后一个就再也进不来了。
   const canUnbindAnything = bound.length - 1 + (hasPassword ? 1 : 0) > 0
-  const unboundProviders = available.filter(
+  const unboundProviders = (canOpenOAuthAuthorization() ? available : []).filter(
     (provider) => !bound.some((item) => item.provider === provider.key),
   )
 
@@ -85,9 +98,10 @@ export function AccountSecuritySection() {
     setError(null)
     try {
       const { authorizeUrl } = await oauthApi.oauthBindStart(provider)
-      window.location.assign(authorizeUrl)
+      await openOAuthAuthorization(authorizeUrl)
     } catch (failure) {
       setError(messageOf(failure))
+    } finally {
       setBusy(null)
     }
   }

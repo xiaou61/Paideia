@@ -1,4 +1,4 @@
-import { AuthLayout, messageOf, useAuth } from '@paideia/auth'
+import { AuthLayout, desktopOAuthHost, messageOf, useAuth } from '@paideia/auth'
 import { Alert, AlertDescription, Spinner } from '@paideia/ui'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
@@ -28,6 +28,11 @@ export function OAuthCallbackPage() {
       return
     }
     started.current = true
+
+    if (desktopOAuthHost()?.developmentRenderer) {
+      setError('桌面开发模式不接收第三方登录回调，请使用密码登录。')
+      return
+    }
 
     const handoff = params.get('handoff')
     if (handoff === null || handoff === '') {

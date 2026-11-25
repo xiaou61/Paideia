@@ -1,0 +1,8 @@
+{
+  "identifier": "io.github.xiaou61.paideia.dev",
+  "plugins": {
+    "deep-link": {
+      "desktop": []
+    }
+  }
+}

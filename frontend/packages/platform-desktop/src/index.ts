@@ -8,10 +8,7 @@ export interface DesktopCacheBridge {
 }
 
 /**
- * 桌面壳通过 preload 暴露给渲染进程的桥。
- *
- * <p>渲染进程不开 Node 集成（{@code contextIsolation} 打开、{@code nodeIntegration} 关闭），
- * 需要跨进程的能力一律经这个桥走 IPC。这个接口就是宿主与业务代码之间的唯一契约。
+ * Tauri 宿主在受信任的渲染页注入的桥；需要跨进程的能力经这个桥走 IPC。
  */
 export interface DesktopBridge {
   readonly cache: DesktopCacheBridge
@@ -25,6 +22,10 @@ export interface DesktopBridge {
   readonly cacheSnapshot: Record<string, string>
   /** 渲染进程的服务地址，用于显示与排查。 */
   readonly rendererOrigin: string
+  /** 开发渲染器不读正式缓存，也不消费正式 OAuth 握手码。 */
+  readonly developmentRenderer: boolean
+  /** 由宿主校验协议并交给系统浏览器。 */
+  openExternal(url: string): Promise<void>
   /**
    * 订阅第三方登录握手码（WORK-037）。
    *
@@ -79,7 +80,7 @@ function requireBridge(): DesktopBridge {
   const bridge = globalThis.window?.paideiaDesktop
   if (bridge === undefined) {
     throw new Error(
-      '缺少桌面桥：这个包只能在 Electron 的渲染进程里使用，且 preload 必须已注入 window.paideiaDesktop',
+      '缺少桌面桥：这个包只能在 Tauri 宿主已注入 window.paideiaDesktop 的窗口里使用',
     )
   }
   return bridge
