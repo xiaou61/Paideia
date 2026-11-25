@@ -105,10 +105,12 @@ class AccountDeletionCascadeIntegrationTest {
             {"knowledge_search_log", "user_id"},
             // 回答反馈（WORK-036）：这个人点过的赞与踩
             {"ai_feedback", "user_id"},
+            // 首页自定义布局（首页自定义）：每用户一份界面配置，注销即删
+            {"user_home_layout", "user_id"},
             // AI 调用追踪（WORK-022）：轮次行带 user_id，步骤与载荷随 trace 走（listener 里先删）
             {"ai_runs", "user_id"},
             {"refresh_tokens", "user_id"},
-    };
+        };
 
     @Autowired
     MockMvc mockMvc;
@@ -256,6 +258,10 @@ class AccountDeletionCascadeIntegrationTest {
                 """, owner);
         // 积分账户 + 一条流水（WORK-009）
         jdbcTemplate.update("INSERT INTO ai_credit_accounts (user_id, balance) VALUES (?, 123)", owner);
+        jdbcTemplate.update("""
+                INSERT INTO user_home_layout (user_id, layout_json, updated_at)
+                VALUES (?, '{"version":1}', UTC_TIMESTAMP(3))
+                """, owner);
         jdbcTemplate.update("""
                 INSERT INTO ai_credit_ledger (user_id, delta, kind, model, input_tokens, output_tokens, note)
                 VALUES (?, -3, 'SETTLE', 'm', 10, 20, '用例流水')

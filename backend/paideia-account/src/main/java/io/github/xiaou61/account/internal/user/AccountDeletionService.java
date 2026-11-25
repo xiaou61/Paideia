@@ -1,6 +1,7 @@
 package io.github.xiaou61.account.internal.user;
 
 import io.github.xiaou61.account.internal.token.RefreshTokenMapper;
+import io.github.xiaou61.account.internal.home.HomeLayoutService;
 import io.github.xiaou61.platform.BizException;
 import io.github.xiaou61.platform.ErrorCode;
 import io.github.xiaou61.platform.UserDeletedEvent;
@@ -32,17 +33,21 @@ public class AccountDeletionService {
     private final ApplicationEventPublisher events;
     /** 画像与本模块同库同域，这里直接删（不绕事件）。 */
     private final io.github.xiaou61.account.internal.profile.LearnerProfileService profiles;
+    /** 首页布局同属本模块，随注销一起删。 */
+    private final HomeLayoutService homeLayouts;
 
     AccountDeletionService(UserMapper users,
                            RefreshTokenMapper refreshTokens,
                            PasswordHasher hasher,
                            ApplicationEventPublisher events,
-                           io.github.xiaou61.account.internal.profile.LearnerProfileService profiles) {
+                           io.github.xiaou61.account.internal.profile.LearnerProfileService profiles,
+                           HomeLayoutService homeLayouts) {
         this.users = users;
         this.refreshTokens = refreshTokens;
         this.hasher = hasher;
         this.events = events;
         this.profiles = profiles;
+        this.homeLayouts = homeLayouts;
     }
 
     /**
@@ -97,6 +102,7 @@ public class AccountDeletionService {
         // 画像与本模块同库同域（WORK-010）：直接删，不必绕一圈事件。
         // 其它模块的用户数据仍由 UserDeletedEvent 各自删除（方向是单向的）。
         profiles.deleteByUser(userId);
+        homeLayouts.deleteByUser(userId);
         users.deleteById(userId);
         // 事务提交前由各模块监听并删掉自己的数据（见 UserDeletedEvent 的说明）
         events.publishEvent(new UserDeletedEvent(userId));

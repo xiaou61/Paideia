@@ -7,9 +7,36 @@ import {
 import { createIdentityApi, NAV_PREFERENCE, stageCue } from '@paideia/identity'
 import { AppShell, Button, Card, Input, LoadingRow, Section, Spinner } from '@paideia/ui'
 import { useAuth } from '@paideia/auth'
-import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, BookOpen, Container, Database, Dumbbell, Flame, GraduationCap, Layers, MessagesSquare, Network, Newspaper, NotebookPen, Search, Target, Terminal } from 'lucide-react'
-import { useMemo, useState, type FormEvent } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  ArrowRight,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
+  Container,
+  Database,
+  Dumbbell,
+  Eye,
+  EyeOff,
+  Flame,
+  GraduationCap,
+  GripVertical,
+  Layers,
+  Link2,
+  MessagesSquare,
+  Network,
+  Newspaper,
+  NotebookPen,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Search,
+  Target,
+  Terminal,
+  Trash2,
+  X,
+} from 'lucide-react'
+import { Fragment, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
 
 import { api } from '../api'
@@ -18,6 +45,14 @@ import { LearnerHeader } from '../components/LearnerHeader'
 import { HomeListSkeleton } from '../components/skeletons'
 import { ESSAY_LABELS, essayDirections } from '../essay'
 import { errorMessage } from '@paideia/core'
+import {
+  HOME_BLOCK_LABELS,
+  homeLayoutApi,
+  mergeBlockPrefs,
+  type HomeBlockId,
+  type HomeLayoutConfig,
+  type HomeQuickLinkPref,
+} from '../home-layout'
 
 const knowledge = createKnowledgeApi(api)
 const learning = createLearningApi(api)
@@ -27,6 +62,10 @@ const learning = createLearningApi(api)
  *
  * <p>只有顺序会变，**集合不变**（面试页是导航里的入口，这里不重复）：首页是"我该从哪开始"，
  * 把身份最相关的那张卡排前面就够了；藏掉入口会让"推荐"变成"限制"。
+ *
+ * <p>2026-11-25 起支持用户自定义：这一份是**内置清单**，用户的排序/隐藏/自定义链接存在
+ * `home-layout` 里（见 `../home-layout`）。内置清单本身是"默认顺序 + 永远补末尾"的基底，
+ * 以后新增的入口不会被老配置藏掉。
  */
 type QuickLinkKey = 'learn' | 'knowledge' | 'notes' | 'my-assessments' | 'interview' | 'graph' | 'digest'
 
@@ -135,6 +174,95 @@ const QUICK_LINKS: {
   },
 ]
 
+const QUICK_LINK_BY_PATH = new Map(QUICK_LINKS.map((item) => [item.to, item]))
+
+/** 内置入口的默认顺序：按 NAV_PREFERENCE 排，未提到的（含 key=null 固定卡）追加在后。 */
+function defaultQuickLinkOrder(): (typeof QUICK_LINKS)[number][] {
+  const ordered = NAV_PREFERENCE
+    .map((key) => QUICK_LINKS.find((item) => item.key === key))
+    .filter((item): item is (typeof QUICK_LINKS)[number] => item !== undefined)
+  return [...ordered, ...QUICK_LINKS.filter((item) => !ordered.includes(item))]
+}
+
+interface QuickEntry {
+  id: string
+  path: string
+  title: string
+  description: string
+  icon: typeof BookOpen
+  testId?: string
+  visible: boolean
+  custom: boolean
+}
+
+/** 合并内置 + 用户配置，得到完整入口清单（**含隐藏项**，编辑态要用全部）。 */
+function buildQuickEntries(saved?: HomeQuickLinkPref[]): QuickEntry[] {
+  const out: QuickEntry[] = []
+  const seen = new Set<string>()
+  const raw: HomeQuickLinkPref[] =
+    saved && saved.length > 0
+      ? saved
+      : defaultQuickLinkOrder().map((item) => ({ type: 'preset' as const, path: item.to, visible: true }))
+  for (const pref of raw) {
+    if (pref.type === 'custom') {
+      if (!pref.path || seen.has('c:' + pref.path)) continue
+      seen.add('c:' + pref.path)
+      out.push({
+        id: 'c:' + pref.path,
+        path: pref.path,
+        title: pref.title?.trim() || pref.path,
+        description: pref.description?.trim() || '',
+        icon: Link2,
+        visible: pref.visible !== false,
+        custom: true,
+      })
+    } else {
+      const preset = QUICK_LINK_BY_PATH.get(pref.path)
+      if (!preset || seen.has(pref.path)) continue
+      seen.add(pref.path)
+      out.push({
+        id: preset.to,
+        path: preset.to,
+        title: preset.title,
+        description: preset.description,
+        icon: preset.icon,
+        testId: preset.testId,
+        visible: pref.visible !== false,
+        custom: false,
+      })
+    }
+  }
+  // 新增的内置入口自动追加，老配置不会把它藏掉。
+  for (const item of QUICK_LINKS) {
+    if (!seen.has(item.to)) {
+      seen.add(item.to)
+      out.push({
+        id: item.to,
+        path: item.to,
+        title: item.title,
+        description: item.description,
+        icon: item.icon,
+        testId: item.testId,
+        visible: true,
+        custom: false,
+      })
+    }
+  }
+  return out
+}
+
+function buildQuickDraft(saved?: HomeQuickLinkPref[]): HomeQuickLinkPref[] {
+  return buildQuickEntries(saved).map((entry) =>
+    entry.custom
+      ? { type: 'custom', path: entry.path, visible: entry.visible, title: entry.title, description: entry.description }
+      : { type: 'preset', path: entry.path, visible: entry.visible },
+  )
+}
+
+function buildDraft(layout: HomeLayoutConfig | undefined): HomeLayoutConfig {
+  return { version: 1, blocks: mergeBlockPrefs(layout?.blocks), quickLinks: buildQuickDraft(layout?.quickLinks) }
+}
+
 /**
  * 首页 = 仪表盘。
  *
@@ -145,6 +273,9 @@ const QUICK_LINKS: {
  *
  * <p>现在首页回答三件事：**我在哪、最近有什么可读、我的学习痕迹**。三个数字都来自接口，
  * 没有一条是写死的。
+ *
+ * <p>2026-11-25：版块顺序/显隐与快捷入口的排序/隐藏/自定义链接都可被用户覆盖（存服务端），
+ * 未登录或没配置时退回内置默认（见 `../home-layout`）。hero 问候区固定在最上，不可删。
  */
 export function HomePage() {
   const { user } = useAuth()
@@ -155,14 +286,44 @@ export function HomePage() {
     staleTime: 5 * 60_000,
     retry: false,
   })
-  const quickLinks = useMemo(() => {
-    const ordered = NAV_PREFERENCE
-      .map((key) => QUICK_LINKS.find((item) => item.key === key))
-      .filter((item): item is (typeof QUICK_LINKS)[number] => item !== undefined)
-    // 常量只表达"谁排前面"，没提到的（含 key=null 的固定卡）追加在后面。
-    // **用 includes 判断而不是按 key 去重**：null 不是合法 nav key，去重会把固定卡一起丢掉。
-    return [...ordered, ...QUICK_LINKS.filter((item) => !ordered.includes(item))]
-  }, [])
+  const queryClient = useQueryClient()
+  // 用户在服务端的首页布局（没有就是默认：一个 { version: 1 }）。
+  const { data: layoutData } = useQuery({
+    queryKey: ['home-layout'],
+    queryFn: () => homeLayoutApi.get(),
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
+  const blockPrefs = useMemo(() => mergeBlockPrefs(layoutData?.blocks), [layoutData])
+  const quickEntries = useMemo(() => buildQuickEntries(layoutData?.quickLinks), [layoutData])
+  const visibleQuickEntries = useMemo(() => quickEntries.filter((entry) => entry.visible), [quickEntries])
+
+  const [editingLayout, setEditingLayout] = useState(false)
+  const [draft, setDraft] = useState<HomeLayoutConfig | null>(null)
+  const [savingLayout, setSavingLayout] = useState(false)
+  const openLayoutEditor = () => {
+    setDraft(buildDraft(layoutData))
+    setEditingLayout(true)
+  }
+  const closeLayoutEditor = () => {
+    setEditingLayout(false)
+    setDraft(null)
+  }
+  const saveLayout = async () => {
+    if (draft === null) {
+      return
+    }
+    setSavingLayout(true)
+    try {
+      const saved = await homeLayoutApi.save(draft)
+      queryClient.setQueryData(['home-layout'], saved)
+      setEditingLayout(false)
+      setDraft(null)
+    } finally {
+      setSavingLayout(false)
+    }
+  }
+
   /**
    * 当前阶段的那条建议（2026-11-09）。
    *
@@ -287,6 +448,185 @@ export function HomePage() {
     }
   }
 
+  /** 每个可自定义版块的 JSX。按 `blockPrefs` 的顺序与可见性渲染。 */
+  const renderBlock = (id: HomeBlockId): ReactNode => {
+    if (id === 'essay') {
+      if (essayCategories.length === 0) {
+        return null
+      }
+      return (
+        <section
+          data-testid="home-essay-banner"
+          className="border-primary/25 from-primary/[0.09] via-primary/[0.05] to-background mb-6 rounded-2xl border bg-gradient-to-r px-4 py-3.5 sm:px-5"
+        >
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Flame className="text-primary size-5 shrink-0" aria-hidden />
+              <div className="min-w-0">
+                <h2 className="text-base leading-6 font-semibold">面试前，刷一遍面经</h2>
+                <p className="text-muted-foreground text-xs leading-5">
+                  每天从牛客面经里抽题、AI 逐题解析，四个方向按岗位挑
+                </p>
+              </div>
+            </div>
+            <div className="ml-auto flex flex-wrap gap-2">
+              {essayCategories.map((category) => (
+                <Link
+                  key={category.id}
+                  to={`/knowledge/categories/${category.id}`}
+                  data-testid={`home-essay-${category.slug}`}
+                  className="border-primary/30 bg-background/70 hover:border-primary hover:bg-primary hover:text-primary-foreground inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors"
+                >
+                  {ESSAY_LABELS[category.slug] ?? category.name}
+                  {essayCountOf(category.id) === undefined ? null : (
+                    <span className="tabular-nums opacity-70">{essayCountOf(category.id)}</span>
+                  )}
+                  <ArrowRight className="size-3.5" aria-hidden />
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )
+    }
+    if (id === 'continue') {
+      if (continueLearning.length > 0) {
+        return (
+          <Section
+            title="继续学习"
+            description="接着上次那一站往下走。"
+            actions={
+              <Button variant="ghost" size="sm" render={<Link to="/learn" />}>
+                全部学习线
+              </Button>
+            }
+          >
+            <div className="grid gap-3 sm:grid-cols-3" data-testid="home-continue-learning">
+              {continueLearning.map((item) => (
+                <Link
+                  key={item.entryId}
+                  to={`/knowledge/entries/${item.entryId}`}
+                  data-testid={`home-continue-${item.entryId}`}
+                  className="border-border bg-card hover:border-primary/40 hover:shadow-card group flex items-start gap-3 rounded-xl border p-4 transition-all hover:-translate-y-0.5"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="group-hover:text-primary block truncate text-sm font-medium transition-colors">
+                      {item.title}
+                    </span>
+                    <span className="text-muted-foreground mt-1 block text-xs">{item.label}</span>
+                  </span>
+                  <ArrowRight className="text-muted-foreground group-hover:text-primary mt-0.5 size-4 shrink-0 transition-colors" />
+                </Link>
+              ))}
+            </div>
+          </Section>
+        )
+      }
+      if (recent.length === 0) {
+        return null
+      }
+      return (
+        <Section
+          title="继续学习"
+          description="接着上次那一条读下去。"
+          actions={<span className="text-muted-foreground text-xs">进度只保存在这台设备上</span>}
+        >
+          <div className="grid gap-3 sm:grid-cols-3" data-testid="home-recent-reading">
+            {recent.map((item) => (
+              <Link
+                key={item.entryId}
+                to={`/knowledge/entries/${item.entryId}`}
+                data-testid={`home-recent-${item.entryId}`}
+                className="border-border bg-card hover:border-primary/40 hover:shadow-card group flex items-start gap-3 rounded-xl border p-4 transition-all hover:-translate-y-0.5"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="group-hover:text-primary block truncate text-sm font-medium transition-colors">
+                    {item.title}
+                  </span>
+                  <span className="text-muted-foreground mt-1 block text-xs">
+                    上次阅读 {new Date(item.visited).toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}
+                  </span>
+                </span>
+                <ArrowRight className="text-muted-foreground group-hover:text-primary mt-0.5 size-4 shrink-0 transition-colors" />
+              </Link>
+            ))}
+          </div>
+        </Section>
+      )
+    }
+    if (id === 'categories') {
+      return (
+        <Section
+          title="按分类浏览"
+          description="先看分类，点进去才是条目。"
+          actions={
+            <Button variant="ghost" size="sm" render={<Link to="/knowledge" />}>
+              全部分类
+            </Button>
+          }
+        >
+          {categories.isPending ? <LoadingRow label="加载分类…" /> : null}
+          {categories.isSuccess && categories.data.length === 0 ? (
+            <p className="text-muted-foreground text-sm">还没有建分类。</p>
+          ) : null}
+          {categories.isSuccess && categories.data.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="home-categories">
+              {categories.data.slice(0, 6).map((category) => (
+                <Link
+                  key={category.id}
+                  to={`/knowledge/categories/${category.id}`}
+                  className="border-border bg-card hover:border-primary/40 hover:shadow-card group flex items-center justify-between rounded-xl border p-4 transition-all hover:-translate-y-0.5"
+                >
+                  <span className="flex min-w-0 items-center gap-3">
+                    <span className="tile-surface border-border flex size-9 shrink-0 items-center justify-center rounded-lg border">
+                      <Layers className="text-primary size-4" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium">{category.name}</span>
+                      <span className="text-muted-foreground block text-xs">
+                        {category.children.length === 0 ? '暂无子分类' : `${category.children.length} 个子分类`}
+                      </span>
+                    </span>
+                  </span>
+                  <ArrowRight className="text-muted-foreground group-hover:text-primary size-4 shrink-0 transition-colors" />
+                </Link>
+              ))}
+            </div>
+          ) : null}
+        </Section>
+      )
+    }
+    // entries
+    return (
+      <Section title="所有入口" description="点击右上「自定义首页」可排序、隐藏或添加链接。">
+        <ul className="border-border divide-border divide-y overflow-hidden rounded-xl border" data-testid="home-entries">
+          {visibleQuickEntries.map((item, index) => (
+            <li key={item.id}>
+              <Link
+                to={item.path}
+                data-testid={item.testId ?? `home-entry-custom-${index}`}
+                className="hover:bg-accent/40 group flex items-center gap-3.5 px-4 py-3 transition-colors focus-ring"
+              >
+                <span className="text-muted-foreground group-hover:text-primary flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors">
+                  <item.icon className="size-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="group-hover:text-primary block text-sm font-medium transition-colors">
+                    {item.title}
+                  </span>
+                  {item.description === '' ? null : (
+                    <span className="text-muted-foreground mt-0.5 block truncate text-xs">{item.description}</span>
+                  )}
+                </span>
+                <ArrowRight className="text-muted-foreground group-hover:text-primary size-4 shrink-0 transition-colors" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Section>
+    )
+  }
+
   return (
     <AppShell title="Paideia" actions={<LearnerHeader />} wide>
       {firstRun ? (
@@ -298,6 +638,25 @@ export function HomePage() {
           }}
         />
       ) : null}
+
+      <div className="mb-4 flex justify-end">
+        <Button variant="outline" size="sm" data-testid="home-customize" onClick={openLayoutEditor}>
+          <Pencil className="size-3.5" />
+          自定义首页
+        </Button>
+      </div>
+
+      {editingLayout && draft !== null ? (
+        <HomeLayoutEditor
+          draft={draft}
+          onChange={setDraft}
+          onSave={() => void saveLayout()}
+          onCancel={closeLayoutEditor}
+          onReset={() => setDraft(buildDraft(undefined))}
+          saving={savingLayout}
+        />
+      ) : null}
+
       {/* hero：左边是"你要做什么"，右边是"最近有什么"——右侧放真实内容而不是插画，
           一屏之内既有行动也有去处，不会只剩一大片留白 */}
       <section className="border-border from-accent via-background to-background mb-8 grid gap-6 rounded-2xl border bg-gradient-to-br p-5 sm:gap-8 sm:p-8 lg:grid-cols-[1.1fr_1fr] lg:p-10">
@@ -353,12 +712,6 @@ export function HomePage() {
             </Button>
           </div>
 
-          {/*
-            库存量放在搜索框下面一行小字里，**不再单独占一排大数字卡**。
-            原来这里还有一组「可读条目 / 分类 / 我标记过」，与上面那组
-            「待复习 / 学到一半 / 还不懂」是同一个模板重复两遍：前者答"我现在该做什么"，
-            后者只是把库存念了一遍，而"我标记过"又与"还不懂"是同一件事。
-          */}
           <p className="text-muted-foreground mt-6 text-sm">
             库里共{' '}
             {/* testid 只挂在数字上：e2e 会把这个元素的非数字字符全去掉再与条目总数对照，
@@ -449,190 +802,263 @@ export function HomePage() {
         </Card>
       </section>
 
-      {/*
-        面经专区（2026-11-09 从「所有入口」列表底部提到 hero 正下方）。
-        原来它只是一行不起眼的索引项，而且只连 essay-java 一个分类——前端/测试/数据三类
-        根本进不去。现在改成一张带主色的横幅：四个方向各一个 chip，点哪个进哪个分类。
-        数据来自已经加载的 categories 树，**不额外发请求**（条数在分类页里显示）。
-      */}
-      {essayCategories.length === 0 ? null : (
-        <section
-          data-testid="home-essay-banner"
-          className="border-primary/25 from-primary/[0.09] via-primary/[0.05] to-background mb-6 rounded-2xl border bg-gradient-to-r px-4 py-3.5 sm:px-5"
-        >
-          {/*
-            一行装下：左边是什么、右边去哪。900 高的屏上它必须完整露在首屏里——
-            留两行说明就又被挤到折线以下，等于白提上来（2026-11-09 实测）。
-          */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <Flame className="text-primary size-5 shrink-0" aria-hidden />
-              <div className="min-w-0">
-                <h2 className="text-base leading-6 font-semibold">面试前，刷一遍面经</h2>
-                <p className="text-muted-foreground text-xs leading-5">
-                  每天从牛客面经里抽题、AI 逐题解析，四个方向按岗位挑
-                </p>
-              </div>
-            </div>
-            <div className="ml-auto flex flex-wrap gap-2">
-              {essayCategories.map((category) => (
-                <Link
-                  key={category.id}
-                  to={`/knowledge/categories/${category.id}`}
-                  data-testid={`home-essay-${category.slug}`}
-                  className="border-primary/30 bg-background/70 hover:border-primary hover:bg-primary hover:text-primary-foreground inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors"
-                >
-                  {ESSAY_LABELS[category.slug] ?? category.name}
-                  {essayCountOf(category.id) === undefined ? null : (
-                    <span className="tabular-nums opacity-70">{essayCountOf(category.id)}</span>
-                  )}
-                  <ArrowRight className="size-3.5" aria-hidden />
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* 「继续学习」：服务端有记录就优先用它（跨设备一致），否则退回本地阅读痕迹。
-          只有真读过才出现——空着一条"还没开始"只是噪音。 */}
-      {continueLearning.length > 0 ? (
-        <Section
-          title="继续学习"
-          description="接着上次那一站往下走。"
-          actions={
-            <Button variant="ghost" size="sm" render={<Link to="/learn" />}>
-              全部学习线
-            </Button>
-          }
-        >
-          <div className="grid gap-3 sm:grid-cols-3" data-testid="home-continue-learning">
-            {continueLearning.map((item) => (
-              <Link
-                key={item.entryId}
-                to={`/knowledge/entries/${item.entryId}`}
-                data-testid={`home-continue-${item.entryId}`}
-                className="border-border bg-card hover:border-primary/40 hover:shadow-card group flex items-start gap-3 rounded-xl border p-4 transition-all hover:-translate-y-0.5"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="group-hover:text-primary block truncate text-sm font-medium transition-colors">
-                    {item.title}
-                  </span>
-                  <span className="text-muted-foreground mt-1 block text-xs">{item.label}</span>
-                </span>
-                <ArrowRight className="text-muted-foreground group-hover:text-primary mt-0.5 size-4 shrink-0 transition-colors" />
-              </Link>
-            ))}
-          </div>
-        </Section>
-      ) : null}
-
-      {continueLearning.length > 0 || recent.length === 0 ? null : (
-        <Section
-          title="继续学习"
-          description="接着上次那一条读下去。"
-          actions={
-            <span className="text-muted-foreground text-xs">进度只保存在这台设备上</span>
-          }
-        >
-          <div className="grid gap-3 sm:grid-cols-3" data-testid="home-recent-reading">
-            {recent.map((item) => (
-              <Link
-                key={item.entryId}
-                to={`/knowledge/entries/${item.entryId}`}
-                data-testid={`home-recent-${item.entryId}`}
-                className="border-border bg-card hover:border-primary/40 hover:shadow-card group flex items-start gap-3 rounded-xl border p-4 transition-all hover:-translate-y-0.5"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="group-hover:text-primary block truncate text-sm font-medium transition-colors">
-                    {item.title}
-                  </span>
-                  <span className="text-muted-foreground mt-1 block text-xs">
-                    上次阅读 {new Date(item.visited).toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}
-                  </span>
-                </span>
-                <ArrowRight className="text-muted-foreground group-hover:text-primary mt-0.5 size-4 shrink-0 transition-colors" />
-              </Link>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      <Section
-        title="按分类浏览"
-        description="先看分类，点进去才是条目。"
-        actions={
-          <Button variant="ghost" size="sm" render={<Link to="/knowledge" />}>
-            全部分类
-          </Button>
-        }
-      >
-        {categories.isPending ? (
-          <LoadingRow label="加载分类…" />
-        ) : null}
-        {categories.isSuccess && categories.data.length === 0 ? (
-          <p className="text-muted-foreground text-sm">还没有建分类。</p>
-        ) : null}
-        {categories.isSuccess && categories.data.length > 0 ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="home-categories">
-            {categories.data.slice(0, 6).map((category) => (
-              <Link
-                key={category.id}
-                to={`/knowledge/categories/${category.id}`}
-                className="border-border bg-card hover:border-primary/40 hover:shadow-card group flex items-center justify-between rounded-xl border p-4 transition-all hover:-translate-y-0.5"
-              >
-                <span className="flex min-w-0 items-center gap-3">
-                  <span className="tile-surface border-border flex size-9 shrink-0 items-center justify-center rounded-lg border">
-                    <Layers className="text-primary size-4" />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium">{category.name}</span>
-                    <span className="text-muted-foreground block text-xs">
-                      {category.children.length === 0 ? '暂无子分类' : `${category.children.length} 个子分类`}
-                    </span>
-                  </span>
-                </span>
-                <ArrowRight className="text-muted-foreground group-hover:text-primary size-4 shrink-0 transition-colors" />
-              </Link>
-            ))}
-          </div>
-        ) : null}
-      </Section>
-
-      {/*
-        其余入口用**一行一条的索引**，不是 12 张同尺寸的卡片。
-        12 张一模一样的卡等于 12 个平等的选项，也就是没有推荐——眼睛只能从头扫到尾。
-        索引行按身份排好的顺序从上往下读，图标退到左侧做锚点，标题与说明挤在一行里。
-        所有 `data-testid` 与链接目标保持不变（e2e 与导航入口都依赖它们）。
-      */}
-      <Section
-        title="所有入口"
-        description="面试与速递在前，其余按常用程度排。"
-      >
-        <ul className="border-border divide-border divide-y overflow-hidden rounded-xl border" data-testid="home-entries">
-          {quickLinks.map((item) => (
-            <li key={item.to}>
-              <Link
-                to={item.to}
-                data-testid={item.testId}
-                className="hover:bg-accent/40 group flex items-center gap-3.5 px-4 py-3 transition-colors focus-ring"
-              >
-                <span className="text-muted-foreground group-hover:text-primary flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors">
-                  <item.icon className="size-4" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="group-hover:text-primary block text-sm font-medium transition-colors">
-                    {item.title}
-                  </span>
-                  <span className="text-muted-foreground mt-0.5 block truncate text-xs">{item.description}</span>
-                </span>
-                <ArrowRight className="text-muted-foreground group-hover:text-primary size-4 shrink-0 transition-colors" />
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </Section>
+      {blockPrefs
+        .filter((block) => block.visible)
+        .map((block) => (
+          <Fragment key={block.id}>{renderBlock(block.id)}</Fragment>
+        ))}
     </AppShell>
+  )
+}
+
+interface HomeLayoutEditorProps {
+  draft: HomeLayoutConfig
+  onChange: (next: HomeLayoutConfig) => void
+  onSave: () => void
+  onCancel: () => void
+  onReset: () => void
+  saving: boolean
+}
+
+/** 首页自定义的编辑面板：拖动/箭头排序、眼睛显隐、添加自定义链接。 */
+function HomeLayoutEditor({ draft, onChange, onSave, onCancel, onReset, saving }: HomeLayoutEditorProps) {
+  const blocks = draft.blocks ?? []
+  const quickLinks = draft.quickLinks ?? []
+  const [newTitle, setNewTitle] = useState('')
+  const [newHref, setNewHref] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  const move = <T,>(list: T[], from: number, to: number): T[] => {
+    if (to < 0 || to >= list.length || from === to) {
+      return list
+    }
+    const next = list.slice()
+    const [item] = next.splice(from, 1)
+    if (item === undefined) {
+      return list
+    }
+    next.splice(to, 0, item)
+    return next
+  }
+
+  const setBlocks = (next: HomeLayoutConfig['blocks']) => onChange({ ...draft, blocks: next })
+  const setQuick = (next: HomeQuickLinkPref[]) => onChange({ ...draft, quickLinks: next })
+
+  const toggleQuick = (index: number) =>
+    setQuick(quickLinks.map((entry, i) => (i === index ? { ...entry, visible: !entry.visible } : entry)))
+
+  const removeQuick = (index: number) => setQuick(quickLinks.filter((_, i) => i !== index))
+
+  const addCustom = () => {
+    const href = newHref.trim()
+    const title = newTitle.trim()
+    if (href === '') {
+      setError('请填写链接地址')
+      return
+    }
+    if (!/^(https?:\/\/|\/)/.test(href)) {
+      setError('链接需以 http(s):// 或 / 开头')
+      return
+    }
+    if (title === '') {
+      setError('请填写名称')
+      return
+    }
+    if (quickLinks.some((entry) => entry.type === 'custom' && entry.path === href)) {
+      setError('该链接已存在')
+      return
+    }
+    setError(null)
+    setQuick([...quickLinks, { type: 'custom', path: href, visible: true, title, description: '' }])
+    setNewTitle('')
+    setNewHref('')
+  }
+
+  const titleOf = (pref: HomeQuickLinkPref) =>
+    pref.type === 'custom' ? pref.title ?? pref.path : QUICK_LINK_BY_PATH.get(pref.path)?.title ?? pref.path
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-8" data-testid="home-layout-editor">
+      <div className="border-border bg-card flex max-h-[86vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border shadow-xl">
+        <div className="border-border flex items-center justify-between border-b px-5 py-3.5">
+          <h2 className="text-sm font-medium">自定义首页</h2>
+          <button type="button" onClick={onCancel} aria-label="关闭" className="text-muted-foreground hover:text-foreground">
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 space-y-6 overflow-y-auto px-5 py-4">
+          <section>
+            <h3 className="text-muted-foreground text-xs font-medium">版块（拖动或点箭头排序，点眼睛可隐藏）</h3>
+            <ul className="mt-2 divide-border divide-y" data-testid="home-layout-blocks">
+              {blocks.map((block, index) => (
+                <li
+                  key={block.id}
+                  draggable
+                  onDragStart={(event) => event.dataTransfer.setData('text/plain', `b:${index}`)}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    const data = event.dataTransfer.getData('text/plain')
+                    if (data.startsWith('b:')) {
+                      setBlocks(move(blocks, Number(data.slice(2)), index))
+                    }
+                  }}
+                  className="flex items-center gap-2 py-2"
+                >
+                  <GripVertical className="text-muted-foreground size-4 shrink-0 cursor-grab" />
+                  <span className="flex-1 text-sm">{HOME_BLOCK_LABELS[block.id]}</span>
+                  <OrderButtons
+                    onUp={() => setBlocks(move(blocks, index, index - 1))}
+                    onDown={() => setBlocks(move(blocks, index, index + 1))}
+                    upDisabled={index === 0}
+                    downDisabled={index === blocks.length - 1}
+                  />
+                  <button
+                    type="button"
+                    aria-label={block.visible ? '隐藏版块' : '显示版块'}
+                    onClick={() =>
+                      setBlocks(blocks.map((item, i) => (i === index ? { ...item, visible: !item.visible } : item)))
+                    }
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    {block.visible ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section>
+            <h3 className="text-muted-foreground text-xs font-medium">快捷入口（拖动或点箭头排序，可隐藏或删除自定义项）</h3>
+            <ul className="mt-2 divide-border divide-y" data-testid="home-layout-quicklinks">
+              {quickLinks.map((entry, index) => (
+                <li
+                  key={`${entry.type}:${entry.path}`}
+                  draggable
+                  onDragStart={(event) => event.dataTransfer.setData('text/plain', `q:${index}`)}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    const data = event.dataTransfer.getData('text/plain')
+                    if (data.startsWith('q:')) {
+                      setQuick(move(quickLinks, Number(data.slice(2)), index))
+                    }
+                  }}
+                  className="flex items-center gap-2 py-2"
+                >
+                  <GripVertical className="text-muted-foreground size-4 shrink-0 cursor-grab" />
+                  <span className="min-w-0 flex-1">
+                    <span className={`block truncate text-sm ${entry.visible ? '' : 'text-muted-foreground line-through'}`}>
+                      {titleOf(entry)}
+                    </span>
+                    {entry.type === 'custom' ? (
+                      <span className="text-muted-foreground block truncate text-xs">{entry.path}</span>
+                    ) : null}
+                  </span>
+                  <OrderButtons
+                    onUp={() => setQuick(move(quickLinks, index, index - 1))}
+                    onDown={() => setQuick(move(quickLinks, index, index + 1))}
+                    upDisabled={index === 0}
+                    downDisabled={index === quickLinks.length - 1}
+                  />
+                  <button
+                    type="button"
+                    aria-label={entry.visible ? '隐藏入口' : '显示入口'}
+                    onClick={() => toggleQuick(index)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    {entry.visible ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+                  </button>
+                  {entry.type === 'custom' ? (
+                    <button
+                      type="button"
+                      aria-label="删除入口"
+                      onClick={() => removeQuick(index)}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+
+            <div className="border-border mt-3 rounded-xl border p-3">
+              <p className="text-muted-foreground text-xs font-medium">添加自定义链接</p>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                <Input
+                  value={newTitle}
+                  onChange={(event) => setNewTitle(event.target.value)}
+                  placeholder="名称，如「牛客面经」"
+                  className="h-8"
+                  data-testid="home-layout-new-title"
+                />
+                <Input
+                  value={newHref}
+                  onChange={(event) => setNewHref(event.target.value)}
+                  placeholder="链接，https:// 或 / 开头"
+                  className="h-8"
+                  data-testid="home-layout-new-href"
+                />
+                <Button type="button" size="sm" onClick={addCustom} data-testid="home-layout-add">
+                  <Plus className="size-3.5" />
+                  添加
+                </Button>
+              </div>
+              {error === null ? null : <p className="text-destructive mt-1.5 text-xs">{error}</p>}
+            </div>
+          </section>
+        </div>
+
+        <div className="border-border flex items-center gap-2 border-t px-5 py-3">
+          <Button type="button" variant="ghost" size="sm" onClick={onReset} data-testid="home-layout-reset">
+            <RotateCcw className="size-3.5" />
+            恢复默认
+          </Button>
+          <span className="flex-1" />
+          <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+            取消
+          </Button>
+          <Button type="button" size="sm" onClick={onSave} disabled={saving} data-testid="home-layout-save">
+            {saving ? '保存中…' : '保存'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function OrderButtons({
+  onUp,
+  onDown,
+  upDisabled,
+  downDisabled,
+}: {
+  onUp: () => void
+  onDown: () => void
+  upDisabled: boolean
+  downDisabled: boolean
+}) {
+  return (
+    <span className="flex items-center">
+      <button
+        type="button"
+        aria-label="上移"
+        onClick={onUp}
+        disabled={upDisabled}
+        className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+      >
+        <ChevronUp className="size-4" />
+      </button>
+      <button
+        type="button"
+        aria-label="下移"
+        onClick={onDown}
+        disabled={downDisabled}
+        className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+      >
+        <ChevronDown className="size-4" />
+      </button>
+    </span>
   )
 }
 
