@@ -5,7 +5,7 @@ work: 架构审计整改
 status: approved
 updated: 2026-11-25
 approved_by: xiaou61
-approved_at: 2026-11-25 13:59:18 +0800
+approved_at: 2026-11-25 14:42:04 +0800
 approver_role: CTO
 ---
 
@@ -98,3 +98,21 @@ approver_role: CTO
 - 验证：`pnpm --filter @paideia/assistant test`（新增）与 `pnpm --filter @paideia/app typecheck`；合成流，不调用真实模型。
 - 实测：`pnpm --filter @paideia/assistant test` → 4 个文件 24 条通过（`sse.test.ts` 11 条含"截断流未终止""error 也算终止"；新增 `client.test.ts` 3 条：done 不补错并按 input/output/total 归一、无终止断流补一条"未能完整结束"错误、服务端已发 error 不叠加）。`pnpm --filter @paideia/app typecheck` 0。
 - 实现补充：`readEventStream` 现返回 `StreamOutcome{terminated}`（收到 `done` 或 `error` 即 true；无响应体/仅正文即断为 false）；`sendMessage` 在 `!terminated` 时合成一条 `{type:'error',message:'回答未能完整结束（连接中断），请重试'}` 事件。面试页原有 `event.type==='error' → setError` 已据终止状态给出"没成功"提示、`busy` 正常收尾且不留"假装完成"的空气泡，故 `InterviewPage.tsx` 无需改动（原设计第 15 项对该文件的功能要求由既有处理满足）；abort 仍以异常抛出、不合成错误。
+
+## 第三批任务（REQ-006、REQ-007，已批准 2026-11-25 14:41）
+
+### TASK-008 | done | 发布失败整体回滚与并发串行化
+
+- 对应：REQ-006、AC-006；依赖：无。
+- 修改：`scripts/release.ps1`；新增 `scripts/deploy/remote-deploy.sh`、`scripts/deploy/test-remote-deploy.sh`；`docs/architecture/03-deployment.md`。
+- 步骤：先把远端状态机外置为可测脚本并保持 `PHASE`/`DEPLOY_OK`/`DEPLOY_FAILED` 契约；停服后快照 jar+web+清单；健康失败整体还原、成功才推进并清理；原子 `mkdir` 发布锁串行化；补迁移边界说明。先写隔离模拟测试再改脚本。
+- 验证：`scripts/deploy/test-remote-deploy.sh`（Git Bash）成功晋升、健康失败字节一致回滚、并发锁拒绝；`release.ps1 -ValidateOnly` 通过；不连服务器、不部署。
+- 实测（2026-11-25）：远端状态机移到 `scripts/deploy/remote-deploy.sh`，`release.ps1` 改为读取模板替换占位符并新增启动时"仅回代码、不降级 schema"回滚边界提示 → `promPath` 常量。`bash scripts/deploy/test-remote-deploy.sh` 21 项断言全过（场景 1 健康通过：DEPLOY_OK、jar/web/双清单推进、标记写入、快照与锁清理；场景 2 健康失败：DEPLOY_FAILED、jar 逐字节回 `OLDJAR`、web 新文件消失回旧版、双清单未推进、无残留；场景 3 持锁：'另一个发布' 直接失败、jar/web 未被触碰）。`release.ps1` PowerShell 语法解析 0 错误；`git diff --check` 通过。未连服务器、未部署。
+- 实现补充：并发锁用可移植的原子 `mkdir .deploy.lock.d` + pid 存活探测（持锁进程已死则清死锁重抢），不依赖服务器是否装 `flock`；快照用 `.rollback/`（app.jar + web/ + 两份清单），健康失败时三者一起还原。
+
+### TASK-009 | wait | 最小架构漂移检查与运维核查清单
+
+- 对应：REQ-007、AC-007；依赖：无。
+- 修改：重新生成 `docs/architecture/05-database-tables.md`、`06-api-surface.md` 并对齐 `README.md` 计数；新增 `.github/workflows/arch-guard.yml`、`docs/architecture/ops-verification.md`。
+- 步骤：先让 `gen-arch-diagram.mjs --check` 归零；再加 CI 复跑图语法/漂移/内容/`ModularityTest`；写运维四项核查清单（标注未核实、需线上授权）。
+- 验证：`node scripts/gen-arch-diagram.mjs --check`、`node scripts/check-diagrams.mjs`、`node scripts/check-content.mjs --scope content` 均 0；`ModularityTest` 通过；`arch-guard.yml` YAML 解析通过并用本地等价命令验证（GitHub 未实际运行，明确标注）。

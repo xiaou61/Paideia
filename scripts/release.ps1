@@ -234,6 +234,10 @@ function Get-JarFingerprint([string]$path) {
 }
 
 Write-Host "发版到 $Server（端口 $Port，目录 $RemoteDir）"
+# 回滚边界（WRK-092 TASK-008）：发布失败时脚本只把 jar + web + 清单整体恢复到上一已验证版本，
+# 不会降级数据库 schema。因此新增迁移必须是向后兼容的 expand/contract（先加列/表，旧代码可忽略），
+# 跨破坏性迁移（删列、改类型、收窄约束）要单独走停机窗口，不能靠本脚本自动回滚。
+Write-Host '  回滚边界：仅回代码，不降级数据库；迁移须向后兼容（expand/contract）。'
 
 if ($WithTests) {
     Step '后端全量测试' {
@@ -420,93 +424,18 @@ $repackCmd = if ($script:changed.Count -eq 0 -and $script:removed.Count -eq 0) {
 } else {
     '/opt/jdk25/bin/jar c0fm app.jar.new MANIFEST.MF -C exploded .'
 }
+# 发版标记（node_exporter textfile collector 读取）。远端模板用它替换 __PROM_PATH__。
+$promPath = '/var/lib/node_exporter/textfile/deploy.prom'
 
 # 远端脚本随部署包走（bundle 成员 'deploy.sh'），不从命令行传——命令行单参数超过约
 # 8192 字符会被静默截断（2026-11-02 实测：11572 字符的命令只跑了前半段 `echo <b64>`，
 # 远端零副作用、退出码还是 0，表现为"部署没成功但也不报错"）。
 # 清单只在健康检查通过后才推进（.new -> 正式），失败的部署不会让下一次误判"已经是最新的"。
-$remoteScript = @'
-set -eu
-cd __REMOTE_DIR__
-# unpack（含本脚本自己的解包）已在命令行里做过——脚本是从 deploy-in/deploy.sh 跑起来的。
-# 只报 0 秒，保持 PHASE 序列完整。
-echo "PHASE unpack 0"
-
-# 跳过前端构建的前提是"服务器上那份还在且完整"：缺了就在这里拦下，
-# 别安静地发出一份没有前端的版本。
-if [ ! -d deploy-in/web ] && { [ ! -f web/index.html ] || [ ! -f web/admin/index.html ]; }; then
-  echo "DEPLOY_FAILED 服务器上缺 web 产物，请用 -WithWeb 重建"
-  exit 0
-fi
-
-t1=$(date +%s)
-if [ -f deploy-in/app-full.jar ]; then
-  cp -f deploy-in/app-full.jar app.jar.new
-  rm -rf exploded && mkdir exploded
-  ( cd exploded && unzip -q ../app.jar.new )
-  mv -f exploded/META-INF/MANIFEST.MF MANIFEST.MF
-else
-  # 增量路径要有 exploded/ 这个基点：缺了就只能整包，别在这里用 tar 撞一个看不懂的错
-  if [ ! -d exploded ]; then
-    echo "DEPLOY_FAILED 服务器上没有 exploded/ 增量基点，请在服务器上删掉 exploded.manifest 后重跑（会走整包）"
-    exit 0
-  fi
-  if [ -f deploy-in/release-patch.tar.gz ]; then
-    tar xzf deploy-in/release-patch.tar.gz -C exploded
-    rm -f deploy-in/release-patch.tar.gz
-  fi
-  __REMOVE_CMD__
-  cp -f deploy-in/MANIFEST.MF MANIFEST.MF
-  __REPACK_CMD__
-fi
-mv -f deploy-in/exploded.manifest exploded.manifest.new
-# web 清单同样先放 .new：健康检查过了才推进，失败的部署不会让下一次误判"服务器已是最新"
-if [ -f deploy-in/web.manifest ]; then mv -f deploy-in/web.manifest web.manifest.new; fi
-echo "PHASE repack $(( $(date +%s) - t1 ))"
-
-# **先停服务再换文件**（见文件头约束 4）：应用在跑时换掉 app.jar 会让懒加载类找不到
-t2=$(date +%s)
-systemctl stop paideia
-cp -f app.jar app.jar.prev
-mv -f app.jar.new app.jar
-if [ -d deploy-in/web ]; then
-  rm -rf web && mv -f deploy-in/web web
-elif [ -f deploy-in/web-patch.tar.gz ]; then
-  # 前端增量：只解变化的文件，再按 diff 删掉服务器上多出来的（清单推进在健康检查之后）
-  tar xzf deploy-in/web-patch.tar.gz -C web
-  __WEB_REMOVE_CMD__
-  rm -f deploy-in/web-patch.tar.gz
-fi
-rm -rf deploy-in
-echo "PHASE swap $(( $(date +%s) - t2 ))"
-
-t3=$(date +%s)
-systemctl start paideia
-echo "PHASE start $(( $(date +%s) - t3 ))"
-
-t4=$(date +%s)
-ok=no
-i=0
-while [ $i -lt 90 ]; do
-  if curl -fsS -m 2 http://127.0.0.1:__PORT__/actuator/health 2>/dev/null | grep -q '"status":"UP"'; then ok=yes; break; fi
-  sleep 1
-  i=$(( i + 1 ))
-done
-echo "PHASE health $(( $(date +%s) - t4 ))"
-if [ "$ok" != yes ]; then
-  echo "DEPLOY_FAILED 健康检查 90 秒未就绪；回滚：cd __REMOTE_DIR__ && mv -f app.jar.prev app.jar && systemctl start paideia"
-  exit 0
-fi
-
-# 走到这里才算成功：推进基线清单 + 写发版标记
-t5=$(date +%s)
-mv -f exploded.manifest.new exploded.manifest
-if [ -f web.manifest.new ]; then mv -f web.manifest.new web.manifest; fi
-printf '%s' '__PROM_B64__' | base64 -d > /var/lib/node_exporter/textfile/deploy.prom.tmp && mv -f /var/lib/node_exporter/textfile/deploy.prom.tmp /var/lib/node_exporter/textfile/deploy.prom
-echo "PHASE marker $(( $(date +%s) - t5 ))"
-echo "DEPLOY_OK"
-'@
-$remoteScript = $remoteScript.Replace('__REMOTE_DIR__', $RemoteDir).Replace('__PORT__', "$Port").Replace('__REMOVE_CMD__', $removeCmd).Replace('__WEB_REMOVE_CMD__', $webRemoveCmd).Replace('__REPACK_CMD__', $repackCmd).Replace('__PROM_B64__', $deployB64)
+# 远端状态机已外置为可测试的脚本（WORK-092 TASK-008）：这里只读取模板、替换占位符。
+$remoteTemplate = Join-Path $repo 'scripts\deploy\remote-deploy.sh'
+if (-not (Test-Path $remoteTemplate)) { throw "找不到远端部署脚本模板：$remoteTemplate" }
+$remoteScript = [System.IO.File]::ReadAllText($remoteTemplate)
+$remoteScript = $remoteScript.Replace('__REMOTE_DIR__', $RemoteDir).Replace('__PORT__', "$Port").Replace('__REMOVE_CMD__', $removeCmd).Replace('__WEB_REMOVE_CMD__', $webRemoveCmd).Replace('__REPACK_CMD__', $repackCmd).Replace('__PROM_B64__', $deployB64).Replace('__PROM_PATH__', $promPath)
 # 工作区是 CRLF（git autocrlf），bash 会把行尾的 \r 当成命令的一部分。2026-11-02 第一次
 # 跑就是这么炸的：`cd: $'/opt/paideia-app\r': No such file or directory` + `set: -: invalid option`。
 $remoteScript = $remoteScript.Replace("`r`n", "`n")
