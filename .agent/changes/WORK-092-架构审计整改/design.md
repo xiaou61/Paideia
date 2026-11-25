@@ -5,7 +5,7 @@ work: 架构审计整改
 status: approved
 updated: 2026-11-25
 approved_by: xiaou61
-approved_at: 2026-11-25 13:58:56 +0800
+approved_at: 2026-11-25 14:41:44 +0800
 approver_role: CTO
 ---
 
@@ -93,3 +93,34 @@ approver_role: CTO
 ### 待决定事项（第二批）
 
 - 待批准本批设计；批准后写入任务计划并实现；迁移先在隔离测试库验证，不动生产库。
+
+## 第三批设计（REQ-006、REQ-007，待批准）
+
+### 变更清单（第三批）
+
+| # | 位置 | 类型 | 改前 | 改后 | 依据 |
+| --- | --- | --- | --- | --- | --- |
+| 24 | `scripts/release.ps1:428-508,592-611` | 修改 | 远端脚本内嵌；健康失败只回滚 `app.jar`，`web/` 与清单可能停在新版本，形成"新前端+旧后端"；无并发保护 | 远端状态机外置到 `scripts/deploy/remote-deploy.sh`；停服后把 `app.jar`+`web/`+`exploded.manifest`+`web.manifest` 快照到 `.rollback/`；健康失败按快照整体还原为发布前同一已验证版本；`flock` 串行化并发发布；健康通过才推进清单并清理快照 | AC-006 |
+| 25 | `scripts/deploy/remote-deploy.sh` | 新增 | 无可独立运行的发布状态机 | 读取 `deploy-in/`，执行 停服→快照→换文件→启动→健康→成功推进/失败整体回滚；保持 `PHASE`/`DEPLOY_OK`/`DEPLOY_FAILED` 输出契约与 LF | AC-006 |
+| 26 | `scripts/deploy/test-remote-deploy.sh` | 新增 | 无发布回滚测试 | 本地隔离目录 + 假 `systemctl/curl/jar/unzip`：成功晋升、注入健康失败后 jar/web/清单字节一致、并发第二个被锁拒绝 | AC-006 |
+| 27 | `scripts/release.ps1`（头注释）/ `docs/architecture/03-deployment.md` | 修改 | 未写明迁移不可自动回滚 | 增"代码回滚、schema 只前向、迁移须向后兼容（expand/contract）、跨迁移不能自动降级"边界与本批新迁移提示 | AC-006 |
+| 28 | `docs/architecture/05-database-tables.md`、`06-api-surface.md`、`README.md` | 修改 | 生成结果为 78 表/235 端点，README 仍写 77/233，`--check` 红 | 用脚本重新生成并对齐计数，令 `gen-arch-diagram.mjs --check` 通过 | AC-007 |
+| 29 | `.github/workflows/arch-guard.yml` | 新增 | 无版本化 CI，漂移不拦变更 | PR/推送触发：图语法、结构图漂移、内容校验、`ModularityTest`；失败即红；由仓库 owner 设为 required check 才真正拦截合并（文档说明） | AC-007 |
+| 30 | `docs/architecture/ops-verification.md` | 新增 | 备份/HTTPS/端点暴露未核实 | 核查清单：备份异地性、隔离恢复演练、外部 HTTPS、运维端点暴露；标注"未核实/需线上授权"，本轮不改线上 | AC-007 |
+
+### 组件与失败行为（第三批）
+
+**发布回滚。** 每次发布在停服后先把当前 `app.jar`、`web/`、`exploded.manifest`、`web.manifest` 快照到远端 `.rollback/`，再切换到新版本；健康检查未通过则用快照把三者还原成发布前同一已验证版本并重启，输出 `DEPLOY_FAILED 已恢复上一版本`；健康通过后才推进清单、清理 `.rollback`。整个切换在 `flock` 独占锁内，第二个并发发布直接失败退出、不触碰任何文件。基线清单只在成功时推进，失败发布不会让下一次误判"已最新"；前端与后端作为同一整体晋升/回滚，不再出现"新前端+旧后端"。
+
+**迁移边界。** 发布只回滚代码，不回滚数据库；迁移遵循 expand/contract、保证新代码可被旧结构容纳（向后兼容）。脚本检测到本次含新迁移时打印提示；明确"跨迁移边界不能自动回滚 schema"，需人工评估，绝不自动降级。
+
+**最小检查。** 结构图与计数由 `gen-arch-diagram.mjs --check` 把关，图语法由 `check-diagrams.mjs`，内容由 `check-content.mjs`，模块边界由 `ModularityTest`；CI 复跑这些，失败即红。合并拦截依赖仓库 required check 配置（文档明示，属 owner 动作）。运维四项仅出核查清单，本轮不改线上。
+
+### 测试策略（第三批）
+
+- **REQ-006 / AC-006：** `scripts/deploy/test-remote-deploy.sh`（Git Bash 本地隔离）验证成功晋升、注入健康失败后 jar/web/清单恢复字节一致、并发锁拒绝；`powershell -File scripts/release.ps1 -ValidateOnly` 仍通过；不连服务器、不部署。
+- **REQ-007 / AC-007：** 重新生成后 `node scripts/gen-arch-diagram.mjs --check`、`node scripts/check-diagrams.mjs`、`node scripts/check-content.mjs --scope content` 均 0；`ModularityTest` 通过；`arch-guard.yml` 用 YAML 解析校验并用本地等价命令验证（GitHub 上未实际运行，明确标注未跑）。备份/HTTPS/端点暴露标注未核实，需线上授权。
+
+### 待决定事项（第三批）
+
+- 待批准本批设计；批准后写入任务计划并实现。发布脚本改动只在本地隔离目录模拟验证，不连服务器、不部署、不改线上配置。
