@@ -5,11 +5,13 @@ work: 架构审计整改
 status: approved
 updated: 2026-11-25
 approved_by: xiaou61
-approved_at: 2026-11-25 12:08:01 +0800
+approved_at: 2026-11-25 13:59:18 +0800
 approver_role: CTO
 ---
 
-# 架构审计整改：首批实施任务
+# 架构审计整改：实施任务（首批已完成；第二批待批准）
+
+> 首批 TASK-001～003 已批准（2026-11-25 12:08）并完成。第二批 TASK-004～007 已批准（2026-11-25 13:58），正在实施。
 
 ## 依据
 
@@ -60,3 +62,33 @@ approver_role: CTO
 ## 完成条件
 
 - 三个切片通过各自检查并有本地提交；记录命令、实际测试结果、未验项和原因。AC-004～007 仍未验，不以本批结果关闭整个工作项。
+
+## 第二批任务（REQ-004、REQ-005，已批准 2026-11-25 13:58）
+
+### TASK-004 | done | 学习进度与笔记保存的并发正确性
+
+- 对应：REQ-004、AC-004；依赖：无。
+- 修改：`backend/paideia-knowledge/src/main/java/io/github/xiaou61/knowledge/internal/learning/{LearningProgressService,LearningProgressMapper}.java`；`frontend/apps/app/src/pages/NoteWorkspacePage.tsx`；新增 `frontend/packages/knowledge/src/note-autosave.ts` 及其单测并从 `@paideia/knowledge` 导出（`DocEditor.tsx` 无需改：保存期间编辑框始终可编辑）。
+- 步骤：先写并发与慢保存回归；学习侧改为确保行 + `SELECT … FOR UPDATE` 锁 + 按 id 更新（不迁移学习表）；笔记侧把自动保存抽成与框架无关的 `NoteAutosaver`（草稿版本、保存中补存最新、编辑中不用服务端结果覆盖本地、切换文档丢弃旧文档排队保存）。
+- 实测：后端 `../scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=LearningProgressIntegrationTest` → `Tests run: 11, Failures: 0, Errors: 0`（含新增 `concurrentDisjointBlocksBothSurvive`：两线程不同块并发写，两块的 c1/c2 都保留）BUILD SUCCESS，隔离库，不触碰线上库；前端 `pnpm --filter @paideia/knowledge exec vitest run src/note-autosave.test.ts` 5 passed；`pnpm --filter @paideia/knowledge typecheck` 0、`pnpm --filter @paideia/app typecheck` 0。
+
+### TASK-005 | wait | AI 计费预约的持久幂等与恢复
+
+- 对应：REQ-005、AC-005；依赖：无。
+- 修改：`backend/paideia-ai/src/main/java/io/github/xiaou61/ai/internal/billing/{CreditService,CreditLedgerMapper}.java`、新增 `CreditReservationMapper.java`、`backend/paideia-ai/src/main/java/io/github/xiaou61/ai/internal/web/AssistantConversationController.java`、恢复调度；新增迁移 `V2026112514xxxx__add_ai_credit_reservations.sql`。
+- 步骤：先写幂等与恢复回归；建预约表与台账 `round_id` 唯一键；`reserve` 记录 round_id；结算/退款幂等；控制器改用 roundId；加恢复任务。
+- 验证：隔离库 `scripts/test-db.sh` 跑结算/退款幂等、重复恢复、并发；迁移在零数据新库通过。
+
+### TASK-006 | wait | 知识导入中断的可恢复与 fencing
+
+- 对应：REQ-005、AC-005；依赖：无。
+- 修改：`backend/paideia-ai/src/main/java/io/github/xiaou61/ai/internal/importing/{KnowledgeImportService,KnowledgeImportMapper}.java`；新增迁移 `V2026112514xxxx__add_knowledge_import_lease.sql`。
+- 步骤：先写中断/过期覆盖回归；领取写 `claim_token`+时间+次数；结果写需令牌匹配；超时回收 `requeueStale`。
+- 验证：隔离库 `scripts/test-db.sh` 跑中断恢复、过期 worker 不覆盖、指纹去重。
+
+### TASK-007 | wait | SSE 未完整结束不显示正常完成
+
+- 对应：REQ-005、AC-005；依赖：无。
+- 修改：`frontend/packages/assistant/src/{sse.ts,client.ts}`、`frontend/apps/app/src/pages/InterviewPage.tsx`。
+- 步骤：先写截断流回归；`readEventStream` 暴露终止事件；页面据终止状态提示未完整；abort 不报错。
+- 验证：`pnpm --filter @paideia/assistant test`（新增）与 `pnpm --filter @paideia/app typecheck`；合成流，不调用真实模型。

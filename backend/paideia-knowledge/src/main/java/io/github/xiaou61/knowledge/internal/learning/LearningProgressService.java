@@ -133,7 +133,11 @@ public class LearningProgressService {
         Entry entry = requirePublished(entryId);
         validate(report);
 
-        LearningProgressRow existing = progressMapper.findOne(userId, entryId).orElse(null);
+        // 并发写入必须串行化：先确保行存在，再带 FOR UPDATE 锁读出最新值。
+        // 否则两个不同块的更新各自基于旧快照合并，后写整体覆盖先写（丢更新）。
+        progressMapper.ensureRow(userId, entryId);
+        LearningProgressRow existing = progressMapper.lockOne(userId, entryId)
+                .orElseThrow(() -> new BizException(ErrorCode.INTERNAL, "学习记录锁定失败"));
         Map<String, LearningProgressRules.BlockScore> oldChallenges = parse(existing, true);
         Map<String, LearningProgressRules.BlockScore> oldQuizzes = parse(existing, false);
 
@@ -144,17 +148,17 @@ public class LearningProgressService {
         boolean scoresChanged = !challenges.equals(oldChallenges) || !quizzes.equals(oldQuizzes);
 
         int tourStep = Math.max(
-                existing == null ? 0 : existing.getTourStep(),
+                existing.getTourStep(),
                 report.tourStep() == null ? 0 : report.tourStep());
 
         boolean passed = LearningProgressRules.passed(ruleFor(entryId), challenges, quizzes);
-        boolean wasPassed = existing != null && STATUS_PASSED.equals(existing.getStatus());
+        boolean wasPassed = STATUS_PASSED.equals(existing.getStatus());
 
         Instant now = Instant.now();
         String status = passed ? STATUS_PASSED : STATUS_IN_PROGRESS;
-        Instant passedAt = existing == null ? null : existing.getPassedAt();
-        int stage = existing == null ? 0 : existing.getReviewStage();
-        Instant dueAt = existing == null ? null : existing.getReviewDueAt();
+        Instant passedAt = existing.getPassedAt();
+        int stage = existing.getReviewStage();
+        Instant dueAt = existing.getReviewDueAt();
 
         if (passed && !wasPassed) {
             // 首次通过：排第一次复习
@@ -180,7 +184,7 @@ public class LearningProgressService {
         }
 
         LearningProgressRow row = new LearningProgressRow();
-        row.setId(existing == null ? null : existing.getId());
+        row.setId(existing.getId());
         row.setUserId(userId);
         row.setEntryId(entryId);
         row.setTourStep(tourStep);
@@ -190,7 +194,7 @@ public class LearningProgressService {
         row.setPassedAt(passedAt);
         row.setReviewStage(stage);
         row.setReviewDueAt(dueAt);
-        progressMapper.upsert(row);
+        progressMapper.updateById(row);
         return toView(row, entry.getTitle(), entryMapper.findLineKindOfEntry(entryId));
     }
 

@@ -5,11 +5,15 @@ work: 架构审计整改
 status: approved
 updated: 2026-11-25
 approved_by: xiaou61
-approved_at: 2026-11-25 11:59:43 +0800
+approved_at: 2026-11-25 13:58:56 +0800
 approver_role: CTO
 ---
 
-# 架构审计整改：首批设计
+# 架构审计整改：设计（首批已批准并实现；第二批待批准）
+
+> 首批 REQ-001～003 设计已于 2026-11-25 11:59 批准并实现（提交 0157d669、1e037af3、91e4fab6），其「变更清单」见下表前 11 行。第二批 REQ-004、REQ-005 为本文件新增范围，随用户确认后再统一签署。
+
+## 首批设计（REQ-001～003，已实现）
 
 ## 变更清单
 
@@ -46,6 +50,46 @@ approver_role: CTO
 - **REQ-002 / AC-002：** `frontend/packages/auth/src/auth-context.test.tsx` 和 `frontend/packages/auth/src/auth.test.ts` 用可控 Promise 验证旧刷新完成/失败、旧 401、新会话刷新、正常续期。两端各加会话切换回归：同一窗口先以 A 使用私有资源，切换至 B 后才释放 A 的延迟响应，断言 B 不短暂显示 A 的数据，且刷新不重建同会话的缓存。验证变更缓存和页面本地状态；数据库测试只走隔离测试入口。
 - **REQ-003 / AC-003：** Rust 测试用本地无凭据夹具检查绑定失败、release 不选开发模式、origin 过滤与开发缓存；保留 OAuth 校验。只构建启动验证需要的产物；有桌面依赖时验证真实窗口的错误路径与正常启动，否则明确记录未跑的项，不用单测替代桌面实测。
 
-## 待决定事项
+## 待决定事项（首批）
 
-- 等待批准本设计；执行命令、分片提交和验收证据在任务计划中列出。
+- 首批设计已批准并实现，见 tasks.md 的 TASK-001～003。
+
+## 第二批设计（REQ-004、REQ-005，待批准）
+
+### 变更清单（第二批）
+
+| # | 位置 | 类型 | 改前 | 改后 | 依据 |
+| --- | --- | --- | --- | --- | --- |
+| 12 | `backend/paideia-knowledge/src/main/java/io/github/xiaou61/knowledge/internal/learning/LearningProgressService.java:131-195` | 修改 | 事务内读旧值→合并→整行 upsert，无行锁 | 事务内先确保行存在，再 `SELECT … FOR UPDATE` 锁定，合并后按 id 更新 | AC-004 |
+| 13 | `backend/paideia-knowledge/src/main/java/io/github/xiaou61/knowledge/internal/learning/LearningProgressMapper.java:22-28,69-86` | 修改 | `findOne` 无锁；`upsert` 覆盖整行 | 新增 `ensureRow`、`lockOne`（FOR UPDATE）与 `updateById` | AC-004 |
+| 14 | `frontend/apps/app/src/pages/NoteWorkspacePage.tsx:111-120,160-194` | 修改 | 保存中再次编辑被 `if(savingRef.current)return` 丢弃；成功即无条件清 dirty 并刷新 | 按文档草稿版本号：保存完成若版本已变则立即补存最新；dirty 仅在版本未变时清除；编辑中不用服务端结果覆盖本地 | AC-004 |
+| 15 | `frontend/apps/app/src/components/notes/DocEditor.tsx:224-274` | 修改 | 保存期间仍可编辑但无补存保障 | 与版本号配合，允许编辑并在保存完成后触发补存 | AC-004 |
+| 16 | `backend/paideia-ai/src/main/java/io/github/xiaou61/ai/internal/billing/CreditService.java:95-130,191-234` | 修改 | `reserve` 仅扣余额；结算/退款无幂等台账键 | `reserve` 记录 `round_id` 预约；新增幂等 `settleRound`/`refundRound`（按 round_id 唯一） | AC-005 |
+| 17 | `backend/paideia-app/src/main/resources/db/migration/V2026112514xxxx__add_ai_credit_reservations.sql` | 新增 | 无预约表，台账无 round_id | 新建 `ai_credit_reservations`；`ai_credit_ledger` 增 `round_id` + 唯一键 | AC-005 |
+| 18 | `backend/paideia-ai/src/main/java/io/github/xiaou61/ai/internal/web/AssistantConversationController.java:339-352` | 修改 | `settled[0]=true` 先置位再落库，落库失败即不可恢复 | 以持久化预约的 round_id 幂等结算/退款，终态失败可恢复 | AC-005 |
+| 19 | `backend/paideia-ai/src/main/java/io/github/xiaou61/ai/internal/importing/KnowledgeImportService.java:114-174` | 修改 | CAS 领取无租约/令牌，结果按 id 覆盖 | 领取写入 `claim_token`/`processing_since`/`attempts`；写结果需令牌匹配；定期 `requeueStale` | AC-005 |
+| 20 | `backend/paideia-ai/src/main/java/io/github/xiaou61/ai/internal/importing/KnowledgeImportMapper.java:29,45,48-57` | 修改 | 无租约字段的领取与更新 | 带 `claim_token` 的 `updateResult` + `requeueStale` | AC-005 |
+| 21 | `backend/paideia-app/src/main/resources/db/migration/V2026112514xxxx__add_knowledge_import_lease.sql` | 新增 | 导入表无租约列 | 增 `claim_token`、`processing_since`、`attempts` | AC-005 |
+| 22 | `frontend/packages/assistant/src/sse.ts:92-126`、`frontend/packages/assistant/src/client.ts:120-151` | 修改 | `readEventStream` 不区分是否收到终止事件 | 返回是否收到 `done`/`error`；无终止且非中断标记未完整 | AC-005 |
+| 23 | `frontend/apps/app/src/pages/InterviewPage.tsx:242-272` | 修改 | 流被截断仍按正常结束 | 无 `done` 时提示“回答未完整，请重试”，不显示正常完成 | AC-005 |
+
+### 组件与失败行为（第二批）
+
+**学习进度。** 用行锁串行化同一 `(user_id, entry_id)` 的更新；首次更新也先确保行存在再锁定，避免并发首写丢更新。只改写入原子性，不改 JSON 结构、合并规则与展示语义。
+
+**笔记保存。** 草稿版本号只在前端维护，保存请求仍走现有 PUT；成功回调据版本决定清 dirty 或立即补存最新；网络失败保持现有提示。编辑期间后台刷新不覆盖本地草稿。
+
+**AI 计费。** 每轮对话生成 `roundId`；`reserve` 记录预约并与余额扣减同事务；结算/退款以 `round_id` 唯一键幂等；恢复任务扫描超时 `reserved` 预约，幂等退款并记账，重复恢复不多扣不多退。
+
+**知识导入。** 领取令牌做 fencing，过期 worker 不能覆盖结果；`requeueStale` 超时回收；既有的来源指纹去重继续防止重复草稿。
+
+**流式回复。** 仅当收到终止事件才算正常完成；客户端中断（abort）不算错误；截断的回复提示可重试，不自动重复扣费。
+
+### 测试策略（第二批）
+
+- **REQ-004 / AC-004：** 学习进度——两个事务交错更新不同 block 均被保留（`scripts/test-db.sh` 隔离库并发用例）。笔记——用假计时器模拟慢保存并在期间继续编辑，断言最终保存最新内容，且编辑期间服务端刷新不覆盖本地；DocEditor 保存态与补存。
+- **REQ-005 / AC-005：** 信用——结算/退款幂等（重复调用只记一次账）、模拟结算抛错后恢复、并发结算。导入——中断后 `requeueStale` 回收并可重试、过期 worker 不能覆盖、指纹去重。SSE——截断流显示未完整、正常流仍完成、abort 不报错。迁移只加表/列/唯一键，用 14 位时间戳 `V2026112514xxxx`，在隔离测试库验证。
+
+### 待决定事项（第二批）
+
+- 待批准本批设计；批准后写入任务计划并实现；迁移先在隔离测试库验证，不动生产库。

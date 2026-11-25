@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 /**
  * 学习记录访问（WORK-020）。
@@ -26,6 +27,37 @@ public interface LearningProgressMapper {
             WHERE user_id = #{userId} AND entry_id = #{entryId}
             """)
     Optional<LearningProgressRow> findOne(@Param("userId") Long userId, @Param("entryId") Long entryId);
+
+    /**
+     * 确保 {@code (user_id, entry_id)} 一定有一行，供并发写入前先加行锁。
+     *
+     * <p>已存在时是空操作（{@code id = id}），不存在时插入一份空记录（空 JSON、未通过）。
+     * 必须在同一事务里紧跟 {@link #lockOne}，否则锁不住"还不存在的行"。
+     * 用 upsert 而不是"先查再插"：后者在并发首写时仍会撞唯一键。
+     */
+    @Insert("""
+            INSERT INTO learning_progress
+                (user_id, entry_id, tour_step, challenges_json, quizzes_json, status, review_stage)
+            VALUES
+                (#{userId}, #{entryId}, 0, '{}', '{}', 'in_progress', 0)
+            ON DUPLICATE KEY UPDATE id = id
+            """)
+    int ensureRow(@Param("userId") Long userId, @Param("entryId") Long entryId);
+
+    /**
+     * 带行锁读当前值（{@code SELECT … FOR UPDATE}）。
+     *
+     * <p>合并必须基于"被锁住的最新值"，否则两个不同块的并发更新会各自按旧快照合并，
+     * 后写整体覆盖先写（丢更新）。调用前须先 {@link #ensureRow}。
+     */
+    @Select("""
+            SELECT id, user_id, entry_id, tour_step, challenges_json, quizzes_json, status,
+                   passed_at, review_stage, review_due_at, created_at, updated_at
+            FROM learning_progress
+            WHERE user_id = #{userId} AND entry_id = #{entryId}
+            FOR UPDATE
+            """)
+    Optional<LearningProgressRow> lockOne(@Param("userId") Long userId, @Param("entryId") Long entryId);
 
     /** 某个人的全部记录（含已下架条目），供线的统计用。 */
     @Select("""
@@ -84,6 +116,25 @@ public interface LearningProgressMapper {
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int upsert(LearningProgressRow row);
+
+    /**
+     * 按主键更新一行（合并已在服务层基于行锁后的最新值算好）。
+     *
+     * <p>用 id 定位并同时校验 {@code user_id}，与 upsert 的整行覆盖不同：这里只覆盖既有行，
+     * 不会因为并发插入产生第二行。行锁由调用方在事务内先取（{@link #lockOne}）。
+     */
+    @Update("""
+            UPDATE learning_progress
+            SET tour_step = #{tourStep},
+                challenges_json = #{challengesJson},
+                quizzes_json = #{quizzesJson},
+                status = #{status},
+                passed_at = #{passedAt,jdbcType=TIMESTAMP},
+                review_stage = #{reviewStage},
+                review_due_at = #{reviewDueAt,jdbcType=TIMESTAMP}
+            WHERE id = #{id} AND user_id = #{userId}
+            """)
+    int updateById(LearningProgressRow row);
 
     @Delete("""
             DELETE FROM learning_progress WHERE user_id = #{userId} AND entry_id = #{entryId}

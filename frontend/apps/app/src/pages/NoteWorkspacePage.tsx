@@ -1,4 +1,5 @@
 import { errorMessage } from '@paideia/core'
+import { NoteAutosaver, shouldApplyServerDocument } from '@paideia/knowledge'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Copy, FilePlus, FolderPlus } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -71,7 +72,40 @@ export function NoteWorkspacePage() {
   const [renameTarget, setRenameTarget] = useState<{ id: number; title: string } | null>(null)
   const [renameTitle, setRenameTitle] = useState('')
   const [zen, setZen] = useState(false)
-  const savingRef = useRef(false)
+  /** 已载入编辑器的文档 id：只有切换到别的文档时才用服务端内容刷新本地，避免覆盖未保存草稿。 */
+  const loadedDocIdRef = useRef<number | null>(null)
+  /**
+   * 自动保存状态机（防抖 + 保存期间补存）。语义与单测见 @paideia/knowledge 的 note-autosave。
+   * save 回调自包含：用 draft 自身字段落库并失效相关查询，不依赖渲染闭包里的 selected。
+   */
+  const autosaverRef = useRef<NoteAutosaver | null>(null)
+  if (autosaverRef.current === null) {
+    autosaverRef.current = new NoteAutosaver(
+      { selected: null, entryId: null, title: '', body: '', category: '', level: '' },
+      {
+        debounceMs: 700,
+        save: async (draft) => {
+          if (draft.selected === null) {
+            return
+          }
+          await notes.updateDoc(draft.selected, {
+            entryId: draft.entryId,
+            title: draft.title,
+            body: draft.body,
+            category: draft.category.trim() === '' ? null : draft.category.trim(),
+            level: draft.level === '' ? null : draft.level,
+          })
+          void queryClient.invalidateQueries({ queryKey: ['note-tree', bookId] })
+          void queryClient.invalidateQueries({ queryKey: ['note-doc', draft.selected] })
+          void queryClient.invalidateQueries({ queryKey: ['note-links', draft.selected] })
+        },
+        onError: (reason) => setError(errorMessage(reason)),
+        onSavingChange: (value) => setSaving(value),
+        onDirtyChange: (value) => setDirty(value),
+      },
+    )
+  }
+  const autosaver = autosaverRef.current
 
   const booksQuery = useQuery({ queryKey: ['note-books'], queryFn: () => notes.listBooks() })
   const book = booksQuery.data?.find((item) => item.id === bookId)
@@ -86,6 +120,14 @@ export function NoteWorkspacePage() {
     queryKey: ['note-doc', selected],
     queryFn: () => (selected === null ? Promise.resolve(null) : notes.read(selected)),
     enabled: selected !== null,
+  })
+  autosaver.setDraft({
+    selected,
+    entryId: docQuery.data?.entryId ?? null,
+    title,
+    body,
+    category: docCategory,
+    level: docLevel,
   })
 
   const linksQuery = useQuery({
@@ -110,14 +152,29 @@ export function NoteWorkspacePage() {
 
   useEffect(() => {
     const doc = docQuery.data
-    if (doc !== undefined && doc !== null) {
-      setTitle(doc.title)
-      setBody(doc.body)
-      setDocCategory(doc.category ?? '')
-      setDocLevel(doc.level ?? '')
-      setDirty(false)
+    if (doc === undefined || doc === null) {
+      return
     }
+    // 只在“切换到另一篇文档”时用服务端内容刷新编辑器；同一篇文档的后台刷新
+    // （保存后的 invalidate、窗口聚焦重取等）不覆盖本地，避免把正在编辑的草稿冲掉。
+    if (!shouldApplyServerDocument(loadedDocIdRef.current, doc.id)) {
+      return
+    }
+    setTitle(doc.title)
+    setBody(doc.body)
+    setDocCategory(doc.category ?? '')
+    setDocLevel(doc.level ?? '')
+    loadedDocIdRef.current = doc.id
+    autosaver.markClean()
   }, [docQuery.data])
+
+  // 切换文档（含清空、新建后选中）时丢弃上一篇排队的自动保存，避免把旧内容写到新文档。
+  useEffect(() => {
+    autosaver.markClean()
+  }, [selected])
+
+  // 卸载时清掉未触发的防抖计时，避免定时器泄漏。
+  useEffect(() => () => autosaverRef.current?.dispose(), [])
 
   const selectedNode = (treeQuery.data ?? []).find((node) => node.id === selected)
   const pairNode =
@@ -135,12 +192,6 @@ export function NoteWorkspacePage() {
     ),
   ).sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'))
 
-  function refreshDoc(): void {
-    void queryClient.invalidateQueries({ queryKey: ['note-tree', bookId] })
-    void queryClient.invalidateQueries({ queryKey: ['note-doc', selected] })
-    void queryClient.invalidateQueries({ queryKey: ['note-links', selected] })
-  }
-
   async function openDoc(id: number): Promise<void> {
     const doc = await notes.read(id)
     if (typeof doc.bookId === 'number' && doc.bookId !== bookId) {
@@ -156,42 +207,6 @@ export function NoteWorkspacePage() {
     }
     setSelected(id)
   }
-
-  async function save(): Promise<void> {
-    if (selected === null) return
-    if (savingRef.current) return
-    savingRef.current = true
-    setSaving(true)
-    setError(null)
-    try {
-      await notes.updateDoc(selected, {
-        entryId: docQuery.data?.entryId ?? null,
-        title,
-        body,
-        category: docCategory.trim() === '' ? null : docCategory.trim(),
-        level: docLevel === '' ? null : docLevel,
-      })
-      setDirty(false)
-      refreshDoc()
-    } catch (reason) {
-      setError(errorMessage(reason))
-    } finally {
-      savingRef.current = false
-      setSaving(false)
-    }
-  }
-
-  // 自动保存：正文/标题改动后停顿 700ms 落库（显式保存按钮仍保留）。
-  useEffect(() => {
-    if (selected === null || !dirty) {
-      return
-    }
-    const handle = window.setTimeout(() => {
-      void save()
-    }, 700)
-    return () => window.clearTimeout(handle)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, body, docCategory, docLevel, selected, dirty])
 
   /** 把 dragId 挂到 parentId 下第 index 位；同级按新顺序重新编号落库。 */
   async function applyMove(dragId: number, parentId: number | null, index: number): Promise<void> {
@@ -504,14 +519,14 @@ export function NoteWorkspacePage() {
               saving={saving}
               onTitle={(value) => {
                 setTitle(value)
-                setDirty(true)
+                autosaver.markDirty()
               }}
               onBody={(value) => {
                 setBody(value)
-                setDirty(true)
+                autosaver.markDirty()
               }}
               onSave={() => {
-                void save()
+                void autosaver.flush()
               }}
               onUpload={uploadNoteImage}
               zen={zen}
@@ -521,12 +536,12 @@ export function NoteWorkspacePage() {
               category={docCategory}
               onCategory={(value) => {
                 setDocCategory(value)
-                setDirty(true)
+                autosaver.markDirty()
               }}
               level={docLevel}
               onLevel={(value) => {
                 setDocLevel(value)
-                setDirty(true)
+                autosaver.markDirty()
               }}
               categoryOptions={categoryOptions}
             />

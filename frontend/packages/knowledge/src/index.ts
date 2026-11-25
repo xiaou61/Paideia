@@ -131,6 +131,13 @@ export {
   type HomeSignals,
   type RankedEntry,
 } from './home-ranking'
+export {
+  NoteAutosaver,
+  noteDraftsEqual,
+  shouldApplyServerDocument,
+  type NoteAutosaveOptions,
+  type NoteDraft,
+} from './note-autosave'
 export { MarkdownBody } from './markdown-body'
 export { MarkdownField } from './markdown-field'
 export { KnowledgeNeighborhood } from './neighborhood'
