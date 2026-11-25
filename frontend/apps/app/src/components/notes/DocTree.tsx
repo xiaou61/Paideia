@@ -124,7 +124,7 @@ function TreeRow({
           onDropRow(item.node.id)
         }}
         data-drop-pos={rowHint ?? undefined}
-        className={`group flex items-center gap-1 rounded-md pr-1 ${
+        className={`group flex items-start gap-1 rounded-md pr-1 ${
           selected ? 'bg-accent text-accent-foreground' : 'hover:bg-muted'
         } ${draggedId === item.node.id ? 'opacity-40' : ''} ${
           rowHint === 'into' ? 'ring-primary ring-1' : ''
@@ -137,7 +137,7 @@ function TreeRow({
           <button
             type="button"
             aria-label={open ? '折叠' : '展开'}
-            className="flex h-6 w-5 items-center justify-center text-muted-foreground"
+            className="flex h-7 w-5 shrink-0 items-center justify-center text-muted-foreground"
             onClick={() => setOpen((value) => !value)}
             disabled={!hasChildren}
           >
@@ -150,44 +150,53 @@ function TreeRow({
             ) : null}
           </button>
         ) : (
-          <span className="h-6 w-5" />
+          <span className="h-7 w-5 shrink-0" />
         )}
         <button
           type="button"
-          className="flex min-w-0 flex-1 items-center gap-1.5 py-1 text-left text-sm"
+          className="flex min-w-0 flex-1 flex-col gap-0.5 py-1 text-left text-sm"
           onClick={() => onSelect(item.node.id)}
         >
-          {isFolder ? (
-            <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          ) : (
-            <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          )}
-          <span className="truncate">{item.node.title}</span>
-          {item.node.docType === 'tutorial' ? (
-            <span className="shrink-0 rounded bg-amber-100 px-1 py-0.5 text-[10px] leading-none text-amber-700">
-              教程
-            </span>
-          ) : null}
-          {item.node.docType === 'gap_fill' ? (
-            <span className="bg-violet-100 text-violet-700 shrink-0 rounded px-1 py-0.5 text-[10px] leading-none">
-              查漏补缺
-            </span>
-          ) : null}
-          {item.node.category !== null && item.node.category !== '' ? (
-            <span className="bg-sky-100 text-sky-700 shrink-0 rounded px-1 py-0.5 text-[10px] leading-none">
-              {item.node.category}
-            </span>
-          ) : null}
-          {item.node.level !== null && item.node.level !== '' ? (
-            <span className="bg-slate-100 text-slate-700 shrink-0 rounded px-1 py-0.5 text-[10px] leading-none">
-              {item.node.level}
+          <span className="flex min-w-0 items-center gap-1.5">
+            {isFolder ? (
+              <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            ) : (
+              <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            )}
+            <span className="truncate">{item.node.title}</span>
+          </span>
+          {item.node.docType === 'tutorial' ||
+          item.node.docType === 'gap_fill' ||
+          (item.node.category !== null && item.node.category !== '') ||
+          (item.node.level !== null && item.node.level !== '') ? (
+            <span className="flex flex-wrap items-center gap-1 pl-5">
+              {item.node.docType === 'tutorial' ? (
+                <span className="shrink-0 rounded bg-amber-100 px-1 py-0.5 text-[10px] leading-none text-amber-700">
+                  教程
+                </span>
+              ) : null}
+              {item.node.docType === 'gap_fill' ? (
+                <span className="bg-violet-100 text-violet-700 shrink-0 rounded px-1 py-0.5 text-[10px] leading-none">
+                  查漏补缺
+                </span>
+              ) : null}
+              {item.node.category !== null && item.node.category !== '' ? (
+                <span className="bg-sky-100 text-sky-700 shrink-0 rounded px-1 py-0.5 text-[10px] leading-none">
+                  {item.node.category}
+                </span>
+              ) : null}
+              {item.node.level !== null && item.node.level !== '' ? (
+                <span className="bg-slate-100 text-slate-700 shrink-0 rounded px-1 py-0.5 text-[10px] leading-none">
+                  {item.node.level}
+                </span>
+              ) : null}
             </span>
           ) : null}
         </button>
         <button
           type="button"
           aria-label="重命名"
-          className="hidden h-6 w-6 items-center justify-center rounded text-muted-foreground hover:text-foreground group-hover:flex"
+          className="mt-0.5 hidden h-6 w-6 items-center justify-center rounded text-muted-foreground hover:text-foreground group-hover:flex"
           onClick={() => onRename(item.node.id, item.node.title)}
         >
           <Pencil className="h-3 w-3" />
@@ -195,7 +204,7 @@ function TreeRow({
         <button
           type="button"
           aria-label="删除"
-          className="hidden h-6 w-6 items-center justify-center rounded text-muted-foreground hover:text-destructive group-hover:flex"
+          className="mt-0.5 hidden h-6 w-6 items-center justify-center rounded text-muted-foreground hover:text-destructive group-hover:flex"
           onClick={() => onDelete(item.node.id)}
         >
           ×
