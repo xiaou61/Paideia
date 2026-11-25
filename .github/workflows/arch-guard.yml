@@ -1,0 +1,45 @@
+name: arch-guard
+
+# 最小架构护栏（WORK-092 TASK-009 / REQ-007）。
+#
+# 只拦「机器能自动判定」的漂移：图语法、结构图与代码/README 计数漂移、内容检查、
+# 以及后端模块边界的 ModularityTest。人工评审类的架构判断不在这里。
+#
+# 注意：本文件存在 ≠ 能拦住合并。要真正拦截，需仓库 owner 在 GitHub 分支保护里把
+# 这两个 job（arch-guard / modularity）设为 required status checks；否则失败只是红叉。
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  arch-guard:
+    name: arch-guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # 三个脚本只用 Node 标准库，不需要 pnpm install。
+      - name: Mermaid 语法
+        run: node scripts/check-diagrams.mjs
+      - name: 结构图与 README 计数漂移
+        run: node scripts/gen-arch-diagram.mjs --check
+      - name: 内容检查
+        run: node scripts/check-content.mjs --scope content
+
+  modularity:
+    name: modularity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: 模块边界（Spring Modulith）
+        # 只跑边界验证，不起 Spring 上下文、不连数据库。
+        run: mvn -B -f backend/pom.xml -pl paideia-app -am -Dtest=ModularityTest -Dsurefire.failIfNoSpecifiedTests=false test

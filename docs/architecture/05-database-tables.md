@@ -6,8 +6,8 @@
 
 # 数据库表
 
-由 `backend/paideia-app/src/main/resources/db/migration/` 的 62 个迁移生成：
-共 **77 张表**，其中只有 **16 条外键**。
+由 `backend/paideia-app/src/main/resources/db/migration/` 的 67 个迁移生成：
+共 **79 张表**，其中只有 **16 条外键**。
 
 外键少是**刻意的**，不是遗漏：跨模块的关联（比如 `ai_memories_structured.user_id` → `users.id`）
 由应用层保证，不交给数据库。所以下面这张图只画**有真实外键约束**的关系，
@@ -53,6 +53,7 @@ flowchart LR
 | `ai_conversations` | `V5__create_assistant_tables` | （无） |
 | `ai_credit_accounts` | `V11__create_credit_tables` | （无） |
 | `ai_credit_ledger` | `V11__create_credit_tables` | （无） |
+| `ai_credit_reservations` | `V20261125141000__add_ai_credit_reservations` | （无） |
 | `ai_entry_summaries` | `V4__create_ai_tables` | （无） |
 | `ai_essay_verifications` | `V20261119103000__create_ai_essay_verifications` | （无） |
 | `ai_feedback` | `V20261023140000__create_ai_feedback` | （无） |
@@ -125,5 +126,6 @@ flowchart LR
 | `review_sessions` | `V20261023120000__create_review_sessions` | （无） |
 | `sql_dataset_reports` | `V20261023110000__create_sql_dataset_tables` | （无） |
 | `sql_datasets` | `V20261023110000__create_sql_dataset_tables` | （无） |
+| `user_home_layout` | `V20261125100000__create_user_home_layout` | （无） |
 | `user_identities` | `V20261023150000__oauth_identities` | `user_id` → `users` |
 | `users` | `V1__create_account_tables` | （无） |

@@ -6,7 +6,7 @@
 
 # API 端点清单
 
-由后端 55 个 Controller 生成：**233 个端点**，分布在 9 个模块。
+由后端 56 个 Controller 生成：**235 个端点**，分布在 9 个模块。
 
 这是**结构性的清单**，不是手写文档——端点加一个这里就多一行，
 所以它不会像手写的接口文档那样过期。真正的授权规则在 `SecurityConfiguration`，
@@ -14,6 +14,7 @@
 
 | 模块 | 前缀 | 控制器 | 鉴权（按前缀推测） | 端点数 |
 | --- | --- | --- | --- | --- |
+| `paideia-account` | `/api/v1/account/home-layout` | `HomeLayoutController` | 登录即可 | 2 |
 | `paideia-account` | `/api/v1/account/oauth` | `OAuthIdentityController` | 登录即可 | 3 |
 | `paideia-account` | `/api/v1/account/profile` | `LearnerProfileController` | 登录即可 | 2 |
 | `paideia-account` | `/api/v1/auth` | `AuthController` | 免鉴权 | 8 |
@@ -74,8 +75,8 @@
 
 | 方法 | 数量 |
 | --- | --- |
-| `GET` | 108 |
+| `GET` | 109 |
 | `POST` | 86 |
 | `DELETE` | 21 |
-| `PUT` | 15 |
+| `PUT` | 16 |
 | `PATCH` | 3 |

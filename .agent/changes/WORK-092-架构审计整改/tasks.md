@@ -110,9 +110,11 @@ approver_role: CTO
 - 实测（2026-11-25）：远端状态机移到 `scripts/deploy/remote-deploy.sh`，`release.ps1` 改为读取模板替换占位符并新增启动时"仅回代码、不降级 schema"回滚边界提示 → `promPath` 常量。`bash scripts/deploy/test-remote-deploy.sh` 21 项断言全过（场景 1 健康通过：DEPLOY_OK、jar/web/双清单推进、标记写入、快照与锁清理；场景 2 健康失败：DEPLOY_FAILED、jar 逐字节回 `OLDJAR`、web 新文件消失回旧版、双清单未推进、无残留；场景 3 持锁：'另一个发布' 直接失败、jar/web 未被触碰）。`release.ps1` PowerShell 语法解析 0 错误；`git diff --check` 通过。未连服务器、未部署。
 - 实现补充：并发锁用可移植的原子 `mkdir .deploy.lock.d` + pid 存活探测（持锁进程已死则清死锁重抢），不依赖服务器是否装 `flock`；快照用 `.rollback/`（app.jar + web/ + 两份清单），健康失败时三者一起还原。
 
-### TASK-009 | wait | 最小架构漂移检查与运维核查清单
+### TASK-009 | done | 最小架构漂移检查与运维核查清单
 
 - 对应：REQ-007、AC-007；依赖：无。
 - 修改：重新生成 `docs/architecture/05-database-tables.md`、`06-api-surface.md` 并对齐 `README.md` 计数；新增 `.github/workflows/arch-guard.yml`、`docs/architecture/ops-verification.md`。
 - 步骤：先让 `gen-arch-diagram.mjs --check` 归零；再加 CI 复跑图语法/漂移/内容/`ModularityTest`；写运维四项核查清单（标注未核实、需线上授权）。
 - 验证：`node scripts/gen-arch-diagram.mjs --check`、`node scripts/check-diagrams.mjs`、`node scripts/check-content.mjs --scope content` 均 0；`ModularityTest` 通过；`arch-guard.yml` YAML 解析通过并用本地等价命令验证（GitHub 未实际运行，明确标注）。
+- 实测（2026-11-25）：`node scripts/gen-arch-diagram.mjs` 重新生成 01/04/05/06（05 现为 79 表/16 外键，06 为 235 端点/56 控制器，含本轮新增 `ai_credit_reservations` 与导入租约列），`--check` 四项全绿并核对 README 计数（已把 77/233/55 改为 79/235/56）。`node scripts/check-diagrams.mjs` 14 图块可解析（646 文件）；`node scripts/check-content.mjs --scope content` 0 error/0 warning（478 篇）。`.github/workflows/arch-guard.yml` 用 Python pyyaml `safe_load` 解析通过，jobs = arch-guard / modularity；GitHub 未实际运行，作为本地等价命令（node 三件 + `ModularityTest`）已验证，并注明需 owner 设为 required check 才真正拦截。新增 `docs/architecture/ops-verification.md`（备份异地/隔离恢复/HTTPS/端点暴露四项，均标「未核实·需线上授权」）。
+- 实现补充：`ModularityTest` 未在本轮重新跑全量（此前批次已通过、本批只改文档/CI/运维清单），CI 里作为独立 job；`arch-guard.yml` 使用 actions/checkout@v4、setup-node 22、setup-java temurin 25，仅 Node 标准库脚本无需 pnpm install。
