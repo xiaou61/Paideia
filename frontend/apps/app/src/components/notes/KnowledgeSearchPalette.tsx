@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { FileText, Search } from 'lucide-react'
+import { FileText, Loader2, Search } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import type { KeyboardEvent } from 'react'
+import type { KeyboardEvent, ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 
 import { notes } from '../../notes-api'
@@ -20,9 +20,41 @@ function stripMarkdown(text: string): string {
     .trim()
 }
 
+/** 用 <mark> 高亮标题/摘录里命中的关键词（支持空格分隔的多个词）。 */
+function highlight(text: string, query: string): ReactNode {
+  const terms = query
+    .trim()
+    .split(/\s+/)
+    .filter((term) => term !== '')
+  if (terms.length === 0) return text
+  const escaped = terms.map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const parts = text.split(new RegExp(`(${escaped.join('|')})`, 'gi'))
+  const lower = new Set(terms.map((term) => term.toLowerCase()))
+  return parts.map((part, index) =>
+    lower.has(part.toLowerCase()) ? (
+      <mark
+        key={index}
+        className="bg-primary/15 text-primary rounded-[3px] px-0.5 font-medium [box-decoration-break:clone]"
+      >
+        {part}
+      </mark>
+    ) : (
+      part
+    ),
+  )
+}
+
+function Kbd({ children }: { children: ReactNode }) {
+  return (
+    <kbd className="border-border bg-muted/70 text-muted-foreground inline-flex h-5 min-w-5 items-center justify-center rounded border px-1 text-[10px] leading-none font-medium">
+      {children}
+    </kbd>
+  )
+}
+
 /**
- * VitePress 风格的全局文档搜索：点击搜索框（或 Ctrl/Cmd+K）弹出居中浮层，
- * 输入即检索本人全部知识库里的文档，↑↓ 选择、↵ 打开、esc 关闭。
+ * VitePress / Algolia DocSearch 风格的全局文档搜索：点击搜索框（或 Ctrl/Cmd+K）弹出居中浮层，
+ * 输入即检索本人全部知识库里的文档，命中词高亮，↑↓ 选择、↵ 打开、esc 关闭。
  */
 export function KnowledgeSearchPalette({
   open,
@@ -105,21 +137,22 @@ export function KnowledgeSearchPalette({
 
   if (!open) return null
 
-  const searching = searchQuery.isFetching && results.length === 0
+  const loading = searchQuery.isFetching && results.length === 0
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 px-4 pt-[8vh] backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 px-4 pt-[9vh] backdrop-blur-[3px]"
       onMouseDown={() => onOpenChange(false)}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label="搜索文档"
-        className="bg-card border-border w-full max-w-2xl overflow-hidden rounded-xl border shadow-2xl"
+        className="bg-card text-card-foreground border-border ring-border/60 w-full max-w-[640px] overflow-hidden rounded-2xl border shadow-[0_24px_60px_-12px_rgba(0,0,0,0.35)] ring-1"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="border-border flex items-center gap-3 border-b px-4 py-3">
+        {/* 搜索头 */}
+        <div className="border-border flex items-center gap-3 border-b px-4 py-3.5">
           <Search className="text-muted-foreground h-5 w-5 shrink-0" />
           <input
             ref={inputRef}
@@ -128,65 +161,101 @@ export function KnowledgeSearchPalette({
             onKeyDown={handleKeyDown}
             placeholder="搜索全部知识库文档…"
             aria-label="搜索文档"
-            className="placeholder:text-muted-foreground w-full bg-transparent text-base outline-none"
+            className="placeholder:text-muted-foreground/80 w-full bg-transparent text-[15px] outline-none"
           />
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            className="border-border text-muted-foreground hover:text-foreground shrink-0 rounded border px-1.5 py-0.5 text-[10px] leading-none"
-          >
-            esc
+          {loading ? <Loader2 className="text-muted-foreground h-4 w-4 shrink-0 animate-spin" /> : null}
+          <button type="button" onClick={() => onOpenChange(false)} aria-label="关闭搜索" className="shrink-0">
+            <Kbd>esc</Kbd>
           </button>
         </div>
 
-        <div ref={listRef} className="max-h-[55vh] overflow-y-auto p-2">
+        {/* 结果区 */}
+        <div ref={listRef} className="max-h-[58vh] overflow-y-auto p-2">
           {query === '' ? (
-            <p className="text-muted-foreground px-3 py-10 text-center text-sm">
-              输入关键词，搜索你所有知识库里的文档
-            </p>
-          ) : searching ? (
-            <p className="text-muted-foreground px-3 py-10 text-center text-sm">搜索中…</p>
+            <div className="flex flex-col items-center gap-1.5 px-3 py-14 text-center">
+              <Search className="text-muted-foreground/40 mb-1 h-8 w-8" />
+              <p className="text-foreground/80 text-sm font-medium">搜索你的全部知识库</p>
+              <p className="text-muted-foreground text-xs">支持文档标题与正文全文检索</p>
+            </div>
+          ) : loading ? (
+            <div className="text-muted-foreground flex items-center justify-center gap-2 px-3 py-14 text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" /> 搜索中…
+            </div>
           ) : results.length === 0 ? (
-            <p className="text-muted-foreground px-3 py-10 text-center text-sm">
-              没有找到「{query}」相关的文档
-            </p>
+            <div className="flex flex-col items-center gap-1.5 px-3 py-14 text-center">
+              <Search className="text-muted-foreground/40 mb-1 h-8 w-8" />
+              <p className="text-foreground/80 text-sm font-medium">没有找到「{query}」</p>
+              <p className="text-muted-foreground text-xs">换个关键词试试，或检查是否拼写有误</p>
+            </div>
           ) : (
             <>
-              <div className="text-muted-foreground px-3 pt-1 pb-2 text-xs font-medium">
-                文档 · {results.length}
+              <div className="text-muted-foreground flex items-center justify-between px-3 pt-1 pb-2 text-xs font-medium">
+                <span>文档</span>
+                <span className="text-muted-foreground/70">{results.length} 条结果</span>
               </div>
-              {results.map((item, index) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  data-idx={index}
-                  onMouseEnter={() => setActive(index)}
-                  onClick={() => void openResult(item.id)}
-                  className={`flex w-full items-start gap-3 rounded-lg px-3 py-2 text-left transition-colors ${
-                    index === active ? 'bg-primary/10' : 'hover:bg-muted'
-                  }`}
-                >
-                  <FileText className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">
-                      {item.title !== '' ? item.title : '未命名文档'}
+              {results.map((item, index) => {
+                const selected = index === active
+                const title = item.title !== '' ? item.title : '未命名文档'
+                const excerpt = item.excerpt !== null ? stripMarkdown(item.excerpt) : ''
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    data-idx={index}
+                    onMouseEnter={() => setActive(index)}
+                    onClick={() => void openResult(item.id)}
+                    aria-selected={selected}
+                    className={`flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                      selected ? 'bg-primary/10' : 'hover:bg-muted/60'
+                    }`}
+                  >
+                    <span
+                      className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
+                        selected ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
+                      }`}
+                    >
+                      <FileText className="h-3.5 w-3.5" />
                     </span>
-                    {item.excerpt !== null && stripMarkdown(item.excerpt) !== '' ? (
-                      <span className="text-muted-foreground mt-0.5 block truncate text-xs">
-                        {stripMarkdown(item.excerpt)}
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2">
+                        <span className={`truncate text-sm font-medium ${selected ? 'text-primary' : ''}`}>
+                          {highlight(title, query)}
+                        </span>
+                        {selected ? (
+                          <span className="text-primary ml-auto flex shrink-0 items-center gap-1 text-[10px]">
+                            <Kbd>↵</Kbd>
+                          </span>
+                        ) : null}
                       </span>
-                    ) : null}
-                  </span>
-                </button>
-              ))}
+                      {excerpt !== '' ? (
+                        <span className="text-muted-foreground mt-0.5 line-clamp-2 block text-xs leading-relaxed">
+                          {highlight(excerpt, query)}
+                        </span>
+                      ) : null}
+                    </span>
+                  </button>
+                )
+              })}
             </>
           )}
         </div>
 
-        <div className="border-border text-muted-foreground flex items-center gap-3 border-t px-4 py-2 text-[11px]">
-          <span>↑↓ 选择</span>
-          <span>↵ 打开</span>
-          <span>esc 关闭</span>
+        {/* 底部键位提示 */}
+        <div className="border-border text-muted-foreground flex items-center gap-4 border-t px-4 py-2 text-[11px]">
+          <span className="flex items-center gap-1">
+            <Kbd>↑</Kbd>
+            <Kbd>↓</Kbd>
+            <span className="ml-0.5">选择</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <Kbd>↵</Kbd>
+            <span className="ml-0.5">打开</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <Kbd>esc</Kbd>
+            <span className="ml-0.5">关闭</span>
+          </span>
+          <span className="text-muted-foreground/60 ml-auto">Paideia 全文检索</span>
         </div>
       </div>
     </div>
