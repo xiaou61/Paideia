@@ -81,12 +81,14 @@ approver_role: CTO
 - 实测：迁移 `V20261125141000__add_ai_credit_reservations.sql`（新建 `ai_credit_reservations` + `ai_credit_ledger.round_id` 唯一键）。隔离库 `../scripts/test-db.sh mvn -B -pl paideia-app -am -Dtest=AiCreditIntegrationTest,AccountDeletionCascadeIntegrationTest,ModularityTest -Dsurefire.failIfNoSpecifiedTests=false test` → `Tests run: 13, Failures: 0, Errors: 0` BUILD SUCCESS（AiCredit 8 条含新增 `settleRoundIsIdempotent`、`refundRoundIsIdempotent`、`staleReservationIsRecovered`；AccountDeletionCascade 4 条含预约行注销归零；Modularity 1 条）；`mvn -q -o -T 1C -pl paideia-ai,paideia-app -am -DskipTests compile` 退出 0。
 - 实现补充（切片边界）：新增 `reserveRound`/`settleRound`/`refundRound`/`staleReservations` 与恢复任务，**只把被审计的会话路径**（`ConversationService.prepare` + `AssistantConversationController.settleOnce`）切到持久 round_id；其余约 8 个 AI 服务（简历/训练营/复盘/外部问答等）仍用旧 `reserve/settle/refund`，不随本轮改动——这是刻意的切片边界，避免一次性改动未覆盖测试的结算点；崩溃恢复只保证会话路径，其余路径按现状。`settled[0]` 内存闸仍保留（省一次 DB 往返），真正幂等由 `ai_credit_reservations` 状态 CAS 保证。
 
-### TASK-006 | wait | 知识导入中断的可恢复与 fencing
+### TASK-006 | done | 知识导入中断的可恢复与 fencing
 
 - 对应：REQ-005、AC-005；依赖：无。
 - 修改：`backend/paideia-ai/src/main/java/io/github/xiaou61/ai/internal/importing/{KnowledgeImportService,KnowledgeImportMapper}.java`；新增迁移 `V2026112514xxxx__add_knowledge_import_lease.sql`。
 - 步骤：先写中断/过期覆盖回归；领取写 `claim_token`+时间+次数；结果写需令牌匹配；超时回收 `requeueStale`。
 - 验证：隔离库 `scripts/test-db.sh` 跑中断恢复、过期 worker 不覆盖、指纹去重。
+- 实测：迁移 `V20261125142000__add_knowledge_import_lease.sql`（`claim_token` / `processing_since` / `attempts` + `(status, processing_since)` 索引）。隔离库 `../scripts/test-db.sh mvn -B -pl paideia-ai,paideia-app -am -Dtest=KnowledgeImportServiceTest,KnowledgeImportJobTest,KnowledgeImportRecoveryIntegrationTest,KnowledgeImportFlowIntegrationTest,ModularityTest -Dsurefire.failIfNoSpecifiedTests=false test` → BUILD SUCCESS：`KnowledgeImportServiceTest` 6 条、`KnowledgeImportJobTest` 3 条（单飞/吞异常）、新增 `KnowledgeImportRecoveryIntegrationTest` 2 条（过期令牌写结果被丢弃不覆盖；超时 processing 被回收为 pending、旧令牌失效、可重新领取）、既有 `KnowledgeImportFlowIntegrationTest` 3 条（草稿落库/指纹去重/RAG，回归通过）、`ModularityTest` 1 条。
+- 实现补充：`processPending` 每轮先 `requeueStale(now - processingTimeout)` 把「领取后被杀」的行退回 pending 再消费；`processOne` 用 UUID 令牌领取，所有 `updateResult` 都带令牌做 fencing；超时阈值 `${paideia.ai.import.processing-timeout-ms:600000}`。指纹去重仍由 `KnowledgeApi.createCollected` 保证，所以「回收后重跑」不会产生重复草稿。
 
 ### TASK-007 | wait | SSE 未完整结束不显示正常完成
 

@@ -49,7 +49,7 @@ class KnowledgeImportJobTest {
         });
         KnowledgeImportService service = new KnowledgeImportService(
                 jobs, mock(KnowledgeApi.class), mock(ResumeTextExtractor.class),
-                mock(DocumentDistiller.class), mock(CredentialService.class), new NoopRunRecorder());
+                mock(DocumentDistiller.class), mock(CredentialService.class), new NoopRunRecorder(), 600_000L);
         KnowledgeImportJob job = new KnowledgeImportJob(service);
 
         Thread first = new Thread(job::runOnce);

@@ -16,12 +16,16 @@ import io.github.xiaou61.platform.ErrorCode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
@@ -52,17 +56,21 @@ public class KnowledgeImportService {
     private final DocumentDistiller distiller;
     private final CredentialService credentials;
     private final RunRecorder recorder;
+    /** 一条 processing 任务超过这么久没写结果，就认为领取它的 worker 已经死掉，可被回收（WORK-092 TASK-006）。 */
+    private final Duration processingTimeout;
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     KnowledgeImportService(KnowledgeImportMapper jobs, KnowledgeApi knowledge,
                            ResumeTextExtractor extractor, DocumentDistiller distiller,
-                           CredentialService credentials, RunRecorder recorder) {
+                           CredentialService credentials, RunRecorder recorder,
+                           @Value("${paideia.ai.import.processing-timeout-ms:600000}") long processingTimeoutMs) {
         this.jobs = jobs;
         this.knowledge = knowledge;
         this.extractor = extractor;
         this.distiller = distiller;
         this.credentials = credentials;
         this.recorder = recorder;
+        this.processingTimeout = Duration.ofMillis(processingTimeoutMs);
     }
 
     /** 登记一条导入任务，返回任务 id。 */
@@ -99,6 +107,11 @@ public class KnowledgeImportService {
             return;
         }
         try {
+            // 先把"领取后被杀、结果永远没写回"的 processing 行退回 pending，避免它们饿死队列。
+            int recovered = jobs.requeueStale(Instant.now().minus(processingTimeout));
+            if (recovered > 0) {
+                log.info("knowledge.import.requeued_stale count={}", recovered);
+            }
             for (KnowledgeImport job : jobs.findPending(MAX_BATCH)) {
                 processOne(job);
             }
@@ -113,13 +126,14 @@ public class KnowledgeImportService {
      */
     void processOne(KnowledgeImport job) {
         long id = job.getId();
-        if (jobs.markProcessing(id) == 0) {
+        String claimToken = UUID.randomUUID().toString();
+        if (jobs.markClaimed(id, claimToken) == 0) {
             return;
         }
         try {
             Optional<KnowledgeApi.AttachmentContent> attachment = knowledge.findAttachment(job.getFileId());
             if (attachment.isEmpty()) {
-                fail(id, "附件不存在或已删除");
+                fail(id, claimToken, "附件不存在或已删除");
                 return;
             }
             KnowledgeApi.AttachmentContent file = attachment.get();
@@ -128,13 +142,13 @@ public class KnowledgeImportService {
             try {
                 text = extractor.extract(file.bytes(), file.originalName()).text();
             } catch (BizException badFile) {
-                fail(id, badFile.getMessage());
+                fail(id, claimToken, badFile.getMessage());
                 return;
             }
 
             Optional<ModelAccess> access = credentials.access(job.getOperatorId());
             if (access.isEmpty()) {
-                fail(id, "平台尚未配置 AI 服务，请联系管理员");
+                fail(id, claimToken, "平台尚未配置 AI 服务，请联系管理员");
                 return;
             }
 
@@ -154,7 +168,7 @@ public class KnowledgeImportService {
                             "draft",
                             fingerprint(text),
                             sourceUrl));
-                    jobs.updateResult(id, STATUS_SUCCEEDED, outcome.entryId(), null);
+                    jobs.updateResult(id, STATUS_SUCCEEDED, outcome.entryId(), null, claimToken);
                     if (document.usage() != null) {
                         run.tokens(document.usage().inputTokens(), document.usage().outputTokens(),
                                 document.usage().cacheReadTokens());
@@ -164,12 +178,12 @@ public class KnowledgeImportService {
                             id, outcome.entryId(), outcome.created());
                 } catch (BizException failure) {
                     run.finish(RunOutcome.FAILED, "knowledge_import_failed");
-                    fail(id, failure.getMessage());
+                    fail(id, claimToken, failure.getMessage());
                 }
             }
         } catch (RuntimeException unexpected) {
             log.warn("knowledge.import.failed job={} cause={}", id, unexpected.toString());
-            fail(id, "导入失败：" + safeMessage(unexpected));
+            fail(id, claimToken, "导入失败：" + safeMessage(unexpected));
         }
     }
 
@@ -191,8 +205,8 @@ public class KnowledgeImportService {
         return job.getTargetCategoryId();
     }
 
-    private void fail(long id, String message) {
-        jobs.updateResult(id, STATUS_FAILED, null, truncate(message));
+    private void fail(long id, String claimToken, String message) {
+        jobs.updateResult(id, STATUS_FAILED, null, truncate(message), claimToken);
     }
 
     private static String truncate(String message) {

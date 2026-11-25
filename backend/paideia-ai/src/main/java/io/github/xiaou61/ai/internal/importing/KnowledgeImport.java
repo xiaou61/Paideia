@@ -22,6 +22,15 @@ public class KnowledgeImport {
     /** 失败原因（对用户可见，已截断）。 */
     private String error;
     private Long operatorId;
+    /**
+     * 当前处理者的领取令牌（WORK-092 TASK-006）：领取时写入，写结果时按它做 fencing，
+     * 防止"过期 worker 回来覆盖新 worker 的结果"。未在 processing 时为 null。
+     */
+    private String claimToken;
+    /** 领取时间（UTC）：恢复任务据此判断是否超时未完成。 */
+    private Instant processingSince;
+    /** 已尝试处理的次数（每次领取 +1），便于观测反复失败的任务。 */
+    private Integer attempts;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -87,6 +96,30 @@ public class KnowledgeImport {
 
     public void setOperatorId(Long operatorId) {
         this.operatorId = operatorId;
+    }
+
+    public String getClaimToken() {
+        return claimToken;
+    }
+
+    public void setClaimToken(String claimToken) {
+        this.claimToken = claimToken;
+    }
+
+    public Instant getProcessingSince() {
+        return processingSince;
+    }
+
+    public void setProcessingSince(Instant processingSince) {
+        this.processingSince = processingSince;
+    }
+
+    public Integer getAttempts() {
+        return attempts;
+    }
+
+    public void setAttempts(Integer attempts) {
+        this.attempts = attempts;
     }
 
     public Instant getCreatedAt() {

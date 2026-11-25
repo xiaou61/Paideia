@@ -43,7 +43,7 @@ class KnowledgeImportServiceTest {
 
     private KnowledgeImportService service() {
         return new KnowledgeImportService(jobs, knowledge, extractor, distiller, credentials,
-                new NoopRunRecorder());
+                new NoopRunRecorder(), 600_000L);
     }
 
     private static KnowledgeImport job(long id, String fileId, String relativePath) {
@@ -65,7 +65,7 @@ class KnowledgeImportServiceTest {
     @DisplayName("成功：蒸馏草稿以 draft + 来源 + 指纹落库，任务置 succeeded")
     void successCreatesDraft() {
         KnowledgeImport job = job(1L, "f1", "第一章/背景.pdf");
-        when(jobs.markProcessing(1L)).thenReturn(1);
+        when(jobs.markClaimed(eq(1L), any())).thenReturn(1);
         when(knowledge.findAttachment("f1")).thenReturn(Optional.of(attachment("f1", "背景.pdf")));
         when(extractor.extract(any(), eq("背景.pdf")))
                 .thenReturn(new ResumeTextExtractor.ExtractedText("正文内容足够长可以形成指纹", false, 1));
@@ -87,14 +87,14 @@ class KnowledgeImportServiceTest {
         assertThat(written.fingerprint()).hasSize(64);
         assertThat(written.title()).isEqualTo("标题");
 
-        verify(jobs).updateResult(1L, KnowledgeImportService.STATUS_SUCCEEDED, 77L, null);
+        verify(jobs).updateResult(eq(1L), eq(KnowledgeImportService.STATUS_SUCCEEDED), eq(77L), isNull(), any());
     }
 
     @Test
     @DisplayName("指纹重复（createCollected 返回已存在）：仍置 succeeded 并指向原条目")
     void duplicateStillSucceeds() {
         KnowledgeImport job = job(2L, "f2", null);
-        when(jobs.markProcessing(2L)).thenReturn(1);
+        when(jobs.markClaimed(eq(2L), any())).thenReturn(1);
         when(knowledge.findAttachment("f2")).thenReturn(Optional.of(attachment("f2", "a.pdf")));
         when(extractor.extract(any(), any()))
                 .thenReturn(new ResumeTextExtractor.ExtractedText("重复文档正文内容", false, 1));
@@ -105,19 +105,19 @@ class KnowledgeImportServiceTest {
 
         service().processOne(job);
 
-        verify(jobs).updateResult(2L, KnowledgeImportService.STATUS_SUCCEEDED, 88L, null);
+        verify(jobs).updateResult(eq(2L), eq(KnowledgeImportService.STATUS_SUCCEEDED), eq(88L), isNull(), any());
     }
 
     @Test
     @DisplayName("附件不存在：任务 failed，不调用蒸馏、不落条目")
     void missingAttachmentFails() {
         KnowledgeImport job = job(3L, "gone", null);
-        when(jobs.markProcessing(3L)).thenReturn(1);
+        when(jobs.markClaimed(eq(3L), any())).thenReturn(1);
         when(knowledge.findAttachment("gone")).thenReturn(Optional.empty());
 
         service().processOne(job);
 
-        verify(jobs).updateResult(eq(3L), eq(KnowledgeImportService.STATUS_FAILED), isNull(), any());
+        verify(jobs).updateResult(eq(3L), eq(KnowledgeImportService.STATUS_FAILED), isNull(), any(), any());
         verify(distiller, never()).distill(any(), any(), any());
         verify(knowledge, never()).createCollected(any());
     }
@@ -126,7 +126,7 @@ class KnowledgeImportServiceTest {
     @DisplayName("抽取失败（扫描件等）：任务 failed，原因可见，不留半截条目")
     void extractionFailureFails() {
         KnowledgeImport job = job(4L, "f4", null);
-        when(jobs.markProcessing(4L)).thenReturn(1);
+        when(jobs.markClaimed(eq(4L), any())).thenReturn(1);
         when(knowledge.findAttachment("f4")).thenReturn(Optional.of(attachment("f4", "scan.pdf")));
         when(extractor.extract(any(), any()))
                 .thenThrow(new BizException(io.github.xiaou61.platform.ErrorCode.INVALID_ARGUMENT,
@@ -135,7 +135,7 @@ class KnowledgeImportServiceTest {
         service().processOne(job);
 
         verify(jobs).updateResult(eq(4L), eq(KnowledgeImportService.STATUS_FAILED), isNull(),
-                eq("这个文件里没有可读的文字（可能是扫描件）"));
+                eq("这个文件里没有可读的文字（可能是扫描件）"), any());
         verify(distiller, never()).distill(any(), any(), any());
         verify(knowledge, never()).createCollected(any());
     }
@@ -144,11 +144,11 @@ class KnowledgeImportServiceTest {
     @DisplayName("任务已被别的 worker 抢占：不再重复处理")
     void skipWhenAlreadyProcessing() {
         KnowledgeImport job = job(5L, "f5", null);
-        when(jobs.markProcessing(5L)).thenReturn(0);
+        when(jobs.markClaimed(eq(5L), any())).thenReturn(0);
 
         service().processOne(job);
 
-        verify(jobs, never()).updateResult(anyLong(), any(), anyLong(), any());
+        verify(jobs, never()).updateResult(anyLong(), any(), anyLong(), any(), any());
         verify(knowledge, never()).findAttachment(any());
     }
 
