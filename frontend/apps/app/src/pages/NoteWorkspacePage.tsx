@@ -25,11 +25,16 @@ import {
   EmptyTitle,
   Input,
   PageHeader,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Spinner,
 } from '@paideia/ui'
 
 import { BacklinksPanel } from '../components/notes/BacklinksPanel'
-import { DocEditor } from '../components/notes/DocEditor'
+import { CategoryCombobox, DocEditor, LevelSelect } from '../components/notes/DocEditor'
 import { DocTree } from '../components/notes/DocTree'
 import { uploadNoteImage } from '../components/notes/image-upload'
 import { OutlinePanel } from '../components/notes/OutlinePanel'
@@ -408,19 +413,26 @@ export function NoteWorkspacePage() {
             </CardHeader>
             {categoryOptions.length === 0 ? null : (
               <div className="px-3 pb-2">
-                <select
-                  aria-label="按分类筛选"
-                  className="border-input bg-background h-8 w-full rounded-md border px-2 text-sm"
+                <Select
+                  items={[
+                    { value: '', label: '全部分类' },
+                    ...categoryOptions.map((option) => ({ value: option, label: option })),
+                  ]}
                   value={categoryFilter}
-                  onChange={(event) => setCategoryFilter(event.target.value)}
+                  onValueChange={(value) => setCategoryFilter(value as string)}
                 >
-                  <option value="">全部分类</option>
-                  {categoryOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger aria-label="按分类筛选" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">全部分类</SelectItem>
+                    {categoryOptions.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
             <CardContent className="max-h-[50vh] overflow-auto py-2">
@@ -591,30 +603,14 @@ export function NoteWorkspacePage() {
                   onChange={(event) => setNewPairKey(event.target.value)}
                 />
               )}
-              <div className="flex gap-2">
-                <Input
-                  aria-label="分类"
-                  list="note-new-category-options"
-                  placeholder="分类，如 Agent基础概念"
+              <div className="flex items-center gap-2">
+                <CategoryCombobox
                   value={newCategory}
-                  onChange={(event) => setNewCategory(event.target.value)}
+                  onChange={setNewCategory}
+                  options={categoryOptions}
+                  className="flex-1"
                 />
-                <datalist id="note-new-category-options">
-                  {categoryOptions.map((option) => (
-                    <option key={option} value={option} />
-                  ))}
-                </datalist>
-                <select
-                  aria-label="难度"
-                  className="border-input bg-background h-9 rounded-md border px-3 text-sm"
-                  value={newLevel}
-                  onChange={(event) => setNewLevel(event.target.value)}
-                >
-                  <option value="">难度：不限</option>
-                  <option value="入门">入门</option>
-                  <option value="进阶">进阶</option>
-                  <option value="高级">高级</option>
-                </select>
+                <LevelSelect value={newLevel} onChange={setNewLevel} className="w-28" />
               </div>
             </div>
           ) : null}
