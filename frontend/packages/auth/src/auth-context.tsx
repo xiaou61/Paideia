@@ -15,6 +15,8 @@ export type AuthStatus = 'loading' | 'signed-in' | 'signed-out'
 export interface AuthContextValue {
   status: AuthStatus
   user: AuthUser | null
+  /** 登录边界的内存标记：续期时保持不变。 */
+  sessionId: number
   login(identifier: string, password: string): Promise<void>
   register(input: {
     username: string
@@ -46,57 +48,67 @@ export function AuthProvider({
   /** 会话彻底失效（refresh 也无效）时通知应用，用于跳回登录页。 */
   onNeedsLogin?: () => void
 }) {
-  const [status, setStatus] = useState<AuthStatus>('loading')
-  const [user, setUser] = useState<AuthUser | null>(null)
+  const [session, setSession] = useState<Pick<AuthContextValue, 'status' | 'user' | 'sessionId'>>(
+    () => ({ status: 'loading', user: null, sessionId: tokens.sessionId() }),
+  )
   // 首次挂载时尝试用已保存的 refresh 恢复会话
   const started = useRef(false)
-  // 进行中的刷新：挂载恢复与 fetch 层的 401 回调必须共用同一次（见 refreshSession）
-  const inFlightRefresh = useRef<Promise<boolean> | null>(null)
+  const loginAttempt = useRef(0)
+  const inFlightRefresh = useRef<{ sessionId: number; promise: Promise<boolean> } | null>(null)
 
   const apply = useCallback(
-    (issued: AuthTokens) => {
-      tokens.set(issued)
-      setUser(issued.user)
-      setStatus('signed-in')
+    (issued: AuthTokens, newSession: boolean) => {
+      if (newSession) tokens.startSession(issued)
+      else tokens.set(issued)
+      setSession({ status: 'signed-in', user: issued.user, sessionId: tokens.sessionId() })
     },
     [tokens],
   )
 
   const clear = useCallback(() => {
     tokens.clear()
-    setUser(null)
-    setStatus('signed-out')
+    setSession({ status: 'signed-out', user: null, sessionId: tokens.sessionId() })
   }, [tokens])
+
+  const signIn = useCallback(async (exchange: () => Promise<AuthTokens>) => {
+    const attempt = ++loginAttempt.current
+    const issued = await exchange()
+    if (attempt !== loginAttempt.current) {
+      throw new DOMException('登录请求已被取代', 'AbortError')
+    }
+    apply(issued, true)
+  }, [apply])
 
   const refreshSession = useCallback(async () => {
     // 单飞：刚进页面时挂载恢复与首个 401 回调会各自调一次，而 refresh 是一次性的——
     // 两次并发必然一胜一败，败的那次会被后端判为"令牌重用"并吊销整条链，
     // 表现就是"刷新页面后随机被踢下线"。让它们共用同一个 Promise 即可。
-    if (inFlightRefresh.current !== null) {
-      return inFlightRefresh.current
+    const sessionId = tokens.sessionId()
+    if (inFlightRefresh.current?.sessionId === sessionId) {
+      return inFlightRefresh.current.promise
     }
+    const refreshToken = tokens.refresh()
+    if (refreshToken === null) return false
     const run = (async () => {
-      const refreshToken = tokens.refresh()
-      if (refreshToken === null) {
-        return false
-      }
       try {
-        apply(await api.refresh(refreshToken))
+        const issued = await api.refresh(refreshToken)
+        if (tokens.sessionId() !== sessionId) return false
+        apply(issued, false)
         return true
       } catch (error) {
         // 只有服务端明确拒绝（ApiError）才算会话失效。网络抖动、超时抛的是别的错误，
         // 此时 refresh 仍然有效，清令牌等于因为断网把用户登出。
-        if (error instanceof ApiError) {
+        if (tokens.sessionId() === sessionId && error instanceof ApiError) {
           clear()
         }
         return false
       }
     })()
-    inFlightRefresh.current = run
+    inFlightRefresh.current = { sessionId, promise: run }
     try {
       return await run
     } finally {
-      inFlightRefresh.current = null
+      if (inFlightRefresh.current?.promise === run) inFlightRefresh.current = null
     }
   }, [api, apply, clear, tokens])
 
@@ -105,36 +117,26 @@ export function AuthProvider({
       return
     }
     started.current = true
-    if (tokens.refresh() === null) {
-      setStatus('signed-out')
-      return
-    }
     void refreshSession().then((ok) => {
       // 失败也必须收敛 status：留在 'loading' 会让 RequireAuth 永远显示"正在确认登录状态…"、
       // RequireGuest 返回 null（整页空白），onNeedsLogin 也永不触发——用户既进不去应用，
       // 也回不到登录页。网络类失败时令牌仍然保留（见 refreshSession），重新登录即可。
       if (!ok) {
-        setStatus((current) => (current === 'loading' ? 'signed-out' : current))
+        setSession((current) => (current.status === 'loading' ? { ...current, status: 'signed-out' } : current))
       }
     })
-  }, [refreshSession, tokens])
+  }, [refreshSession])
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      status,
-      user,
+      ...session,
       api,
       refreshSession,
-      login: async (identifier, password) => {
-        apply(await api.login(identifier, password))
-      },
-      register: async (input) => {
-        apply(await api.register(input))
-      },
-      completeOAuth: async (handoff) => {
-        apply(await api.oauthExchange(handoff))
-      },
+      login: (identifier, password) => signIn(() => api.login(identifier, password)),
+      register: (input) => signIn(() => api.register(input)),
+      completeOAuth: (handoff) => signIn(() => api.oauthExchange(handoff)),
       logout: async () => {
+        loginAttempt.current += 1
         const refreshToken = tokens.refresh()
         clear()
         if (refreshToken !== null) {
@@ -146,10 +148,11 @@ export function AuthProvider({
         }
       },
     }),
-    [api, apply, clear, refreshSession, status, tokens, user],
+    [api, clear, refreshSession, session, signIn, tokens],
   )
 
   // fetch 层刷新失败时回调这里，界面随之回到登录页
+  const { status } = session
   useEffect(() => {
     if (status === 'signed-out' && onNeedsLogin !== undefined) {
       onNeedsLogin()

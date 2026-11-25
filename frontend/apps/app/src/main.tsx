@@ -1,8 +1,8 @@
 import { AuthProvider, useAuth } from '@paideia/auth'
 import { ThemeProvider } from '@paideia/ui'
 import '@paideia/ui/styles.css'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { StrictMode, useEffect } from 'react'
+import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { StrictMode, useEffect, useMemo, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router'
 
@@ -11,15 +11,27 @@ import { platform } from './host'
 import { PlatformProvider } from './platform'
 import { router } from './router'
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      // 骨架期不做失败重试：连不上后端时希望立刻看到原因，而不是等几次重试
-      retry: false,
-      refetchOnWindowFocus: false,
-    },
-  },
-})
+function SessionRouter() {
+  const { sessionId } = useAuth()
+  const queryClient = useMemo(() => {
+    const checkSession = () => {
+      if (auth.tokens.sessionId() !== sessionId) throw new DOMException('登录会话已结束', 'AbortError')
+    }
+    return new QueryClient({
+      mutationCache: new MutationCache({ onMutate: checkSession, onSuccess: checkSession }),
+      defaultOptions: {
+        queries: { retry: false, refetchOnWindowFocus: false },
+        // 写请求离线时直接失败，不等联网后用另一个会话的凭据发送。
+        mutations: { networkMode: 'always', retry: false },
+      },
+    })
+  }, [sessionId])
+  useEffect(() => () => {
+    if (auth.tokens.sessionId() !== sessionId) queryClient.clear()
+  }, [queryClient, sessionId])
+  // 路由器不重挂，避免一次性 OAuth 回调重复运行；登录门以内的页面按会话重挂。
+  return <QueryClientProvider client={queryClient}><RouterProvider router={router} /></QueryClientProvider>
+}
 
 /**
  * 把认证上下文的刷新实现注册给带令牌的 fetch。
@@ -46,6 +58,7 @@ function RefreshBridge() {
  */
 function DesktopOauthBridge() {
   const { completeOAuth, status } = useAuth()
+  const lastHandoff = useRef<string | null>(null)
   useEffect(() => {
     const bridge = window.paideiaDesktop
     if (bridge?.onOauthHandoff === undefined) {
@@ -54,9 +67,11 @@ function DesktopOauthBridge() {
     return bridge.onOauthHandoff((handoff) => {
       // 已经登录时不再处理：协议链接可能是旧的（60 秒窗口内重复点击），
       // 覆盖当前会话没有意义，而且会打乱用户正在做的事
-      if (status === 'signed-in') {
+      if (status === 'signed-in' || lastHandoff.current === handoff) {
         return
       }
+      // StrictMode 的订阅清理与重建可能都收到同一个冷启动握手码，只交换一次。
+      lastHandoff.current = handoff
       void completeOAuth(handoff).catch(() => {
         // 失败时不弹窗：码过期是常见情况，用户重试即可。
         // 静默失败在这里是安全的——没有登录态就是没有登录态，界面停在登录页。
@@ -93,18 +108,22 @@ window.addEventListener('vite:preloadError', (event) => {
  * 只是从**界面**挪到了**元数据**：测试读属性，用户看不到。
  */
 document.documentElement.dataset['platform'] = platform.kind
+// 一次性清除旧版本保存在标签页里的简历草稿；新草稿仅在会话查询缓存里。
+try {
+  window.sessionStorage.removeItem('paideia:resume-draft')
+} catch {
+  // 浏览器禁用存储时也要能启动，新草稿不依赖它。
+}
 
 createRoot(container).render(
   <StrictMode>
     <PlatformProvider platform={platform}>
       <ThemeProvider storage={platform.cache}>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider tokens={auth.tokens} api={auth.authApi}>
-            <RefreshBridge />
-            <DesktopOauthBridge />
-            <RouterProvider router={router} />
-          </AuthProvider>
-        </QueryClientProvider>
+        <AuthProvider tokens={auth.tokens} api={auth.authApi}>
+          <RefreshBridge />
+          <DesktopOauthBridge />
+          <SessionRouter />
+        </AuthProvider>
       </ThemeProvider>
     </PlatformProvider>
   </StrictMode>,

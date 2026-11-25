@@ -1,5 +1,5 @@
 import { Spinner } from '@paideia/ui'
-import type { ReactNode } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router'
 
 import { useAuth } from './auth-context'
@@ -11,7 +11,7 @@ import { useAuth } from './auth-context'
  * 前端守卫的价值是"不让人白等一次失败请求"，不是安全。
  */
 export function RequireAuth({ children }: { children: ReactNode }) {
-  const { status } = useAuth()
+  const { status, sessionId } = useAuth()
   const location = useLocation()
 
   if (status === 'loading') {
@@ -29,7 +29,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
     return <Navigate to={`/login${redirect}`} replace />
   }
 
-  return <>{children}</>
+  return <Fragment key={sessionId}>{children}</Fragment>
 }
 
 /**

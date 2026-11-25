@@ -8,6 +8,7 @@ import {
   stripDuplicateTitle,
   fetchAllEntries,
 } from '@paideia/knowledge'
+import { useAuth } from '@paideia/auth'
 import {
   AppShell,
   Badge,
@@ -21,6 +22,7 @@ import { useMemo } from 'react'
 import { Link, useParams } from 'react-router'
 
 import { api } from '../api'
+import { auth } from '../auth'
 import { LearnerHeader } from '../components/LearnerHeader'
 import { API_BASE_URL } from '../env'
 import { readSourceMeta } from './source-meta'
@@ -36,6 +38,7 @@ const learning = createLearningApi(api)
  * `source-walk` 块自己完成。
  */
 export function SourceChapterPage() {
+  const { user, sessionId } = useAuth()
   const { project = '', entryId: rawId } = useParams<{ project: string; entryId: string }>()
   const entryId = Number(rawId)
   const valid = Number.isFinite(entryId) && entryId > 0
@@ -77,17 +80,19 @@ export function SourceChapterPage() {
     retry: false,
   })
   const progressPort = useMemo(() => {
-    if (!valid || serverProgress.isPending || entry.data === undefined) {
+    if (user === null || !valid || serverProgress.isPending || entry.data === undefined) {
       return undefined
     }
     return createServerProgressPort({
+      accountId: user.id,
+      sessionSignal: auth.tokens.sessionSignal(),
       entryId,
       title: entry.data.title,
       initial: serverProgress.data ?? null,
       report: (body) => learning.report(entryId, body),
       clear: () => learning.reset(entryId),
     })
-  }, [valid, serverProgress.isPending, serverProgress.data, entry.data, entryId])
+  }, [user?.id, sessionId, valid, serverProgress.isPending, serverProgress.data, entry.data, entryId])
 
   const body = useMemo(
     () => stripDuplicateTitle(entry.data?.body ?? '', entry.data?.title),

@@ -1,22 +1,34 @@
 import { AuthProvider, useAuth } from '@paideia/auth'
 import { ThemeProvider } from '@paideia/ui'
 import '@paideia/ui/styles.css'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { StrictMode, useEffect } from 'react'
+import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { StrictMode, useEffect, useMemo } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router'
 
 import { auth, platform } from './auth'
 import { router } from './router'
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: false,
-      refetchOnWindowFocus: false,
-    },
-  },
-})
+function SessionRouter() {
+  const { sessionId } = useAuth()
+  const queryClient = useMemo(() => {
+    const checkSession = () => {
+      if (auth.tokens.sessionId() !== sessionId) throw new DOMException('登录会话已结束', 'AbortError')
+    }
+    return new QueryClient({
+      mutationCache: new MutationCache({ onMutate: checkSession, onSuccess: checkSession }),
+      defaultOptions: {
+        queries: { retry: false, refetchOnWindowFocus: false },
+        // 写请求离线时直接失败，不等联网后用另一个会话的凭据发送。
+        mutations: { networkMode: 'always', retry: false },
+      },
+    })
+  }, [sessionId])
+  useEffect(() => () => {
+    if (auth.tokens.sessionId() !== sessionId) queryClient.clear()
+  }, [queryClient, sessionId])
+  return <QueryClientProvider client={queryClient}><RouterProvider router={router} /></QueryClientProvider>
+}
 
 /** 把认证上下文的刷新实现注册给带令牌的 fetch（原因见 apps/app/src/auth.ts 的说明）。 */
 function RefreshBridge() {
@@ -35,12 +47,10 @@ if (container === null) {
 createRoot(container).render(
   <StrictMode>
     <ThemeProvider storage={platform.cache}>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider tokens={auth.tokens} api={auth.authApi}>
-          <RefreshBridge />
-          <RouterProvider router={router} />
-        </AuthProvider>
-      </QueryClientProvider>
+      <AuthProvider tokens={auth.tokens} api={auth.authApi}>
+        <RefreshBridge />
+        <SessionRouter />
+      </AuthProvider>
     </ThemeProvider>
   </StrictMode>,
 )

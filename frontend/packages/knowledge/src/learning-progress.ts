@@ -74,30 +74,34 @@ export interface ServerProgressPort extends ProgressPort {
  * @param clear   重置函数（删服务端记录）
  */
 export function createServerProgressPort({
+  accountId,
+  sessionSignal,
   entryId,
   title,
   initial,
   report,
   clear,
 }: {
+  accountId: string
+  sessionSignal: AbortSignal
   entryId: number
   title?: string
   initial: EntryProgressView | null
   report: (body: ProgressReport) => Promise<unknown>
   clear: () => Promise<unknown>
 }): ServerProgressPort {
-  const local = createEntryProgressPort(entryId, title)
+  const local = createEntryProgressPort(accountId, entryId, title)
   let state = mergeProgress(initial, local?.read() ?? null)
   let timer: ReturnType<typeof setTimeout> | null = null
   let pending: ProgressReport = {}
 
   const send = () => {
     timer = null
-    if (pending.tourStep === undefined && pending.challenges === undefined && pending.quizzes === undefined) {
-      return
-    }
     const body = pending
     pending = {}
+    if (sessionSignal.aborted || (body.tourStep === undefined && body.challenges === undefined && body.quizzes === undefined)) {
+      return
+    }
     // 不 await：界面不等网络。失败只丢这一次上报，下一次得分会重新带上
     report(body).catch(() => {
       // 静默：学习记录不是交易，丢了下次重做还在
@@ -121,6 +125,7 @@ export function createServerProgressPort({
     },
 
     update(patch: ProgressPatch): void {
+      if (sessionSignal.aborted) return
       const challenges = mergeScores(state.challenges, patch.challenges as Record<string, BlockScore> | undefined)
       const quizzes = mergeScores(state.quizzes, patch.quizzes as Record<string, BlockScore> | undefined)
       state = {
@@ -141,6 +146,7 @@ export function createServerProgressPort({
     },
 
     reset(): void {
+      if (sessionSignal.aborted) return
       state = { updatedAt: new Date().toISOString(), tours: {}, challenges: {}, quizzes: {} }
       pending = {}
       if (timer !== null) {

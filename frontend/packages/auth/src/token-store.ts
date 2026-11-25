@@ -28,7 +28,11 @@ export interface IssuedTokens {
 export interface TokenStore {
   access(): string | null
   refresh(): string | null
+  sessionId(): number
+  sessionSignal(): AbortSignal
+  /** 仅续期，不切换登录会话。 */
   set(tokens: IssuedTokens): void
+  startSession(tokens: IssuedTokens): void
   clear(): void
 }
 
@@ -36,14 +40,31 @@ export function createTokenStore(storage: TokenStorage): TokenStore {
   // 模块闭包里的内存变量：刷新页面即消失，这是刻意的最小暴露面
   let accessToken: string | null = null
   let refreshToken: string | null = storage.get(REFRESH_TOKEN_KEY)
+  let sessionId = 0
+  let session = new AbortController()
+
+  function endPreviousSession() {
+    const previous = session
+    session = new AbortController()
+    sessionId += 1
+    previous.abort()
+  }
+
+  function set(tokens: IssuedTokens) {
+    storage.set(REFRESH_TOKEN_KEY, tokens.refreshToken)
+    accessToken = tokens.accessToken
+    refreshToken = tokens.refreshToken
+  }
 
   return {
     access: () => accessToken,
     refresh: () => refreshToken,
-    set(tokens) {
-      accessToken = tokens.accessToken
-      refreshToken = tokens.refreshToken
-      storage.set(REFRESH_TOKEN_KEY, tokens.refreshToken)
+    sessionId: () => sessionId,
+    sessionSignal: () => session.signal,
+    set,
+    startSession(tokens) {
+      set(tokens)
+      endPreviousSession()
     },
     clear() {
       // 先删存储再清内存：反过来的话，remove 抛异常（隐私模式、缓存接口异常）时
@@ -57,6 +78,7 @@ export function createTokenStore(storage: TokenStorage): TokenStore {
       } finally {
         accessToken = null
         refreshToken = null
+        endPreviousSession()
       }
     },
   }

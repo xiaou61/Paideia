@@ -38,13 +38,15 @@ approver_role: CTO
 - 步骤：先写合成视图和无副作用 handler 的授权断言；再把无匹配与不限制区分开；在发现层早拒绝，在执行层独立拒绝；确认已有角色、默认组和读写用例通过。
 - 验证：在 `backend/` 跑 `mvn -q -o -pl paideia-mcp,paideia-app -am -Dtest=McpViewsTest,McpViewRegistryTest,McpToolInvokerTest,ModularityTest -Dsurefire.failIfNoSpecifiedTests=false test`；实际 38 条通过，未启动数据库或外部 MCP 服务。
 
-### TASK-002 | pending | 隔离学习者端与管理端的登录会话
+### TASK-002 | done | 隔离学习者端与管理端的登录会话
 
 - 对应：REQ-002、AC-002；依赖：无。
 - 修改：`frontend/packages/auth/src/{token-store.ts,auth-context.tsx,authorized-fetch.ts}` 和既有认证测试；`frontend/apps/{app,admin}/src/main.tsx`；两端浏览器回归优先扩展 `frontend/apps/app/e2e/home.spec.ts` 和 `frontend/apps/admin/e2e/admin.spec.ts`。
 - 接口：计划 `TokenStore.sessionId(): number` 与 `AuthContextValue.sessionId: number` 共享一个会话标识；保持应用的 API 客户端和对外请求契约不变。
 - 步骤：用延迟 Promise 锁定旧认证/请求结果和例行续期行为；添加同一窗口中连续登录两个合成账号的回归；绑定 fetch 与认证结果的会话，重挂页面树并清理旧缓存；检查旧响应不产生新账号的重试、旧 UI 不复用及续期不重挂。
 - 验证：在 `frontend/` 执行 `pnpm --filter @paideia/auth test` 和 `pnpm --filter @paideia/auth --filter @paideia/app --filter @paideia/admin typecheck`。两端回归使用本地浏览器和合成 HTTP 响应；使用现有真实后端 e2e 时，分别以 `../scripts/test-db.sh pnpm --filter @paideia/app test:e2e e2e/home.spec.ts --project chromium` 和 `../scripts/test-db.sh pnpm --filter @paideia/admin test:e2e e2e/admin.spec.ts --project chromium` 启动，只在确认隔离测试库后串行运行。
+- 实测：认证单测 22 条、知识进度定向单测 14 条、认证/知识/学习者端/管理端四个 TypeScript 检查通过。`E2E_CHANNEL=chrome pnpm --filter @paideia/app exec playwright test --config e2e-session/playwright.config.ts --repeat-each=2` 通过 4 次（两端各 2 次，合成 HTTP），包含迟到的管理端变更与例行令牌续期。没有确认独占数据库，因此未运行真实后端 e2e。
+- 实现补充：简历临时草稿随会话查询缓存清理；浏览器本地阅读记录按账号存储，旧共享记录不自动归属任何账号，已经同步到服务端的进度不受此影响。已结束的会话不发送延迟进度批次。
 
 ### TASK-003 | pending | 桌面正式版只加载自身的渲染服务
 

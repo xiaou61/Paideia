@@ -77,7 +77,7 @@ export function RequireAdmin({ children, bare = false }: {
    */
   bare?: boolean
 }) {
-  const { status, user } = useAuth()
+  const { status, user, sessionId } = useAuth()
 
   if (status === 'loading') {
     return (
@@ -100,7 +100,7 @@ export function RequireAdmin({ children, bare = false }: {
 
   if (bare) {
     return canEnterAdmin(user) ? (
-      <div data-testid="admin-console">{children}</div>
+      <div key={sessionId} data-testid="admin-console">{children}</div>
     ) : (
       <div className="p-8"><AdminDenied user={user} /></div>
     )
@@ -108,6 +108,7 @@ export function RequireAdmin({ children, bare = false }: {
 
   return (
     <AdminShell
+      key={sessionId}
       actions={
         <>
           <BackendStatus />

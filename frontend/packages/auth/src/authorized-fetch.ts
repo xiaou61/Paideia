@@ -10,7 +10,7 @@ import type { TokenStore } from './token-store'
  * <p><b>重放最多一次</b>：刷新成功后只重放一次原请求。不再递归，否则刷新接口自身返回 401 时
  * 会形成循环。
  *
- * <p>刷新失败即视为会话结束：清令牌并回调，由认证上下文把界面切回登录页。
+ * <p>同一请求的发送、响应和重放绑定发起时的会话。凭据明确失效由认证上下文清理。
  */
 
 export interface AuthorizedFetchOptions {
@@ -40,10 +40,10 @@ function urlOf(input: RequestInfo | URL): string {
 
 export function createAuthorizedFetch(options: AuthorizedFetchOptions): typeof fetch {
   const base = options.baseFetch ?? globalThis.fetch
-  let inFlightRefresh: Promise<boolean> | null = null
+  let inFlightRefresh: { signal: AbortSignal; promise: Promise<boolean> } | null = null
 
   const send = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const headers = new Headers(init?.headers)
+    const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))
     const access = options.tokens.access()
     if (access !== null && access !== '') {
       headers.set('Authorization', `Bearer ${access}`)
@@ -52,7 +52,17 @@ export function createAuthorizedFetch(options: AuthorizedFetchOptions): typeof f
   }
 
   return async (input, init) => {
-    const response = await send(input, init)
+    const session = options.tokens.sessionSignal()
+    const callerSignal = init?.signal ?? (input instanceof Request ? input.signal : undefined)
+    const signal = callerSignal ? AbortSignal.any([session, callerSignal]) : session
+    const initWithSignal = { ...init, signal }
+    const sendInSession = async () => {
+      signal.throwIfAborted()
+      const result = await send(input, initWithSignal)
+      signal.throwIfAborted()
+      return result
+    }
+    const response = await sendInSession()
     if (response.status !== 401 || isAuthEndpoint(urlOf(input))) {
       return response
     }
@@ -60,17 +70,18 @@ export function createAuthorizedFetch(options: AuthorizedFetchOptions): typeof f
     // 共享同一次刷新：所有并发到达的 401 等的是同一个 Promise。
     // 必须接住 rejection——刷新本身抛错时若不转成 false，await 会把异常继续往上冒，
     // 于是 onSessionLost() 不会被调用，调用方拿到的是未处理的拒绝而不是那次 401 响应。
-    inFlightRefresh ??= options
-      .refresh()
-      .catch(() => false)
-      .finally(() => {
-        inFlightRefresh = null
+    if (inFlightRefresh?.signal !== session) {
+      const promise = options.refresh().catch(() => false).finally(() => {
+        if (inFlightRefresh?.promise === promise) inFlightRefresh = null
       })
-    const refreshed = await inFlightRefresh
+      inFlightRefresh = { signal: session, promise }
+    }
+    const refreshed = await inFlightRefresh.promise
+    signal.throwIfAborted()
     if (!refreshed) {
       options.onSessionLost()
       return response
     }
-    return send(input, init)
+    return sendInSession()
   }
 }

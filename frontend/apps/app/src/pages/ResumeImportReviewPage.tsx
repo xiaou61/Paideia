@@ -41,6 +41,7 @@ import { useNavigate, useParams } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { resumeDraftKey } from '../resume-draft'
 
 const resumes = createResumeApi(api)
 
@@ -48,24 +49,12 @@ const resumes = createResumeApi(api)
  * 上传后的核对页（WORK-018 REQ-003）。
  *
  * <p>识别结果**先在这里给用户看、改、确认**，点保存才落库。这是需求里最硬的一条：
- * 未经确认不得写入任何简历数据。所以这一页从 `sessionStorage` 读草稿，保存成功后清掉它。
+ * 未经确认不得写入任何简历数据。所以这一页从本会话的查询缓存读草稿，保存成功后清掉它。
  */
-const DRAFT_KEY = 'paideia:resume-draft'
-
 export function ResumeImportReviewPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [draft] = useState<ResumeDraft | null>(() => {
-    const raw = sessionStorage.getItem(DRAFT_KEY)
-    if (raw === null) {
-      return null
-    }
-    try {
-      return JSON.parse(raw) as ResumeDraft
-    } catch {
-      return null
-    }
-  })
+  const [draft] = useState(() => queryClient.getQueryData<ResumeDraft>(resumeDraftKey) ?? null)
   const [title, setTitle] = useState('我的简历')
   const [error, setError] = useState<string | null>(null)
 
@@ -77,7 +66,7 @@ export function ResumeImportReviewPage() {
       return resumes.create({ title: title.trim(), data: draft.data, plainText: draft.plainText })
     },
     onSuccess: (document: ResumeDocument) => {
-      sessionStorage.removeItem(DRAFT_KEY)
+      queryClient.removeQueries({ queryKey: resumeDraftKey, exact: true })
       void queryClient.invalidateQueries({ queryKey: ['resumes'] })
       navigate(`/resume/${document.id}`)
     },

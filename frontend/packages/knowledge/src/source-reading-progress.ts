@@ -7,10 +7,11 @@ import type { EntryProgress, ProgressPatch, ProgressPort } from '@paideia/ui'
  * 丢了不损失内容；而一张进度表会连带出接口、鉴权、迁移与集成测试。
  *
  * <p>三条纪律：**读写全部容错**（隐私模式、配额满、别的标签页写坏 JSON 都不该让页面挂）、
- * **一次写一个条目**（不改别人的 key）、**键带版本**（结构变了换 v2，旧键自然失效，
- * 不做迁移）。
+ * **一次写一个条目**、**按账号隔离**。旧版本的共享记录无法确定归属，不迁移。
  */
-const STORAGE_KEY = 'paideia:source-reading:v1'
+function storageKey(accountId: string): string {
+  return `paideia:source-reading:v2:${accountId}`
+}
 
 interface StoredEntry {
   updatedAt: string
@@ -22,9 +23,9 @@ interface StoredEntry {
 
 type Store = Record<string, StoredEntry>
 
-function readStore(): Store {
+function readStore(accountId: string): Store {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
+    const raw = window.localStorage.getItem(storageKey(accountId))
     if (raw === null) {
       return {}
     }
@@ -39,9 +40,9 @@ function readStore(): Store {
   }
 }
 
-function writeStore(store: Store): void {
+function writeStore(accountId: string, store: Store): void {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store))
+    window.localStorage.setItem(storageKey(accountId), JSON.stringify(store))
   } catch {
     // 隐私模式/配额满：静默。阅读不因为存不下而失败
   }
@@ -61,18 +62,18 @@ function toProgress(entry: StoredEntry | undefined): EntryProgress | null {
 }
 
 /** 某个条目的进度端口。`entryId` 为空时返回 `undefined`（管理端预览不记录）。 */
-export function createEntryProgressPort(entryId: number | undefined, title?: string): ProgressPort | undefined {
-  if (entryId === undefined) {
+export function createEntryProgressPort(accountId?: string, entryId?: number, title?: string): ProgressPort | undefined {
+  if (accountId === undefined || entryId === undefined) {
     return undefined
   }
   return {
     read(targetId?: number): EntryProgress | null {
-      const store = readStore()
+      const store = readStore(accountId)
       const key = String(targetId ?? entryId)
       return toProgress(store[key])
     },
     update(patch: ProgressPatch): void {
-      const store = readStore()
+      const store = readStore(accountId)
       const key = String(entryId)
       const previous = store[key]
       store[key] = {
@@ -82,12 +83,12 @@ export function createEntryProgressPort(entryId: number | undefined, title?: str
         challenges: { ...(previous?.challenges ?? {}), ...(patch.challenges ?? {}) },
         quizzes: { ...(previous?.quizzes ?? {}), ...(patch.quizzes ?? {}) },
       }
-      writeStore(store)
+      writeStore(accountId, store)
     },
     reset(): void {
-      const store = readStore()
+      const store = readStore(accountId)
       delete store[String(entryId)]
-      writeStore(store)
+      writeStore(accountId, store)
     },
   }
 }
@@ -99,8 +100,9 @@ export interface RecentReading {
 }
 
 /** 最近读过的条目（按更新时间倒序），首页「继续学习」用。 */
-export function recentReading(limit = 3): RecentReading[] {
-  const store = readStore()
+export function recentReading(accountId: string | undefined, limit = 3): RecentReading[] {
+  if (accountId === undefined) return []
+  const store = readStore(accountId)
   return Object.entries(store)
     .map(([key, entry]) => ({
       entryId: Number(key),

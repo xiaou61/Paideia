@@ -42,6 +42,7 @@ export function MarkdownBody({
   mediaBaseUrl,
   entryId,
   entryTitle,
+  progressAccountId,
   onAskAssistant,
   onOpenEntry,
   sandbox,
@@ -55,9 +56,10 @@ export function MarkdownBody({
    * 由调用方从自己的 `API_BASE_URL` 传进来——本包不认识部署形态，也不该认识。
    */
   mediaBaseUrl?: string
-  /** 当前条目 id；**只有它是数字时**才记录阅读进度。 */
+  /** 当前条目 id；有账号和条目时才记录本地阅读进度。 */
   entryId?: number
   entryTitle?: string
+  progressAccountId?: string
   /** 由应用注入：把一句话交给助手输入框（不自动发送）。 */
   onAskAssistant?: (prompt: string) => void
   /** 由应用注入：学习路径里点击某站时跳转。 */
@@ -139,7 +141,10 @@ export function MarkdownBody({
     [mediaBaseUrl],
   )
 
-  const localProgress = useMemo(() => createEntryProgressPort(entryId, entryTitle), [entryId, entryTitle])
+  const localProgress = useMemo(
+    () => createEntryProgressPort(progressAccountId, entryId, entryTitle),
+    [progressAccountId, entryId, entryTitle],
+  )
   const progress = injectedProgress ?? localProgress
 
   const documentContext = useMemo(

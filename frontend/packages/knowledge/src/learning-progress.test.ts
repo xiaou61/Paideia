@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { mergeProgress } from './learning-progress'
+import { createServerProgressPort, mergeProgress } from './learning-progress'
 import type { EntryProgressView } from './learning-types'
 
 /**
@@ -66,4 +66,22 @@ describe('mergeProgress', () => {
     expect(merged.quizzes).toEqual({})
     expect(merged.tours).toEqual({})
   })
+})
+
+it('仅在同一登录会话内发送延迟的进度和重置', () => {
+  const session = new AbortController()
+  const report = vi.fn(async () => {})
+  const clear = vi.fn(async () => {})
+  const port = createServerProgressPort({
+    accountId: 'learner-a', entryId: 7, initial: null, sessionSignal: session.signal, report, clear,
+  })
+  port.update({ quizzes: { q1: { score: 1, total: 1 } } })
+  port.flush()
+  expect(report).toHaveBeenCalledTimes(1)
+  port.update({ quizzes: { q2: { score: 1, total: 1 } } })
+  session.abort()
+  port.flush()
+  port.reset()
+  expect(report).toHaveBeenCalledTimes(1)
+  expect(clear).not.toHaveBeenCalled()
 })

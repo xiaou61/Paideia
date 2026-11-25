@@ -37,6 +37,7 @@ import { useNavigate } from 'react-router'
 
 import { api } from '../api'
 import { LearnerHeader } from '../components/LearnerHeader'
+import { resumeDraftKey } from '../resume-draft'
 
 const resumes = createResumeApi(api)
 
@@ -47,11 +48,9 @@ const resumes = createResumeApi(api)
  *
  * <p>上传之后的解析结果**不落库**：它先经 `/parse` 拿到草稿，用户在核对页上确认后才
  * `POST /resumes` 创建。所以这一页在拿到草稿后唯一的动作是"带着草稿去核对页"——
- * 草稿放 `sessionStorage`，因为它是"这一次跳转的中间物"，刷新就该丢（刷新后重传即可，
+ * 草稿放本会话的查询缓存，因为它是"这一次跳转的中间物"，刷新或登出后重传即可，
  * 而把它放库里会让"未经确认的 PII"进入持久层）。
  */
-const DRAFT_KEY = 'paideia:resume-draft'
-
 export function ResumeListPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -69,7 +68,7 @@ export function ResumeListPage() {
   const parse = useMutation({
     mutationFn: (file: File) => resumes.parse(file),
     onSuccess: (draft: ResumeDraft) => {
-      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+      queryClient.setQueryData(resumeDraftKey, draft)
       navigate('/resume/new')
     },
     onError: (failure: Error) => setError(failure.message),

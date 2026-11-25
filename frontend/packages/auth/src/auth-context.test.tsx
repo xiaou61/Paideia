@@ -1,4 +1,5 @@
 import { act, render } from '@testing-library/react'
+import { ApiError } from '@paideia/core'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { AuthApi, AuthTokens } from './auth-api'
@@ -26,14 +27,24 @@ describe('会话刷新', () => {
     }
   }
 
-  function issued(refreshToken: string): AuthTokens {
+  function issued(refreshToken: string, account = 'learner'): AuthTokens {
     return {
       accessToken: `access-${refreshToken}`,
       accessExpiresAt: '2026-10-10T00:00:00Z',
       refreshToken,
       refreshExpiresAt: '2026-10-24T00:00:00Z',
-      user: { id: '1', username: 'learner', email: 'learner@example.com', role: 'learner' },
+      user: { id: account, username: account, email: `${account}@example.test`, role: 'learner' },
     }
+  }
+
+  function mount(tokens: ReturnType<typeof createTokenStore>, overrides: Partial<AuthApi>) {
+    let current: AuthContextValue
+    function Probe() {
+      current = useAuth()
+      return null
+    }
+    render(<AuthProvider tokens={tokens} api={overrides as AuthApi}><Probe /></AuthProvider>)
+    return () => current
   }
 
   it('挂载恢复与并发调用共用同一次刷新：refresh 只发一次', async () => {
@@ -113,5 +124,66 @@ describe('会话刷新', () => {
     expect(tokens.refresh()).toBe('refresh-1')
     // 但 status 必须收敛：留在 'loading' 会让登录门永远转圈、反向门整页空白
     expect(session!.status).toBe('signed-out')
+  })
+
+  it.each([false, true])('ignores refresh from a superseded session (rejected: %s)', async (rejected) => {
+    let resolveOld!: (tokens: AuthTokens) => void
+    let rejectOld!: (reason: unknown) => void
+    const old = new Promise<AuthTokens>((resolve, reject) => { resolveOld = resolve; rejectOld = reject })
+    let resolveNew!: (tokens: AuthTokens) => void
+    const renewed = new Promise<AuthTokens>((resolve) => { resolveNew = resolve })
+    const refresh = vi.fn().mockReturnValueOnce(old).mockReturnValueOnce(renewed)
+    const tokens = createTokenStore(memoryStorage({ 'refresh-token': 'a' }))
+    const current = mount(tokens, { refresh, login: async () => issued('b', 'account-b') })
+
+    const restoring = current().refreshSession()
+    await act(async () => current().login('account-b', 'fixture'))
+    const id = current().sessionId
+    const refreshing = current().refreshSession()
+    await act(async () => {
+      if (rejected) rejectOld(new ApiError(401, 'fixture rejection', null))
+      else resolveOld(issued('a-renewed', 'account-a'))
+      await expect(restoring).resolves.toBe(false)
+    })
+    expect(current().user?.username).toBe('account-b')
+    expect(tokens.refresh()).toBe('b')
+
+    await act(async () => {
+      const concurrent = current().refreshSession()
+      resolveNew(issued('b-renewed', 'account-b'))
+      await expect(Promise.all([refreshing, concurrent])).resolves.toEqual([true, true])
+    })
+    expect(refresh.mock.calls).toEqual([['a'], ['b']])
+    expect(tokens.refresh()).toBe('b-renewed')
+    expect(current().sessionId).toBe(id)
+  })
+
+  it('登出后旧登录结果不能恢复会话', async () => {
+    let finish!: (tokens: AuthTokens) => void
+    const pending = new Promise<AuthTokens>((resolve) => { finish = resolve })
+    const tokens = createTokenStore(memoryStorage())
+    const current = mount(tokens, { login: () => pending })
+    const signingIn = current().login('account-a', 'fixture')
+    await act(async () => current().logout())
+    await act(async () => {
+      finish(issued('a', 'account-a'))
+      await expect(signingIn).rejects.toMatchObject({ name: 'AbortError' })
+    })
+    expect(current().status).toBe('signed-out')
+    expect(tokens.refresh()).toBeNull()
+  })
+
+  it('当前会话续期被拒时清除凭据并更新会话标记', async () => {
+    const tokens = createTokenStore(memoryStorage())
+    const current = mount(tokens, {
+      login: async () => issued('a'),
+      refresh: async () => { throw new ApiError(401, 'fixture rejection', null) },
+    })
+    await act(async () => current().login('account-a', 'fixture'))
+    const id = current().sessionId
+    await act(async () => { await expect(current().refreshSession()).resolves.toBe(false) })
+    expect(current().status).toBe('signed-out')
+    expect(current().sessionId).not.toBe(id)
+    expect(tokens.refresh()).toBeNull()
   })
 })

@@ -338,7 +338,7 @@ export function HomePage() {
    * 「继续学习」（WORK-014）：读本地进度，不发请求。
    * 用 `useMemo` 而不是 state：这个值每次进入首页重新算一次就够，也不需要监听其他标签页。
    */
-  const recent = useMemo(() => recentReading(3), [])
+  const recent = useMemo(() => recentReading(user?.id), [user?.id])
   /**
    * 服务端的"继续学习"（WORK-020）：跨设备以它为准。
    *

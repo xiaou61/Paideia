@@ -28,11 +28,13 @@ import {
 } from '@paideia/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createAssistantApi, SummaryCardView } from '@paideia/assistant'
+import { useAuth } from '@paideia/auth'
 import { ArrowLeft, ArrowRight, ArrowUp, ChevronLeft, ListTree } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 
 import { api } from '../api'
+import { auth } from '../auth'
 import { LearnerHeader } from '../components/LearnerHeader'
 import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { API_BASE_URL } from '../env'
@@ -54,6 +56,7 @@ const RECITE_STORAGE_KEY = 'paideia:entry-recite-mode'
  * 而文字链接在一屏里几乎看不见。
  */
 export function KnowledgeEntryPage() {
+  const { user, sessionId } = useAuth()
   const params = useParams()
   const entryId = Number(params['id'])
   const valid = Number.isFinite(entryId)
@@ -250,17 +253,19 @@ export function KnowledgeEntryPage() {
   }, [trackMap.data, entryId])
 
   const progressPort = useMemo(() => {
-    if (!valid || serverProgress.isPending || entry.data === undefined) {
+    if (user === null || !valid || serverProgress.isPending || entry.data === undefined) {
       return undefined
     }
     return createServerProgressPort({
+      accountId: user.id,
+      sessionSignal: auth.tokens.sessionSignal(),
       entryId,
       title: entry.data.title,
       initial: serverProgress.data ?? null,
       report: (body) => learning.report(entryId, body),
       clear: () => learning.reset(entryId),
     })
-  }, [valid, serverProgress.isPending, serverProgress.data, entry.data, entryId])
+  }, [user?.id, sessionId, valid, serverProgress.isPending, serverProgress.data, entry.data, entryId])
 
   /**
    * 练习册（WORK-048）：把正文里的 `quiz` 围栏摘出来，交给末尾的入口卡。

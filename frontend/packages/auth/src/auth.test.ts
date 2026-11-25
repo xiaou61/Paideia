@@ -61,6 +61,19 @@ describe('令牌存储', () => {
     expect(store.has('refresh-token')).toBe(false)
   })
 
+  it('只有新登录和登出才结束原会话', () => {
+    const tokens = createTokenStore(memoryStorage().storage)
+    const guest = tokens.sessionSignal()
+    tokens.startSession({ accessToken: 'a', refreshToken: 'r' })
+    const signedIn = tokens.sessionSignal()
+    expect(guest.aborted).toBe(true)
+    tokens.set({ accessToken: 'a2', refreshToken: 'r2' })
+    expect(tokens.sessionSignal()).toBe(signedIn)
+    expect(signedIn.aborted).toBe(false)
+    tokens.clear()
+    expect(signedIn.aborted).toBe(true)
+  })
+
   it('存储清理失败时内存照样清掉，且不把异常抛给调用方', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const storage = {
@@ -134,6 +147,67 @@ describe('带令牌的 fetch', () => {
     // 重放时用的是新令牌
     const replayed = baseFetch.mock.calls[2]?.[1]
     expect(new Headers(replayed?.headers).get('Authorization')).toBe('Bearer fresh')
+  })
+
+  it.each([200, 401])('does not retry a stale request in a new session (HTTP %i)', async (status) => {
+    const tokens = createTokenStore(memoryStorage().storage)
+    tokens.startSession({ accessToken: 'a', refreshToken: 'a-refresh' })
+    let finish!: (response: Response) => void
+    const delayed = new Promise<Response>((resolve) => { finish = resolve })
+    const baseFetch = vi.fn<typeof fetch>(() => delayed)
+    const refresh = vi.fn(async () => true)
+    const fetchWithAuth = createAuthorizedFetch({ tokens, refresh, onSessionLost: vi.fn(), baseFetch })
+
+    const pending = fetchWithAuth('/api/v1/me')
+    tokens.clear()
+    tokens.startSession({ accessToken: 'b', refreshToken: 'b-refresh' })
+    expect(baseFetch.mock.calls[0]?.[1]?.signal?.aborted).toBe(true)
+    finish(jsonResponse(status))
+
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    expect(refresh).not.toHaveBeenCalled()
+    expect(baseFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('新会话的请求不复用旧会话正在执行的刷新', async () => {
+    const tokens = createTokenStore(memoryStorage().storage)
+    tokens.startSession({ accessToken: 'a', refreshToken: 'a-refresh' })
+    let finish!: (ok: boolean) => void
+    const delayed = new Promise<boolean>((resolve) => { finish = resolve })
+    const refresh = vi.fn(async () => true).mockImplementationOnce(() => delayed)
+    const baseFetch = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(401))
+      .mockResolvedValueOnce(jsonResponse(401))
+      .mockResolvedValueOnce(jsonResponse(200))
+    const onSessionLost = vi.fn()
+    const fetchWithAuth = createAuthorizedFetch({ tokens, refresh, onSessionLost, baseFetch })
+
+    const old = fetchWithAuth('/api/v1/a')
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalledTimes(1))
+    tokens.startSession({ accessToken: 'b', refreshToken: 'b-refresh' })
+    await expect(fetchWithAuth('/api/v1/b')).resolves.toMatchObject({ status: 200 })
+    finish(false)
+    await expect(old).rejects.toMatchObject({ name: 'AbortError' })
+
+    expect(onSessionLost).not.toHaveBeenCalled()
+    expect(refresh).toHaveBeenCalledTimes(2)
+    expect(baseFetch.mock.calls.map(([url]) => url)).toEqual(['/api/v1/a', '/api/v1/b', '/api/v1/b'])
+  })
+
+  it('保留调用方的取消信号，不重放取消的请求', async () => {
+    const tokens = createTokenStore(memoryStorage().storage)
+    const cancel = new AbortController()
+    const baseFetch = vi.fn<typeof fetch>(async (_input, init) => {
+      cancel.abort()
+      expect(init?.signal?.aborted).toBe(true)
+      return jsonResponse(401)
+    })
+    const refresh = vi.fn(async () => true)
+    const fetchWithAuth = createAuthorizedFetch({ tokens, refresh, onSessionLost: vi.fn(), baseFetch })
+
+    await expect(fetchWithAuth('/api/v1/me', { signal: cancel.signal })).rejects.toMatchObject({ name: 'AbortError' })
+    expect(refresh).not.toHaveBeenCalled()
+    expect(tokens.sessionSignal().aborted).toBe(false)
   })
 
   it('刷新失败时会话结束，只回调一次且不重放', async () => {

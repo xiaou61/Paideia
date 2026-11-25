@@ -1,4 +1,5 @@
 import { MarkdownBody, createKnowledgeApi, fetchAllEntries, plainText } from '@paideia/knowledge'
+import { useAuth } from '@paideia/auth'
 import type { CategoryNode, EntrySummary } from '@paideia/knowledge'
 import { AppShell, Empty, EmptyDescription, EmptyHeader, EmptyTitle, ErrorAlert, LoadingRow, PageHeader } from '@paideia/ui'
 import { useQuery } from '@tanstack/react-query'
@@ -18,6 +19,7 @@ const knowledge = createKnowledgeApi(api)
  * 与条目详情页同一渲染）。这是“像读一本手册一样逐页翻阅”的入口，不新增任何分类/图谱模型。
  */
 export function KnowledgeWikiPage() {
+  const { user } = useAuth()
   const [categoryId, setCategoryId] = useState<number | null>(null)
   const [entryId, setEntryId] = useState<number | null>(null)
 
@@ -112,7 +114,7 @@ export function KnowledgeWikiPage() {
           {detail.isSuccess && entryId !== null ? (
             <>
               <h2 className="mb-4 text-xl font-semibold">{detail.data.title}</h2>
-              <MarkdownBody markdown={detail.data.body} mediaBaseUrl={API_BASE_URL} entryId={detail.data.id} entryTitle={detail.data.title} />
+              <MarkdownBody markdown={detail.data.body} mediaBaseUrl={API_BASE_URL} entryId={detail.data.id} entryTitle={detail.data.title} progressAccountId={user?.id} />
             </>
           ) : null}
         </article>
