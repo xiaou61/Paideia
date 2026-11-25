@@ -9,7 +9,7 @@ import {
   Search,
   Trash2,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 
 import {
@@ -35,12 +35,12 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-  Input,
   PageHeader,
   Spinner,
 } from '@paideia/ui'
 
 import { LearnerHeader } from '../components/LearnerHeader'
+import { KnowledgeSearchPalette } from '../components/notes/KnowledgeSearchPalette'
 import { notes, type BookView } from '../notes-api'
 
 const FALLBACK_ACCENTS = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6']
@@ -61,21 +61,26 @@ function formatDate(value: string | null): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function matches(book: BookView, keyword: string): boolean {
-  const q = keyword.trim().toLowerCase()
-  if (q === '') return true
-  const haystack = [book.name, book.description ?? '', ...book.tags].join(' ').toLowerCase()
-  return haystack.includes(q)
-}
-
 /** 我的知识库：多知识库总览，支持搜索、排序与新建入口。 */
 export function NoteBooksPage() {
   const queryClient = useQueryClient()
   const booksQuery = useQuery({ queryKey: ['note-books'], queryFn: () => notes.listBooks() })
-  const [keyword, setKeyword] = useState('')
   const [sort, setSort] = useState<'updated' | 'name' | 'created'>('updated')
+  const [paletteOpen, setPaletteOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<BookView | null>(null)
+
+  // Ctrl/Cmd+K 打开搜索浮层（VitePress 同款快捷键）
+  useEffect(() => {
+    function onKey(event: KeyboardEvent): void {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setPaletteOpen(true)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const remove = useMutation({
     mutationFn: (id: number) => notes.removeBook(id),
@@ -97,15 +102,14 @@ export function NoteBooksPage() {
     [booksQuery.data],
   )
   const visible = useMemo(() => {
-    const filtered = all.filter((book) => matches(book, keyword))
-    return [...filtered].sort((a, b) => {
+    return [...all].sort((a, b) => {
       if (sort === 'name') return a.name.localeCompare(b.name, 'zh-Hans-CN')
       if (sort === 'created') {
         return (new Date(b.createdAt ?? 0).getTime() || 0) - (new Date(a.createdAt ?? 0).getTime() || 0)
       }
       return (new Date(b.updatedAt ?? 0).getTime() || 0) - (new Date(a.updatedAt ?? 0).getTime() || 0)
     })
-  }, [all, keyword, sort])
+  }, [all, sort])
 
   const totalDocs = all.reduce((sum, book) => sum + book.documentCount, 0)
   const publicCount = all.filter((book) => book.visibility === 'public').length
@@ -138,16 +142,18 @@ export function NoteBooksPage() {
       </div>
 
       <div className="bg-card border-border mb-6 flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center">
-        <div className="relative min-w-0 flex-1">
-          <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-          <Input
-            aria-label="搜索知识库"
-            className="pl-9"
-            placeholder="搜索知识库名称、描述或标签…"
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-          />
-        </div>
+        <button
+          type="button"
+          onClick={() => setPaletteOpen(true)}
+          className="border-input bg-background text-muted-foreground hover:border-ring focus-visible:ring-ring/50 flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border px-3 text-sm outline-none focus-visible:ring-3"
+          aria-label="搜索文档"
+        >
+          <Search className="h-4 w-4 shrink-0" />
+          <span className="truncate text-left">搜索全部知识库文档…</span>
+          <kbd className="border-border bg-muted ml-auto hidden shrink-0 rounded border px-1.5 py-0.5 text-[10px] leading-none sm:inline">
+            Ctrl K
+          </kbd>
+        </button>
         <select
           aria-label="排序方式"
           className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-9 rounded-lg border px-3 text-sm outline-none focus-visible:ring-3"
@@ -158,9 +164,6 @@ export function NoteBooksPage() {
           <option value="name">名称</option>
           <option value="created">创建时间</option>
         </select>
-        <Button variant="ghost" render={<Link to="/notes/all" />}>
-          旧版全部笔记
-        </Button>
         <Button className="sm:hidden" render={<Link to="/notes/new-book" />}>
           <Plus className="mr-1 h-4 w-4" />
           新建知识库
@@ -197,15 +200,6 @@ export function NoteBooksPage() {
             </Button>
           </EmptyContent>
         </Empty>
-      ) : visible.length === 0 ? (
-        <div className="border-border rounded-xl border border-dashed py-16 text-center">
-          <Search className="text-muted-foreground mx-auto mb-3 h-8 w-8" />
-          <p className="text-sm font-medium">没有找到「{keyword}」相关的知识库</p>
-          <p className="text-muted-foreground mt-1 text-xs">换个关键词，或清空搜索看看全部。</p>
-          <Button variant="ghost" className="mt-3" onClick={() => setKeyword('')}>
-            清空搜索
-          </Button>
-        </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visible.map((book) => {
@@ -291,6 +285,8 @@ export function NoteBooksPage() {
           })}
         </div>
       )}
+
+      <KnowledgeSearchPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
 
       <Dialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
         <DialogContent>
