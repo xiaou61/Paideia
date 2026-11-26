@@ -368,9 +368,14 @@ export function NoteWorkspacePage() {
           title={book?.name ?? '知识库'}
           description={book?.description ?? '整理你的文档与目录，正文用 Markdown 保存。'}
           actions={
-            <Button variant="ghost" render={<Link to="/notes" />}>
-              返回知识库列表
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShareOpen(true)}>
+                分享
+              </Button>
+              <Button variant="ghost" size="sm" render={<Link to="/notes" />}>
+                返回知识库列表
+              </Button>
+            </div>
           }
         />
       )}
@@ -402,6 +407,7 @@ export function NoteWorkspacePage() {
                   variant="ghost"
                   size="sm"
                   aria-label="新建文档"
+                  title="新建文档"
                   onClick={() => {
                     setNewTitle('')
                     setNewDocType('none')
@@ -417,6 +423,7 @@ export function NoteWorkspacePage() {
                   variant="ghost"
                   size="sm"
                   aria-label="新建目录"
+                  title="新建目录"
                   onClick={() => {
                     setNewTitle('')
                     setCreateKind('folder')
@@ -436,7 +443,7 @@ export function NoteWorkspacePage() {
                   value={categoryFilter}
                   onValueChange={(value) => setCategoryFilter(value as string)}
                 >
-                  <SelectTrigger aria-label="按分类筛选" className="w-full">
+                  <SelectTrigger aria-label="按分类筛选" className="h-8 w-full text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -471,15 +478,6 @@ export function NoteWorkspacePage() {
                 />
               )}
             </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex-row items-center justify-between space-y-0 py-3">
-              <CardTitle className="text-sm">分享整个知识库</CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => setShareOpen(true)}>
-                分享
-              </Button>
-            </CardHeader>
           </Card>
         </aside>
 

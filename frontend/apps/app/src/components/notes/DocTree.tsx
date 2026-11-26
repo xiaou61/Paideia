@@ -124,14 +124,14 @@ function TreeRow({
           onDropRow(item.node.id)
         }}
         data-drop-pos={rowHint ?? undefined}
-        className={`group relative flex items-start gap-1 rounded-md border-l-2 border-transparent pr-1 ${
-          selected ? 'border-primary bg-primary/5' : 'hover:bg-muted'
+        className={`group relative flex items-center gap-1 rounded-md pr-1 transition-colors ${
+          selected ? 'bg-primary/5' : 'hover:bg-muted'
         } ${draggedId === item.node.id ? 'opacity-40' : ''} ${
           rowHint === 'into' ? 'ring-primary ring-1' : ''
         } ${rowHint === 'before' ? 'border-primary border-t-2' : ''} ${
           rowHint === 'after' ? 'border-primary border-b-2' : ''
         }`}
-        style={{ paddingLeft: `${depth * 14}px` }}
+        style={{ paddingLeft: `${depth * 12}px` }}
       >
         {isFolder ? (
           <button
@@ -154,52 +154,54 @@ function TreeRow({
         )}
         <button
           type="button"
-          className="flex min-w-0 flex-1 flex-col gap-0.5 py-1 text-left text-sm"
+          className="flex min-w-0 flex-1 items-center gap-1.5 py-1 text-left text-sm"
           onClick={() => onSelect(item.node.id)}
+          data-doc-title={isFolder ? undefined : item.node.title}
         >
-          <span className="flex min-w-0 items-start gap-1.5">
-            {isFolder ? (
-              <Folder className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            ) : (
-              <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            )}
-            <span
-              className={`line-clamp-2 break-words ${
-                selected ? 'text-primary font-medium' : ''
-              }`}
-            >
-              {item.node.title}
-            </span>
+          {isFolder ? (
+            <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          ) : (
+            <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          )}
+          <span
+            className={`truncate ${selected ? 'text-primary font-medium' : ''}`}
+            title={item.node.title}
+          >
+            {item.node.title}
           </span>
-          {item.node.docType === 'tutorial' ||
+        </button>
+        {!isFolder &&
+        (item.node.docType === 'tutorial' ||
           item.node.docType === 'gap_fill' ||
           (item.node.category !== null && item.node.category !== '') ||
-          (item.node.level !== null && item.node.level !== '') ? (
-            <span className="flex flex-wrap items-center gap-1 pl-5">
-              {item.node.docType === 'tutorial' ? (
-                <span className="shrink-0 rounded bg-amber-100 px-1 py-0.5 text-[10px] leading-none text-amber-700">
-                  教程
-                </span>
-              ) : null}
-              {item.node.docType === 'gap_fill' ? (
-                <span className="bg-violet-100 text-violet-700 shrink-0 rounded px-1 py-0.5 text-[10px] leading-none">
-                  查漏补缺
-                </span>
-              ) : null}
-              {item.node.category !== null && item.node.category !== '' ? (
-                <span className="bg-sky-100 text-sky-700 shrink-0 rounded px-1 py-0.5 text-[10px] leading-none">
-                  {item.node.category}
-                </span>
-              ) : null}
-              {item.node.level !== null && item.node.level !== '' ? (
-                <span className="bg-slate-100 text-slate-700 shrink-0 rounded px-1 py-0.5 text-[10px] leading-none">
-                  {item.node.level}
-                </span>
-              ) : null}
-            </span>
-          ) : null}
-        </button>
-        <div className="absolute right-1 top-1 hidden items-center gap-0.5 rounded-md bg-background/90 p-0.5 shadow-sm backdrop-blur group-hover:flex">
+          (item.node.level !== null && item.node.level !== '')) ? (
+          <span className="flex shrink-0 items-center gap-1">
+            {item.node.docType === 'tutorial' ? (
+              <span className="shrink-0 rounded border border-border bg-muted px-1 py-0.5 text-[10px] leading-none text-muted-foreground">
+                教程
+              </span>
+            ) : null}
+            {item.node.docType === 'gap_fill' ? (
+              <span className="shrink-0 rounded border border-border bg-muted px-1 py-0.5 text-[10px] leading-none text-muted-foreground">
+                查漏补缺
+              </span>
+            ) : null}
+            {item.node.level !== null && item.node.level !== '' ? (
+              <span className="hidden shrink-0 rounded border border-border bg-muted px-1 py-0.5 text-[10px] leading-none text-muted-foreground sm:inline-block">
+                {item.node.level}
+              </span>
+            ) : null}
+            {item.node.category !== null && item.node.category !== '' ? (
+              <span
+                className="hidden max-w-[6rem] truncate text-[10px] leading-none text-muted-foreground lg:inline"
+                title={item.node.category}
+              >
+                {item.node.category}
+              </span>
+            ) : null}
+          </span>
+        ) : null}
+        <div className="bg-background/90 absolute right-1 top-1/2 hidden -translate-y-1/2 items-center gap-0.5 rounded-md p-0.5 shadow-sm group-hover:flex group-focus-within:flex">
           <button
             type="button"
             aria-label="重命名"
@@ -224,6 +226,7 @@ function TreeRow({
             type="button"
             className="text-primary text-xs hover:underline"
             onClick={() => onAddGapFill(pairKey, item.node.parentId)}
+            data-create-gap={pairKey ?? undefined}
           >
             ＋ 新建查漏补缺
           </button>
